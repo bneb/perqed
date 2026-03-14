@@ -1,0 +1,4 @@
+FROM ./models/deepseek-prover-v2-7b.Q8_0.gguf
+
+PARAMETER temperature 0.3
+PARAMETER stop "<|end▁of▁sentence|>"

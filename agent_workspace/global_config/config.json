@@ -1,0 +1,33 @@
+{
+  "models": {
+    "formalist": {
+      "name": "deepseek-r1:8b",
+      "role": "Lean 4 tactic generation + JSON reasoning",
+      "endpoint": "http://localhost:11434/api/chat",
+      "temperature": 0.6
+    },
+    "prover": {
+      "name": "deepseek-prover-v2:7b",
+      "role": "Dedicated Lean 4 proof specialist (fallback)",
+      "endpoint": "http://localhost:11434/api/chat",
+      "temperature": 0.3
+    }
+  },
+  "architect": {
+    "model": "gemini-2.5-pro",
+    "role": "Strategic oversight on escalation"
+  },
+  "lean": {
+    "binary": "~/.elan/bin/lean",
+    "timeoutMs": 60000
+  },
+  "z3": {
+    "binary": "python3",
+    "timeoutMs": 30000
+  },
+  "orchestrator": {
+    "maxGlobalIterations": 50,
+    "maxLocalRetries": 3,
+    "contextWindowTokens": 4000
+  }
+}

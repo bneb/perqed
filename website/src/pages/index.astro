@@ -1,0 +1,286 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Perqed — AI That Proves Mathematics" activeNav="home">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <p class="eyebrow animate-in">Autonomous Proof Engine</p>
+      <h1 class="hero-title animate-in animate-in-1">
+        AI that proves<br>mathematics.
+      </h1>
+      <p class="hero-sub animate-in animate-in-2">
+        Perqed is an open-source neuro-symbolic engine that autonomously discovers
+        and verifies formal mathematical proofs using local LLMs and the Lean&nbsp;4
+        theorem prover.
+      </p>
+      <div class="hero-actions animate-in animate-in-3">
+        <a href="https://github.com/bneb/perqed" target="_blank" rel="noopener" class="btn btn-primary">
+          View on GitHub
+        </a>
+        <a href="/minutiae/" class="btn btn-ghost">
+          Watch it think →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Architecture</p>
+      <h2 class="section-heading">The proof loop</h2>
+      <p class="section-lede">
+        A falsification-first pipeline where LLMs propose and Lean&nbsp;4 verifies.
+      </p>
+
+      <div class="steps">
+        <div class="step">
+          <span class="step-n">01</span>
+          <h3 class="step-title">Falsify First</h3>
+          <p class="step-body">
+            Before wasting compute on a proof, Z3 hunts for counterexamples in bounded domains.
+            If the theorem is false, we find out in 50ms.
+          </p>
+          <span class="step-tech">Z3 · SMT Solver</span>
+        </div>
+
+        <div class="step">
+          <span class="step-n">02</span>
+          <h3 class="step-title">Lean-as-DSL</h3>
+          <p class="step-body">
+            Lean 4 is the single source of truth. The LLM reads tactic state, proposes tactics, and
+            Lean verifies every step. No hallucination survives.
+          </p>
+          <span class="step-tech">Lean 4 · Formal Verification</span>
+        </div>
+
+        <div class="step">
+          <span class="step-n">03</span>
+          <h3 class="step-title">Parallel Speculation</h3>
+          <p class="step-body">
+            Up to 5 tactics per iteration, sorted by confidence, dispatched concurrently via
+            <code>Promise.all()</code>. First complete proof wins.
+          </p>
+          <span class="step-tech">DeepSeek-R1 · Local LLM</span>
+        </div>
+
+        <div class="step">
+          <span class="step-n">04</span>
+          <h3 class="step-title">The Vault</h3>
+          <p class="step-body">
+            Verified proofs land in an append-only vault. The LLM can read but never write here.
+            Every proof is machine-checked, no exceptions.
+          </p>
+          <span class="step-tech">verified_lib/ · Immutable</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stack -->
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">Model Stack</p>
+      <h2 class="section-heading">Runs on your hardware</h2>
+      <p class="section-lede">
+        No cloud APIs required for core proving. Everything runs locally on a Mac or a $300 Minisforum.
+      </p>
+
+      <div class="stack">
+        <div class="stack-item">
+          <h3 class="stack-name">DeepSeek-R1:8B</h3>
+          <p class="stack-role">Formalist Agent</p>
+          <p class="stack-detail">R1 chain-of-thought reasoning with Qwen JSON compliance. ~6.5 GB RAM.</p>
+        </div>
+        <div class="stack-item">
+          <h3 class="stack-name">Lean 4.28.0</h3>
+          <p class="stack-role">Proof Kernel</p>
+          <p class="stack-detail">Formal verification via tactic mode. The sole arbiter of mathematical truth.</p>
+        </div>
+        <div class="stack-item">
+          <h3 class="stack-name">Z3</h3>
+          <p class="stack-role">SMT Pre-flight</p>
+          <p class="stack-detail">Bounded model checking. Kills false conjectures before they waste cycles.</p>
+        </div>
+        <div class="stack-item">
+          <h3 class="stack-name">Gemini 3.0 Flash / 3.1 Pro</h3>
+          <p class="stack-role">Architect (Escalation)</p>
+          <p class="stack-detail">Strategic redirect after repeated failures. Flash for planning, Pro for hard cases. ~$0.03/proof blended.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="container" style="text-align: center;">
+      <h2 class="cta-heading">Follow the journey</h2>
+      <p class="cta-body">
+        We're building in public. Watch the agent reason through proofs in real time,
+        or read about our milestones on the blog.
+      </p>
+      <div class="cta-actions">
+        <a href="/minutiae/" class="btn btn-primary">Live Feed →</a>
+        <a href="/blog/" class="btn btn-ghost">Read the Blog</a>
+      </div>
+    </div>
+  </section>
+
+</BaseLayout>
+
+<style>
+  .hero {
+    padding: 96px 0 72px;
+  }
+
+  .hero-title {
+    font-family: var(--font-serif);
+    font-size: clamp(2.6rem, 5.5vw, 3.8rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 24px;
+    color: var(--text-primary);
+  }
+
+  .hero-sub {
+    font-size: 1.12rem;
+    color: var(--text-secondary);
+    max-width: 520px;
+    line-height: 1.75;
+    margin-bottom: 40px;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* Sections */
+  .section {
+    padding: 80px 0;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .section-heading {
+    font-family: var(--font-serif);
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin-bottom: 8px;
+    line-height: 1.2;
+  }
+
+  .section-lede {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    max-width: 480px;
+    line-height: 1.7;
+  }
+
+  /* Architecture Steps */
+  .steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px 56px;
+    margin-top: 48px;
+  }
+
+  .step-n {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .step-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .step-body {
+    font-size: 0.93rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 12px;
+  }
+
+  .step-tech {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+
+  /* Stack */
+  .stack {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px 56px;
+    margin-top: 48px;
+  }
+
+  .stack-name {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+    letter-spacing: -0.01em;
+  }
+
+  .stack-role {
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .stack-detail {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  /* CTA */
+  .cta {
+    padding: 80px 0 40px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .cta-heading {
+    font-family: var(--font-serif);
+    font-size: 1.9rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    letter-spacing: -0.025em;
+  }
+
+  .cta-body {
+    color: var(--text-secondary);
+    max-width: 440px;
+    margin: 0 auto 32px;
+    font-size: 1.02rem;
+    line-height: 1.7;
+  }
+
+  .cta-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 640px) {
+    .hero { padding: 56px 0 40px; }
+    .section { padding: 48px 0; }
+    .steps, .stack { grid-template-columns: 1fr; gap: 32px; }
+  }
+</style>

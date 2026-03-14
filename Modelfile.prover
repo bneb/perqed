@@ -1,0 +1,13 @@
+FROM ./models/deepseek-prover-v2-7b.Q4_K_M.gguf
+
+PARAMETER temperature 0.3
+PARAMETER num_predict 512
+PARAMETER stop "<|end▁of▁sentence|>"
+
+TEMPLATE """{{ .System }}
+
+{{ .Prompt }}"""
+
+SYSTEM """You prove theorems in Lean 4. Output ONLY valid JSON matching this schema:
+{"thoughts":"brief strategy","action":"PROPOSE_LEAN_TACTICS","lean_tactics":[{"tactic":"omega","informal_sketch":"what it does","confidence_score":0.9}]}
+Rules: Lean 4 syntax only. No sorry. Try omega first for arithmetic."""

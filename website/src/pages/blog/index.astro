@@ -1,0 +1,135 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Blog — Perqed" activeNav="blog">
+
+  <section class="blog-header">
+    <div class="container">
+      <p class="eyebrow">Blog</p>
+      <h1 class="header-title">Build log</h1>
+      <p class="header-desc">
+        Milestones, deep-dives, and lessons from building an autonomous proof engine.
+      </p>
+    </div>
+  </section>
+
+  <section class="blog-list">
+    <div class="container">
+      <article class="post-card">
+        <div class="post-meta">
+          <time>March 14, 2026</time>
+          <span class="tag">milestone</span>
+          <span class="tag">lean4</span>
+          <span class="tag">deepseek-r1</span>
+          <span class="tag">prover-v2</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/first-autonomous-proof/">Two Autonomous Proofs, Two Paradigms</a>
+        </h2>
+        <p class="post-excerpt">
+          Two models prove n + m = m + n in Lean 4 — R1:8B as a sniper (77s, 1 shot) and
+          Prover-V2 as a machine gun (33s, 7 iterations). Plus: the quantization trap.
+        </p>
+        <a class="read-link" href="/blog/first-autonomous-proof/">Read post →</a>
+      </article>
+    </div>
+  </section>
+
+</BaseLayout>
+
+<style>
+  .blog-header {
+    padding: 80px 0 40px;
+  }
+
+  .header-title {
+    font-family: var(--font-serif);
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin-bottom: 8px;
+  }
+
+  .header-desc {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    max-width: 460px;
+  }
+
+  .blog-list {
+    padding-bottom: 80px;
+  }
+
+  .post-card {
+    border-top: 1px solid var(--border-color);
+    padding: 36px 0;
+  }
+
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .post-meta time {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    background: var(--accent-purple-subtle);
+    color: var(--accent-purple);
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-weight: 500;
+  }
+
+  .post-title {
+    font-family: var(--font-serif);
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .post-title a {
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
+  .post-title a:hover {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .post-excerpt {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.7;
+    margin-bottom: 12px;
+    max-width: 560px;
+  }
+
+  .read-link {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .read-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (max-width: 640px) {
+    .blog-header { padding: 48px 0 24px; }
+    .header-title { font-size: 1.9rem; }
+  }
+</style>

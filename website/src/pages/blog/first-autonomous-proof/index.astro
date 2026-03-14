@@ -1,0 +1,240 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>Two models. Two paradigms. Both autonomously proved <code>∀ n m : Nat, n + m = m + n</code>
+in Lean 4 — no human in the loop, no cloud APIs. One was a sniper; the other, a machine gun.
+Here's how we got there.</p>
+
+<h2>The Results</h2>
+
+<p><strong>Sniper — DeepSeek-R1:8B</strong> (77.1s, 1 attempt)</p>
+
+<pre><code>theorem nat_add_comm (n m : Nat) : n + m = m + n := by
+  omega</code></pre>
+
+<p>R1 thinks for ~75 seconds in a single long chain-of-thought, reasoning about induction vs.
+automation, then emits clean JSON with <code>omega</code> at 0.95 confidence. One shot, one kill.</p>
+
+<p><strong>Machine Gun — DeepSeek-Prover-V2:7B Q8_0</strong> (32.7s, 7 iterations)</p>
+
+<pre><code>theorem nat_add_comm (n m : Nat) : n + m = m + n := by
+  all_goals omega</code></pre>
+
+<p>Prover-V2 fires ~1.5 seconds per iteration, outputting raw Lean tactics instead of JSON.
+It took 7 iterations to land on <code>all_goals omega</code>, but at 32.7s total it was still
+2.4× faster than R1.</p>
+
+<h2>Model Comparison</h2>
+
+<table>
+<thead>
+<tr><th>Metric</th><th>deepseek-r1:8b</th><th>deepseek-prover-v2:7b-q8</th></tr>
+</thead>
+<tbody>
+<tr><td>Total time</td><td>77.1s</td><td>32.7s</td></tr>
+<tr><td>Per-iteration</td><td>~75s</td><td>~1–2s</td></tr>
+<tr><td>Iterations</td><td>1</td><td>7</td></tr>
+<tr><td>Tactic found</td><td><code>omega</code></td><td><code>all_goals omega</code></td></tr>
+<tr><td>Output format</td><td>Clean JSON</td><td>Prose + Lean (auto-wrapped)</td></tr>
+<tr><td>Size</td><td>5.2 GB</td><td>6.8 GB</td></tr>
+</tbody>
+</table>
+
+<h2>The Quantization Trap</h2>
+
+<p>We nearly shipped a broken model. When we first pulled Prover-V2, we tried Q4_K_M to save
+VRAM. It was a disaster:</p>
+
+<table>
+<thead>
+<tr><th>Quant</th><th>Size</th><th>Output Quality</th><th>Speed</th></tr>
+</thead>
+<tbody>
+<tr><td>Q4_K_M</td><td>3.9 GB</td><td>🚫 Emoji prose (🎉👨‍✈️⚡ LEAN_PROOF!)</td><td>700ms</td></tr>
+<tr><td>Q8_0</td><td>6.8 GB</td><td>✅ Clean Lean tactics</td><td>1.8s</td></tr>
+</tbody>
+</table>
+
+<p>Q4_K_M destroyed the weights responsible for Lean 4 syntax and structured output. The model
+would hallucinate emoji-laden prose instead of valid tactics. Q8_0 preserved the critical
+weights — the 2.9 GB overhead is non-negotiable for this use case.</p>
+
+<h2>The Architecture</h2>
+
+<p>Perqed's proof loop is a generator-discriminator:</p>
+
+<ol>
+  <li><strong>Z3 pre-flight:</strong> Before proving anything, Z3 hunts for counterexamples in bounded
+  domains. If the theorem is false, we find out in 50ms.</li>
+  <li><strong>LLM generation:</strong> The formalist agent reads the current Lean tactic state and proposes
+  tactics — via structured JSON (R1) or raw tactic output (Prover-V2).</li>
+  <li><strong>Bare-tactic wrapping:</strong> Prover-V2's raw output passes through <code>sanitizeR1Output()</code>,
+  which strips thinking blocks, extracts Lean tactics, and wraps them into our
+  <code>FormalistResponse</code> schema.</li>
+  <li><strong>Lean verification:</strong> Each proposed tactic is piped to <code>lean --stdin --run</code>.
+  Lean is the sole arbiter of truth.</li>
+  <li><strong>Parallel speculation:</strong> All tactics run concurrently. First complete proof wins.</li>
+</ol>
+
+<h2>The Debugging Journey</h2>
+
+<h3>The <code>num_predict</code> Trap (R1)</h3>
+
+<p>DeepSeek-R1 uses extended <code>&lt;think&gt;...&lt;/think&gt;</code> reasoning chains that can run 2,000+ tokens
+before producing the final JSON answer. Ollama's default <code>num_predict</code> of 128 cuts this off
+mid-thought, producing truncated garbage.</p>
+
+<p>The fix: set <code>num_predict: 4096</code>. This gives the model enough runway to complete its
+full chain-of-thought <em>and</em> the final structured output.</p>
+
+<h3>The Think-Tag Parser (R1)</h3>
+
+<p>R1's output wraps reasoning in XML-like <code>&lt;think&gt;</code> tags before the JSON payload.
+Our FormalistAgent needed a custom parser that strips the thinking block, extracts the JSON,
+validates against our Zod schema, and falls back to regex extraction if <code>JSON.parse</code> fails.</p>
+
+<h3>Bare-Tactic Wrapping (Prover-V2)</h3>
+
+<p>Prover-V2 doesn't speak JSON — it outputs raw Lean tactics, sometimes wrapped in markdown
+fences, sometimes preceded by thinking prose. We built <code>sanitizeR1Output()</code> to handle all
+variants: single tactics, multi-line blocks, <code>lean</code>-fenced code, and empty thinking tags.</p>
+
+<h2>Test Results</h2>
+
+<p><strong>108/108 GREEN</strong> across 12 files, 209 assertions, 0 regressions.</p>
+
+<ul>
+  <li>4 new bare-tactic wrapping tests (single, multi-line, lean-fence, empty thinking)</li>
+  <li>All Sprint 1–6 tests pass unchanged</li>
+</ul>
+
+<h2>What This Means</h2>
+
+<p>We now have two viable proving paradigms on commodity hardware:</p>
+
+<ul>
+  <li><strong>R1 (sniper)</strong> — one long think, high-confidence JSON output, ideal when you want
+  a single high-quality attempt</li>
+  <li><strong>Prover-V2 (machine gun)</strong> — fast iterations, raw tactic output, 2.4× faster
+  wall-clock for this theorem</li>
+</ul>
+
+<p>The architecture handles both seamlessly. The bare-tactic wrapper unifies their output
+into the same <code>FormalistResponse</code> schema, so the orchestrator doesn't care which model
+is upstream.</p>
+
+<h2>Cost Analysis</h2>
+
+<p>The local models (R1, Prover-V2) are free. The only cloud cost comes from the Architect —
+Gemini 3.0 Flash (preview) for planning and 3.1 Pro (preview) for hard escalations.
+Most proof runs are Flash-dominant, with Pro only firing on repeated failures.</p>
+
+<table>
+<thead>
+<tr><th>Tier</th><th>Input (20K tokens)</th><th>Output (2.5K tokens)</th><th>Total / proof run</th></tr>
+</thead>
+<tbody>
+<tr><td>3.1 Pro</td><td>$0.025</td><td>$0.025</td><td>$0.05</td></tr>
+<tr><td>3.0 Flash</td><td>$0.01</td><td>$0.0075</td><td>~$0.02</td></tr>
+<tr><td><strong>Blended</strong></td><td></td><td></td><td><strong>~$0.03</strong></td></tr>
+</tbody>
+</table>
+
+<p>At ~$0.03 per proof, that's roughly <strong>33 proofs per dollar</strong>. Cheap, but a real number
+worth tracking — not a rounding error.</p>
+
+<p>Next up: harder theorems. We're targeting Mathlib lemmas, starting with basic algebra
+and working toward real analysis.</p>
+
+<hr>
+
+<p><em>Perqed is open source. <a href="https://github.com/perqed/perqed">Follow us on GitHub</a>
+or <a href="/minutiae/">watch the agent think in real time</a>.</em></p>
+`;
+---
+
+<BaseLayout title="Two Autonomous Proofs, Two Paradigms — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>March 14, 2026</time>
+            <span class="sep">·</span>
+            <span>10 min read</span>
+          </div>
+          <h1>Two Autonomous Proofs, Two Paradigms</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  /* Tables inside prose */
+  .article :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+
+  .article :global(th) {
+    text-align: left;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+
+  .article :global(td) {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+  }
+
+  .article :global(tr:last-child td) {
+    border-bottom: none;
+  }
+
+  @media (max-width: 640px) {
+    .article { padding: 32px 0 48px; }
+
+    .article :global(table) {
+      font-size: 0.8rem;
+    }
+
+    .article :global(th),
+    .article :global(td) {
+      padding: 8px 10px;
+    }
+  }
+</style>
