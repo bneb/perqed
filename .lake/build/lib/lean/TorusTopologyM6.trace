@@ -1,0 +1,28 @@
+{"synthetic": false,
+ "schemaVersion": "2025-09-10",
+ "outputs":
+ {"o": ["9e0825cf37a16450.olean"],
+  "i": "b5e57399730ec81b.ilean",
+  "c": "53c22eedac47af1f.c"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/kevin/projects/perqed/.lake/build/lib/lean /Users/kevin/.elan/toolchains/leanprover--lean4---v4.28.0/bin/lean /Users/kevin/projects/perqed/src/lean/TorusTopologyM6.lean -o /Users/kevin/projects/perqed/.lake/build/lib/lean/TorusTopologyM6.olean -i /Users/kevin/projects/perqed/.lake/build/lib/lean/TorusTopologyM6.ilean -c /Users/kevin/projects/perqed/.lake/build/ir/TorusTopologyM6.c --setup /Users/kevin/projects/perqed/.lake/build/ir/TorusTopologyM6.setup.json --json",
+   "level": "trace"}],
+ "inputs":
+ [["TorusTopologyM6:deps",
+   [["deps",
+     [["perqed/TorusTopologyM6:extraDep",
+       [["@perqed:extraDep", "00000000000006bb"]]],
+      ["imports", "00000000000006bb"]]],
+    ["libs",
+     [["import dynlibs", "00000000000006bb"],
+      ["package external libraries", "00000000000006bb"],
+      ["module dynlibs", "00000000000006bb"],
+      ["module plugins", "00000000000006bb"]]]]],
+  ["Lean 4.28.0, commit 7e01a1bf5c70fc6167d49c345d3bf80596e9a79b",
+   "a96bc04a2e5e9630"],
+  ["/Users/kevin/projects/perqed/src/lean/TorusTopologyM6.lean",
+   "8c6a7b23cc1a6138"],
+  ["options", [["-DautoImplicit=false", "4a85acb881fd49d0"]]],
+  ["Module.leanArgs: #[]", "00000000000006bb"]],
+ "depHash": "50170ad0a76d7884"}

@@ -14,3 +14,7 @@ lean_lib KnuthTorusM4 where
 lean_lib TorusTopology where
   srcDir := "src/lean"
   roots := #[`TorusTopology]
+
+lean_lib TorusTopologyM6 where
+  srcDir := "src/lean"
+  roots := #[`TorusTopologyM6]

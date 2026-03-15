@@ -1,0 +1,7 @@
+{"plugins": [],
+ "package": "perqed",
+ "options": {"autoImplicit": false},
+ "name": "TorusTopologyM6",
+ "isModule": false,
+ "importArts": {},
+ "dynlibs": []}
