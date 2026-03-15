@@ -1,9 +1,9 @@
 {"synthetic": false,
  "schemaVersion": "2025-09-10",
  "outputs":
- {"o": ["d985ac2e36fbd557.olean"],
-  "i": "20b147c38af3334a.ilean",
-  "c": "dfc9242a3f70ca61.c"},
+ {"o": ["e5a59809c6b5c521.olean"],
+  "i": "1a43dd967ccfe75b.ilean",
+  "c": "80f2c51fa47c88e8.c"},
  "log":
  [{"message":
    ".> LEAN_PATH=/Users/kevin/projects/perqed/.lake/build/lib/lean /Users/kevin/.elan/toolchains/leanprover--lean4---v4.28.0/bin/lean /Users/kevin/projects/perqed/src/lean/TorusTopology.lean -o /Users/kevin/projects/perqed/.lake/build/lib/lean/TorusTopology.olean -i /Users/kevin/projects/perqed/.lake/build/lib/lean/TorusTopology.ilean -c /Users/kevin/projects/perqed/.lake/build/ir/TorusTopology.c --setup /Users/kevin/projects/perqed/.lake/build/ir/TorusTopology.setup.json --json",
@@ -22,7 +22,7 @@
   ["Lean 4.28.0, commit 7e01a1bf5c70fc6167d49c345d3bf80596e9a79b",
    "a96bc04a2e5e9630"],
   ["/Users/kevin/projects/perqed/src/lean/TorusTopology.lean",
-   "d01500364a816152"],
+   "9a90ae39fef1cf17"],
   ["options", [["-DautoImplicit=false", "4a85acb881fd49d0"]]],
   ["Module.leanArgs: #[]", "00000000000006bb"]],
- "depHash": "6712c65e4c5568ec"}
+ "depHash": "dd175016b1ba9722"}

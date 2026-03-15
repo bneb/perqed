@@ -5,7 +5,7 @@
     1. Custom Decidable instance for forall over Torus4
     2. Pure Prop definitions (isTorusEdge, isHamiltonianCycle, etc.)
     3. Payload decoded into three successor functions
-    4. Each sub-property proved individually by native_decide
+    4. Each sub-property proved individually by decide
     5. Final theorem assembles the sub-proofs
 -/
 
@@ -92,64 +92,64 @@ def f1 : Torus4 → Torus4 := succColor 1
 def f2 : Torus4 → Torus4 := succColor 2
 
 -- ============================================================
--- 4. Sub-Proofs (each by native_decide on a decidable sub-goal)
+-- 4. Sub-Proofs (each by decide on a decidable sub-goal)
 -- ============================================================
 
 -- Edge validity: each color produces valid torus edges
 set_option maxHeartbeats 4000000 in
-theorem edges_f0 : ∀ u : Torus4, isTorusEdge u (f0 u) := by native_decide
+theorem edges_f0 : ∀ u : Torus4, isTorusEdge u (f0 u) := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem edges_f1 : ∀ u : Torus4, isTorusEdge u (f1 u) := by native_decide
+theorem edges_f1 : ∀ u : Torus4, isTorusEdge u (f1 u) := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem edges_f2 : ∀ u : Torus4, isTorusEdge u (f2 u) := by native_decide
+theorem edges_f2 : ∀ u : Torus4, isTorusEdge u (f2 u) := by decide
 
 -- Disjointness: no two colors agree at any vertex
 set_option maxHeartbeats 4000000 in
-theorem disj_01 : ∀ u : Torus4, f0 u ≠ f1 u := by native_decide
+theorem disj_01 : ∀ u : Torus4, f0 u ≠ f1 u := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem disj_02 : ∀ u : Torus4, f0 u ≠ f2 u := by native_decide
+theorem disj_02 : ∀ u : Torus4, f0 u ≠ f2 u := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem disj_12 : ∀ u : Torus4, f1 u ≠ f2 u := by native_decide
+theorem disj_12 : ∀ u : Torus4, f1 u ≠ f2 u := by decide
 
 -- Injectivity: each color function is injective
 set_option maxHeartbeats 40000000 in
-theorem inj_f0 : ∀ x y : Torus4, f0 x = f0 y → x = y := by native_decide
+theorem inj_f0 : ∀ x y : Torus4, f0 x = f0 y → x = y := by decide
 
 set_option maxHeartbeats 40000000 in
-theorem inj_f1 : ∀ x y : Torus4, f1 x = f1 y → x = y := by native_decide
+theorem inj_f1 : ∀ x y : Torus4, f1 x = f1 y → x = y := by decide
 
 set_option maxHeartbeats 40000000 in
-theorem inj_f2 : ∀ x y : Torus4, f2 x = f2 y → x = y := by native_decide
+theorem inj_f2 : ∀ x y : Torus4, f2 x = f2 y → x = y := by decide
 
 -- Orbit closes at exactly 64 steps
 set_option maxRecDepth 131072 in
 set_option maxHeartbeats 4000000 in
-theorem orbit_f0 : applyN f0 64 root = root := by native_decide
+theorem orbit_f0 : applyN f0 64 root = root := by decide
 
 set_option maxRecDepth 131072 in
 set_option maxHeartbeats 4000000 in
-theorem orbit_f1 : applyN f1 64 root = root := by native_decide
+theorem orbit_f1 : applyN f1 64 root = root := by decide
 
 set_option maxRecDepth 131072 in
 set_option maxHeartbeats 4000000 in
-theorem orbit_f2 : applyN f2 64 root = root := by native_decide
+theorem orbit_f2 : applyN f2 64 root = root := by decide
 
 -- No shorter orbit (prevents sub-tours)
 set_option maxRecDepth 131072 in
 set_option maxHeartbeats 40000000 in
-theorem no_short_f0 : ∀ k : Fin 63, applyN f0 (k.val + 1) root ≠ root := by native_decide
+theorem no_short_f0 : ∀ k : Fin 63, applyN f0 (k.val + 1) root ≠ root := by decide
 
 set_option maxRecDepth 131072 in
 set_option maxHeartbeats 40000000 in
-theorem no_short_f1 : ∀ k : Fin 63, applyN f1 (k.val + 1) root ≠ root := by native_decide
+theorem no_short_f1 : ∀ k : Fin 63, applyN f1 (k.val + 1) root ≠ root := by decide
 
 set_option maxRecDepth 131072 in
 set_option maxHeartbeats 40000000 in
-theorem no_short_f2 : ∀ k : Fin 63, applyN f2 (k.val + 1) root ≠ root := by native_decide
+theorem no_short_f2 : ∀ k : Fin 63, applyN f2 (k.val + 1) root ≠ root := by decide
 
 -- ============================================================
 -- 5. The Final Theorem (Zero Sorry)

@@ -14,156 +14,97 @@
 extern "C" {
 #endif
 static lean_object* lp_perqed_payload___closed__25;
-LEAN_EXPORT uint8_t lp_perqed_no__short__f2___nativeDecide__1__1___lam__1(lean_object*);
 static lean_object* lp_perqed_payload___closed__36;
 static lean_object* lp_perqed_payload___closed__57;
-static lean_object* lp_perqed_disj__02___nativeDecide__1__1___closed__0;
-LEAN_EXPORT lean_object* lp_perqed_no__short__f2___nativeDecide__1__1___lam__1___boxed(lean_object*);
 static lean_object* lp_perqed_instDecIsTorusEdge___closed__1;
 static lean_object* lp_perqed_payload___closed__17;
 lean_object* lean_mk_empty_array_with_capacity(lean_object*);
-LEAN_EXPORT lean_object* lp_perqed_edges__f2___nativeDecide__1__1___lam__0___boxed(lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_orbit__f0___nativeDecide__1__1;
-LEAN_EXPORT lean_object* lp_perqed_no__short__f1___nativeDecide__1__1___lam__1___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__3;
-static uint8_t lp_perqed_no__short__f0___nativeDecide__1__1___closed__1;
 static lean_object* lp_perqed_payload___closed__68;
 static lean_object* lp_perqed_payload___closed__44;
 LEAN_EXPORT lean_object* lp_perqed_f0(lean_object*);
 static lean_object* lp_perqed_permDir___closed__0;
 LEAN_EXPORT lean_object* lp_perqed_instDecForallTorus4___redArg___lam__0___boxed(lean_object*, lean_object*, lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__13;
-LEAN_EXPORT uint8_t lp_perqed_disj__01___nativeDecide__1__1;
 static lean_object* lp_perqed_payload___closed__53;
-LEAN_EXPORT uint8_t lp_perqed_inj__f0___nativeDecide__1__1;
 static lean_object* lp_perqed_payload___closed__63;
-LEAN_EXPORT lean_object* lp_perqed_inj__f1___nativeDecide__1__1___lam__0___boxed(lean_object*);
-static lean_object* lp_perqed_no__short__f0___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_payload___closed__69;
 lean_object* lean_array_push(lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__18;
-LEAN_EXPORT lean_object* lp_perqed_disj__12___nativeDecide__1__1___lam__1___boxed(lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_no__short__f1___nativeDecide__1__1;
 LEAN_EXPORT uint8_t lp_perqed_instDecForallTorus4___redArg(lean_object*);
-static uint8_t lp_perqed_disj__01___nativeDecide__1__1___closed__1;
-static lean_object* lp_perqed_no__short__f2___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_payload___closed__42;
 static lean_object* lp_perqed_root___closed__0;
 static lean_object* lp_perqed_instDecIsTorusEdge___closed__2;
 static lean_object* lp_perqed_payload___closed__26;
-LEAN_EXPORT uint8_t lp_perqed_no__short__f1___nativeDecide__1__1___lam__1(lean_object*);
 static lean_object* lp_perqed_payload___closed__64;
-LEAN_EXPORT uint8_t lp_perqed_inj__f2___nativeDecide__1__1___lam__1(lean_object*, lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_edges__f0___nativeDecide__1__1;
-static lean_object* lp_perqed_inj__f1___nativeDecide__1__1___closed__0;
 LEAN_EXPORT uint8_t lp_perqed_instDecForallTorus4___redArg___lam__1(lean_object*, lean_object*, lean_object*, lean_object*);
 lean_object* l_Fin_add(lean_object*, lean_object*, lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_inj__f2___nativeDecide__1__1;
 static lean_object* lp_perqed_payload___closed__37;
-LEAN_EXPORT uint8_t lp_perqed_inj__f2___nativeDecide__1__1___lam__0(lean_object*);
-static lean_object* lp_perqed_orbit__f0___nativeDecide__1__1___closed__1;
 static lean_object* lp_perqed_payload___closed__10;
-static lean_object* lp_perqed_orbit__f2___nativeDecide__1__1___closed__0;
-LEAN_EXPORT lean_object* lp_perqed_inj__f0___nativeDecide__1__1___lam__0___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__33;
 static lean_object* lp_perqed_payload___closed__61;
 uint8_t l_instDecidableEqProd___redArg(lean_object*, lean_object*, lean_object*, lean_object*);
-static uint8_t lp_perqed_no__short__f2___nativeDecide__1__1___closed__1;
-static uint8_t lp_perqed_orbit__f1___nativeDecide__1__1___closed__2;
-static lean_object* lp_perqed_edges__f1___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_payload___closed__58;
 static lean_object* lp_perqed_payload___closed__34;
-LEAN_EXPORT uint8_t lp_perqed_inj__f1___nativeDecide__1__1___lam__1(lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__62;
-static uint8_t lp_perqed_edges__f1___nativeDecide__1__1___closed__1;
-static lean_object* lp_perqed_orbit__f2___nativeDecide__1__1___closed__1;
 static lean_object* lp_perqed_payload___closed__43;
 LEAN_EXPORT uint8_t lp_perqed_instDecForallTorus4___redArg___lam__0(lean_object*, lean_object*, lean_object*, lean_object*);
 LEAN_EXPORT lean_object* lp_perqed_succColor___boxed(lean_object*, lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_orbit__f2___nativeDecide__1__1;
-LEAN_EXPORT uint8_t lp_perqed_inj__f0___nativeDecide__1__1___lam__1(lean_object*, lean_object*);
-static uint8_t lp_perqed_edges__f2___nativeDecide__1__1___closed__1;
 static lean_object* lp_perqed_payload___closed__5;
 static lean_object* lp_perqed_payload___closed__7;
 LEAN_EXPORT lean_object* lp_perqed_stepDir(lean_object*, lean_object*);
-LEAN_EXPORT lean_object* lp_perqed_inj__f2___nativeDecide__1__1___lam__0___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__50;
-LEAN_EXPORT uint8_t lp_perqed_edges__f0___nativeDecide__1__1___lam__0(lean_object*);
-static uint8_t lp_perqed_inj__f2___nativeDecide__1__1___closed__1;
 LEAN_EXPORT lean_object* lp_perqed_instDecForallTorus4___boxed(lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__67;
-static uint8_t lp_perqed_edges__f0___nativeDecide__1__1___closed__1;
-LEAN_EXPORT uint8_t lp_perqed_no__short__f2___nativeDecide__1__1;
 static lean_object* lp_perqed_payload___closed__35;
-LEAN_EXPORT uint8_t lp_perqed_no__short__f0___nativeDecide__1__1___lam__1(lean_object*);
 static lean_object* lp_perqed_payload___closed__9;
-LEAN_EXPORT lean_object* lp_perqed_inj__f0___nativeDecide__1__1___lam__1___boxed(lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__23;
 static lean_object* lp_perqed_payload___closed__28;
 LEAN_EXPORT uint8_t lp_perqed_instDecForallTorus4___redArg___lam__2(lean_object*, lean_object*, lean_object*);
-LEAN_EXPORT lean_object* lp_perqed_inj__f1___nativeDecide__1__1___lam__1___boxed(lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__65;
-LEAN_EXPORT uint8_t lp_perqed_disj__02___nativeDecide__1__1___lam__1(lean_object*);
 static lean_object* lp_perqed_payload___closed__38;
 static lean_object* lp_perqed_payload___closed__54;
-LEAN_EXPORT uint8_t lp_perqed_edges__f2___nativeDecide__1__1___lam__0(lean_object*);
 static lean_object* lp_perqed_payload___closed__45;
 static lean_object* lp_perqed_payload___closed__15;
 static lean_object* lp_perqed_payload___closed__14;
 static lean_object* lp_perqed_payload___closed__55;
 LEAN_EXPORT lean_object* lp_perqed_applyN(lean_object*, lean_object*, lean_object*);
 static lean_object* lp_perqed_root___closed__1;
-static lean_object* lp_perqed_edges__f0___nativeDecide__1__1___closed__0;
-static lean_object* lp_perqed_disj__12___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_payload___closed__19;
 LEAN_EXPORT lean_object* lp_perqed_instDecForallTorus4___redArg___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__46;
-static uint8_t lp_perqed_no__short__f1___nativeDecide__1__1___closed__1;
 LEAN_EXPORT lean_object* lp_perqed_vIdx___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__66;
 static lean_object* lp_perqed_root___closed__2;
 static lean_object* lp_perqed_payload___closed__51;
 static lean_object* lp_perqed_payload___closed__6;
-LEAN_EXPORT lean_object* lp_perqed_inj__f2___nativeDecide__1__1___lam__1___boxed(lean_object*, lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_disj__02___nativeDecide__1__1;
 static lean_object* lp_perqed_payload___closed__70;
 static lean_object* lp_perqed_payload___closed__48;
-static uint8_t lp_perqed_inj__f1___nativeDecide__1__1___closed__1;
-static uint8_t lp_perqed_disj__12___nativeDecide__1__1___closed__1;
 static lean_object* lp_perqed_succColor___closed__0;
 static lean_object* lp_perqed_payload___closed__1;
 static lean_object* lp_perqed_payload___closed__8;
-static lean_object* lp_perqed_no__short__f1___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_payload___closed__52;
 static lean_object* lp_perqed_payload___closed__24;
 static lean_object* lp_perqed_payload___closed__11;
 LEAN_EXPORT lean_object* lp_perqed_instDecIsTorusEdge___boxed(lean_object*, lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_inj__f0___nativeDecide__1__1___lam__0(lean_object*);
 static lean_object* lp_perqed_permDir___closed__1;
 static lean_object* lp_perqed_payload___closed__40;
 LEAN_EXPORT lean_object* lp_perqed_stepDir___boxed(lean_object*, lean_object*);
-static lean_object* lp_perqed_orbit__f0___nativeDecide__1__1___closed__0;
 LEAN_EXPORT lean_object* lp_perqed_instDecForallTorus4___redArg___lam__2___boxed(lean_object*, lean_object*, lean_object*);
 lean_object* lean_array_fget(lean_object*, lean_object*);
 LEAN_EXPORT lean_object* lp_perqed_f2(lean_object*);
 static lean_object* lp_perqed_payload___closed__30;
-LEAN_EXPORT lean_object* lp_perqed_disj__02___nativeDecide__1__1___lam__1___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__21;
-static lean_object* lp_perqed_orbit__f1___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_instDecIsTorusEdge___closed__0;
 uint8_t lean_nat_dec_eq(lean_object*, lean_object*);
 uint8_t lean_nat_dec_lt(lean_object*, lean_object*);
 lean_object* lean_nat_mod(lean_object*, lean_object*);
-static lean_object* lp_perqed_disj__01___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_permDir___closed__2;
 LEAN_EXPORT uint8_t lp_perqed_instDecIsTorusEdge(lean_object*, lean_object*);
-LEAN_EXPORT lean_object* lp_perqed_edges__f0___nativeDecide__1__1___lam__0___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__22;
 static lean_object* lp_perqed_payload___closed__16;
-LEAN_EXPORT uint8_t lp_perqed_edges__f2___nativeDecide__1__1;
 static lean_object* lp_perqed_payload___closed__39;
 LEAN_EXPORT lean_object* lp_perqed_permDir(lean_object*, lean_object*);
-static lean_object* lp_perqed_inj__f2___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_payload___closed__4;
 LEAN_EXPORT lean_object* lp_perqed_root;
 static lean_object* lp_perqed_payload___closed__31;
@@ -173,44 +114,25 @@ lean_object* lean_nat_mul(lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__20;
 static lean_object* lp_perqed_payload___closed__47;
 static lean_object* lp_perqed_payload___closed__56;
-LEAN_EXPORT uint8_t lp_perqed_edges__f1___nativeDecide__1__1___lam__0(lean_object*);
 LEAN_EXPORT lean_object* lp_perqed_succColor(lean_object*, lean_object*);
-static uint8_t lp_perqed_orbit__f0___nativeDecide__1__1___closed__2;
-static lean_object* lp_perqed_orbit__f1___nativeDecide__1__1___closed__1;
 LEAN_EXPORT lean_object* lp_perqed_instDecIsTorusEdge___lam__0___boxed(lean_object*, lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__49;
-LEAN_EXPORT uint8_t lp_perqed_disj__12___nativeDecide__1__1___lam__1(lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_inj__f1___nativeDecide__1__1;
-static uint8_t lp_perqed_inj__f0___nativeDecide__1__1___closed__1;
 static lean_object* lp_perqed_payload___closed__27;
 lean_object* l_instDecidableEqFin___boxed(lean_object*, lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__0;
-static lean_object* lp_perqed_inj__f0___nativeDecide__1__1___closed__0;
-LEAN_EXPORT uint8_t lp_perqed_inj__f1___nativeDecide__1__1___lam__0(lean_object*);
-LEAN_EXPORT lean_object* lp_perqed_no__short__f0___nativeDecide__1__1___lam__1___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__60;
-LEAN_EXPORT uint8_t lp_perqed_disj__12___nativeDecide__1__1;
 lean_object* lean_array_get_size(lean_object*);
 uint8_t l_Nat_decidableForallFin___redArg(lean_object*, lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_edges__f1___nativeDecide__1__1;
 lean_object* lean_nat_add(lean_object*, lean_object*);
 LEAN_EXPORT uint8_t lp_perqed_instDecForallTorus4(lean_object*, lean_object*);
 LEAN_EXPORT uint8_t lp_perqed_instDecIsTorusEdge___lam__0(lean_object*, lean_object*, lean_object*);
-static uint8_t lp_perqed_disj__02___nativeDecide__1__1___closed__1;
-LEAN_EXPORT uint8_t lp_perqed_disj__01___nativeDecide__1__1___lam__1(lean_object*);
-LEAN_EXPORT lean_object* lp_perqed_edges__f1___nativeDecide__1__1___lam__0___boxed(lean_object*);
 static lean_object* lp_perqed_payload___closed__32;
 static lean_object* lp_perqed_payload___closed__41;
 LEAN_EXPORT lean_object* lp_perqed_f1(lean_object*);
-static lean_object* lp_perqed_edges__f2___nativeDecide__1__1___closed__0;
 static lean_object* lp_perqed_payload___closed__29;
 LEAN_EXPORT lean_object* lp_perqed_instDecForallTorus4___redArg___lam__1___boxed(lean_object*, lean_object*, lean_object*, lean_object*);
-LEAN_EXPORT uint8_t lp_perqed_no__short__f0___nativeDecide__1__1;
-static uint8_t lp_perqed_orbit__f2___nativeDecide__1__1___closed__2;
 LEAN_EXPORT lean_object* lp_perqed_permDir___boxed(lean_object*, lean_object*);
 static lean_object* lp_perqed_payload___closed__12;
-LEAN_EXPORT uint8_t lp_perqed_orbit__f1___nativeDecide__1__1;
-LEAN_EXPORT lean_object* lp_perqed_disj__01___nativeDecide__1__1___lam__1___boxed(lean_object*);
 LEAN_EXPORT lean_object* lp_perqed_payload;
 LEAN_EXPORT lean_object* lp_perqed_vIdx(lean_object*);
 static lean_object* lp_perqed_payload___closed__59;
@@ -2036,855 +1958,6 @@ x_3 = lp_perqed_succColor(x_2, x_1);
 return x_3;
 }
 }
-LEAN_EXPORT uint8_t lp_perqed_edges__f0___nativeDecide__1__1___lam__0(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; uint8_t x_3; 
-lean_inc_ref(x_1);
-x_2 = lp_perqed_f0(x_1);
-x_3 = lp_perqed_instDecIsTorusEdge(x_1, x_2);
-return x_3;
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_edges__f0___nativeDecide__1__1___lam__0___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_edges__f0___nativeDecide__1__1___lam__0(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_edges__f0___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_edges__f0___nativeDecide__1__1___lam__0___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_edges__f0___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_edges__f0___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_edges__f0___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_edges__f0___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_edges__f1___nativeDecide__1__1___lam__0(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; uint8_t x_3; 
-lean_inc_ref(x_1);
-x_2 = lp_perqed_f1(x_1);
-x_3 = lp_perqed_instDecIsTorusEdge(x_1, x_2);
-return x_3;
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_edges__f1___nativeDecide__1__1___lam__0___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_edges__f1___nativeDecide__1__1___lam__0(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_edges__f1___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_edges__f1___nativeDecide__1__1___lam__0___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_edges__f1___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_edges__f1___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_edges__f1___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_edges__f1___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_edges__f2___nativeDecide__1__1___lam__0(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; uint8_t x_3; 
-lean_inc_ref(x_1);
-x_2 = lp_perqed_f2(x_1);
-x_3 = lp_perqed_instDecIsTorusEdge(x_1, x_2);
-return x_3;
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_edges__f2___nativeDecide__1__1___lam__0___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_edges__f2___nativeDecide__1__1___lam__0(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_edges__f2___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_edges__f2___nativeDecide__1__1___lam__0___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_edges__f2___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_edges__f2___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_edges__f2___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_edges__f2___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_disj__01___nativeDecide__1__1___lam__1(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; lean_object* x_3; lean_object* x_4; lean_object* x_5; uint8_t x_6; 
-x_2 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-lean_inc_ref(x_1);
-x_4 = lp_perqed_f0(x_1);
-x_5 = lp_perqed_f1(x_1);
-x_6 = l_instDecidableEqProd___redArg(x_2, x_3, x_4, x_5);
-if (x_6 == 0)
-{
-uint8_t x_7; 
-x_7 = 1;
-return x_7;
-}
-else
-{
-uint8_t x_8; 
-x_8 = 0;
-return x_8;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_disj__01___nativeDecide__1__1___lam__1___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_disj__01___nativeDecide__1__1___lam__1(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_disj__01___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_disj__01___nativeDecide__1__1___lam__1___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_disj__01___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_disj__01___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_disj__01___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_disj__01___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_disj__02___nativeDecide__1__1___lam__1(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; lean_object* x_3; lean_object* x_4; lean_object* x_5; uint8_t x_6; 
-x_2 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-lean_inc_ref(x_1);
-x_4 = lp_perqed_f0(x_1);
-x_5 = lp_perqed_f2(x_1);
-x_6 = l_instDecidableEqProd___redArg(x_2, x_3, x_4, x_5);
-if (x_6 == 0)
-{
-uint8_t x_7; 
-x_7 = 1;
-return x_7;
-}
-else
-{
-uint8_t x_8; 
-x_8 = 0;
-return x_8;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_disj__02___nativeDecide__1__1___lam__1___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_disj__02___nativeDecide__1__1___lam__1(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_disj__02___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_disj__02___nativeDecide__1__1___lam__1___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_disj__02___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_disj__02___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_disj__02___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_disj__02___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_disj__12___nativeDecide__1__1___lam__1(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; lean_object* x_3; lean_object* x_4; lean_object* x_5; uint8_t x_6; 
-x_2 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-lean_inc_ref(x_1);
-x_4 = lp_perqed_f1(x_1);
-x_5 = lp_perqed_f2(x_1);
-x_6 = l_instDecidableEqProd___redArg(x_2, x_3, x_4, x_5);
-if (x_6 == 0)
-{
-uint8_t x_7; 
-x_7 = 1;
-return x_7;
-}
-else
-{
-uint8_t x_8; 
-x_8 = 0;
-return x_8;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_disj__12___nativeDecide__1__1___lam__1___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_disj__12___nativeDecide__1__1___lam__1(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_disj__12___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_disj__12___nativeDecide__1__1___lam__1___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_disj__12___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_disj__12___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_disj__12___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_disj__12___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_inj__f0___nativeDecide__1__1___lam__1(lean_object* x_1, lean_object* x_2) {
-_start:
-{
-lean_object* x_3; lean_object* x_4; lean_object* x_5; lean_object* x_6; uint8_t x_7; 
-x_3 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_4 = lp_perqed_instDecIsTorusEdge___closed__1;
-lean_inc_ref(x_1);
-x_5 = lp_perqed_f0(x_1);
-lean_inc_ref(x_2);
-x_6 = lp_perqed_f0(x_2);
-x_7 = l_instDecidableEqProd___redArg(x_3, x_4, x_5, x_6);
-if (x_7 == 0)
-{
-uint8_t x_8; 
-lean_dec_ref(x_2);
-lean_dec_ref(x_1);
-x_8 = 1;
-return x_8;
-}
-else
-{
-uint8_t x_9; 
-x_9 = l_instDecidableEqProd___redArg(x_3, x_4, x_1, x_2);
-return x_9;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_inj__f0___nativeDecide__1__1___lam__1___boxed(lean_object* x_1, lean_object* x_2) {
-_start:
-{
-uint8_t x_3; lean_object* x_4; 
-x_3 = lp_perqed_inj__f0___nativeDecide__1__1___lam__1(x_1, x_2);
-x_4 = lean_box(x_3);
-return x_4;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_inj__f0___nativeDecide__1__1___lam__0(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; uint8_t x_3; 
-x_2 = lean_alloc_closure((void*)(lp_perqed_inj__f0___nativeDecide__1__1___lam__1___boxed), 2, 1);
-lean_closure_set(x_2, 0, x_1);
-x_3 = lp_perqed_instDecForallTorus4___redArg(x_2);
-return x_3;
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_inj__f0___nativeDecide__1__1___lam__0___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_inj__f0___nativeDecide__1__1___lam__0(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_inj__f0___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_inj__f0___nativeDecide__1__1___lam__0___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_inj__f0___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_inj__f0___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_inj__f0___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_inj__f0___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_inj__f1___nativeDecide__1__1___lam__1(lean_object* x_1, lean_object* x_2) {
-_start:
-{
-lean_object* x_3; lean_object* x_4; lean_object* x_5; lean_object* x_6; uint8_t x_7; 
-x_3 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_4 = lp_perqed_instDecIsTorusEdge___closed__1;
-lean_inc_ref(x_1);
-x_5 = lp_perqed_f1(x_1);
-lean_inc_ref(x_2);
-x_6 = lp_perqed_f1(x_2);
-x_7 = l_instDecidableEqProd___redArg(x_3, x_4, x_5, x_6);
-if (x_7 == 0)
-{
-uint8_t x_8; 
-lean_dec_ref(x_2);
-lean_dec_ref(x_1);
-x_8 = 1;
-return x_8;
-}
-else
-{
-uint8_t x_9; 
-x_9 = l_instDecidableEqProd___redArg(x_3, x_4, x_1, x_2);
-return x_9;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_inj__f1___nativeDecide__1__1___lam__1___boxed(lean_object* x_1, lean_object* x_2) {
-_start:
-{
-uint8_t x_3; lean_object* x_4; 
-x_3 = lp_perqed_inj__f1___nativeDecide__1__1___lam__1(x_1, x_2);
-x_4 = lean_box(x_3);
-return x_4;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_inj__f1___nativeDecide__1__1___lam__0(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; uint8_t x_3; 
-x_2 = lean_alloc_closure((void*)(lp_perqed_inj__f1___nativeDecide__1__1___lam__1___boxed), 2, 1);
-lean_closure_set(x_2, 0, x_1);
-x_3 = lp_perqed_instDecForallTorus4___redArg(x_2);
-return x_3;
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_inj__f1___nativeDecide__1__1___lam__0___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_inj__f1___nativeDecide__1__1___lam__0(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_inj__f1___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_inj__f1___nativeDecide__1__1___lam__0___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_inj__f1___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_inj__f1___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_inj__f1___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_inj__f1___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_inj__f2___nativeDecide__1__1___lam__1(lean_object* x_1, lean_object* x_2) {
-_start:
-{
-lean_object* x_3; lean_object* x_4; lean_object* x_5; lean_object* x_6; uint8_t x_7; 
-x_3 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_4 = lp_perqed_instDecIsTorusEdge___closed__1;
-lean_inc_ref(x_1);
-x_5 = lp_perqed_f2(x_1);
-lean_inc_ref(x_2);
-x_6 = lp_perqed_f2(x_2);
-x_7 = l_instDecidableEqProd___redArg(x_3, x_4, x_5, x_6);
-if (x_7 == 0)
-{
-uint8_t x_8; 
-lean_dec_ref(x_2);
-lean_dec_ref(x_1);
-x_8 = 1;
-return x_8;
-}
-else
-{
-uint8_t x_9; 
-x_9 = l_instDecidableEqProd___redArg(x_3, x_4, x_1, x_2);
-return x_9;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_inj__f2___nativeDecide__1__1___lam__1___boxed(lean_object* x_1, lean_object* x_2) {
-_start:
-{
-uint8_t x_3; lean_object* x_4; 
-x_3 = lp_perqed_inj__f2___nativeDecide__1__1___lam__1(x_1, x_2);
-x_4 = lean_box(x_3);
-return x_4;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_inj__f2___nativeDecide__1__1___lam__0(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; uint8_t x_3; 
-x_2 = lean_alloc_closure((void*)(lp_perqed_inj__f2___nativeDecide__1__1___lam__1___boxed), 2, 1);
-lean_closure_set(x_2, 0, x_1);
-x_3 = lp_perqed_instDecForallTorus4___redArg(x_2);
-return x_3;
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_inj__f2___nativeDecide__1__1___lam__0___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_inj__f2___nativeDecide__1__1___lam__0(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_inj__f2___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_inj__f2___nativeDecide__1__1___lam__0___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_inj__f2___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; uint8_t x_2; 
-x_1 = lp_perqed_inj__f2___nativeDecide__1__1___closed__0;
-x_2 = lp_perqed_instDecForallTorus4___redArg(x_1);
-return x_2;
-}
-}
-static uint8_t _init_lp_perqed_inj__f2___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_inj__f2___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-static lean_object* _init_lp_perqed_orbit__f0___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_f0), 1, 0);
-return x_1;
-}
-}
-static lean_object* _init_lp_perqed_orbit__f0___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; lean_object* x_3; lean_object* x_4; 
-x_1 = lp_perqed_root;
-x_2 = lean_unsigned_to_nat(64u);
-x_3 = lp_perqed_orbit__f0___nativeDecide__1__1___closed__0;
-x_4 = lp_perqed_applyN(x_3, x_2, x_1);
-return x_4;
-}
-}
-static uint8_t _init_lp_perqed_orbit__f0___nativeDecide__1__1___closed__2() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; lean_object* x_3; lean_object* x_4; uint8_t x_5; 
-x_1 = lp_perqed_root;
-x_2 = lp_perqed_orbit__f0___nativeDecide__1__1___closed__1;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-x_4 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_5 = l_instDecidableEqProd___redArg(x_4, x_3, x_2, x_1);
-return x_5;
-}
-}
-static uint8_t _init_lp_perqed_orbit__f0___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_orbit__f0___nativeDecide__1__1___closed__2;
-return x_1;
-}
-}
-static lean_object* _init_lp_perqed_orbit__f1___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_f1), 1, 0);
-return x_1;
-}
-}
-static lean_object* _init_lp_perqed_orbit__f1___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; lean_object* x_3; lean_object* x_4; 
-x_1 = lp_perqed_root;
-x_2 = lean_unsigned_to_nat(64u);
-x_3 = lp_perqed_orbit__f1___nativeDecide__1__1___closed__0;
-x_4 = lp_perqed_applyN(x_3, x_2, x_1);
-return x_4;
-}
-}
-static uint8_t _init_lp_perqed_orbit__f1___nativeDecide__1__1___closed__2() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; lean_object* x_3; lean_object* x_4; uint8_t x_5; 
-x_1 = lp_perqed_root;
-x_2 = lp_perqed_orbit__f1___nativeDecide__1__1___closed__1;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-x_4 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_5 = l_instDecidableEqProd___redArg(x_4, x_3, x_2, x_1);
-return x_5;
-}
-}
-static uint8_t _init_lp_perqed_orbit__f1___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_orbit__f1___nativeDecide__1__1___closed__2;
-return x_1;
-}
-}
-static lean_object* _init_lp_perqed_orbit__f2___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_f2), 1, 0);
-return x_1;
-}
-}
-static lean_object* _init_lp_perqed_orbit__f2___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; lean_object* x_3; lean_object* x_4; 
-x_1 = lp_perqed_root;
-x_2 = lean_unsigned_to_nat(64u);
-x_3 = lp_perqed_orbit__f2___nativeDecide__1__1___closed__0;
-x_4 = lp_perqed_applyN(x_3, x_2, x_1);
-return x_4;
-}
-}
-static uint8_t _init_lp_perqed_orbit__f2___nativeDecide__1__1___closed__2() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; lean_object* x_3; lean_object* x_4; uint8_t x_5; 
-x_1 = lp_perqed_root;
-x_2 = lp_perqed_orbit__f2___nativeDecide__1__1___closed__1;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-x_4 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_5 = l_instDecidableEqProd___redArg(x_4, x_3, x_2, x_1);
-return x_5;
-}
-}
-static uint8_t _init_lp_perqed_orbit__f2___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_orbit__f2___nativeDecide__1__1___closed__2;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_no__short__f0___nativeDecide__1__1___lam__1(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; lean_object* x_3; lean_object* x_4; lean_object* x_5; lean_object* x_6; lean_object* x_7; lean_object* x_8; uint8_t x_9; 
-x_2 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-x_4 = lp_perqed_orbit__f0___nativeDecide__1__1___closed__0;
-x_5 = lean_unsigned_to_nat(1u);
-x_6 = lean_nat_add(x_1, x_5);
-x_7 = lp_perqed_root;
-x_8 = lp_perqed_applyN(x_4, x_6, x_7);
-x_9 = l_instDecidableEqProd___redArg(x_2, x_3, x_8, x_7);
-if (x_9 == 0)
-{
-uint8_t x_10; 
-x_10 = 1;
-return x_10;
-}
-else
-{
-uint8_t x_11; 
-x_11 = 0;
-return x_11;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_no__short__f0___nativeDecide__1__1___lam__1___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_no__short__f0___nativeDecide__1__1___lam__1(x_1);
-lean_dec(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_no__short__f0___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_no__short__f0___nativeDecide__1__1___lam__1___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_no__short__f0___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; uint8_t x_3; 
-x_1 = lp_perqed_no__short__f0___nativeDecide__1__1___closed__0;
-x_2 = lean_unsigned_to_nat(63u);
-x_3 = l_Nat_decidableForallFin___redArg(x_2, x_1);
-return x_3;
-}
-}
-static uint8_t _init_lp_perqed_no__short__f0___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_no__short__f0___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_no__short__f1___nativeDecide__1__1___lam__1(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; lean_object* x_3; lean_object* x_4; lean_object* x_5; lean_object* x_6; lean_object* x_7; lean_object* x_8; uint8_t x_9; 
-x_2 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-x_4 = lp_perqed_orbit__f1___nativeDecide__1__1___closed__0;
-x_5 = lean_unsigned_to_nat(1u);
-x_6 = lean_nat_add(x_1, x_5);
-x_7 = lp_perqed_root;
-x_8 = lp_perqed_applyN(x_4, x_6, x_7);
-x_9 = l_instDecidableEqProd___redArg(x_2, x_3, x_8, x_7);
-if (x_9 == 0)
-{
-uint8_t x_10; 
-x_10 = 1;
-return x_10;
-}
-else
-{
-uint8_t x_11; 
-x_11 = 0;
-return x_11;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_no__short__f1___nativeDecide__1__1___lam__1___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_no__short__f1___nativeDecide__1__1___lam__1(x_1);
-lean_dec(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_no__short__f1___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_no__short__f1___nativeDecide__1__1___lam__1___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_no__short__f1___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; uint8_t x_3; 
-x_1 = lp_perqed_no__short__f1___nativeDecide__1__1___closed__0;
-x_2 = lean_unsigned_to_nat(63u);
-x_3 = l_Nat_decidableForallFin___redArg(x_2, x_1);
-return x_3;
-}
-}
-static uint8_t _init_lp_perqed_no__short__f1___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_no__short__f1___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
-LEAN_EXPORT uint8_t lp_perqed_no__short__f2___nativeDecide__1__1___lam__1(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; lean_object* x_3; lean_object* x_4; lean_object* x_5; lean_object* x_6; lean_object* x_7; lean_object* x_8; uint8_t x_9; 
-x_2 = lp_perqed_instDecIsTorusEdge___closed__0;
-x_3 = lp_perqed_instDecIsTorusEdge___closed__1;
-x_4 = lp_perqed_orbit__f2___nativeDecide__1__1___closed__0;
-x_5 = lean_unsigned_to_nat(1u);
-x_6 = lean_nat_add(x_1, x_5);
-x_7 = lp_perqed_root;
-x_8 = lp_perqed_applyN(x_4, x_6, x_7);
-x_9 = l_instDecidableEqProd___redArg(x_2, x_3, x_8, x_7);
-if (x_9 == 0)
-{
-uint8_t x_10; 
-x_10 = 1;
-return x_10;
-}
-else
-{
-uint8_t x_11; 
-x_11 = 0;
-return x_11;
-}
-}
-}
-LEAN_EXPORT lean_object* lp_perqed_no__short__f2___nativeDecide__1__1___lam__1___boxed(lean_object* x_1) {
-_start:
-{
-uint8_t x_2; lean_object* x_3; 
-x_2 = lp_perqed_no__short__f2___nativeDecide__1__1___lam__1(x_1);
-lean_dec(x_1);
-x_3 = lean_box(x_2);
-return x_3;
-}
-}
-static lean_object* _init_lp_perqed_no__short__f2___nativeDecide__1__1___closed__0() {
-_start:
-{
-lean_object* x_1; 
-x_1 = lean_alloc_closure((void*)(lp_perqed_no__short__f2___nativeDecide__1__1___lam__1___boxed), 1, 0);
-return x_1;
-}
-}
-static uint8_t _init_lp_perqed_no__short__f2___nativeDecide__1__1___closed__1() {
-_start:
-{
-lean_object* x_1; lean_object* x_2; uint8_t x_3; 
-x_1 = lp_perqed_no__short__f2___nativeDecide__1__1___closed__0;
-x_2 = lean_unsigned_to_nat(63u);
-x_3 = l_Nat_decidableForallFin___redArg(x_2, x_1);
-return x_3;
-}
-}
-static uint8_t _init_lp_perqed_no__short__f2___nativeDecide__1__1() {
-_start:
-{
-uint8_t x_1; 
-x_1 = lp_perqed_no__short__f2___nativeDecide__1__1___closed__1;
-return x_1;
-}
-}
 lean_object* initialize_Init(uint8_t builtin);
 static bool _G_initialized = false;
 LEAN_EXPORT lean_object* initialize_perqed_TorusTopology(uint8_t builtin) {
@@ -3060,72 +2133,6 @@ lp_perqed_payload = _init_lp_perqed_payload();
 lean_mark_persistent(lp_perqed_payload);
 lp_perqed_succColor___closed__0 = _init_lp_perqed_succColor___closed__0();
 lean_mark_persistent(lp_perqed_succColor___closed__0);
-lp_perqed_edges__f0___nativeDecide__1__1___closed__0 = _init_lp_perqed_edges__f0___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_edges__f0___nativeDecide__1__1___closed__0);
-lp_perqed_edges__f0___nativeDecide__1__1___closed__1 = _init_lp_perqed_edges__f0___nativeDecide__1__1___closed__1();
-lp_perqed_edges__f0___nativeDecide__1__1 = _init_lp_perqed_edges__f0___nativeDecide__1__1();
-lp_perqed_edges__f1___nativeDecide__1__1___closed__0 = _init_lp_perqed_edges__f1___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_edges__f1___nativeDecide__1__1___closed__0);
-lp_perqed_edges__f1___nativeDecide__1__1___closed__1 = _init_lp_perqed_edges__f1___nativeDecide__1__1___closed__1();
-lp_perqed_edges__f1___nativeDecide__1__1 = _init_lp_perqed_edges__f1___nativeDecide__1__1();
-lp_perqed_edges__f2___nativeDecide__1__1___closed__0 = _init_lp_perqed_edges__f2___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_edges__f2___nativeDecide__1__1___closed__0);
-lp_perqed_edges__f2___nativeDecide__1__1___closed__1 = _init_lp_perqed_edges__f2___nativeDecide__1__1___closed__1();
-lp_perqed_edges__f2___nativeDecide__1__1 = _init_lp_perqed_edges__f2___nativeDecide__1__1();
-lp_perqed_disj__01___nativeDecide__1__1___closed__0 = _init_lp_perqed_disj__01___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_disj__01___nativeDecide__1__1___closed__0);
-lp_perqed_disj__01___nativeDecide__1__1___closed__1 = _init_lp_perqed_disj__01___nativeDecide__1__1___closed__1();
-lp_perqed_disj__01___nativeDecide__1__1 = _init_lp_perqed_disj__01___nativeDecide__1__1();
-lp_perqed_disj__02___nativeDecide__1__1___closed__0 = _init_lp_perqed_disj__02___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_disj__02___nativeDecide__1__1___closed__0);
-lp_perqed_disj__02___nativeDecide__1__1___closed__1 = _init_lp_perqed_disj__02___nativeDecide__1__1___closed__1();
-lp_perqed_disj__02___nativeDecide__1__1 = _init_lp_perqed_disj__02___nativeDecide__1__1();
-lp_perqed_disj__12___nativeDecide__1__1___closed__0 = _init_lp_perqed_disj__12___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_disj__12___nativeDecide__1__1___closed__0);
-lp_perqed_disj__12___nativeDecide__1__1___closed__1 = _init_lp_perqed_disj__12___nativeDecide__1__1___closed__1();
-lp_perqed_disj__12___nativeDecide__1__1 = _init_lp_perqed_disj__12___nativeDecide__1__1();
-lp_perqed_inj__f0___nativeDecide__1__1___closed__0 = _init_lp_perqed_inj__f0___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_inj__f0___nativeDecide__1__1___closed__0);
-lp_perqed_inj__f0___nativeDecide__1__1___closed__1 = _init_lp_perqed_inj__f0___nativeDecide__1__1___closed__1();
-lp_perqed_inj__f0___nativeDecide__1__1 = _init_lp_perqed_inj__f0___nativeDecide__1__1();
-lp_perqed_inj__f1___nativeDecide__1__1___closed__0 = _init_lp_perqed_inj__f1___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_inj__f1___nativeDecide__1__1___closed__0);
-lp_perqed_inj__f1___nativeDecide__1__1___closed__1 = _init_lp_perqed_inj__f1___nativeDecide__1__1___closed__1();
-lp_perqed_inj__f1___nativeDecide__1__1 = _init_lp_perqed_inj__f1___nativeDecide__1__1();
-lp_perqed_inj__f2___nativeDecide__1__1___closed__0 = _init_lp_perqed_inj__f2___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_inj__f2___nativeDecide__1__1___closed__0);
-lp_perqed_inj__f2___nativeDecide__1__1___closed__1 = _init_lp_perqed_inj__f2___nativeDecide__1__1___closed__1();
-lp_perqed_inj__f2___nativeDecide__1__1 = _init_lp_perqed_inj__f2___nativeDecide__1__1();
-lp_perqed_orbit__f0___nativeDecide__1__1___closed__0 = _init_lp_perqed_orbit__f0___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_orbit__f0___nativeDecide__1__1___closed__0);
-lp_perqed_orbit__f0___nativeDecide__1__1___closed__1 = _init_lp_perqed_orbit__f0___nativeDecide__1__1___closed__1();
-lean_mark_persistent(lp_perqed_orbit__f0___nativeDecide__1__1___closed__1);
-lp_perqed_orbit__f0___nativeDecide__1__1___closed__2 = _init_lp_perqed_orbit__f0___nativeDecide__1__1___closed__2();
-lp_perqed_orbit__f0___nativeDecide__1__1 = _init_lp_perqed_orbit__f0___nativeDecide__1__1();
-lp_perqed_orbit__f1___nativeDecide__1__1___closed__0 = _init_lp_perqed_orbit__f1___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_orbit__f1___nativeDecide__1__1___closed__0);
-lp_perqed_orbit__f1___nativeDecide__1__1___closed__1 = _init_lp_perqed_orbit__f1___nativeDecide__1__1___closed__1();
-lean_mark_persistent(lp_perqed_orbit__f1___nativeDecide__1__1___closed__1);
-lp_perqed_orbit__f1___nativeDecide__1__1___closed__2 = _init_lp_perqed_orbit__f1___nativeDecide__1__1___closed__2();
-lp_perqed_orbit__f1___nativeDecide__1__1 = _init_lp_perqed_orbit__f1___nativeDecide__1__1();
-lp_perqed_orbit__f2___nativeDecide__1__1___closed__0 = _init_lp_perqed_orbit__f2___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_orbit__f2___nativeDecide__1__1___closed__0);
-lp_perqed_orbit__f2___nativeDecide__1__1___closed__1 = _init_lp_perqed_orbit__f2___nativeDecide__1__1___closed__1();
-lean_mark_persistent(lp_perqed_orbit__f2___nativeDecide__1__1___closed__1);
-lp_perqed_orbit__f2___nativeDecide__1__1___closed__2 = _init_lp_perqed_orbit__f2___nativeDecide__1__1___closed__2();
-lp_perqed_orbit__f2___nativeDecide__1__1 = _init_lp_perqed_orbit__f2___nativeDecide__1__1();
-lp_perqed_no__short__f0___nativeDecide__1__1___closed__0 = _init_lp_perqed_no__short__f0___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_no__short__f0___nativeDecide__1__1___closed__0);
-lp_perqed_no__short__f0___nativeDecide__1__1___closed__1 = _init_lp_perqed_no__short__f0___nativeDecide__1__1___closed__1();
-lp_perqed_no__short__f0___nativeDecide__1__1 = _init_lp_perqed_no__short__f0___nativeDecide__1__1();
-lp_perqed_no__short__f1___nativeDecide__1__1___closed__0 = _init_lp_perqed_no__short__f1___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_no__short__f1___nativeDecide__1__1___closed__0);
-lp_perqed_no__short__f1___nativeDecide__1__1___closed__1 = _init_lp_perqed_no__short__f1___nativeDecide__1__1___closed__1();
-lp_perqed_no__short__f1___nativeDecide__1__1 = _init_lp_perqed_no__short__f1___nativeDecide__1__1();
-lp_perqed_no__short__f2___nativeDecide__1__1___closed__0 = _init_lp_perqed_no__short__f2___nativeDecide__1__1___closed__0();
-lean_mark_persistent(lp_perqed_no__short__f2___nativeDecide__1__1___closed__0);
-lp_perqed_no__short__f2___nativeDecide__1__1___closed__1 = _init_lp_perqed_no__short__f2___nativeDecide__1__1___closed__1();
-lp_perqed_no__short__f2___nativeDecide__1__1 = _init_lp_perqed_no__short__f2___nativeDecide__1__1();
 return lean_io_result_mk_ok(lean_box(0));
 }
 #ifdef __cplusplus
