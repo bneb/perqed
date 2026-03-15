@@ -78,7 +78,7 @@ We make two contributions:
   stated as \texttt{Prop}-valued theorems in Lean~4 and verified by
   \texttt{decide} inside the trusted kernel.
   \item A stochastic search that finds the $m=6$ witness in the
-  $6^{216}$-element state space, using a corrected energy function and a
+  $6^{215}$-element search space, using a corrected energy function and a
   non-monotonic cooling schedule with the same hyperparameters as $m=4$.
 \end{enumerate}
 
@@ -88,16 +88,38 @@ We make two contributions:
 
 At each vertex, the three outgoing arcs are assigned to three colors
 $\{0, 1, 2\}$. There are $3! = 6$ valid assignments per vertex, giving a
-search space of $6^{m^3}$. This is $6^{64} \approx 10^{49}$ for $m=4$ and
-$6^{216} \approx 10^{168}$ for $m=6$.
+full state space of $6^{m^3}$.
 
 We identify the vertex set $V$ with the index set $\{0, \ldots, m^3{-}1\}$
 via the lexicographic bijection $(i,j,k) \mapsto im^2 + jm + k$.
 A state is an array $\sigma \in \{0, \ldots, 5\}^{m^3}$, where
 $\sigma[v]$ selects which permutation of $\{0,1,2\}$ is applied to the
-outgoing directions $(+x, +y, +z)$ at vertex~$v$. The origin $(0,0,0)$
-corresponds to index~0. We fix $\sigma[0] = 0$ without loss of generality,
-breaking the color symmetry and reducing the search space by a factor of~6.
+outgoing directions $(+x, +y, +z)$ at vertex~$v$. The value
+$\sigma[v] \in \{0,\ldots,5\}$ encodes one of the six permutations
+of~$S_3$ as shown in Table~\ref{tab:permutations}.
+
+\begin{table}[h]
+\centering
+\caption{Permutation mapping from state value to spatial direction.}
+\label{tab:permutations}
+\begin{tabular}{@{}cccc@{}}
+\toprule
+$\sigma[v]$ & Color 0 & Color 1 & Color 2 \\
+\midrule
+0 & $+x$ & $+y$ & $+z$ \\
+1 & $+x$ & $+z$ & $+y$ \\
+2 & $+y$ & $+x$ & $+z$ \\
+3 & $+z$ & $+x$ & $+y$ \\
+4 & $+y$ & $+z$ & $+x$ \\
+5 & $+z$ & $+y$ & $+x$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The origin $(0,0,0)$ corresponds to index~0. We fix $\sigma[0] = 0$
+without loss of generality, breaking the color symmetry and reducing the
+search space to $6^{m^3-1}$: this is $6^{63} \approx 10^{49}$ for
+$m=4$ and $6^{215} \approx 10^{167}$ for $m=6$.
 
 \subsection{Energy Function}
 
@@ -172,9 +194,11 @@ The $m=6$ solution was found at restart~10, iteration~2{,}807{,}777.
 
 \section{Formal Verification}
 
-Each witness is an array in $\{0,\ldots,5\}^{m^3}$. We decode it into three
-successor functions
-$f_0, f_1, f_2 : (\mathbb{Z}/m\mathbb{Z})^3 \to (\mathbb{Z}/m\mathbb{Z})^3$.
+Each witness is an array in $\{0,\ldots,5\}^{m^3}$. We decode it
+(Table~\ref{tab:permutations}) into three successor functions
+$f_0, f_1, f_2 :
+\texttt{Fin}\;m \times \texttt{Fin}\;m \times \texttt{Fin}\;m \to
+\texttt{Fin}\;m \times \texttt{Fin}\;m \times \texttt{Fin}\;m$.
 
 The specification uses Lean's \texttt{Prop} universe. We define the torus
 edge relation on
@@ -216,11 +240,12 @@ theorem torus_m6_valid :
    $\langle$inj_f2, orbit_f2, no_short_f2$\rangle\rangle$
 \end{lstlisting}
 
-Because every vertex in $G_m$ has out-degree exactly~3, proving that the
-three successor functions are mutually disjoint at every vertex (verified
-by \texttt{disj\_01}, \texttt{disj\_02}, \texttt{disj\_12}) is necessary
-and sufficient to establish that the three Hamiltonian cycles partition
-the arc set.
+Because the \texttt{isTorusEdge} relation restricts the outgoing
+neighborhood of any vertex to exactly three destinations, proving
+that the three successor functions are mutually disjoint at every
+vertex (verified by \texttt{disj\_01}, \texttt{disj\_02},
+\texttt{disj\_12}) is necessary and sufficient to establish that
+the three Hamiltonian cycles partition the $3m^3$ arcs.
 
 For $m=6$, the injectivity sub-theorems each check $216^2 = 46{,}656$ pairs,
 and the no-sub-tour sub-theorems each verify 215 orbit prefixes of length
