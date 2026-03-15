@@ -20,8 +20,8 @@
   xleftmargin=1em,
 }
 
-\title{A Formalized Lean~4 Proof of the Small Even Base Cases ($m=4, 6$) \\
-for the Directed Hamiltonian Torus Decomposition}
+\title{Machine-Checked Proofs of the $m=4$ and $m=6$ \\
+Directed Hamiltonian Torus Decompositions}
 
 \author{
   Kevin O'Connor\\
@@ -35,196 +35,167 @@ for the Directed Hamiltonian Torus Decomposition}
 \maketitle
 
 \begin{abstract}
-We present machine-checked formal proofs of the $m=4$ and $m=6$ base cases
-of the Directed Hamiltonian Torus Decomposition problem, verified by the
-Lean~4 kernel via the \texttt{decide} tactic. While an elegant general
-construction for even $m \ge 8$ was recently discovered by Aquino-Michaels,
-the small even cases remained open. We use Simulated Annealing with a
-non-monotonic cooling schedule to find valid decompositions for the
-$4 \times 4 \times 4$ directed torus (64 vertices) and the
-$6 \times 6 \times 6$ directed torus (216 vertices, 648 arcs), finding the
-latter in under 100 seconds on an Apple~M4 processor. We then verify both
-results inside Lean's trusted kernel. We describe the energy function, the
-avoidance of functional graph traps, and the computational scaling of the
-\texttt{decide} tactic to the 216-vertex topology.
+We give machine-checked proofs of the $m=4$ and $m=6$ cases of the Directed
+Hamiltonian Torus Decomposition problem, verified by the Lean~4 kernel via
+the \texttt{decide} tactic. An elegant construction by Aquino-Michaels
+covers all even $m \ge 8$, but the small even cases fall outside its scope.
+We find valid decompositions for the $4 \times 4 \times 4$ torus
+(64 vertices) and the $6 \times 6 \times 6$ torus (216 vertices, 648 arcs)
+using Simulated Annealing with a non-monotonic cooling schedule. The $m=6$
+witness was found in 100 seconds on an Apple~M4 processor. Both witnesses
+are verified inside Lean's trusted kernel with zero unproven subgoals and
+no external dependencies.
 \end{abstract}
 
 \section{Introduction}
 
-Consider a three-dimensional directed graph $G_m$ with vertex set
+Consider a directed graph $G_m$ with vertex set
 $V = \{(i, j, k) : 0 \le i, j, k < m\}$ and directed edges from each vertex
 $(i,j,k)$ to $(i{+}1, j, k)$, $(i, j{+}1, k)$, and $(i, j, k{+}1)$, all
 modulo~$m$. This graph has $m^3$ vertices and $3m^3$ arcs.
 
 \begin{definition}
 A \emph{Directed Hamiltonian Torus Decomposition} of $G_m$ is a partition of
-the $3m^3$ arcs into exactly 3 directed Hamiltonian cycles, each of
+the $3m^3$ arcs into exactly three directed Hamiltonian cycles, each of
 length~$m^3$.
 \end{definition}
 
-Knuth posed this problem in the context of Volume~4B of \emph{The Art of
-Computer Programming}~\cite{knuth2026}. In February 2026, Anthropic's Claude
-Opus~4.6 found a generalized algebraic construction for all odd~$m$, which
-Knuth verified and proved correct. During the same exploration, Claude found
-isolated empirical solutions for $m = 4$, $m = 6$, and $m = 8$, but could
-not generalize them. In a March~6 revision, Knuth noted that Keston
-Aquino-Michaels found an elegant decomposition for even~$m$, though the
-construction relies on a splice gadget that strictly requires $m \ge 8$.
-The small even cases $m = 4$ and $m = 6$ fall outside the scope of that
-general proof and remained unverified.
+Knuth posed this problem in Volume~4B of \emph{The Art of Computer
+Programming}~\cite{knuth2026}. In February 2026, Claude Opus~4.6 found a
+construction for all odd~$m$, which Knuth verified. During that exploration,
+Claude also found isolated solutions for $m = 4$, $m = 6$, and $m = 8$, but
+could not generalize them. In March 2026, Aquino-Michaels found a
+construction for all even~$m$, using a splice gadget that requires $m \ge 8$.
+The cases $m = 4$ and $m = 6$ fall outside that construction.
 
 Morrison formalized Knuth's odd-$m$ proof in Lean~4 on March~4, 2026.
+To our knowledge, no machine-checked proof of any even-$m$ case has been
+published.
 
-We make the following contributions to close the remaining gap:
+We make two contributions:
 \begin{enumerate}
   \item Machine-checked proofs of the $m = 4$ and $m = 6$ decompositions,
-  stated as pure \texttt{Prop}-valued theorems in Lean~4 and verified
-  inside the trusted kernel without external SAT/SMT solvers.
-  \item A stochastic search architecture that successfully navigates the
-  $6^{216}$ state space of the $m=6$ torus using a corrected in-degree
-  energy function and non-monotonic cooling.
-  \item A non-monotonic cooling schedule with dynamic threshold-based
-  reheating~\cite{kirkpatrick1983,marinari1992}.
+  stated as \texttt{Prop}-valued theorems in Lean~4 and verified by
+  \texttt{decide} inside the trusted kernel.
+  \item A stochastic search that finds the $m=6$ witness in the
+  $6^{216}$-element state space, using a corrected energy function and a
+  non-monotonic cooling schedule with the same hyperparameters as $m=4$.
 \end{enumerate}
 
 \section{Method}
 
-\subsection{State Space and Scaling}
+\subsection{State Space}
 
 At each vertex, the three outgoing arcs are assigned to three colors
 $\{0, 1, 2\}$. There are $3! = 6$ valid assignments per vertex, giving a
-search space of $6^{64} \approx 6.3 \times 10^{49}$ for $m=4$.
-
-For $m=6$, the graph grows to 216 vertices and 648 arcs. The state space
-explodes to $6^{216} \approx 1.05 \times 10^{168}$. Pinning $\sigma[0] = 0$
-reduces this by a factor of 6, but the sheer scale renders standard exact
-formulations highly memory-intensive.
+search space of $6^{m^3}$. This is $6^{64} \approx 10^{49}$ for $m=4$ and
+$6^{216} \approx 10^{168}$ for $m=6$.
 
 We represent a state as an array $\sigma \in \{0, \ldots, 5\}^{m^3}$, where
 $\sigma[v]$ selects which permutation of $\{0,1,2\}$ is applied to the
-outgoing directions $(+x, +y, +z)$ at vertex~$v$.
+outgoing directions $(+x, +y, +z)$ at vertex~$v$. We fix $\sigma[0] = 0$
+without loss of generality, reducing the search space by a factor of~6.
 
 \subsection{Energy Function}
 
-Each color subgraph has out-degree~1 at every vertex by construction. However,
-the in-degree is not guaranteed to be~1: a vertex may receive zero or multiple
-incoming arcs of a given color from its three axial predecessors. A graph with
-out-degree~1 but variable in-degree is a functional graph, whose components
-consist of directed cycles with trees feeding into them. A naive cycle-counting
-energy function can assign $E = 0$ to such a lasso topology, incorrectly
-reporting it as a Hamiltonian cycle.
+Each color subgraph has out-degree~1 at every vertex by construction, but
+the in-degree is not guaranteed to be~1. A vertex may receive zero or
+multiple incoming arcs of a given color from its three axial predecessors.
+A graph with out-degree~1 but variable in-degree is a functional graph:
+its components are directed cycles with trees feeding into them. A naive
+energy function that counts only the number of cycles can assign $E = 0$
+to such a non-Hamiltonian topology.
 
 \begin{definition}
-Let $C_c(\sigma)$ be the number of components traced by following successors
-in the color-$c$ subgraph, and let $D_c(\sigma)$ be the number of vertices
-with in-degree $\ne 1$ for color~$c$. The energy is
+Let $C_c(\sigma)$ be the number of connected components in the color-$c$
+functional graph, and let $D_c(\sigma)$ be the number of vertices with
+in-degree $\ne 1$ for color~$c$. The energy is
 \[
   E(\sigma) = \sum_{c=0}^{2} \bigl(C_c(\sigma) - 1\bigr)
             + \sum_{c=0}^{2} D_c(\sigma).
 \]
 \end{definition}
 
-The in-degree penalty ensures that $E = 0$ requires each color subgraph to
-be a single cycle visiting all $m^3$ vertices, i.e., a Hamiltonian cycle.
-The energy can be computed in $O(m^3)$ time. For the $m=6$ engine, we
-implemented an incremental energy evaluator using in-place mutation with
-rollback: the in-degree delta is computed in $O(1)$ per color and the cycle
-count is recalculated only for colors whose successor changed. This yielded
-a 12$\times$ throughput improvement over the immutable full-recalculation
-baseline, verified by a 300{,}000-mutation fuzz test asserting exact
-agreement between incremental and full energy at every step.
+$E = 0$ holds exactly when each color subgraph is a single cycle that visits
+every vertex. Computing $E$ from scratch takes $O(m^3)$ time. For $m=6$,
+we also implemented an incremental evaluator: each single-vertex mutation
+updates the in-degree counts in $O(1)$ and recounts cycles only for the
+affected colors. This was validated by a 300{,}000-step fuzz test asserting
+exact agreement with full recalculation at every mutation.
 
-\subsection{Non-Monotonic Cooling}
+\subsection{Cooling Schedule}
 
 We use the Metropolis-Hastings algorithm with a single-vertex mutation
-operator. A random vertex $v \in \{1, \ldots, m^3{-}1\}$ is selected and its
-permutation changed to one of the five alternatives.
+operator: a random vertex $v \ne 0$ has its permutation changed to one of
+the five alternatives.
 
 The cooling schedule is $T_k = T_0 \cdot \alpha^k$ with $T_0 = 50$ and
-$\alpha = 0.999998$. When the best energy has not improved for $W$ iterations,
-the temperature is set to $T_r = \max(1,\; E_{\text{best}}^{2/5})$ and the
-window is doubled ($W \leftarrow 2W$). Upon improvement, $W$ resets. This
-non-monotonic schedule allows the search to escape deep local
+$\alpha = 0.999998$. When the best energy has not improved for $W$
+iterations, the temperature is reset to
+$T_r = \max(1, E_{\text{best}}^{2/5})$ and the stagnation window doubles
+($W \leftarrow 2W$). Upon improvement, $W$ resets to its initial value.
+This non-monotonic schedule allows the search to escape local
 minima~\cite{kirkpatrick1983,marinari1992}.
 
-Notably, the same cooling rate and reheat formula were used for both $m=4$
-and $m=6$ without modification. The only change for $m=6$ was the use of
-the incremental energy evaluator to increase iteration throughput.
-
-\subsection{Comparison with Exact Solvers}
-
-For $m = 4$, the decomposition problem is small enough that exact solvers
-are practical. An ILP encoding using Miller-Tucker-Zemlin sub-tour
-elimination~\cite{miller1960}, or a pure Boolean SAT encoding using
-positional reachability constraints, would solve this instance in
-milliseconds. Our stochastic approach is not competitive with exact solvers
-at this scale.
-
-However, the SA pipeline evaluates Hamiltonicity in $O(V)$ time with $V$
-bytes of working memory. At $m=6$ (216 vertices, $6^{216} \approx 10^{168}$
-states), this memory efficiency becomes relevant: the SA engine successfully
-found the decomposition in under 100 seconds with negligible memory overhead.
+The same cooling rate, reheat formula, and initial temperature were used
+for both $m=4$ and $m=6$ without modification.
 
 \section{Results}
 
 \begin{table}[h]
 \centering
-\caption{Simulated Annealing runs for $G_4$ and $G_6$.}
+\caption{Simulated Annealing results.}
 \label{tab:results}
-\begin{tabular}{@{}lccccl@{}}
+\begin{tabular}{@{}llcccl@{}}
 \toprule
-Graph & Run & Schedule $\alpha$ & Reheat & Best $E$ & Outcome \\
+Graph & Engine & $\alpha$ & Reheat & Best $E$ & Time \\
 \midrule
-$G_4$ & 1 & 0.99999 & None & 2 & Froze \\
-$G_4$ & 2 & 0.999998 & Fixed, $T_r\!=\!5$ & 41 & Random walk \\
-$G_4$ & 3 & 0.999998 & $\mathbf{E^{2/5}}$, \textbf{backoff} & $\mathbf{0}$ & \textbf{Solved, 93s} \\
-\midrule
-$G_6$ & 4 & 0.999998 & $\mathbf{E^{2/5}}$, \textbf{backoff} & $\mathbf{0}$ & \textbf{Solved, 99.5s} \\
+$G_4$ & Baseline & 0.999998 & $E^{2/5}$, backoff & 0 & 93\,s \\
+$G_4$ & Incremental & 0.999998 & $E^{2/5}$, backoff & 0 & 3.1\,s \\
+$G_6$ & Incremental & 0.999998 & $E^{2/5}$, backoff & 0 & 99.5\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Runs~1--3 on $G_4$ explored the design space of cooling schedules.
-Run~4 on~$G_6$ used identical hyperparameters to Run~3,
-confirming that the non-monotonic schedule generalizes across problem sizes.
-The $m=6$ solution was found on restart~10 at iteration~2{,}807{,}777,
-running at approximately 1.5 million iterations per second on an Apple~M4.
+The baseline engine computes $E$ from scratch on every mutation. The
+incremental engine updates $E$ in place and rolls back rejected mutations,
+giving roughly 12$\times$ higher throughput on $m=6$. All three runs used
+identical hyperparameters.
 
-\section{Formal Verification and Kernel Scaling}
+The $m=4$ baseline solution was found at restart~12, iteration~1{,}366{,}834.
+With the incremental engine, $m=4$ was solved at restart~3 in 3.1 seconds.
+The $m=6$ solution was found at restart~10, iteration~2{,}807{,}777.
 
-The discovered witnesses are arrays in $\{0,\ldots,5\}^{m^3}$,
-each selecting a permutation of the three outgoing directions at a vertex.
-We decode each array into three successor functions $f_0$, $f_1$, $f_2$,
-each mapping $\mathbb{Z}_m^3 \to \mathbb{Z}_m^3$.
+\section{Formal Verification}
 
-The mathematical specification is stated entirely in Lean's \texttt{Prop}
-universe. We define the torus edge relation directly on
-$\texttt{Fin}\;m \times \texttt{Fin}\;m \times \texttt{Fin}\;m$, using
-the built-in modular arithmetic on \texttt{Fin}:
+Each witness is an array in $\{0,\ldots,5\}^{m^3}$. We decode it into three
+successor functions $f_0, f_1, f_2 : \mathbb{Z}_m^3 \to \mathbb{Z}_m^3$.
+
+The specification uses Lean's \texttt{Prop} universe. We define the torus
+edge relation on
+$\texttt{Fin}\;m \times \texttt{Fin}\;m \times \texttt{Fin}\;m$:
 \begin{lstlisting}[language=ML,mathescape=true]
 def isTorusEdge (u v : Torus6) : Prop :=
   v = (u.1 + 1, u.2.1, u.2.2) $\lor$
   v = (u.1, u.2.1 + 1, u.2.2) $\lor$
   v = (u.1, u.2.1, u.2.2 + 1)
 \end{lstlisting}
-We deliberately use \texttt{Fin\;m} rather than Mathlib's \texttt{ZMod\;m}
-to minimize the trusted computing base. In Lean~4's foundation, addition
-on $\texttt{Fin}\;n$ is defined as $(a + b) \mod n$, which is
-definitionally identical to the \texttt{ZMod}\;$n$ ring structure for
-concrete~$n$. This identity is witnessed by Mathlib's
-\texttt{finEquivZMod}, which lifts trivially to the 3D product.
-Our formalization therefore verifies the standard mathematical object
-$(\mathbb{Z}/m\mathbb{Z})^3$ without incurring a Mathlib dependency.
+We use \texttt{Fin\;m} rather than Mathlib's \texttt{ZMod\;m} to keep the
+trusted computing base minimal. In Lean~4, addition on $\texttt{Fin}\;n$
+is $(a + b) \bmod n$, which is the same operation as the
+$\texttt{ZMod}\;n$ ring for concrete~$n$. Mathlib's \texttt{finEquivZMod}
+witnesses this equivalence directly. Our proofs therefore verify the
+standard mathematical object $(\mathbb{Z}/m\mathbb{Z})^3$ without
+requiring Mathlib as a dependency.
 
-Hamiltonicity is defined via finite iteration rather than abstract
-reachability. A function $f$ on $m^3$ vertices is a Hamiltonian cycle iff it
-is injective, its orbit from $(0,0,0)$ closes at exactly $m^3$ steps, and no
-shorter orbit exists. The decomposition theorem requires all three
-functions to produce valid torus edges, to be pairwise disjoint, and to be
-Hamiltonian cycles.
+Hamiltonicity is defined via finite iteration. A function $f$ on $m^3$
+vertices is a Hamiltonian cycle iff it is injective, its orbit from
+$(0,0,0)$ closes at exactly $m^3$ steps, and no shorter orbit exists.
+The decomposition theorem requires all three functions to produce valid
+torus edges, to be pairwise disjoint, and to be Hamiltonian cycles.
 
-The proof for each value of~$m$ is decomposed into 15 sub-theorems, each
-verified by the \texttt{decide} tactic inside Lean's kernel:
+Each proof consists of 15 sub-theorems verified by the \texttt{decide}
+tactic:
 \begin{lstlisting}[language=ML,mathescape=true]
 theorem torus_m6_valid :
     IsHamiltonianDecomposition f0 f1 f2 :=
@@ -235,39 +206,27 @@ theorem torus_m6_valid :
    $\langle$inj_f2, orbit_f2, no_short_f2$\rangle\rangle$
 \end{lstlisting}
 
-Scaling the verification to $m=6$ presented a stress test for Lean's
-trusted kernel. The proof of injectivity requires evaluating
-$216^2 = 46{,}656$ pairwise comparisons, while the cycle validation
-requires verifying three 216-step orbits and $3 \times 215 = 645$
-sub-tour exclusions. Despite the combinatorial explosion, Lean's
-\texttt{decide} tactic successfully reduced all \texttt{Prop}-valued
-sub-theorems without requiring boolean reflection or custom C compilation
-(i.e., \texttt{native\_decide}). Both the $m=4$ and $m=6$ proofs
-compile cleanly with zero axioms and no unproven subgoals.
-
-The trusted computing base consists solely of Lean's kernel type checker.
-Unlike \texttt{native\_decide}, which compiles terms to C and trusts the
-system compiler, \texttt{decide} performs all evaluation within the kernel
-itself.
+For $m=6$, the injectivity sub-theorems each check $216^2 = 46{,}656$ pairs,
+and the no-sub-tour sub-theorems each verify 215 orbit prefixes of length
+up to 215. Lean's \texttt{decide} tactic handles this without boolean
+reflection or \texttt{native\_decide}. Both proofs compile with zero axioms,
+zero sorry, and no unproven subgoals.
 
 \section{Conclusion}
 
-We have given machine-checked, \texttt{Prop}-valued proofs that both the
-$4 \times 4 \times 4$ and $6 \times 6 \times 6$ directed tori admit
-decompositions into three Hamiltonian cycles. Combined with the
-Aquino-Michaels construction for even $m \ge 8$ and Knuth's construction
-for odd~$m$, this computationally closes the directed Hamiltonian torus
-decomposition problem for all~$m$.
+We have given machine-checked proofs that $G_4$ and $G_6$ each admit a
+decomposition into three directed Hamiltonian cycles. Together with
+Knuth's construction for odd~$m$ and the Aquino-Michaels construction for
+even $m \ge 8$, this closes the problem for all~$m$.
 
-All source code, the TypeScript stochastic engine, the incremental
-energy evaluator, the witness payloads, and the Lean~4 proofs are
-available at \url{https://github.com/bneb/perqed}.
+Source code, witnesses, and Lean~4 proofs are available at
+\url{https://github.com/bneb/perqed}.
 
 \section*{Acknowledgments}
 
-We thank Donald Knuth for posing the problem, Kim Morrison for the Lean~4
-formalization of the odd-$m$ case, and Keston Aquino-Michaels for the
-general even-$m$ construction.
+We thank Donald Knuth for posing the problem, Kim Morrison for formalizing
+the odd-$m$ case in Lean~4, and Keston Aquino-Michaels for the general
+even-$m$ construction.
 
 \begin{thebibliography}{9}
 \bibitem{knuth2026}
