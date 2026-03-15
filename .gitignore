@@ -58,6 +58,7 @@ website/node_modules/
 # Paper — private / generated files
 paper/cover_letter.*
 paper/*.pdf
+!paper/torus_decomposition.pdf
 paper/*.aux
 paper/*.log
 paper/*.out
