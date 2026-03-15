@@ -107,17 +107,18 @@ energy function that counts only the number of cycles can assign $E = 0$
 to such a non-Hamiltonian topology.
 
 \begin{definition}
-Let $C_c(\sigma)$ be the number of connected components in the color-$c$
-functional graph, and let $D_c(\sigma)$ be the number of vertices with
-in-degree $\ne 1$ for color~$c$. The energy is
+Let $C_c(\sigma)$ be the number of weakly connected components in the
+color-$c$ functional graph, and let $D_c(\sigma)$ be the number of vertices
+with in-degree $\ne 1$ for color~$c$. The energy is
 \[
   E(\sigma) = \sum_{c=0}^{2} \bigl(C_c(\sigma) - 1\bigr)
             + \sum_{c=0}^{2} D_c(\sigma).
 \]
 \end{definition}
 
-$E = 0$ holds exactly when each color subgraph is a single cycle that visits
-every vertex. Computing $E$ from scratch takes $O(m^3)$ time. For $m=6$,
+Because every vertex has out-degree exactly~1, each weakly connected
+component contains exactly one directed cycle. $E = 0$ holds if and only
+if each color subgraph is a single cycle that visits every vertex. Computing $E$ from scratch takes $O(m^3)$ time. For $m=6$,
 we also implemented an incremental evaluator: each single-vertex mutation
 updates the in-degree counts in $O(1)$ and recounts cycles only for the
 affected colors. This was validated by a 300{,}000-step fuzz test asserting
@@ -180,19 +181,24 @@ def isTorusEdge (u v : Torus6) : Prop :=
   v = (u.1, u.2.1 + 1, u.2.2) $\lor$
   v = (u.1, u.2.1, u.2.2 + 1)
 \end{lstlisting}
-We use \texttt{Fin\;m} rather than Mathlib's \texttt{ZMod\;m} to keep the
-trusted computing base minimal. In Lean~4, addition on $\texttt{Fin}\;n$
-is $(a + b) \bmod n$, which is the same operation as the
-$\texttt{ZMod}\;n$ ring for concrete~$n$. Mathlib's \texttt{finEquivZMod}
-witnesses this equivalence directly. Our proofs therefore verify the
-standard mathematical object $(\mathbb{Z}/m\mathbb{Z})^3$ without
-requiring Mathlib as a dependency.
+We define the vertex coordinate space using Lean's core
+\texttt{Fin\;m} type rather than the \texttt{ZMod\;m} ring provided by
+Mathlib. This choice eliminates all external library dependencies,
+keeping the trusted computing base minimal. Formally, our code verifies
+the decomposition over this \texttt{Fin\;m} topology.
+Metatheoretically, because Lean~4 defines addition on $\texttt{Fin}\;n$
+as $(a + b) \bmod n$, this topology is structurally identical to the
+standard mathematical object $(\mathbb{Z}/m\mathbb{Z})^3$. While
+Mathlib provides \texttt{finEquivZMod} to formally witness this
+equivalence, we omit the dependency to maintain a standalone kernel
+verification.
 
 Hamiltonicity is defined via finite iteration. A function $f$ on $m^3$
-vertices is a Hamiltonian cycle iff it is injective, its orbit from
-$(0,0,0)$ closes at exactly $m^3$ steps, and no shorter orbit exists.
-The decomposition theorem requires all three functions to produce valid
-torus edges, to be pairwise disjoint, and to be Hamiltonian cycles.
+vertices is a Hamiltonian cycle iff its orbit from $(0,0,0)$ closes at
+exactly $m^3$ steps and no shorter orbit exists. While an orbit of
+maximal length on a finite set mathematically guarantees bijectivity,
+we explicitly include injectivity in our Lean \texttt{Prop} definition
+for definitional completeness.
 
 Each proof consists of 15 sub-theorems verified by the \texttt{decide}
 tactic:
@@ -208,9 +214,11 @@ theorem torus_m6_valid :
 
 For $m=6$, the injectivity sub-theorems each check $216^2 = 46{,}656$ pairs,
 and the no-sub-tour sub-theorems each verify 215 orbit prefixes of length
-up to 215. Lean's \texttt{decide} tactic handles this without boolean
-reflection or \texttt{native\_decide}. Both proofs compile with zero axioms,
-zero sorry, and no unproven subgoals.
+up to~215. We set \texttt{maxHeartbeats} to $4 \times 10^8$ to accommodate
+the larger evaluation. Lean's \texttt{decide} tactic handles the full
+verification without boolean reflection or \texttt{native\_decide}.
+The $m=6$ proof compiles in 57 seconds (wall time) on an Apple~M4
+processor, with zero axioms and no unproven subgoals.
 
 \section{Conclusion}
 
