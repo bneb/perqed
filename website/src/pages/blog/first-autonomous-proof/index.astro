@@ -3,20 +3,20 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
 <p>Two models. Two paradigms. Both autonomously proved <code>∀ n m : Nat, n + m = m + n</code>
-in Lean 4 — no human in the loop, no cloud APIs. One was a sniper; the other, a machine gun.
+in Lean 4 — no human in the loop, no cloud APIs. One was a strategist; the other, a speedrunner.
 Here's how we got there.</p>
 
 <h2>The Results</h2>
 
-<p><strong>Sniper — DeepSeek-R1:8B</strong> (77.1s, 1 attempt)</p>
+<p><strong>Strategist — DeepSeek-R1:8B</strong> (77.1s, 1 attempt)</p>
 
 <pre><code>theorem nat_add_comm (n m : Nat) : n + m = m + n := by
   omega</code></pre>
 
 <p>R1 thinks for ~75 seconds in a single long chain-of-thought, reasoning about induction vs.
-automation, then emits clean JSON with <code>omega</code> at 0.95 confidence. One shot, one kill.</p>
+automation, then emits clean JSON with <code>omega</code> at 0.95 confidence. One shot, done.</p>
 
-<p><strong>Machine Gun — DeepSeek-Prover-V2:7B Q8_0</strong> (32.7s, 7 iterations)</p>
+<p><strong>Speedrunner — DeepSeek-Prover-V2:7B Q8_0</strong> (32.7s, 7 iterations)</p>
 
 <pre><code>theorem nat_add_comm (n m : Nat) : n + m = m + n := by
   all_goals omega</code></pre>
@@ -114,9 +114,9 @@ variants: single tactics, multi-line blocks, <code>lean</code>-fenced code, and 
 <p>We now have two viable proving paradigms on commodity hardware:</p>
 
 <ul>
-  <li><strong>R1 (sniper)</strong> — one long think, high-confidence JSON output, ideal when you want
+  <li><strong>R1 (strategist)</strong> — one long think, high-confidence JSON output, ideal when you want
   a single high-quality attempt</li>
-  <li><strong>Prover-V2 (machine gun)</strong> — fast iterations, raw tactic output, 2.4× faster
+  <li><strong>Prover-V2 (speedrunner)</strong> — fast iterations, raw tactic output, 2.4× faster
   wall-clock for this theorem</li>
 </ul>
 
