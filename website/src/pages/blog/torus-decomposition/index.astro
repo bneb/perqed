@@ -2,140 +2,139 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>In March 2026, Donald Knuth posed the Directed Hamiltonian Torus Decomposition
-problem: partition the arcs of a 3D torus into three directed Hamiltonian
-cycles. Claude found a construction for odd <em>m</em>, and Aquino-Michaels
-solved even <em>m</em> ≥ 8. The small even cases — <em>m</em>=4 and
-<em>m</em>=6 — fell outside those constructions and remained open.</p>
+<p>If you read my recent
+<a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf">paper</a>
+closing the final base cases of Knuth's Directed Hamiltonian Torus Decomposition, you saw the
+mathematical result: the arrays work, and the Lean 4 kernel proves they work.</p>
 
-<p>We closed both. The witnesses are formally verified inside the Lean 4 kernel.
-This post covers the engineering side — the paper covers the
-<a href="/paper/torus_decomposition.pdf">math</a>.</p>
+<p>But the paper skips the most interesting engineering problem: how do you actually
+<em>find</em> a working array when the search space is
+6<sup>215</sup> ≈ 10<sup>167</sup> states?</p>
 
-<h2>The Search Problem</h2>
+<p>Brute force is physically impossible. Random guessing is statistically hopeless.
+Here's a look at the TypeScript search engine that found both witnesses, and the
+architectural choices that made it tractable.</p>
 
-<p>At each of the <em>m</em>³ vertices, three outgoing arcs are assigned to three
-colors. There are 3! = 6 valid assignments per vertex. After fixing the origin
-to break symmetry, the search space for <em>m</em>=6 is 6<sup>215</sup> ≈ 10<sup>167</sup>
-states. Exhaustive enumeration is not an option.</p>
+<h2>The Bottleneck: O(N) Energy Evaluation</h2>
 
-<p>We used Simulated Annealing with a single-vertex mutation operator: pick a
-random vertex, change its permutation to one of the five alternatives, accept
-or reject via the Metropolis criterion.</p>
+<p>Simulated Annealing needs an energy function it can evaluate millions of times.
+For this problem, each evaluation has to check whether three color subgraphs form
+valid Hamiltonian cycles across all <em>m</em>³ vertices.</p>
 
-<h2>The Energy Function Bug</h2>
+<p>The naive approach recomputes the entire board on every mutation: trace all
+three color graphs, count components, check in-degrees. For <em>m</em>=6 that's
+216 vertices × 3 colors per evaluation. At millions of iterations, this is a
+death sentence for throughput.</p>
 
-<p>The first version of our energy function counted the number of directed
-cycles per color. A "good" state would have exactly one cycle per color
-(the Hamiltonian cycle). This seems correct, but it has a subtle failure
-mode: a functional graph with out-degree 1 can have components that are
-directed cycles with trees feeding into them. Our naive cycle count
-assigned <em>E</em> = 0 to non-Hamiltonian topologies.</p>
+<h2>Getting the Energy Function Right</h2>
+
+<p>Before optimizing speed, we had to get correctness right — and the first
+version was subtly wrong.</p>
+
+<p>Each color subgraph has out-degree 1 at every vertex by construction (each
+vertex assigns exactly one outgoing arc per color). But the <em>in-degree</em>
+is not guaranteed. A functional graph with variable in-degree can have directed
+cycles with trees feeding into them. Our first energy function counted only the
+number of cycles per color and happily assigned <em>E</em> = 0 to
+non-Hamiltonian topologies.</p>
 
 <p>The fix: count weakly connected components <em>and</em> vertices with
-in-degree ≠ 1. Only a single Hamiltonian cycle has both one component
-and uniform in-degree across all vertices.</p>
+in-degree ≠ 1. The energy becomes:</p>
 
-<h2>The 12× Speedup</h2>
+<pre><code>E(σ) = Σ (components_c - 1) + Σ (vertices with in-degree ≠ 1)</code></pre>
 
-<p>For <em>m</em>=4 (64 vertices), the baseline engine — which recomputes the
-full energy from scratch on every mutation — solved the problem in 93 seconds.
-For <em>m</em>=6 (216 vertices), this approach was too slow. Each energy
-evaluation touched all 216 vertices across three color subgraphs.</p>
+<p>This is zero if and only if each color subgraph is a single Hamiltonian cycle.
+No false zeros.</p>
 
-<p>The incremental engine changed a single vertex's permutation, updated
-the in-degree counts in O(1), and recounted cycles only for the affected
-colors. Rejected mutations were rolled back in place. This gave roughly
-12× higher throughput on <em>m</em>=6.</p>
+<h2>The 12× Speedup: O(N) → O(1)</h2>
 
-<p>To validate correctness, we ran a 300,000-step fuzz test asserting exact
-agreement between the incremental and full-recalculation engines at every
-mutation. Zero discrepancies.</p>
+<p>The SA mutation operator is simple: pick a random vertex, change its
+permutation to one of five alternatives, accept or reject via Metropolis.</p>
+
+<p>The baseline engine recomputed <em>E</em> from scratch on every mutation.
+The incremental engine changed a single vertex, updated the affected in-degree
+counts in O(1), and recounted cycles only for the colors touched by that
+vertex. Rejected mutations were rolled back in place — no allocations, no
+copies.</p>
+
+<p>This turned an O(<em>m</em>³) evaluation into an O(1) delta update.</p>
 
 <table>
 <thead>
-<tr><th>Case</th><th>Engine</th><th>Time</th></tr>
+<tr><th>Case</th><th>Engine</th><th>Time to solution</th></tr>
 </thead>
 <tbody>
-<tr><td><em>m</em>=4</td><td>Baseline</td><td>93 s</td></tr>
-<tr><td><em>m</em>=4</td><td>Incremental</td><td>3.1 s</td></tr>
-<tr><td><em>m</em>=6</td><td>Incremental</td><td>99.5 s</td></tr>
+<tr><td><em>m</em>=4</td><td>Baseline (full recompute)</td><td>93 s</td></tr>
+<tr><td><em>m</em>=4</td><td>Incremental (O(1) delta)</td><td>3.1 s</td></tr>
+<tr><td><em>m</em>=6</td><td>Incremental (O(1) delta)</td><td>99.5 s</td></tr>
 </tbody>
 </table>
 
-<p>Same algorithm, same hyperparameters (α = 0.999998, reheat to
-<em>E</em><sup>2/5</sup> on stagnation). The only difference was
-per-iteration throughput.</p>
+<p>Same algorithm, same hyperparameters. The only difference was per-iteration
+throughput. To validate the incremental engine, we ran a 300,000-step fuzz test
+asserting exact agreement with full recalculation at every mutation.
+Zero discrepancies.</p>
 
-<h2>Cooling Schedule</h2>
+<h2>The Cooling Schedule</h2>
 
-<p>Standard exponential cooling stalls on this problem. The energy landscape
-has deep local minima — states where two colors form Hamiltonian cycles but
-the third fragments into many components. A monotonic schedule gets trapped.</p>
+<p>Standard exponential cooling stalls on this problem. The energy landscape has
+deep local minima — states where two colors form perfect Hamiltonian cycles but
+the third fragments. A monotonic schedule gets trapped.</p>
 
 <p>We used non-monotonic cooling: when the best energy stagnates for <em>W</em>
 iterations, reset the temperature to max(1, <em>E</em><sub>best</sub><sup>2/5</sup>)
-and double the stagnation window. The reheat is proportional to the current
-best energy — gentle near the goal, aggressive when far away. Upon improvement,
-the window resets.</p>
+and double the stagnation window. The reheat is proportional to the current best
+energy — gentle near the goal, aggressive when far away.</p>
 
-<p>This schedule was not tuned per problem size. The same parameters
-(T₀ = 50, α = 0.999998, E<sup>2/5</sup> reheat) solved both
-<em>m</em>=4 and <em>m</em>=6 without modification.</p>
+<p>The same parameters (T₀ = 50, α = 0.999998, <em>E</em><sup>2/5</sup> reheat)
+solved both <em>m</em>=4 and <em>m</em>=6 without any per-problem tuning.</p>
 
-<h2>Lean 4 Verification</h2>
+<h2>Bridging TypeScript to Lean 4</h2>
 
-<p>The solver produces a witness: a 216-element array of integers 0–5.
-The formal verification is completely independent of the search — it only
-takes the witness as input and proves it's valid.</p>
+<p>A heuristic search engine written in TypeScript is fast, but it is not a proof.
+Runtime bugs, off-by-one errors, or edge cases in the energy function could
+produce witnesses that <em>look</em> valid but aren't.</p>
 
-<p>Each proof verifies 15 sub-theorems using Lean's <code>decide</code> tactic:</p>
+<p>That's why the final step is a clean handoff to Lean 4. The TypeScript engine
+acts as an oracle: it does the heavy lifting to find the array, then outputs the
+raw witness. That witness is hardcoded into a Lean script, and Lean's
+<code>decide</code> tactic verifies the topology from first principles. The
+search engine and the proof share zero code.</p>
 
-<ul>
-  <li>3 edge-validity checks (each successor lands on a valid torus neighbor)</li>
-  <li>3 disjointness checks (no two colors share an arc at any vertex)</li>
-  <li>3 injectivity checks (216² = 46,656 pairwise comparisons each)</li>
-  <li>3 orbit-length checks (the cycle visits all 216 vertices)</li>
-  <li>3 no-short-orbit checks (no sub-tour closes early)</li>
-</ul>
+<p>For <em>m</em>=6, the kernel checks 46,656 pairwise injectivity comparisons per
+color and verifies 216-step orbits. We had to set <code>maxHeartbeats</code> to
+4 × 10<sup>8</sup> (roughly 100× the default) to give the kernel enough time.
+It compiles in 57 seconds on an Apple M4.</p>
 
-<p>The <em>m</em>=6 proof required setting <code>maxHeartbeats</code> to
-4 × 10<sup>8</sup> — roughly 100× the default — because the kernel
-evaluates every comparison by reduction. It compiles in 57 seconds on an M4.</p>
-
-<h2>What We Learned</h2>
+<h2>What I Learned</h2>
 
 <p><strong>Energy function design matters more than schedule tuning.</strong>
-Fixing the energy function (adding in-degree checking) was the difference
-between the search converging and not converging. The cooling schedule was
-the same across both problem sizes.</p>
+A wrong energy function means the search converges to the wrong thing.
+No amount of cooling schedule wizardry fixes that.</p>
 
-<p><strong>Incremental evaluation is the scaling lever.</strong> The
-algorithmic improvement (12× throughput) was worth more than any
-hyperparameter change. For <em>m</em>=6, the baseline engine likely
-would have needed hours.</p>
+<p><strong>Incremental evaluation is the scaling lever.</strong>
+The 12× throughput gain from O(1) delta updates was worth more than any
+hyperparameter change. For <em>m</em>=6, the baseline engine would have needed
+hours.</p>
 
-<p><strong>Formal verification is surprisingly tractable.</strong>
-The Lean 4 kernel checked 46,656 pairwise injectivity comparisons
-per color in under a minute, with no Mathlib dependencies and no
-boolean reflection tricks. The <code>decide</code> tactic handled
-everything.</p>
-
-<p><strong>The search and proof are independent artifacts.</strong>
-The solver can be wrong, buggy, or nondeterministic. The Lean kernel
-doesn't care — it only checks the witness. This separation is the
-entire point of formal verification.</p>
+<p><strong>The search and the proof are independent artifacts.</strong>
+The solver can be wrong, buggy, or nondeterministic. The Lean kernel doesn't
+care — it only checks the witness. This separation is the entire point of
+formal verification, and it's liberating as an engineer: you can be fast and
+sloppy in the search, as long as you're rigorous in the proof.</p>
 
 <hr>
 
-<p><em>The full paper is available as a
-<a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf">PDF</a>,
-and the Lean 4 proofs are in the
-<a href="https://github.com/bneb/perqed/tree/main/src/lean">repository</a>.</em></p>
+<p><em>The formal paper is available as a
+<a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf">PDF</a>.
+The SA engine is in
+<a href="https://github.com/bneb/perqed/tree/main/src/math">src/math/</a>,
+and the Lean 4 proofs are in
+<a href="https://github.com/bneb/perqed/tree/main/src/lean">src/lean/</a>.</em></p>
 `;
 ---
 
-<BaseLayout title="Closing Knuth's Torus Problem — Perqed" activeNav="blog">
+<BaseLayout title="Finding Needles in a 6^215 Haystack — Perqed" activeNav="blog">
 
   <article class="article">
     <div class="container">
@@ -146,7 +145,7 @@ and the Lean 4 proofs are in the
             <span class="sep">·</span>
             <span>8 min read</span>
           </div>
-          <h1>Closing Knuth's Torus Problem</h1>
+          <h1>Finding Needles in a 6<sup>215</sup> Haystack</h1>
         </header>
 
         <div set:html={blogContent} />
