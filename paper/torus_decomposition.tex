@@ -77,18 +77,19 @@ published.
 
 We make the following contributions:
 \begin{enumerate}
-  \item A machine-checked proof of the $m = 4$ decomposition, verified by
-  the {\texttt{decide}} tactic inside Lean's trusted kernel (no external
-  compiler in the trusted computing base).
+  \item A machine-checked proof of the $m = 4$ decomposition, stated as a
+  pure \texttt{Prop}-valued theorem in Lean~4 and verified by the
+  \texttt{decide} tactic inside the trusted kernel (no external compiler
+  in the trusted computing base).
   \item A corrected energy function for the stochastic search that accounts
   for in-degree regularity, avoiding a subtle failure mode in functional
   graphs.
   \item A non-monotonic cooling schedule with energy-proportional
-  reheating~\cite{kirkpatrick1983,marinari1992}.
+  reheating at $T_r = \max(1,\; E_{\text{best}}^{2/5})$~\cite{kirkpatrick1983,marinari1992}.
 \end{enumerate}
 
 The empirical discovery of $m=4$ solutions is not new. Our contribution is
-the formal verification and the description of the pipeline.
+the formal verification pipeline and the Prop-valued proof architecture.
 
 \section{Method}
 
@@ -186,57 +187,58 @@ found at iteration 1{,}366{,}834 of restart~12, running at approximately
 
 \section{Formal Verification}
 
-The discovered witness is a 64-element array of integers in $\{0,\ldots,5\}$.
-We encode this array, the successor function, and the verification
-predicate as computable Lean~4 definitions using structural recursion on
-natural numbers.
+The discovered witness is a 64-element array of integers in $\{0,\ldots,5\}$,
+each selecting a permutation of the three outgoing directions at a vertex.
+We decode this array into three successor functions $f_0$, $f_1$, $f_2$,
+each mapping $\mathbb{Z}_4^3 \to \mathbb{Z}_4^3$.
 
-The main theorem is:
-
+The mathematical specification is stated entirely in Lean's \texttt{Prop}
+universe. We define the torus edge relation directly on
+$\texttt{Fin}\;4 \times \texttt{Fin}\;4 \times \texttt{Fin}\;4$, using
+modular arithmetic on \texttt{Fin}:\;4:
 \begin{lstlisting}[language=ML]
-set_option maxRecDepth 131072 in
-set_option maxHeartbeats 4000000 in
-theorem claude_cycles_m4_valid :
-  isValidDecomposition = true := by decide
+def isTorusEdge (u v : Torus4) : Prop :=
+  v = (u.1 + 1, u.2.1, u.2.2) ||
+  v = (u.1, u.2.1 + 1, u.2.2) ||
+  v = (u.1, u.2.1, u.2.2 + 1)
 \end{lstlisting}
+Hamiltonicity is defined via finite iteration rather than abstract
+reachability. A function $f$ on 64 vertices is a Hamiltonian cycle iff it
+is injective, its orbit from $(0,0,0)$ closes at exactly 64 steps, and no
+shorter orbit exists. The decomposition theorem requires all three
+functions to produce valid torus edges, to be pairwise disjoint, and to be
+Hamiltonian cycles.
 
-The \texttt{decide} tactic reduces the Boolean expression inside Lean's
-kernel and confirms that it equals \texttt{true}. Unlike
-\texttt{native\_decide}, which compiles the term to C and trusts the
-compiler, \texttt{decide} keeps the entire evaluation within the type
-checker. The elevated \texttt{maxRecDepth} and \texttt{maxHeartbeats} are
-needed because the verification involves $64 \times 64 \times 3 = 12{,}288$
-orbit-membership checks.
+The proof is decomposed into 15 sub-theorems, each verified by the
+\texttt{decide} tactic inside Lean's kernel:
+\begin{lstlisting}[language=ML]
+theorem torus_m4_valid :
+    IsHamiltonianDecomposition f0 f1 f2 :=
+  <edges_f0, edges_f1, edges_f2,
+   disj_01, disj_02, disj_12,
+   <inj_f0, orbit_f0, no_short_f0>,
+   <inj_f1, orbit_f1, no_short_f1>,
+   <inj_f2, orbit_f2, no_short_f2>>
+\end{lstlisting}
+Each sub-theorem is a standard proposition (universal quantification,
+equality, disjunction) over the finite type
+$\texttt{Fin}\;4 \times \texttt{Fin}\;4 \times \texttt{Fin}\;4$.
+A custom \texttt{Decidable} instance curries the product quantifier into
+nested \texttt{Fin}\;4 quantifiers, which Lean's kernel evaluates
+exhaustively. No Mathlib dependencies are used.
 
-As a separate check, an independent TypeScript verifier confirms that each
-color subgraph forms a single 64-vertex cycle, that all 192 arcs are
-covered without overlap, and that every vertex has in-degree~1 and
-out-degree~1 per color.
-
-\subsection{Limitations}
-
-Our verification proves that a specific Boolean predicate evaluates to
-\texttt{true} on a hardcoded array. It does not include a formal
-mathematical specification of the 3D torus topology or Hamiltonian cycles
-in Lean's \texttt{Prop} universe. In particular, the correctness of the
-\texttt{successor} function (i.e., that it faithfully encodes the edges of
-$G_4$) is trusted code, not a verified theorem.
-
-A fully rigorous formalization would define the torus as a directed graph
-over $\mathbb{Z}_4^3$, define Hamiltonian decomposition as a
-\texttt{Prop}-valued predicate, and prove a reflection theorem establishing
-that our Boolean checker implies the mathematical specification. We leave
-this to future work.
+The trusted computing base consists solely of Lean's kernel type checker.
+Unlike \texttt{native\_decide}, which compiles terms to C and trusts the
+system compiler, \texttt{decide} performs all evaluation within the kernel
+itself.
 
 \section{Conclusion}
 
-We have given a machine-checked proof that a specific Boolean predicate,
-encoding the Hamiltonian decomposition property of the $4 \times 4 \times 4$
-directed torus, evaluates to \texttt{true} on a discovered witness. The
-proof is verified entirely within Lean's trusted kernel via \texttt{decide}.
-The correctness of the encoding (that the Boolean predicate faithfully
-captures the graph-theoretic property) is argued informally but not
-formally verified.
+We have given a machine-checked, \texttt{Prop}-valued proof that the
+$4 \times 4 \times 4$ directed torus admits a decomposition into three
+Hamiltonian cycles. The theorem is stated directly over the 3D torus
+topology using modular arithmetic on $\texttt{Fin}\;4$ and verified by the
+Lean~4 kernel via \texttt{decide}.
 
 The Aquino-Michaels construction covers even $m \ge 8$. Formalizing that
 general proof, or closing the remaining base case $m = 6$, are natural
