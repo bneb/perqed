@@ -17,6 +17,7 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
   return {
     totalAttempts: 5,
     consecutiveFailures: 0,
+    globalFailures: 0,
     goalCount: 1,
     isStuckInLoop: false,
     lastErrors: [],
@@ -56,13 +57,13 @@ describe("AgentRouter — determineNextAgent()", () => {
     expect(AgentRouter.determineNextAgent(signals)).toBe("REASONER");
   });
 
-  test("returns ARCHITECT on 5+ consecutive failures (total failure)", () => {
-    const signals = makeSignals({ consecutiveFailures: 5 });
+  test("returns ARCHITECT on 6+ global tree failures (break glass)", () => {
+    const signals = makeSignals({ globalFailures: 6, consecutiveFailures: 6 });
     expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
-  test("returns ARCHITECT on 7 consecutive failures (above threshold)", () => {
-    const signals = makeSignals({ consecutiveFailures: 7 });
+  test("returns ARCHITECT on 7 global tree failures (above threshold)", () => {
+    const signals = makeSignals({ globalFailures: 7, consecutiveFailures: 7 });
     expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
@@ -71,13 +72,13 @@ describe("AgentRouter — determineNextAgent()", () => {
     expect(AgentRouter.determineNextAgent(signals)).toBe("TACTICIAN");
   });
 
-  test("ARCHITECT takes priority over REASONER at 5 failures with loop", () => {
-    const signals = makeSignals({ consecutiveFailures: 5, isStuckInLoop: true, goalCount: 3 });
+  test("ARCHITECT takes priority over REASONER at 6 global failures with loop", () => {
+    const signals = makeSignals({ globalFailures: 6, consecutiveFailures: 6, isStuckInLoop: true, goalCount: 3 });
     expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
-  test("returns REASONER at exactly 4 failures (below ARCHITECT threshold)", () => {
-    const signals = makeSignals({ consecutiveFailures: 4 });
+  test("returns REASONER at exactly 5 failures (below ARCHITECT threshold of 6)", () => {
+    const signals = makeSignals({ consecutiveFailures: 5 });
     expect(AgentRouter.determineNextAgent(signals)).toBe("REASONER");
   });
 });

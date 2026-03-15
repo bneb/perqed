@@ -2,19 +2,19 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="Perqed — AI That Proves Mathematics" activeNav="home">
+<BaseLayout title="Perqed" activeNav="home">
 
   <!-- Hero -->
   <section class="hero">
     <div class="container">
       <p class="eyebrow animate-in">Autonomous Proof Engine</p>
       <h1 class="hero-title animate-in animate-in-1">
-        AI that proves<br>mathematics.
+        Automated theorem<br>proving in Lean&nbsp;4.
       </h1>
       <p class="hero-sub animate-in animate-in-2">
-        Perqed is an open-source neuro-symbolic engine that autonomously discovers
-        and verifies formal mathematical proofs using local LLMs and the Lean&nbsp;4
-        theorem prover.
+        Perqed is an open-source system that reads mathematical literature,
+        generates conjectures, and attempts to prove them in Lean&nbsp;4
+        using MCTS-guided tactic search. It runs locally on Apple Silicon.
       </p>
       <div class="hero-actions animate-in animate-in-3">
         <a href="https://github.com/bneb/perqed" target="_blank" rel="noopener" class="btn btn-primary">
@@ -33,48 +33,79 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <p class="eyebrow">Architecture</p>
       <h2 class="section-heading">The proof loop</h2>
       <p class="section-lede">
-        A falsification-first pipeline where LLMs propose and Lean&nbsp;4 verifies.
+        LLMs propose tactics, Lean&nbsp;4 verifies each step, Z3 pre-filters false conjectures.
       </p>
 
       <div class="steps">
         <div class="step">
           <span class="step-n">01</span>
+          <h3 class="step-title">Read the Literature</h3>
+          <p class="step-body">
+            The Librarian fetches papers from arXiv, chunks abstracts, embeds them via
+            <code>nomic-embed-text</code>, and stores vectors in LanceDB for semantic retrieval.
+          </p>
+          <span class="step-tech">LanceDB · Ollama · RAG</span>
+        </div>
+
+        <div class="step">
+          <span class="step-n">02</span>
           <h3 class="step-title">Falsify First</h3>
           <p class="step-body">
-            Before wasting compute on a proof, Z3 hunts for counterexamples in bounded domains.
-            If the theorem is false, we find out in 50ms.
+            Before attempting a proof, Z3 checks for counterexamples in bounded domains.
+            False conjectures are typically caught in under 50ms.
           </p>
           <span class="step-tech">Z3 · SMT Solver</span>
         </div>
 
         <div class="step">
-          <span class="step-n">02</span>
+          <span class="step-n">03</span>
+          <h3 class="step-title">AND/OR MCTS</h3>
+          <p class="step-body">
+            Tactics like <code>induction</code> split goals into AND nodes (all must succeed).
+            Alternative tactics form OR nodes (any can succeed). The TreeScorer backpropagates
+            win probabilities: OR&nbsp;=&nbsp;max, AND&nbsp;=&nbsp;product.
+          </p>
+          <span class="step-tech">ProofTree · TreeScorer · Value Backpropagation</span>
+        </div>
+
+        <div class="step">
+          <span class="step-n">04</span>
+          <h3 class="step-title">Async Batch Search</h3>
+          <p class="step-body">
+            Up to 3 nodes expand concurrently via <code>Promise.all()</code>. Tactic
+            generation and proof checking run in parallel.
+          </p>
+          <span class="step-tech">DeepSeek Prover V2 · Promise.all</span>
+        </div>
+
+        <div class="step">
+          <span class="step-n">05</span>
           <h3 class="step-title">Lean-as-DSL</h3>
           <p class="step-body">
-            Lean 4 is the single source of truth. The LLM reads tactic state, proposes tactics, and
-            Lean verifies every step. No hallucination survives.
+            Lean 4 is the ground truth. The LLM reads tactic state and proposes
+            tactics; Lean verifies each step before it is committed.
           </p>
           <span class="step-tech">Lean 4 · Formal Verification</span>
         </div>
 
         <div class="step">
-          <span class="step-n">03</span>
-          <h3 class="step-title">Parallel Speculation</h3>
+          <span class="step-n">06</span>
+          <h3 class="step-title">Self-Improvement</h3>
           <p class="step-body">
-            Up to 5 tactics per iteration, sorted by confidence, dispatched concurrently via
-            <code>Promise.all()</code>. First complete proof wins.
+            Solved proofs are parsed into (State, Tactic) pairs
+            and saved as deduplicated SFT training data.
           </p>
-          <span class="step-tech">DeepSeek-R1 · Local LLM</span>
+          <span class="step-tech">DatasetExtractor · sft_dataset.jsonl</span>
         </div>
 
         <div class="step">
-          <span class="step-n">04</span>
-          <h3 class="step-title">The Vault</h3>
+          <span class="step-n">07</span>
+          <h3 class="step-title">Auto-Publish</h3>
           <p class="step-body">
-            Verified proofs land in an append-only vault. The LLM can read but never write here.
-            Every proof is machine-checked, no exceptions.
+            A separate agent translates verified Lean 4 proofs into
+            AMS-LaTeX documents with theorem environments and numbered equations.
           </p>
-          <span class="step-tech">verified_lib/ · Immutable</span>
+          <span class="step-tech">ScribeAgent · AMS-LaTeX</span>
         </div>
       </div>
     </div>
@@ -86,29 +117,39 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <p class="eyebrow">Model Stack</p>
       <h2 class="section-heading">Runs on your hardware</h2>
       <p class="section-lede">
-        No cloud APIs required for core proving. Everything runs locally on a Mac or a $300 Minisforum.
+        Core proving runs locally. Cloud APIs are optional for strategic planning.
       </p>
 
       <div class="stack">
         <div class="stack-item">
-          <h3 class="stack-name">DeepSeek-R1:8B</h3>
-          <p class="stack-role">Formalist Agent</p>
-          <p class="stack-detail">R1 chain-of-thought reasoning with Qwen JSON compliance. ~6.5 GB RAM.</p>
+          <h3 class="stack-name">DeepSeek Prover V2:7B Q8</h3>
+          <p class="stack-role">Tactician</p>
+          <p class="stack-detail">Raw Lean 4 tactic generation. 1-2s per completion on Apple Silicon. ~7 GB VRAM.</p>
         </div>
         <div class="stack-item">
           <h3 class="stack-name">Lean 4.28.0</h3>
           <p class="stack-role">Proof Kernel</p>
-          <p class="stack-detail">Formal verification via tactic mode. The sole arbiter of mathematical truth.</p>
+          <p class="stack-detail">Formal verification via tactic mode. All proof steps are kernel-checked.</p>
+        </div>
+        <div class="stack-item">
+          <h3 class="stack-name">nomic-embed-text</h3>
+          <p class="stack-role">Embedder (RAG)</p>
+          <p class="stack-detail">768-dim local embeddings for semantic premise retrieval from the arXiv corpus.</p>
+        </div>
+        <div class="stack-item">
+          <h3 class="stack-name">LanceDB</h3>
+          <p class="stack-role">Vector Store</p>
+          <p class="stack-detail">Serverless embedded database. Stores arXiv chunks and Mathlib theorems for retrieval.</p>
         </div>
         <div class="stack-item">
           <h3 class="stack-name">Z3</h3>
           <p class="stack-role">SMT Pre-flight</p>
-          <p class="stack-detail">Bounded model checking. Kills false conjectures before they waste cycles.</p>
+          <p class="stack-detail">Bounded model checking. Filters out false conjectures before proof search begins.</p>
         </div>
         <div class="stack-item">
-          <h3 class="stack-name">Gemini 3.0 Flash / 3.1 Pro</h3>
-          <p class="stack-role">Architect (Escalation)</p>
-          <p class="stack-detail">Strategic redirect after repeated failures. Flash for planning, Pro for hard cases. ~$0.03/proof blended.</p>
+          <h3 class="stack-name">Gemini 2.5 Flash / 3.1 Pro</h3>
+          <p class="stack-role">Architect · Reasoner · Scribe</p>
+          <p class="stack-detail">Strategic redirect, proof planning, RAG-augmented directives, and LaTeX paper generation. ~$0.03/proof blended.</p>
         </div>
       </div>
     </div>
@@ -117,10 +158,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   <!-- CTA -->
   <section class="cta">
     <div class="container" style="text-align: center;">
-      <h2 class="cta-heading">Follow the journey</h2>
+      <h2 class="cta-heading">Building in public</h2>
       <p class="cta-body">
-        We're building in public. Watch the agent reason through proofs in real time,
-        or read about our milestones on the blog.
+        Watch proof attempts in real time or read about progress on the blog.
       </p>
       <div class="cta-actions">
         <a href="/minutiae/" class="btn btn-primary">Live Feed →</a>

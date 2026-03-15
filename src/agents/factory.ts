@@ -1,25 +1,28 @@
 /**
- * Sprint 8: AgentFactory — Specialist Instantiation
+ * Hybrid Roster: AgentFactory — Signals-Based Specialist Instantiation
  *
- * Provides a uniform interface for all specialists and a factory
- * method to instantiate the correct agent for a given role.
+ * 4-Tier Escalation:
+ *   TACTICIAN (local Ollama)  → default tactic spray
+ *   REASONER  (Gemini cloud)  → tactical unblocking
+ *   ARCHITECT (Gemini cloud)  → structural planning
  *
- * Each specialist implements SpecialistAgent so the orchestrator
- * can call them interchangeably.
+ * Gemini model tiers selected by RoutingSignals:
+ *   < M (4) failures: gemini-2.5-flash (free tier)
+ *   ≥ M failures:     gemini-3.1-flash-lite-preview (paid flash)
+ *   ≥ N (6) failures: gemini-3.1-pro-preview (break glass)
  */
 
-import type { AgentRole } from "../types";
-import type { ArchitectTier } from "./router";
-import type { FormalistResponse, ArchitectResponse } from "../schemas";
+import type { AgentRole, RoutingSignals } from "../types";
+import type { FormalistResponse } from "../schemas";
 import { FormalistAgent, type FormalistConfig } from "./formalist";
-import { ArchitectClient, type ArchitectClientConfig } from "../architect_client";
+import { GeminiAgent, type GeminiModelTier } from "./gemini";
 
 // ──────────────────────────────────────────────
 // Specialist Agent Interface
 // ──────────────────────────────────────────────
 
-/** Response type: either a FormalistResponse (Tactician/Reasoner) or ArchitectResponse */
-export type SpecialistResponse = FormalistResponse | ArchitectResponse;
+/** Response type: unified across all specialists. */
+export type SpecialistResponse = FormalistResponse | Record<string, any>;
 
 /**
  * A unified interface for all specialist agents.
@@ -36,7 +39,7 @@ export interface SpecialistAgent {
 
 /**
  * Wraps FormalistAgent as a SpecialistAgent.
- * Used for both TACTICIAN and REASONER roles.
+ * Used for TACTICIAN only (local Ollama model).
  */
 class FormalistSpecialist implements SpecialistAgent {
   readonly role: AgentRole;
@@ -60,19 +63,22 @@ class FormalistSpecialist implements SpecialistAgent {
 }
 
 /**
- * Wraps ArchitectClient as a SpecialistAgent.
- * Used for the ARCHITECT role (Gemini cloud).
+ * Wraps GeminiAgent as a SpecialistAgent.
+ * Used for REASONER and ARCHITECT roles (Gemini cloud).
  */
-class ArchitectSpecialist implements SpecialistAgent {
-  readonly role: AgentRole = "ARCHITECT";
-  private readonly client: ArchitectClient;
+class GeminiSpecialist implements SpecialistAgent {
+  readonly role: AgentRole;
+  readonly modelTier: GeminiModelTier;
+  private readonly agent: GeminiAgent;
 
-  constructor(config: ArchitectClientConfig) {
-    this.client = new ArchitectClient(config);
+  constructor(role: AgentRole, modelTier: GeminiModelTier, apiKey: string) {
+    this.role = role;
+    this.modelTier = modelTier;
+    this.agent = new GeminiAgent(role, modelTier, apiKey);
   }
 
-  async generateMove(context: string): Promise<ArchitectResponse> {
-    return this.client.escalate(context);
+  async generateMove(context: string, retries?: number): Promise<any> {
+    return this.agent.generateMove(context, retries);
   }
 }
 
@@ -83,25 +89,22 @@ class ArchitectSpecialist implements SpecialistAgent {
 export interface FactoryConfig {
   /** Ollama endpoint (default: http://localhost:11434) */
   ollamaEndpoint?: string;
-  /** Gemini API key (required for ARCHITECT). Falls back to process.env.GEMINI_API_KEY. */
+  /** Gemini API key (required for REASONER & ARCHITECT). Falls back to process.env.GEMINI_API_KEY. */
   geminiApiKey?: string;
-  /** Gemini Pro model (default: gemini-2.5-pro) — used for heavy structural rethinks. */
-  geminiProModel?: string;
-  /** Gemini Flash model (default: gemini-2.5-flash) — used for proof plans and light checks. */
-  geminiFlashModel?: string;
   /** Tactician system prompt (short, tactic-focused) */
   tacticianSystemPrompt?: string;
-  /** Reasoner system prompt (full, JSON-focused) */
-  reasonerSystemPrompt?: string;
+  /** Advanced Flash threshold M (default: 4) */
+  thresholdM?: number;
+  /** Break Glass Pro threshold N (default: 6) */
+  thresholdN?: number;
 }
 
-const DEFAULT_FACTORY_CONFIG: Required<FactoryConfig> = {
+const DEFAULT_FACTORY_CONFIG = {
   ollamaEndpoint: "http://localhost:11434",
   geminiApiKey: "",
-  geminiProModel: "gemini-3.1-pro-preview",
-  geminiFlashModel: "gemini-3-flash-preview",
   tacticianSystemPrompt: "You are a Lean 4 theorem prover. When given a theorem, output ONLY the tactic(s) to complete the proof. No explanations. No markdown. Just the tactic code.",
-  reasonerSystemPrompt: "",  // Loaded from workspace at runtime
+  thresholdM: 4,
+  thresholdN: 6,
 };
 
 // ──────────────────────────────────────────────
@@ -111,8 +114,15 @@ const DEFAULT_FACTORY_CONFIG: Required<FactoryConfig> = {
 export class AgentFactory {
   private readonly config: Required<FactoryConfig>;
 
+  /** Escalation threshold: advance to paid Flash-Lite. */
+  readonly THRESHOLD_M: number;
+  /** Escalation threshold: break glass to Pro. */
+  readonly THRESHOLD_N: number;
+
   constructor(config: FactoryConfig = {}) {
-    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config };
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config } as Required<FactoryConfig>;
+    this.THRESHOLD_M = this.config.thresholdM;
+    this.THRESHOLD_N = this.config.thresholdN;
   }
 
   /** Resolve API key: explicit config > process.env > empty */
@@ -121,16 +131,14 @@ export class AgentFactory {
   }
 
   /**
-   * Create a SpecialistAgent for the given role.
+   * Create a SpecialistAgent for the given role, selecting the Gemini
+   * tier based on routing signals.
    *
-   * - TACTICIAN: deepseek-prover-v2:7b-q8 (fast, low temp, small output)
-   * - REASONER:  deepseek-r1:8b (slow, higher temp, large output, JSON)
-   * - ARCHITECT: Gemini via ArchitectClient (cloud, structural analysis)
-   *
-   * @param role - The specialist role to instantiate.
-   * @param tier - For ARCHITECT: "FLASH" (default) or "PRO". Ignored for other roles.
+   * - TACTICIAN: Always local (deepseek-prover-v2:7b-q8)
+   * - REASONER:  Gemini 2.5 Flash (free) or 3.1 Flash-Lite (paid, ≥M failures)
+   * - ARCHITECT: Gemini 2.5 Flash (free) or 3.1 Pro (break glass, ≥N failures)
    */
-  getAgent(role: AgentRole, tier: ArchitectTier = "FLASH"): SpecialistAgent {
+  getAgent(role: AgentRole, signals: RoutingSignals): SpecialistAgent {
     switch (role) {
       case "TACTICIAN":
         return new FormalistSpecialist("TACTICIAN", {
@@ -138,19 +146,24 @@ export class AgentFactory {
           model: "deepseek-prover-v2:7b-q8",
           temperature: 0.3,
           numPredict: 256,
-          mode: "chat",
+          mode: "completion",
           systemPrompt: this.config.tacticianSystemPrompt,
-        }, 1);  // Tactician: only 1 retry (fast iteration, let the loop retry)
+        }, 3);
 
-      case "REASONER":
-        return new FormalistSpecialist("REASONER", {
-          endpoint: this.config.ollamaEndpoint,
-          model: "deepseek-r1:8b",
-          temperature: 0.6,
-          numPredict: 4096,
-          mode: "chat",
-          systemPrompt: this.config.reasonerSystemPrompt,
-        }, 3);  // Reasoner: 3 retries (slower, make each count)
+      case "REASONER": {
+        const apiKey = this.resolveGeminiApiKey();
+        if (!apiKey) {
+          throw new Error(
+            "REASONER role requires a Gemini API key. Set geminiApiKey in FactoryConfig or GEMINI_API_KEY env var."
+          );
+        }
+
+        const reasonerTier: GeminiModelTier = signals.consecutiveFailures >= this.THRESHOLD_M
+          ? "gemini-3.1-flash-lite-preview"
+          : "gemini-2.5-flash";
+
+        return new GeminiSpecialist("REASONER", reasonerTier, apiKey);
+      }
 
       case "ARCHITECT": {
         const apiKey = this.resolveGeminiApiKey();
@@ -159,13 +172,12 @@ export class AgentFactory {
             "ARCHITECT role requires a Gemini API key. Set geminiApiKey in FactoryConfig or GEMINI_API_KEY env var."
           );
         }
-        const model = tier === "PRO"
-          ? this.config.geminiProModel
-          : this.config.geminiFlashModel;
-        return new ArchitectSpecialist({
-          apiKey,
-          model,
-        });
+
+        const architectTier: GeminiModelTier = signals.globalFailures >= this.THRESHOLD_N
+          ? "gemini-3.1-pro-preview"
+          : "gemini-2.5-flash";
+
+        return new GeminiSpecialist("ARCHITECT", architectTier, apiKey);
       }
 
       default:

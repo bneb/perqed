@@ -1,20 +1,20 @@
 /**
- * Sprint 8: AgentRouter — Signal-Based Specialist Selection
+ * Hybrid Roster: AgentRouter — Signal-Based Specialist Selection
  *
  * Pure function. No I/O, no side effects. Analyzes telemetry
  * signals to determine which specialist should handle the next move.
  *
- * Routing priority (evaluated top-to-bottom):
- *   1. Initial state (no attempts)     → ARCHITECT (build proof plan)
- *   2. 5+ consecutive failures         → ARCHITECT (structural rethink)
- *   3. 3+ failures / stuck / multigoal → REASONER  (strategic unblock)
- *   4. Default                          → TACTICIAN (fast tactic spray)
+ * 4-Tier Escalation (evaluated top-to-bottom):
+ *   1. Initial state (no attempts)                → ARCHITECT (build proof plan)
+ *   2. 6+ global tree failures                    → ARCHITECT (break glass / structural rethink)
+ *   3. 3+ local failures / stuck / multigoal      → REASONER  (tactical unblock)
+ *   4. Default                                     → TACTICIAN (fast tactic spray)
+ *
+ * The ARCHITECT sees global tree health; the REASONER sees local node state.
+ * Gemini tier selection is handled by the AgentFactory, not the router.
  */
 
 import type { AgentRole, RoutingSignals } from "../types";
-
-/** Architect sub-tier: Flash (fast/cheap) vs Pro (deep reasoning). */
-export type ArchitectTier = "FLASH" | "PRO";
 
 export class AgentRouter {
 
@@ -30,12 +30,15 @@ export class AgentRouter {
       return "ARCHITECT";
     }
 
-    // ── Priority 2: Total failure — Architect must intervene structurally ──
-    if (signals.consecutiveFailures >= 5) {
+    // ── Priority 2: Global tree failure (N=6+) — Architect must intervene structurally ──
+    // Requires BOTH global tree health to be poor AND an active local crisis
+    // (consecutive failures >= 6). Prevents infinite ARCHITECT loops when
+    // tree-accumulated errors persist after a DIRECTIVE reset.
+    if (signals.globalFailures >= 6 && signals.consecutiveFailures >= 6) {
       return "ARCHITECT";
     }
 
-    // ── Priority 3: Struggling — Reasoner analyzes and unblocks ──
+    // ── Priority 3: Struggling (3+) — Reasoner analyzes and unblocks ──
     if (
       signals.consecutiveFailures >= 3 ||
       signals.isStuckInLoop ||
@@ -46,23 +49,6 @@ export class AgentRouter {
 
     // ── Priority 4: Normal operation — Tactician fires fast tactics ──
     return "TACTICIAN";
-  }
-
-  /**
-   * Determine which Gemini tier to use when the ARCHITECT is selected.
-   *
-   * - FLASH: Initial proof plan, periodic checks (fast, cheap)
-   * - PRO:   Heavy structural rethink after total failure (deep reasoning)
-   */
-  static determineArchitectTier(signals: RoutingSignals): ArchitectTier {
-    // Pro only for severe failure — 5+ consecutive failures means
-    // we need Gemini's deep reasoning to fundamentally rethink approach
-    if (signals.consecutiveFailures >= 5) {
-      return "PRO";
-    }
-
-    // Everything else (initial plan, light checks) → Flash
-    return "FLASH";
   }
 
   /**

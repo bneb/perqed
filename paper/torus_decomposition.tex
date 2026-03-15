@@ -1,0 +1,259 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  breaklines=true,
+  frame=single,
+  xleftmargin=1em,
+}
+
+\title{A Formalized Lean~4 Proof of the $m=4$ Directed Hamiltonian\\Torus Decomposition via Stochastic Search}
+
+\author{
+  Kevin Nebeker\\
+  \texttt{kevin@perqed.com}
+}
+
+\date{March 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We present a machine-checked formal proof of the $m=4$ case of the Directed
+Hamiltonian Torus Decomposition problem, verified by the Lean~4 kernel via
+the \texttt{decide} tactic. Empirical solutions for even $m$ have been found
+computationally by several authors, and Morrison formalized Knuth's odd-$m$
+construction in Lean~4, but no machine-checked proof of an even-$m$ case has
+been published. We use Simulated Annealing with a non-monotonic cooling
+schedule to find a valid decomposition of the $4 \times 4 \times 4$ directed
+torus (64 vertices, 192 arcs) in 93 seconds on an Apple~M4 processor. We
+then verify the result inside Lean's trusted kernel. We describe the energy
+function, a subtlety involving in-degree regularity, and the practical
+considerations for scaling this approach to larger values of~$m$.
+\end{abstract}
+
+\section{Introduction}
+
+Consider a three-dimensional directed graph $G_m$ with vertex set
+$V = \{(i, j, k) : 0 \le i, j, k < m\}$ and directed edges from each vertex
+$(i,j,k)$ to $(i{+}1, j, k)$, $(i, j{+}1, k)$, and $(i, j, k{+}1)$, all
+modulo~$m$. This graph has $m^3$ vertices and $3m^3$ arcs.
+
+\begin{definition}
+A \emph{Directed Hamiltonian Torus Decomposition} of $G_m$ is a partition of
+the $3m^3$ arcs into exactly 3 directed Hamiltonian cycles, each of
+length~$m^3$.
+\end{definition}
+
+Knuth posed this problem in the context of Volume~4B of \emph{The Art of
+Computer Programming}~\cite{knuth2026}. In February 2026, Anthropic's Claude
+Opus~4.6 found a generalized algebraic construction for all odd~$m$, which
+Knuth verified and proved correct. During the same exploration, Claude found
+isolated empirical solutions for $m = 4$, $m = 6$, and $m = 8$, but could
+not generalize them. In a March~6 revision, Knuth noted that Keston
+Aquino-Michaels found an elegant decomposition for general even~$m$ using a
+combination of GPT and Claude.
+
+Morrison formalized Knuth's odd-$m$ proof in Lean~4 on March~4, 2026.
+To our knowledge, no machine-checked proof of any even-$m$ case has been
+published.
+
+We make the following contributions:
+\begin{enumerate}
+  \item A machine-checked proof of the $m = 4$ decomposition, verified by
+  the {\texttt{decide}} tactic inside Lean's trusted kernel (no external
+  compiler in the trusted computing base).
+  \item A corrected energy function for the stochastic search that accounts
+  for in-degree regularity, avoiding a subtle failure mode in functional
+  graphs.
+  \item A non-monotonic cooling schedule with energy-proportional
+  reheating~\cite{kirkpatrick1983,marinari1992}, and a discussion of why
+  this approach may scale better than SAT encodings for larger~$m$.
+\end{enumerate}
+
+The empirical discovery of $m=4$ solutions is not new. Our contribution is
+the formal verification and the description of the pipeline.
+
+\section{Method}
+
+\subsection{State Space}
+
+At each vertex, the three outgoing arcs are assigned to three colors
+$\{0, 1, 2\}$. There are $3! = 6$ valid assignments per vertex, giving a
+search space of $6^{64} \approx 6.3 \times 10^{49}$ for $m=4$.
+
+We represent a state as an array $\sigma \in \{0, \ldots, 5\}^{64}$, where
+$\sigma[v]$ selects which permutation of $\{0,1,2\}$ is applied to the
+outgoing directions $(+x, +y, +z)$ at vertex~$v$.
+
+The automorphism group of $G_4$ has order $64 \times 6 \times 6 = 2{,}304$,
+comprising spatial translations, axis permutations, and color permutations.
+We fix $\sigma[0] = 0$ without loss of generality, breaking the $3! = 6$
+color permutations and reducing the search space to $6^{63}$. The remaining
+384-fold redundancy from translations and axis permutations is not exploited.
+
+\subsection{Energy Function}
+
+Each color subgraph has out-degree~1 at every vertex by construction. However,
+the in-degree is not guaranteed to be~1: a vertex may receive zero or multiple
+incoming arcs of a given color from its three axial predecessors. A graph with
+out-degree~1 but variable in-degree is a functional graph, whose components
+consist of directed cycles with trees feeding into them. A naive cycle-counting
+energy function can assign $E = 0$ to such a lasso topology, incorrectly
+reporting it as a Hamiltonian cycle.
+
+\begin{definition}
+Let $C_c(\sigma)$ be the number of components traced by following successors
+in the color-$c$ subgraph, and let $D_c(\sigma)$ be the number of vertices
+with in-degree $\ne 1$ for color~$c$. The energy is
+\[
+  E(\sigma) = \sum_{c=0}^{2} \bigl(C_c(\sigma) - 1\bigr)
+            + \sum_{c=0}^{2} D_c(\sigma).
+\]
+\end{definition}
+
+The in-degree penalty ensures that $E = 0$ requires each color subgraph to
+be a single cycle visiting all 64 vertices, i.e., a Hamiltonian cycle. The
+energy can be computed in $O(m^3)$ time.
+
+\subsection{Non-Monotonic Cooling}
+
+We use the Metropolis-Hastings algorithm with a single-vertex mutation
+operator. A random vertex $v \in \{1, \ldots, 63\}$ is selected and its
+permutation changed to one of the five alternatives.
+
+The cooling schedule is $T_k = T_0 \cdot \alpha^k$ with $T_0 = 50$ and
+$\alpha = 0.999998$. When the best energy has not improved for $W$ iterations,
+the temperature is set to $T_r = \max(1,\; E_{\text{best}}^{2/5})$ and the
+window is doubled ($W \leftarrow 2W$). Upon improvement, $W$ resets. This is
+a standard non-monotonic cooling schedule~\cite{kirkpatrick1983,marinari1992}
+with a power-law reheat temperature that scales with the current difficulty
+of the optimization.
+
+\subsection{Scaling Considerations}
+
+A SAT or ILP encoding of Hamiltonian cycle decomposition requires sub-tour
+elimination constraints. In ILP, these are typically formulated via
+Miller-Tucker-Zemlin auxiliary variables~\cite{miller1960}; in pure Boolean
+SAT, positional or reachability encodings introduce $O(V^2 \log V)$ to
+$O(V^3)$ clauses. For $m = 4$ ($V = 64$), this is straightforward and
+exact solvers will outperform our approach. For $m = 8$ ($V = 512$), the
+encoding requires hundreds of thousands of auxiliary variables per color
+and millions of clauses, which degrades solver performance.
+
+Our pipeline evaluates Hamiltonicity in $O(V)$ time with $V$ bytes of
+working memory, which remains practical at larger scales. We do not claim
+that SA is faster than SAT for small instances; rather, the memory profile
+of the stochastic approach is more favorable as $V$ grows.
+
+\section{Results}
+
+\begin{table}[h]
+\centering
+\caption{Simulated Annealing runs for $G_4$.}
+\label{tab:results}
+\begin{tabular}{@{}ccccl@{}}
+\toprule
+Run & Schedule & Reheat & Best $E$ & Outcome \\
+\midrule
+1 & $\alpha = 0.99999$ & None & 2 & Froze \\
+2 & $\alpha = 0.999998$ & Fixed, $T_r\!=\!5$ & 41 & Random walk \\
+3 & $\alpha = 0.999998$ & Fixed, $T_r\!=\!2$ & 0 & Solved (old $E$) \\
+\textbf{4} & $\alpha = \mathbf{0.999998}$ & $\mathbf{E^{2/5}}$, \textbf{backoff} & $\mathbf{0}$ & \textbf{Solved, 93s} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Run~3 used a cycle-counting energy without the in-degree penalty and is
+therefore not sound. Run~4 used the corrected energy function, vertex-0
+pinning, and the non-monotonic schedule described above. The solution was
+found at iteration 1{,}366{,}834 of restart~12, running at approximately
+1.5 million iterations per second on an Apple~M4.
+
+\section{Formal Verification}
+
+The discovered witness is a 64-element array of integers in $\{0,\ldots,5\}$.
+We encode this array, the successor function, and the verification
+predicate as computable Lean~4 definitions using structural recursion on
+natural numbers. No Mathlib dependencies are required.
+
+The main theorem is:
+
+\begin{lstlisting}[language=ML]
+set_option maxRecDepth 131072 in
+set_option maxHeartbeats 4000000 in
+theorem claude_cycles_m4_valid :
+  isValidDecomposition = true := by decide
+\end{lstlisting}
+
+The \texttt{decide} tactic reduces the Boolean expression inside Lean's
+kernel and confirms that it equals \texttt{true}. Unlike
+\texttt{native\_decide}, which compiles the term to C and trusts the
+compiler, \texttt{decide} keeps the entire evaluation within the type
+checker. The elevated \texttt{maxRecDepth} and \texttt{maxHeartbeats} are
+needed because the verification involves $64 \times 64 \times 3 = 12{,}288$
+orbit-membership checks.
+
+As a separate check, an independent TypeScript verifier confirms that each
+color subgraph forms a single 64-vertex cycle, that all 192 arcs are
+covered without overlap, and that every vertex has in-degree~1 and
+out-degree~1 per color.
+
+\section{Conclusion}
+
+We have given a machine-checked proof that the $4 \times 4 \times 4$
+directed torus admits a decomposition into three Hamiltonian cycles. The
+proof is verified by Lean's kernel via \texttt{decide}. The corrected energy
+function with in-degree penalties and the non-monotonic cooling schedule
+provide a sound stochastic search that we hope will extend to $m = 6$ and
+$m = 8$.
+
+Aquino-Michaels' general even-$m$ construction, if formalized, would
+subsume all finite cases. In the meantime, individual case verification
+through stochastic search and kernel checking provides a practical route
+to building confidence in the conjecture.
+
+All source code, the TypeScript stochastic engine, the witness payload, and
+the Lean~4 proof are available at \url{https://github.com/bneb/perqed}.
+
+\section*{Acknowledgments}
+
+We thank Donald Knuth for posing the problem, Kim Morrison for the Lean~4
+formalization of the odd-$m$ case, and Keston Aquino-Michaels for the
+general even-$m$ construction.
+
+\begin{thebibliography}{9}
+\bibitem{knuth2026}
+D.~E. Knuth, ``Three-dimensional Hamiltonian cycles in a torus,''
+March 2026. Available: \url{https://cs.stanford.edu/~knuth/papers/claude.pdf}
+
+\bibitem{kirkpatrick1983}
+S.~Kirkpatrick, C.~D.~Gelatt, and M.~P.~Vecchi, ``Optimization by simulated
+annealing,'' \emph{Science}, vol.~220, no.~4598, pp.~671--680, 1983.
+
+\bibitem{marinari1992}
+E.~Marinari and G.~Parisi, ``Simulated tempering: a new Monte Carlo scheme,''
+\emph{Europhysics Letters}, vol.~19, no.~6, pp.~451--458, 1992.
+
+\bibitem{miller1960}
+C.~E.~Miller, A.~W.~Tucker, and R.~A.~Zemlin, ``Integer programming
+formulation of traveling salesman problems,'' \emph{Journal of the ACM},
+vol.~7, no.~4, pp.~326--329, 1960.
+\end{thebibliography}
+
+\end{document}

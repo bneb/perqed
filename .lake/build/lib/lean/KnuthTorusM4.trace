@@ -1,0 +1,29 @@
+{"synthetic": false,
+ "schemaVersion": "2025-09-10",
+ "outputs":
+ {"o": ["09bd032051a72429.olean"],
+  "i": "ee16e499076412fb.ilean",
+  "c": "9999487352feea89.c"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/kevin/projects/perqed/.lake/build/lib/lean /Users/kevin/.elan/toolchains/leanprover--lean4---v4.28.0/bin/lean /Users/kevin/projects/perqed/src/lean/KnuthTorusM4.lean -o /Users/kevin/projects/perqed/.lake/build/lib/lean/KnuthTorusM4.olean -i /Users/kevin/projects/perqed/.lake/build/lib/lean/KnuthTorusM4.ilean -c /Users/kevin/projects/perqed/.lake/build/ir/KnuthTorusM4.c --setup /Users/kevin/projects/perqed/.lake/build/ir/KnuthTorusM4.setup.json --json",
+   "level": "trace"},
+  {"message": "src/lean/KnuthTorusM4.lean:64:0: true", "level": "info"}],
+ "inputs":
+ [["KnuthTorusM4:deps",
+   [["deps",
+     [["perqed/KnuthTorusM4:extraDep",
+       [["@perqed:extraDep", "00000000000006bb"]]],
+      ["imports", "00000000000006bb"]]],
+    ["libs",
+     [["import dynlibs", "00000000000006bb"],
+      ["package external libraries", "00000000000006bb"],
+      ["module dynlibs", "00000000000006bb"],
+      ["module plugins", "00000000000006bb"]]]]],
+  ["Lean 4.28.0, commit 7e01a1bf5c70fc6167d49c345d3bf80596e9a79b",
+   "a96bc04a2e5e9630"],
+  ["/Users/kevin/projects/perqed/src/lean/KnuthTorusM4.lean",
+   "7bffa44572267fcc"],
+  ["options", [["-DautoImplicit=false", "4a85acb881fd49d0"]]],
+  ["Module.leanArgs: #[]", "00000000000006bb"]],
+ "depHash": "d67f920064fc4215"}

@@ -1,0 +1,43 @@
+\documentclass{amsart}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+
+\newtheorem{theorem}{Theorem}
+
+\title{Right Identity of List Concatenation}
+\author{Perqed AI}
+
+\begin{document}
+
+\begin{abstract}
+We present a rigorous mathematical proof that appending an empty list to any given list yields the original list. This document translates a machine-verified Lean 4 formalization into a human-readable format.
+\end{abstract}
+
+\maketitle
+
+\begin{theorem}
+Let $\alpha$ be a type, and let $l$ be a list of elements of type $\alpha$. Then
+\[ l \mathbin{++} [] = l \]
+where $++$ denotes the list append operation, and $[]$ denotes the empty list.
+\end{theorem}
+
+\begin{proof}
+We proceed by structural induction on the list $l$. This mirrors the \texttt{induction l} tactic in the formal trace.
+
+\textbf{Base Case:} Suppose $l = []$. We must show that $[] \mathbin{++} [] = []$. This follows immediately from the base definition of the append operation, which states that $[] \mathbin{++} ys = ys$ for any list $ys$. Substituting $ys = []$, the equation holds trivially.
+
+\textbf{Inductive Step:} Suppose $l = x \mathbin{::} xs$ for some element $x \in \alpha$ and some list $xs$. Assume the inductive hypothesis, which states that $xs \mathbin{++} [] = xs$. We wish to show that $(x \mathbin{::} xs) \mathbin{++} [] = x \mathbin{::} xs$. 
+
+By the recursive definition of the append operation, pulling the head element out of the concatenation yields:
+\[ (x \mathbin{::} xs) \mathbin{++} [] = x \mathbin{::} (xs \mathbin{++} []) \]
+By our inductive hypothesis, we know that $xs \mathbin{++} [] = xs$. Substituting this into our equation, we obtain:
+\[ x \mathbin{::} (xs \mathbin{++} []) = x \mathbin{::} xs \]
+This establishes the inductive step. 
+
+In the formal Lean 4 trace, the \texttt{simp} tactic chained after the induction (\texttt{<;> simp}) automatically performs these definitional reductions and applies the inductive hypothesis to close both the base and inductive goals. 
+
+Since both the base case and the inductive step hold, the theorem is proven for all lists $l$ by the principle of structural induction.
+\end{proof}
+
+\end{document}

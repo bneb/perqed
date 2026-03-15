@@ -80,7 +80,7 @@ export class ArchitectClient {
    * @param context - The full state context (lab log + progress + objective).
    * @returns Validated ArchitectResponse with diagnosis, backtrack count, and new directive.
    */
-  async escalate(context: string): Promise<ArchitectResponse> {
+  async escalate(context: string, retries: number = 3): Promise<ArchitectResponse> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
     const payload = {
@@ -97,30 +97,47 @@ export class ArchitectClient {
       },
     };
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    let lastError = "";
 
-    if (!response.ok) {
-      throw new Error(
-        `Gemini API returned HTTP ${response.status}: ${await response.text()}`,
-      );
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Gemini API returned HTTP ${response.status}: ${await response.text()}`,
+          );
+        }
+
+        const body = (await response.json()) as GeminiApiResponse;
+
+        const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (!rawText) {
+          throw new Error("Gemini returned an empty response.");
+        }
+
+        // Strip markdown fences and parse
+        const jsonString = extractJSON(rawText);
+        const parsed = JSON.parse(jsonString);
+
+        return ArchitectResponseSchema.parse(parsed);
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        console.log(`   ⚠️ [Architect] attempt ${attempt}/${retries} failed: ${lastError}`);
+      }
     }
 
-    const body = (await response.json()) as GeminiApiResponse;
-
-    const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    if (!rawText) {
-      throw new Error("Gemini returned an empty response.");
-    }
-
-    // Strip markdown fences and parse
-    const jsonString = extractJSON(rawText);
-    const parsed = JSON.parse(jsonString);
-
-    return ArchitectResponseSchema.parse(parsed);
+    // Fallback: return a safe directive so the loop continues
+    console.log(`   🏛️ [Architect] All ${retries} attempts failed. Using fallback directive.`);
+    return {
+      analysis: `Architect escalation failed after ${retries} attempts: ${lastError}`,
+      steps_to_backtrack: 0,
+      new_directive: "Try a different approach. Use omega for linear arithmetic or induction for structural proofs.",
+    };
   }
 }
 

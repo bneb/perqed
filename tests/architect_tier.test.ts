@@ -1,12 +1,13 @@
 /**
- * Sprint 8b: Architect Tier Tests (TDD — RED first)
+ * Hybrid Roster: Gemini Tier Selection Tests (TDD)
  *
- * Tests that the router can distinguish between Flash (light)
- * and Pro (heavy) Architect tiers based on failure severity.
+ * Tests that the AgentFactory selects the correct Gemini model tier
+ * based on RoutingSignals:
+ *   - REASONER: < M(4) → 2.5-flash, ≥ M → 3.1-flash-lite
+ *   - ARCHITECT: < N(6) → 2.5-flash, ≥ N → 3.1-pro
  */
 
 import { describe, test, expect } from "bun:test";
-import { AgentRouter } from "../src/agents/router";
 import { AgentFactory } from "../src/agents/factory";
 import type { RoutingSignals } from "../src/types";
 
@@ -14,6 +15,7 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
   return {
     totalAttempts: 5,
     consecutiveFailures: 0,
+    globalFailures: 0,
     goalCount: 1,
     isStuckInLoop: false,
     lastErrors: [],
@@ -22,60 +24,54 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
   };
 }
 
-describe("AgentRouter — determineArchitectTier()", () => {
+describe("AgentFactory — Gemini tier based on signals", () => {
 
-  test("returns FLASH for initial proof plan (0 attempts)", () => {
-    const signals = makeSignals({ totalAttempts: 0 });
-    expect(AgentRouter.determineArchitectTier(signals)).toBe("FLASH");
-  });
+  const factory = new AgentFactory({ geminiApiKey: "test-key" });
 
-  test("returns PRO for 5+ consecutive failures (structural rethink)", () => {
-    const signals = makeSignals({ consecutiveFailures: 5 });
-    expect(AgentRouter.determineArchitectTier(signals)).toBe("PRO");
-  });
-
-  test("returns PRO for 7 consecutive failures", () => {
-    const signals = makeSignals({ consecutiveFailures: 7 });
-    expect(AgentRouter.determineArchitectTier(signals)).toBe("PRO");
-  });
-
-  test("returns FLASH when called for non-ARCHITECT role (fallback)", () => {
-    // If something unexpected routes here with low failures, default to cheap
-    const signals = makeSignals({ consecutiveFailures: 2 });
-    expect(AgentRouter.determineArchitectTier(signals)).toBe("FLASH");
-  });
-});
-
-describe("AgentFactory — Architect tier selection", () => {
-
-  test("creates Flash architect with correct role", () => {
-    const factory = new AgentFactory({ geminiApiKey: "test-key" });
-    const agent = factory.getAgent("ARCHITECT", "FLASH");
+  test("ARCHITECT at 0 failures → gemini-2.5-flash (free tier)", () => {
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ totalAttempts: 0 }));
     expect(agent.role).toBe("ARCHITECT");
+    expect((agent as any).modelTier).toBe("gemini-2.5-flash");
   });
 
-  test("creates Pro architect with correct role", () => {
-    const factory = new AgentFactory({ geminiApiKey: "test-key" });
-    const agent = factory.getAgent("ARCHITECT", "PRO");
-    expect(agent.role).toBe("ARCHITECT");
+  test("ARCHITECT at 5 globalFailures → gemini-2.5-flash (still below N=6)", () => {
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ globalFailures: 5 }));
+    expect((agent as any).modelTier).toBe("gemini-2.5-flash");
   });
 
-  test("defaults to Flash when no tier specified", () => {
-    const factory = new AgentFactory({ geminiApiKey: "test-key" });
-    // Should not throw — defaults to flash
-    const agent = factory.getAgent("ARCHITECT");
-    expect(agent.role).toBe("ARCHITECT");
+  test("ARCHITECT at N=6 globalFailures → gemini-3.1-pro-preview (break glass)", () => {
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ globalFailures: 6 }));
+    expect((agent as any).modelTier).toBe("gemini-3.1-pro-preview");
+  });
+
+  test("ARCHITECT at 7 globalFailures → still gemini-3.1-pro-preview", () => {
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ globalFailures: 7 }));
+    expect((agent as any).modelTier).toBe("gemini-3.1-pro-preview");
+  });
+
+  test("REASONER at 0 failures → gemini-2.5-flash (free tier)", () => {
+    const agent = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 0 }));
+    expect((agent as any).modelTier).toBe("gemini-2.5-flash");
+  });
+
+  test("REASONER at 3 failures → gemini-2.5-flash (below M=4)", () => {
+    const agent = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 3 }));
+    expect((agent as any).modelTier).toBe("gemini-2.5-flash");
+  });
+
+  test("REASONER at M=4 failures → gemini-3.1-flash-lite-preview (paid tier)", () => {
+    const agent = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 4 }));
+    expect((agent as any).modelTier).toBe("gemini-3.1-flash-lite-preview");
   });
 
   test("reads GEMINI_API_KEY from process.env as fallback", () => {
     const originalKey = process.env.GEMINI_API_KEY;
     process.env.GEMINI_API_KEY = "env-test-key";
     try {
-      const factory = new AgentFactory(); // No key in config
-      const agent = factory.getAgent("ARCHITECT");
+      const f = new AgentFactory(); // No key in config
+      const agent = f.getAgent("ARCHITECT", makeSignals());
       expect(agent.role).toBe("ARCHITECT");
     } finally {
-      // Restore
       if (originalKey !== undefined) {
         process.env.GEMINI_API_KEY = originalKey;
       } else {

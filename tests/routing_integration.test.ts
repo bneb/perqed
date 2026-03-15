@@ -12,7 +12,7 @@ import { describe, test, expect } from "bun:test";
 import { buildRoutingSignals } from "../src/orchestrator";
 import { AgentRouter } from "../src/agents/router";
 import { AgentFactory } from "../src/agents/factory";
-import type { AttemptLog } from "../src/types";
+import type { AttemptLog, RoutingSignals } from "../src/types";
 
 function makeLog(overrides: Partial<AttemptLog> = {}): AttemptLog {
   return {
@@ -20,6 +20,19 @@ function makeLog(overrides: Partial<AttemptLog> = {}): AttemptLog {
     action: "PROPOSE_LEAN_TACTICS",
     success: false,
     timestamp: Date.now(),
+    ...overrides,
+  };
+}
+
+function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
+  return {
+    totalAttempts: 1,
+    consecutiveFailures: 0,
+    globalFailures: 0,
+    goalCount: 1,
+    isStuckInLoop: false,
+    lastErrors: [],
+    hasArchitectDirective: false,
     ...overrides,
   };
 }
@@ -74,7 +87,7 @@ describe("End-to-End Routing Integration", () => {
     expect(role).toBe("REASONER");
   });
 
-  test("5+ failures → ARCHITECT (total structural failure)", () => {
+  test("6+ global tree failures → ARCHITECT (break glass structural failure)", () => {
     const logs = [
       makeLog({ agent: "ARCHITECT", success: true }),
       makeLog({ agent: "TACTICIAN", success: false }),
@@ -82,19 +95,22 @@ describe("End-to-End Routing Integration", () => {
       makeLog({ agent: "REASONER", success: false }),
       makeLog({ agent: "TACTICIAN", success: false }),
       makeLog({ agent: "TACTICIAN", success: false }),
+      makeLog({ agent: "TACTICIAN", success: false }),
     ];
     const signals = buildRoutingSignals(logs, "⊢ n + m = m + n", false);
+    // Simulate ProofTree.getGlobalTreeFailures() — in production this comes from the tree
+    signals.globalFailures = 6;
     const role = AgentRouter.determineNextAgent(signals);
     expect(role).toBe("ARCHITECT");
   });
 
   test("factory creates correct agent for each routed role", () => {
     const factory = new AgentFactory({ geminiApiKey: "test-key" });
+    const signals = makeSignals();
 
-    // Simulate all three routing outcomes
-    const tacticianAgent = factory.getAgent("TACTICIAN");
-    const reasonerAgent = factory.getAgent("REASONER");
-    const architectAgent = factory.getAgent("ARCHITECT");
+    const tacticianAgent = factory.getAgent("TACTICIAN", signals);
+    const reasonerAgent = factory.getAgent("REASONER", signals);
+    const architectAgent = factory.getAgent("ARCHITECT", signals);
 
     expect(tacticianAgent.role).toBe("TACTICIAN");
     expect(reasonerAgent.role).toBe("REASONER");

@@ -116,18 +116,24 @@ describe("buildSlimContext()", () => {
 
   test("includes last error when provided", () => {
     const ctx = buildSlimContext("nat_add_comm", "(n m : Nat) : n + m = m + n", "unknown identifier 'simp'");
-    expect(ctx).toContain("Previous tactic failed with error:");
+    expect(ctx).toContain("Previous tactic failed:");
     expect(ctx).toContain("unknown identifier 'simp'");
+    // Error is wrapped in a Lean comment block
+    expect(ctx).toContain("/-");
+    expect(ctx).toContain("-/");
   });
 
   test("omits error section when no error", () => {
     const ctx = buildSlimContext("nat_add_comm", "(n m : Nat) : n + m = m + n");
     expect(ctx).not.toContain("Previous tactic failed");
+    expect(ctx).not.toContain("/-");
   });
 
-  test("starts with instruction to output only tactics", () => {
+  test("starts with theorem in Lean 4 format (no English instructions)", () => {
     const ctx = buildSlimContext("nat_add_comm", "(n m : Nat) : n + m = m + n");
-    expect(ctx.startsWith("Prove this theorem")).toBe(true);
-    expect(ctx).toContain("ONLY the tactic");
+    expect(ctx.startsWith("theorem nat_add_comm")).toBe(true);
+    // Should NOT contain English instructions
+    expect(ctx).not.toContain("Prove this");
+    expect(ctx).not.toContain("ONLY");
   });
 });

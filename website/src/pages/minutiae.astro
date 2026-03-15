@@ -1,5 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
+const GIST_RAW_URL = "https://gist.githubusercontent.com/bneb/66d185688c92067a1878666b311aab1a/raw/perqed_live_state.json";
 ---
 
 <BaseLayout title="Minutiae — Perqed Live Feed" activeNav="minutiae">
@@ -11,7 +13,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <p class="eyebrow">Live Feed</p>
           <h1 class="header-title">Minutiae</h1>
           <p class="header-desc">
-            Watch the proof engine reason through mathematics in real time.
+            Live telemetry from the proof engine.
           </p>
         </div>
         <div class="status-badge" id="status-badge">
@@ -27,16 +29,16 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <div class="container container--wide">
       <div class="sb">
         <div class="sb-item">
+          <span class="sb-label">Run</span>
+          <span class="sb-value" id="sb-run">—</span>
+        </div>
+        <div class="sb-item">
           <span class="sb-label">Theorem</span>
           <span class="sb-value" id="sb-theorem">—</span>
         </div>
         <div class="sb-item">
           <span class="sb-label">Iteration</span>
           <span class="sb-value" id="sb-iteration">—</span>
-        </div>
-        <div class="sb-item">
-          <span class="sb-label">Elapsed</span>
-          <span class="sb-value" id="sb-elapsed">—</span>
         </div>
         <div class="sb-item">
           <span class="sb-label">Status</span>
@@ -46,53 +48,111 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     </div>
   </section>
 
-  <!-- Terminals -->
-  <section class="term-section">
+  <!-- Routing Cascade -->
+  <section class="cascade-section">
     <div class="container container--wide">
-      <div class="term-grid">
-        <div class="terminal">
-          <div class="terminal-header">
-            <span class="terminal-dot terminal-dot--red"></span>
-            <span class="terminal-dot terminal-dot--amber"></span>
-            <span class="terminal-dot terminal-dot--green"></span>
-            <span class="terminal-title">lean — tactic state</span>
-          </div>
-          <div class="terminal-body" id="tactic-state">
-            <span class="cursor-blink">▊</span>
+      <h3 class="panel-heading">Routing Cascade</h3>
+      <div class="cascade-grid" id="cascade-grid">
+        <div class="cascade-card" id="tier-tactician" data-tier="TACTICIAN">
+          <div class="cascade-icon">🔫</div>
+          <div class="cascade-name">TACTICIAN</div>
+          <div class="cascade-model">prover-v2 (local)</div>
+          <div class="cascade-cost">$0</div>
+          <div class="cascade-badge" id="badge-tactician">—</div>
+        </div>
+        <div class="cascade-arrow">→</div>
+        <div class="cascade-card" id="tier-reasoner-free" data-tier="REASONER_FREE">
+          <div class="cascade-icon">🧠</div>
+          <div class="cascade-name">REASONER</div>
+          <div class="cascade-model">gemini-2.5-flash</div>
+          <div class="cascade-cost">FREE</div>
+          <div class="cascade-badge" id="badge-reasoner-free">—</div>
+        </div>
+        <div class="cascade-arrow">→</div>
+        <div class="cascade-card" id="tier-reasoner-paid" data-tier="REASONER_PAID">
+          <div class="cascade-icon">🧠</div>
+          <div class="cascade-name">REASONER+</div>
+          <div class="cascade-model">gemini-3.1-flash-lite</div>
+          <div class="cascade-cost">M≥4</div>
+          <div class="cascade-badge" id="badge-reasoner-paid">—</div>
+        </div>
+        <div class="cascade-arrow">→</div>
+        <div class="cascade-card" id="tier-architect-pro" data-tier="ARCHITECT_PRO">
+          <div class="cascade-icon">🏛️</div>
+          <div class="cascade-name">ARCHITECT</div>
+          <div class="cascade-model">gemini-3.1-pro</div>
+          <div class="cascade-cost">N≥6</div>
+          <div class="cascade-badge" id="badge-architect-pro">—</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Signals + History -->
+  <section class="panels-section">
+    <div class="container container--wide">
+      <div class="panels-grid">
+        <!-- Signals Panel -->
+        <div>
+          <h3 class="panel-heading">Routing Signals</h3>
+          <div class="signals-panel" id="signals-panel">
+            <div class="signal-row">
+              <span class="signal-label">consecutiveFailures</span>
+              <span class="signal-value" id="sig-failures">0</span>
+            </div>
+            <div class="signal-threshold">
+              <div class="threshold-bar" id="threshold-bar">
+                <div class="threshold-fill" id="threshold-fill"></div>
+                <div class="threshold-mark" style="left: 57.14%">
+                  <span class="threshold-label">M=4</span>
+                </div>
+                <div class="threshold-mark" style="left: 85.71%">
+                  <span class="threshold-label">N=6</span>
+                </div>
+              </div>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">goalCount</span>
+              <span class="signal-value" id="sig-goals">0</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">isStuckInLoop</span>
+              <span class="signal-value" id="sig-loop">false</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">hasArchitectDirective</span>
+              <span class="signal-value" id="sig-directive">false</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">totalAttempts</span>
+              <span class="signal-value" id="sig-attempts">0</span>
+            </div>
           </div>
         </div>
 
-        <div class="terminal">
-          <div class="terminal-header">
-            <span class="terminal-dot terminal-dot--red"></span>
-            <span class="terminal-dot terminal-dot--amber"></span>
-            <span class="terminal-dot terminal-dot--green"></span>
-            <span class="terminal-title">deepseek-r1:8b — reasoning</span>
-          </div>
-          <div class="terminal-body" id="llm-thinking">
-            <span class="cursor-blink">▊</span>
+        <!-- Attempt History -->
+        <div>
+          <h3 class="panel-heading">Attempt History</h3>
+          <div class="history-list" id="history-list">
+            <p class="empty-msg">Waiting for data…</p>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Panels -->
-  <section class="panels-section">
+  <!-- Latest Error Terminal -->
+  <section class="term-section">
     <div class="container container--wide">
-      <div class="panels-grid">
-        <div>
-          <h3 class="panel-heading">Proposed Tactics</h3>
-          <div id="tactics-list" class="tactics-list">
-            <p class="empty-msg">Waiting for data…</p>
-          </div>
+      <div class="terminal">
+        <div class="terminal-header">
+          <span class="terminal-dot terminal-dot--red"></span>
+          <span class="terminal-dot terminal-dot--amber"></span>
+          <span class="terminal-dot terminal-dot--green"></span>
+          <span class="terminal-title">latest error output</span>
         </div>
-
-        <div>
-          <h3 class="panel-heading">Event Log</h3>
-          <div id="event-log" class="event-log">
-            <p class="empty-msg">Waiting for events…</p>
-          </div>
+        <div class="terminal-body" id="error-output">
+          <span class="cursor-blink">▊</span>
         </div>
       </div>
     </div>
@@ -100,71 +160,141 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 </BaseLayout>
 
-<script is:inline>
-  var DEMO = {
-    theorem: "nat_add_comm (n m : Nat) : n + m = m + n",
-    iteration: 1,
-    elapsed: "47s",
-    status: "SOLVED",
-    tacticState: "n m : Nat\n⊢ n + m = m + n",
-    thinking: "Okay, I need to prove that n + m = m + n for natural numbers.\n\nThis is the commutativity of addition. Let me think about what tactics are available in Lean 4 / Mathlib...\n\nOption 1: \"omega\" — this is a decision procedure for linear arithmetic over integers and naturals. It should handle this directly.\n\nOption 2: \"simp [Nat.add_comm]\" — this uses the simplifier with the known commutativity lemma.\n\nOption 3: Manual induction on n, then use succ_add and the inductive hypothesis. More verbose but always works.\n\nI'm most confident in omega since it's a complete decision procedure for this class of problems.",
-    tactics: [
-      { tactic: "omega", confidence: 0.95, result: "complete" },
-      { tactic: "simp [Nat.add_comm]", confidence: 0.82, result: "complete" },
-      { tactic: "induction n with | zero => simp | succ n ih => simp [Nat.succ_add, ih]", confidence: 0.70, result: null }
-    ],
-    events: [
-      { time: "00:00", message: "Z3 pre-flight: unsat (no counterexample found)" },
-      { time: "00:01", message: "FormalistAgent: sending tactic state to deepseek-r1:8b" },
-      { time: "00:32", message: "LLM response received (1,847 think tokens + JSON)" },
-      { time: "00:32", message: "Dispatching 3 tactics via Promise.all()" },
-      { time: "00:47", message: "✓ Proof complete — omega (confidence: 0.95)" },
-      { time: "00:47", message: "Committed to verified_lib/nat_add_comm.lean" }
-    ]
+<script is:inline define:vars={{ GIST_RAW_URL }}>
+  var POLL_INTERVAL = 3000;
+  var lastIteration = -1;
+
+  var AGENT_ICONS = {
+    TACTICIAN: "🔫",
+    REASONER: "🧠",
+    ARCHITECT: "🏛️"
   };
 
-  var GIST_ID = "";
-  var GIST_URL = GIST_ID ? "https://gist.githubusercontent.com/raw/" + GIST_ID + "/perqed_state.json" : null;
-
   function render(d) {
+    // — Status badge —
     var badge = document.getElementById("status-badge");
-    badge.querySelector(".status-text").textContent = GIST_URL ? "Live" : "Demo";
-    badge.classList.toggle("live", !!GIST_URL);
+    var isLive = d.status === "IN_PROGRESS";
+    badge.querySelector(".status-text").textContent = isLive ? "Live" : d.status;
+    badge.className = "status-badge" + (isLive ? " live" : "");
 
+    // — Status bar —
+    document.getElementById("sb-run").textContent = (d.runId || "—").slice(0, 8);
     document.getElementById("sb-theorem").textContent = d.theorem || "—";
-    document.getElementById("sb-iteration").textContent = d.iteration || "—";
-    document.getElementById("sb-elapsed").textContent = d.elapsed || "—";
+    document.getElementById("sb-iteration").textContent = d.iteration ?? "—";
+
     var st = document.getElementById("sb-status");
     st.textContent = d.status || "—";
     st.className = "sb-value";
     if (d.status === "SOLVED") st.classList.add("solved");
-    else if (d.status === "RUNNING") st.classList.add("running");
+    else if (d.status === "IN_PROGRESS") st.classList.add("running");
+    else if (d.status === "EXHAUSTED") st.classList.add("exhausted");
 
-    document.getElementById("tactic-state").textContent = d.tacticState || "";
-    document.getElementById("llm-thinking").textContent = d.thinking || "";
+    // — Routing Cascade —
+    var cards = document.querySelectorAll(".cascade-card");
+    cards.forEach(function(c) { c.classList.remove("active", "pulse"); });
 
-    var list = document.getElementById("tactics-list");
-    if (d.tactics && d.tactics.length) {
-      list.innerHTML = d.tactics.map(function(t, i) {
-        return '<div class="tactic-row"><span class="tactic-rank">#' + (i+1) + '</span><code class="tactic-code">' + t.tactic + '</code><span class="tactic-conf">' + Math.round(t.confidence * 100) + '%</span>' + (t.result === "complete" ? '<span class="tactic-ok">✓</span>' : '') + '</div>';
-      }).join("");
+    if (d.latestLog && d.currentSignals) {
+      var failures = d.currentSignals.consecutiveFailures || 0;
+      var agent = d.latestLog.agent;
+      var activeId = null;
+
+      if (agent === "TACTICIAN") {
+        activeId = "tier-tactician";
+      } else if (agent === "REASONER" && failures >= 4) {
+        activeId = "tier-reasoner-paid";
+      } else if (agent === "REASONER") {
+        activeId = "tier-reasoner-free";
+      } else if (agent === "ARCHITECT") {
+        activeId = failures >= 6 ? "tier-architect-pro" : "tier-reasoner-free";
+      }
+
+      if (activeId) {
+        var el = document.getElementById(activeId);
+        if (el) {
+          el.classList.add("active");
+          if (isLive) el.classList.add("pulse");
+        }
+      }
     }
 
-    var log = document.getElementById("event-log");
-    if (d.events && d.events.length) {
-      log.innerHTML = d.events.map(function(e) {
-        return '<div class="event-row"><span class="event-time">' + e.time + '</span><span class="event-msg">' + e.message + '</span></div>';
-      }).join("");
+    // Count calls per tier from history
+    var counts = { tactician: 0, reasonerFree: 0, reasonerPaid: 0, architectPro: 0 };
+    if (d.history) {
+      var runningFailures = 0;
+      d.history.forEach(function(h) {
+        if (h.agent === "TACTICIAN") counts.tactician++;
+        else if (h.agent === "REASONER" && runningFailures >= 4) counts.reasonerPaid++;
+        else if (h.agent === "REASONER") counts.reasonerFree++;
+        else if (h.agent === "ARCHITECT") counts.architectPro++;
+        if (!h.success) runningFailures++;
+        else runningFailures = 0;
+      });
     }
+    document.getElementById("badge-tactician").textContent = counts.tactician || "—";
+    document.getElementById("badge-reasoner-free").textContent = counts.reasonerFree || "—";
+    document.getElementById("badge-reasoner-paid").textContent = counts.reasonerPaid || "—";
+    document.getElementById("badge-architect-pro").textContent = counts.architectPro || "—";
+
+    // — Signals —
+    if (d.currentSignals) {
+      var s = d.currentSignals;
+      document.getElementById("sig-failures").textContent = s.consecutiveFailures ?? 0;
+      document.getElementById("sig-goals").textContent = s.goalCount ?? 0;
+      document.getElementById("sig-loop").textContent = s.isStuckInLoop ? "true" : "false";
+      document.getElementById("sig-loop").className = "signal-value" + (s.isStuckInLoop ? " warn" : "");
+      document.getElementById("sig-directive").textContent = s.hasArchitectDirective ? "true" : "false";
+      document.getElementById("sig-attempts").textContent = s.totalAttempts ?? 0;
+
+      // Threshold bar (0-7 range, capped)
+      var pct = Math.min((s.consecutiveFailures || 0) / 7, 1) * 100;
+      var fill = document.getElementById("threshold-fill");
+      fill.style.width = pct + "%";
+      fill.className = "threshold-fill";
+      if (s.consecutiveFailures >= 6) fill.classList.add("danger");
+      else if (s.consecutiveFailures >= 4) fill.classList.add("warning");
+    }
+
+    // — History —
+    var list = document.getElementById("history-list");
+    if (d.history && d.history.length) {
+      list.innerHTML = d.history.map(function(h, i) {
+        var icon = AGENT_ICONS[h.agent] || "❓";
+        var badge = h.success
+          ? '<span class="h-badge h-ok">✓</span>'
+          : '<span class="h-badge h-fail">✗</span>';
+        var errSnippet = h.error ? '<span class="h-error">' + h.error.slice(0, 60) + '</span>' : '';
+        return '<div class="h-row">' +
+          '<span class="h-num">' + (i + 1) + '</span>' +
+          '<span class="h-icon">' + icon + '</span>' +
+          '<span class="h-agent">' + h.agent + '</span>' +
+          badge +
+          errSnippet +
+          '</div>';
+      }).join("");
+      list.scrollTop = list.scrollHeight;
+    }
+
+    // — Error terminal —
+    var errOut = document.getElementById("error-output");
+    if (d.latestLog && d.latestLog.error) {
+      errOut.textContent = d.latestLog.error;
+    } else if (d.status === "SOLVED") {
+      errOut.innerHTML = '<span style="color:var(--accent-green)">✅ Proof verified — no errors</span>';
+    }
+
+    lastIteration = d.iteration;
   }
 
   function poll() {
-    if (!GIST_URL) { render(DEMO); return; }
-    fetch(GIST_URL + "?t=" + Date.now())
+    fetch(GIST_RAW_URL + "?t=" + Date.now())
       .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) { if (d) render(d); })
-      .catch(function() {});
-    setTimeout(poll, 10000);
+      .then(function(d) {
+        if (d) render(d);
+      })
+      .catch(function(e) {
+        console.warn("[Minutiae] poll error:", e.message);
+      });
+    setTimeout(poll, POLL_INTERVAL);
   }
 
   poll();
@@ -222,7 +352,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     animation: blink 2s ease-in-out infinite;
   }
 
-  /* Status Bar */
+  /* ── Status Bar ── */
   .sb-section { padding: 28px 0; }
 
   .sb {
@@ -258,18 +388,256 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   .solved { color: var(--accent-green) !important; }
   .running { color: var(--accent-amber) !important; }
+  .exhausted { color: var(--accent-red) !important; }
 
-  /* Terminals */
-  .term-section { padding-bottom: 24px; }
+  /* ── Routing Cascade ── */
+  .cascade-section { padding-bottom: 32px; }
 
-  .term-grid {
+  .cascade-grid {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+  }
+
+  .cascade-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 20px 24px;
+    text-align: center;
+    min-width: 160px;
+    position: relative;
+    transition: all 0.3s ease;
+  }
+
+  .cascade-card.active {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+    box-shadow: 0 0 20px var(--accent-subtle);
+  }
+
+  .cascade-card.pulse {
+    animation: tierPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes tierPulse {
+    0%, 100% { box-shadow: 0 0 12px var(--accent-subtle); }
+    50% { box-shadow: 0 0 28px var(--accent-subtle); }
+  }
+
+  .cascade-icon {
+    font-size: 1.6rem;
+    margin-bottom: 6px;
+  }
+
+  .cascade-name {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+
+  .cascade-model {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .cascade-cost {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+
+  .cascade-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 100px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    color: var(--text-muted);
+  }
+
+  .cascade-arrow {
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    padding: 0 8px;
+    flex-shrink: 0;
+  }
+
+  /* ── Signals Panel ── */
+  .panels-section { padding-bottom: 32px; }
+
+  .panels-grid {
     display: grid;
-    grid-template-columns: 1fr 1.5fr;
+    grid-template-columns: 1fr 1.4fr;
     gap: 20px;
   }
 
+  .signals-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+  }
+
+  .signal-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .signal-row:last-child { border-bottom: none; }
+
+  .signal-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .signal-value {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .signal-value.warn { color: var(--accent-amber); }
+
+  /* Threshold bar */
+  .signal-threshold {
+    padding: 10px 0 6px;
+  }
+
+  .threshold-bar {
+    position: relative;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: visible;
+  }
+
+  .threshold-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent-green);
+    transition: width 0.5s ease, background 0.3s ease;
+  }
+
+  .threshold-fill.warning { background: var(--accent-amber); }
+  .threshold-fill.danger { background: var(--accent-red); }
+
+  .threshold-mark {
+    position: absolute;
+    top: -4px;
+    transform: translateX(-50%);
+  }
+
+  .threshold-mark::before {
+    content: '';
+    display: block;
+    width: 2px;
+    height: 14px;
+    background: var(--text-muted);
+    margin: 0 auto;
+    opacity: 0.5;
+  }
+
+  .threshold-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 2px;
+  }
+
+  /* ── History ── */
+  .history-list {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    max-height: 330px;
+    overflow-y: auto;
+  }
+
+  .h-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+  }
+
+  .h-row:last-child { border-bottom: none; }
+
+  .h-num {
+    color: var(--text-muted);
+    min-width: 20px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .h-icon { flex-shrink: 0; }
+
+  .h-agent {
+    color: var(--text-primary);
+    font-weight: 500;
+    min-width: 80px;
+  }
+
+  .h-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .h-ok {
+    color: var(--accent-green);
+    background: var(--accent-green-subtle);
+  }
+
+  .h-fail {
+    color: var(--accent-red);
+    background: rgba(220, 38, 38, 0.06);
+  }
+
+  [data-theme="dark"] .h-fail {
+    background: rgba(248, 113, 113, 0.08);
+  }
+
+  .h-error {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+  }
+
+  /* ── Terminal ── */
+  .term-section { padding-bottom: 60px; }
+
   .terminal-body {
-    max-height: 320px;
+    max-height: 200px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-word;
@@ -278,15 +646,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .cursor-blink {
     animation: blink 1s step-end infinite;
     color: var(--accent-green);
-  }
-
-  /* Panels */
-  .panels-section { padding-bottom: 60px; }
-
-  .panels-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
   }
 
   .panel-heading {
@@ -305,68 +664,16 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     color: var(--text-muted);
   }
 
-  /* Tactics */
-  .tactic-row {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border-subtle);
-    font-size: 0.82rem;
-  }
-
-  .tactic-rank {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    flex-shrink: 0;
-  }
-
-  .tactic-code {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    flex: 1;
-    color: var(--text-primary);
-    border: none;
-    background: none;
-    padding: 0;
-  }
-
-  .tactic-conf {
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    flex-shrink: 0;
-  }
-
-  .tactic-ok {
-    color: var(--accent-green);
-    font-weight: 700;
-  }
-
-  /* Events */
-  .event-row {
-    display: flex;
-    gap: 12px;
-    padding: 6px 0;
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-    line-height: 1.5;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .event-time {
-    color: var(--text-muted);
-    flex-shrink: 0;
-    min-width: 36px;
-  }
-
-  .event-msg {
-    color: var(--text-secondary);
-  }
-
+  /* ── Responsive ── */
   @media (max-width: 768px) {
-    .term-grid, .panels-grid, .sb {
+    .cascade-grid {
+      flex-direction: column;
+    }
+    .cascade-arrow {
+      transform: rotate(90deg);
+      padding: 4px 0;
+    }
+    .panels-grid, .sb {
       grid-template-columns: 1fr;
     }
     .header-row {

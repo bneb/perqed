@@ -31,6 +31,8 @@ export interface FormalistConfig {
   mode: "chat" | "completion";
   /** Max tokens to generate. */
   numPredict: number;
+  /** Ollama context window size. Default: undefined (Ollama default 4096). */
+  numCtx?: number;
 }
 
 const DEFAULT_CONFIG: FormalistConfig = {
@@ -139,8 +141,13 @@ export class FormalistAgent {
         // Capture thinking for telemetry
         this.lastThinking = extractThinkContent(rawContent);
 
-        // Sanitize: strip <think> tags and markdown fences
+        // Sanitize: strip <think> tags and markdown fences, auto-wrap bare tactics
         const cleanJson = sanitizeR1Output(rawContent);
+
+        // Guard: empty response (model returned only <think> tags or whitespace)
+        if (!cleanJson || cleanJson.trim() === "") {
+          throw new Error("Empty tactic generated — model produced no usable output");
+        }
 
         // Parse JSON and validate against Zod schema
         const parsed = JSON.parse(cleanJson);
@@ -196,6 +203,7 @@ export class FormalistAgent {
       options: {
         temperature: this.config.temperature,
         num_predict: this.config.numPredict,
+        ...(this.config.numCtx ? { num_ctx: this.config.numCtx } : {}),
       },
     };
 
@@ -238,34 +246,47 @@ export class FormalistAgent {
       return content;
     }
 
-    // Fallback: check if thinking contains JSON (model confusion)
-    if (thinking && thinking.includes('"action"')) {
-      return thinking;
+    // Fallback: check if thinking contains an actual JSON object (model confusion —
+    // sometimes R1 puts the JSON response inside the thinking block)
+    if (thinking) {
+      // Look for a JSON object in the thinking text
+      const jsonMatch = thinking.match(/(\{[\s\S]*"action"[\s\S]*\})/);
+      if (jsonMatch?.[1]) {
+        try {
+          JSON.parse(jsonMatch[1]); // Validate it's real JSON
+          return jsonMatch[1];
+        } catch {
+          // Not valid JSON, fall through
+        }
+      }
     }
 
-    return content;
+    // Content is truly empty — throw to trigger retry loop
+    throw new Error("Empty content — model produced only thinking, no usable output");
   }
 
   /**
-   * Completion mode: /api/generate with code-completion prompt (for prover models).
-   * Uses Lean 4 code prefix to elicit tactic output.
+   * Completion mode: /api/generate for prover models.
+   * Sends raw Lean 4 context — no markdown fences, strict stop sequences.
    */
   private async callCompletion(context: string): Promise<string> {
-    // Build a code-completion prompt from the context
-    const prompt = [
-      "```lean4",
-      context,
-      "  ",  // trailing indent to prompt tactic completion
-    ].join("\n");
-
     const payload = {
       model: this.config.model,
-      prompt,
+      prompt: context,
       stream: false,
       options: {
         temperature: this.config.temperature,
         num_predict: this.config.numPredict,
-        stop: ["```", "\n\n\n"],
+        stop: [
+          "\n\n",       // Stop at paragraph break
+          "/-",         // Stop at Lean comment open
+          "```",        // Stop at markdown fence
+          "</pre>",     // Stop at HTML hallucination
+          "⊢",          // Stop at goal state marker
+          "|-",         // Stop at ASCII goal marker
+          "\ntheorem",  // Stop if it starts a new theorem
+          "\nexample",  // Stop if it starts an example
+        ],
       },
     };
 
@@ -282,7 +303,15 @@ export class FormalistAgent {
     }
 
     const body = (await response.json()) as { response?: string };
-    const content = body?.response?.trim() ?? "";
+    let content = body?.response?.trim() ?? "";
+
+    // Sanitize: strip any remaining markdown fences or HTML artifacts
+    content = content
+      .replace(/^```(?:lean4?)?\n?/, "")
+      .replace(/```$/, "")
+      .replace(/<[^>]+>/g, "")    // Strip any HTML tags
+      .replace(/^<[;,]>/, "")     // Strip garbled prefix artifacts
+      .trim();
 
     console.log(`   🔍 [FormalistAgent:completion] response: ${content.length} chars`);
     console.log(`   🔍 [FormalistAgent:completion] preview: ${content.slice(0, 200)}`);

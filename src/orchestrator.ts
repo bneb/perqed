@@ -15,12 +15,17 @@
  */
 
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { WorkspaceManager } from "./workspace";
 import { SolverBridge, type SolverResult } from "./solver";
 import { LeanBridge, type LeanResult } from "./lean_bridge";
 import { LocalAgent } from "./llm_client";
 import { AgentRouter } from "./agents/router";
+import { TelemetryEmitter, type TelemetryPayload } from "./telemetry/emitter";
 import { AgentFactory, type SpecialistAgent } from "./agents/factory";
+import { ProofTree, type ProofNode } from "./tree";
+import type { LocalEmbedder } from "./embeddings/embedder";
+import type { VectorDatabase } from "./embeddings/vector_store";
 import type { AgentRole, RoutingSignals, AttemptLog } from "./types";
 import {
   AgentResponseSchema,
@@ -107,6 +112,12 @@ export interface OrchestratorConfig {
   theoremSignature?: string;
   /** Sprint 8: AgentFactory for dynamic routing. When set, enables specialist routing. */
   agentFactory?: AgentFactory;
+  /** Sprint 13: Local embedding service (Ollama nomic-embed-text). */
+  embedder?: LocalEmbedder;
+  /** Sprint 13: Vector database for premise storage and search. */
+  vectorDb?: VectorDatabase;
+  /** Sprint 17: Concurrent node expansion batch size. */
+  batchSize?: number;
 }
 
 const DEFAULT_CONFIG: OrchestratorConfig = {
@@ -115,6 +126,7 @@ const DEFAULT_CONFIG: OrchestratorConfig = {
   z3TimeoutMs: 30_000,
   leanTimeoutMs: 60_000,
   contextWindowTokens: 4000,
+  batchSize: 3,
 };
 
 // ──────────────────────────────────────────────
@@ -160,6 +172,7 @@ export function buildRoutingSignals(
   return {
     totalAttempts,
     consecutiveFailures,
+    globalFailures: consecutiveFailures, // Transitional: falls back to local until ProofTree is wired
     goalCount,
     isStuckInLoop,
     lastErrors,
@@ -168,23 +181,28 @@ export function buildRoutingSignals(
 }
 
 /**
- * Build a minimal context for the Tactician — just the theorem + last error.
- * This keeps prompt processing under 100 tokens for blazing-fast TTFT.
+ * Build a minimal context for the Tactician — strict Lean 4 file format.
+ * No markdown, no instructions. The model sees a theorem and must complete the tactic.
  */
 export function buildSlimContext(
   theoremName: string,
   theoremSignature: string,
   lastError?: string,
 ): string {
-  const lines = [
-    `Prove this theorem in Lean 4. Reply with ONLY the tactic, nothing else.`,
-    ``,
-    `theorem ${theoremName} ${theoremSignature} := by`,
-    `  -- complete this proof`,
-  ];
+  const lines: string[] = [];
   if (lastError) {
-    lines.push(``, `Previous tactic failed with error:`, lastError);
+    lines.push(
+      `/-`,
+      `Previous tactic failed:`,
+      lastError.slice(0, 200),
+      `-/`,
+      ``,
+    );
   }
+  lines.push(
+    `theorem ${theoremName} ${theoremSignature} := by`,
+    `  `,  // trailing indent to prompt tactic completion
+  );
   return lines.join("\n");
 }
 
@@ -523,6 +541,366 @@ export async function runProverLoop(
 }
 
 // ──────────────────────────────────────────────
+// Sprint 9: Dynamic Routing Loop
+// ──────────────────────────────────────────────
+
+/**
+ * The dynamic orchestrator loop that uses AgentRouter to select
+ * the correct specialist on every iteration.
+ *
+ * Requires `config.agentFactory`, `config.leanBridge`, `config.theoremName`,
+ * and `config.theoremSignature` to be set.
+ */
+export async function runDynamicLoop(
+  workspace: WorkspaceManager,
+  solver: SolverBridge,
+  config: Partial<OrchestratorConfig> = {},
+): Promise<{ status: "SOLVED" | "BUDGET_EXHAUSTED"; tree?: ProofTree }> {
+  const cfg = { ...DEFAULT_CONFIG, ...config };
+
+  if (!cfg.agentFactory) {
+    throw new Error("runDynamicLoop requires config.agentFactory");
+  }
+  if (!cfg.leanBridge || !cfg.theoremName || !cfg.theoremSignature) {
+    throw new Error("runDynamicLoop requires leanBridge, theoremName, and theoremSignature");
+  }
+
+  const factory = cfg.agentFactory;
+  const attemptLogs: AttemptLog[] = [];
+  let iteration = 0;
+  let lastTacticState = "";
+
+  // Sprint 12d: Instantiate the ProofTree with initial theorem state
+  const initialLeanState = `⊢ ${cfg.theoremSignature}`;
+  const tree = new ProofTree(initialLeanState);
+
+  // Telemetry: non-blocking Gist emitter
+  const telemetry = new TelemetryEmitter();
+  const runId = randomUUID();
+  if (telemetry.isConfigured) {
+    console.log(`📡 Telemetry emitter active (run: ${runId.slice(0, 8)})`);
+  }
+
+  console.log(`\n🚀 Perqed Dynamic Loop — Starting (max ${cfg.maxGlobalIterations} iterations)\n`);
+
+  while (iteration < cfg.maxGlobalIterations) {
+    iteration++;
+
+    // 1. Extract signals from attempt history
+    const hasDirective = await Bun.file(workspace.paths.architectDirective).exists();
+    const signals = buildRoutingSignals(attemptLogs, lastTacticState, hasDirective);
+    // Sprint 12d: Use tree's global failure count instead of consecutive fallback
+    signals.globalFailures = tree.getGlobalTreeFailures();
+    const nextRole = AgentRouter.determineNextAgent(signals);
+
+    // 2. Get the specialist (factory selects Gemini tier based on signals)
+    const agent = factory.getAgent(nextRole, signals);
+    const tierLabel = (agent as any).modelTier ? ` [${(agent as any).modelTier}]` : "";
+
+    console.log(`\n🧭 Iteration ${iteration} | Router → ${nextRole}${tierLabel}`);
+
+
+    // 4. Build role-specific context
+    let context: string;
+    if (nextRole === "TACTICIAN") {
+      // Slim context: just theorem + last error for blazing fast inference
+      const lastError = attemptLogs.length > 0
+        ? attemptLogs[attemptLogs.length - 1]!.error
+        : undefined;
+      context = buildSlimContext(cfg.theoremName!, cfg.theoremSignature!, lastError);
+    } else if (nextRole === "ARCHITECT") {
+      // Sprint 12d: Architect gets the frontier digest from the ProofTree
+      context = tree.buildFrontierDigest() + `\n## Theorem: ${cfg.theoremName} ${cfg.theoremSignature}`;
+
+      // Sprint 13: 📚 LIBRARIAN INJECTION — Neural Premise Selection
+      if (cfg.vectorDb && cfg.embedder) {
+        const queryVector = await cfg.embedder.embed(
+          `${cfg.theoremName} ${cfg.theoremSignature}`,
+        );
+        const similarPremises = await cfg.vectorDb.search(queryVector, 3);
+
+        if (similarPremises.length > 0) {
+          context += `\n\n📚 HISTORICAL PREMISE MATCHES (Neural Vector Search):\n`;
+          context += `The following theorems from Mathlib share latent structural similarities with our current goal. Consider their tactics when formulating your DIRECTIVE:\n\n`;
+          similarPremises.forEach((p, i) => {
+            context += `▶ Match ${i + 1}: ${p.theoremSignature}\n`;
+            context += `  Successful Approach: \`${p.successfulTactic}\`\n\n`;
+          });
+        }
+      }
+    } else {
+      // Reasoner gets a focused context: theorem + last errors
+      const lastError = attemptLogs.length > 0
+        ? attemptLogs[attemptLogs.length - 1]!.error
+        : undefined;
+      const errorContext = attemptLogs
+        .filter(l => !l.success && l.error)
+        .slice(-3)
+        .map(l => `- ${l.error}`)
+        .join("\n");
+      context = [
+        `## Theorem: ${cfg.theoremName} ${cfg.theoremSignature}`,
+        ``,
+        `## Recent Failures:`,
+        errorContext || "(none)",
+      ].join("\n");
+    }
+
+    // 5. Execute specialist
+    const response = await agent.generateMove(context);
+
+    // 6. Handle ARCHITECT response — MCTS tree navigation
+    if (nextRole === "ARCHITECT") {
+      const action = (response as any).action ?? "DIRECTIVE";
+      const targetId = (response as any).target_node_id ?? "";
+      const reasoning = (response as any).reasoning ?? (response as any).analysis ?? "";
+      const tactics = (response as any).tactics ?? "";
+
+      console.log(`🏛️ Architect${tierLabel} [${action}]: ${reasoning.slice(0, 80)}`);
+
+      if (action === "BACKTRACK") {
+        // ── BACKTRACK: Mark target branch as dead, pivot to best open node ──
+        console.log(`⏪ BACKTRACK: Marking node ${targetId.slice(0, 8)} as DEAD_END`);
+
+        // Sprint 12d: Physically mark the node in the tree
+        if (tree.getNode(targetId)) {
+          tree.markDeadEnd(targetId);
+        }
+        const nextNode = tree.getBestOpenNode();
+        if (nextNode) {
+          tree.setActiveNode(nextNode.id);
+        }
+
+        await workspace.backtrackProgress(1);
+
+        attemptLogs.push({
+          agent: "ARCHITECT",
+          action: "BACKTRACK",
+          success: true,
+          timestamp: Date.now(),
+        });
+
+        await workspace.logAttempt(
+          `ARCHITECT BACKTRACK${tierLabel}`,
+          `Reasoning: ${reasoning}`,
+          `Abandoned branch ${targetId.slice(0, 8)}`,
+          true,
+        );
+
+        // Reset signals completely for the new branch —
+        // totalAttempts=0 triggers ARCHITECT on the next iteration
+        attemptLogs.length = 0;
+        lastTacticState = "";
+
+        continue;
+      }
+
+      if (action === "GIVE_UP") {
+        console.log(`🛑 ARCHITECT has given up: ${reasoning}`);
+        break;
+      }
+
+      // ── DIRECTIVE: Set target node and store suggested tactics ──
+      const directive = tactics || reasoning;
+      console.log(`📝 DIRECTIVE → ${directive.slice(0, 80)}`);
+
+      // Write directive
+      await Bun.write(workspace.paths.architectDirective, directive);
+
+      // Log & reset signals
+      attemptLogs.length = 0;
+      attemptLogs.push({
+        agent: "ARCHITECT",
+        action: "DIRECTIVE",
+        success: true,
+        timestamp: Date.now(),
+      });
+      lastTacticState = "";
+
+      await workspace.logAttempt(
+        `ARCHITECT${tierLabel}: ${reasoning}`,
+        `Directive: ${directive}`,
+        "Planning step — no Lean execution",
+        true,
+      );
+
+      continue;
+    }
+
+    // 6b. Handle REASONER (Gemini) response — extract tactics string
+    if (nextRole === "REASONER" && "tactics" in response && typeof (response as any).tactics === "string") {
+      const geminiReasonerResp = response as { tactics: string; reasoning: string; confidence_score: number };
+      const tacticStr = geminiReasonerResp.tactics.trim();
+      console.log(`🧠 REASONER${tierLabel}: ${geminiReasonerResp.reasoning?.slice(0, 80)}`);
+      console.log(`🧠 REASONER tactic: ${tacticStr}`);
+
+      if (tacticStr && cfg.leanBridge) {
+        const result = await cfg.leanBridge.checkProof(
+          cfg.theoremName!,
+          cfg.theoremSignature!,
+          [tacticStr],
+          cfg.leanTimeoutMs,
+        );
+
+        if (result.isComplete) {
+          console.log(`✅ REASONER proved it: [${geminiReasonerResp.confidence_score}] ${tacticStr}`);
+          // Sprint 12d: Spawn child node in tree
+          const activeNode = tree.getActiveNode();
+          const child = tree.addChild(activeNode.id, tacticStr, "no goals");
+          child.status = "SOLVED";
+          tree.setActiveNode(child.id);
+
+          await workspace.commitProof(cfg.theoremName!, tacticStr);
+          telemetry.emit({
+            runId, theorem: cfg.theoremName!, status: "SOLVED", iteration,
+            currentSignals: signals, latestLog: attemptLogs[attemptLogs.length - 1] ?? null,
+            history: attemptLogs, timestamp: new Date().toISOString(),
+          });
+          return { status: "SOLVED" as const, tree };
+        } else {
+          console.log(`❌ REASONER tactic failed: ${result.error ?? "unknown"}`);
+          attemptLogs.push({
+            agent: "REASONER",
+            action: "PROPOSE_LEAN_TACTICS",
+            success: false,
+            error: result.error ?? "Lean rejected tactic",
+            timestamp: Date.now(),
+          });
+          // Sprint 12d: Record error on tree's active node
+          tree.getActiveNode().errorHistory.push(result.error ?? "Lean rejected tactic");
+          lastTacticState = lastTacticState;
+          continue;
+        }
+      }
+    }
+
+    // 7. Handle Lean tactic responses (TACTICIAN or REASONER)
+    if ("lean_tactics" in response && response.lean_tactics && response.lean_tactics.length > 0) {
+      const tactics = response.lean_tactics as FormalistResponse["lean_tactics"];
+      const sortedTactics = [...tactics!].sort(
+        (a, b) => b.confidence_score - a.confidence_score,
+      );
+
+      console.log(`🧬 ${nextRole}: ${sortedTactics.length} tactic(s) — ${sortedTactics.map(t => t.tactic).join(", ")}`);
+
+      // Fire all tactics in parallel
+      const leanPromises = sortedTactics.map((tactic) =>
+        cfg.leanBridge!.checkProof(
+          cfg.theoremName!,
+          cfg.theoremSignature!,
+          [tactic.tactic],
+          cfg.leanTimeoutMs,
+        ),
+      );
+      const leanResults = await Promise.all(leanPromises);
+
+      // Find the winner
+      const winnerIdx = leanResults.findIndex((r) => r.isComplete);
+
+      if (winnerIdx !== -1) {
+        const winner = sortedTactics[winnerIdx]!;
+        const winResult = leanResults[winnerIdx]!;
+
+        console.log(`✅ ${nextRole} proved it: [${winner.confidence_score.toFixed(2)}] ${winner.tactic}`);
+
+        // Sprint 12d: Spawn child node in tree
+        const activeNode = tree.getActiveNode();
+        const child = tree.addChild(activeNode.id, winner.tactic, winResult.rawOutput);
+        child.status = "SOLVED";
+        tree.setActiveNode(child.id);
+
+        attemptLogs.push({
+          agent: nextRole,
+          action: "PROPOSE_LEAN_TACTICS",
+          success: true,
+          timestamp: Date.now(),
+        });
+
+        await workspace.logAttempt(
+          `[${nextRole}][${winner.confidence_score.toFixed(2)}] ${winner.informal_sketch}`,
+          winner.tactic,
+          winResult.rawOutput,
+          true,
+        );
+        await workspace.updateHappyPath(`Proved via ${nextRole}: ${winner.informal_sketch}`);
+
+        // Commit to vault
+        const fullSource = cfg.leanBridge!.buildLeanSource(
+          cfg.theoremName!,
+          cfg.theoremSignature!,
+          [winner.tactic],
+        );
+        await workspace.commitProof(cfg.theoremName!, fullSource);
+
+        await generateProofSolution(workspace, iteration);
+        console.log(`\n🏁 Dynamic loop — SOLVED on iteration ${iteration}`);
+        telemetry.emit({
+          runId, theorem: cfg.theoremName!, status: "SOLVED", iteration,
+          currentSignals: signals, latestLog: attemptLogs[attemptLogs.length - 1] ?? null,
+          history: attemptLogs, timestamp: new Date().toISOString(),
+        });
+        return { status: "SOLVED", tree };
+      } else {
+        // All tactics failed
+        console.log(`❌ ${nextRole}: all ${sortedTactics.length} tactic(s) failed.`);
+
+        const lastLeanError = leanResults[0]?.error ?? leanResults[0]?.rawOutput ?? "unknown error";
+        lastTacticState = lastLeanError;
+
+        attemptLogs.push({
+          agent: nextRole,
+          action: "PROPOSE_LEAN_TACTICS",
+          success: false,
+          error: lastLeanError,
+          timestamp: Date.now(),
+        });
+
+        for (let i = 0; i < sortedTactics.length; i++) {
+          await workspace.logAttempt(
+            `[${nextRole}][${sortedTactics[i]!.confidence_score.toFixed(2)}] ${sortedTactics[i]!.informal_sketch}`,
+            sortedTactics[i]!.tactic,
+            leanResults[i]!.error ?? leanResults[i]!.rawOutput,
+            false,
+          );
+        }
+        // Sprint 12d: Record error on tree's active node
+        tree.getActiveNode().errorHistory.push(lastLeanError);
+      }
+    } else if ("action" in response && (response as FormalistResponse).action === "GIVE_UP") {
+      // Agent is giving up — log and continue (router will escalate)
+      attemptLogs.push({
+        agent: nextRole,
+        action: "GIVE_UP",
+        success: false,
+        error: "Agent gave up",
+        timestamp: Date.now(),
+      });
+    }
+
+    // ── End of iteration: emit telemetry (fire-and-forget) ──
+    telemetry.emit({
+      runId,
+      theorem: cfg.theoremName!,
+      status: "IN_PROGRESS",
+      iteration,
+      currentSignals: signals,
+      latestLog: attemptLogs[attemptLogs.length - 1] ?? null,
+      history: attemptLogs,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  console.log(`\n🏁 Dynamic loop — budget exhausted after ${iteration} iterations.`);
+  telemetry.emit({
+    runId, theorem: cfg.theoremName!, status: "EXHAUSTED", iteration,
+    currentSignals: buildRoutingSignals(attemptLogs, lastTacticState, false),
+    latestLog: attemptLogs[attemptLogs.length - 1] ?? null,
+    history: attemptLogs, timestamp: new Date().toISOString(),
+  });
+  return { status: "BUDGET_EXHAUSTED", tree };
+}
+
+// ──────────────────────────────────────────────
 // Architect Escalation
 // ──────────────────────────────────────────────
 
@@ -616,4 +994,62 @@ async function safeReadFile(path: string): Promise<string> {
   const file = Bun.file(path);
   if (!(await file.exists())) return "";
   return file.text();
+}
+
+// ──────────────────────────────────────────────
+// Sprint 17: Concurrent Node Processing
+// ──────────────────────────────────────────────
+
+export interface ProcessNodeDeps {
+  generateTactic: (leanState: string) => Promise<string>;
+  checkProof: (name: string, sig: string, tactics: string[], timeout?: number) => Promise<{
+    success: boolean;
+    isComplete: boolean;
+    error?: string;
+    rawOutput: string;
+  }>;
+}
+
+/**
+ * Evaluates a single WORKING node by generating a tactic and verifying it.
+ * Designed to be called concurrently via Promise.all.
+ *
+ * @param node - The WORKING node to process
+ * @param tree - The ProofTree to mutate
+ * @param theoremName - Theorem name for Lean execution
+ * @param theoremSignature - Full theorem signature
+ * @param deps - Injected dependencies (tactic generator + lean bridge)
+ */
+export async function processNode(
+  node: ProofNode,
+  tree: ProofTree,
+  theoremName: string,
+  theoremSignature: string,
+  deps: ProcessNodeDeps,
+): Promise<void> {
+  try {
+    const tactic = await deps.generateTactic(node.leanState);
+    const allTactics = [...tree.getPath(node.id), tactic];
+    const result = await deps.checkProof(
+      theoremName,
+      theoremSignature,
+      allTactics,
+    );
+
+    if (result.isComplete) {
+      const child = tree.addChild(node.id, tactic, "no goals");
+      child.status = "SOLVED";
+      node.status = "DEAD_END"; // Parent is fully explored
+    } else if (result.error) {
+      node.errorHistory.push(`${tactic}: ${result.error}`);
+      node.status = "OPEN"; // Unlock for future retries
+    } else {
+      // Valid tactic but not solved — advance the frontier
+      tree.addChild(node.id, tactic, result.rawOutput);
+      node.status = "DEAD_END"; // Parent branch explored
+    }
+  } catch (e: any) {
+    node.errorHistory.push(e.message);
+    node.status = "OPEN"; // Unlock on catastrophic failure
+  }
 }

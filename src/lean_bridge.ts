@@ -161,4 +161,84 @@ export class LeanBridge {
       rawOutput: combinedOutput,
     };
   }
+
+  // ──────────────────────────────────────────────
+  // Sprint 15: Gauntlet Methods (Conjecturer)
+  // ──────────────────────────────────────────────
+
+  /**
+   * Verifies if a theorem signature is syntactically valid Lean 4.
+   * Compiles the signature with `sorry` — if it compiles (even with sorry warning),
+   * the syntax is valid.
+   *
+   * @param signature - Full theorem declaration (e.g., "theorem foo (n : Nat) : n = n")
+   * @returns true if syntactically valid
+   */
+  async checkSyntax(signature: string): Promise<boolean> {
+    const source = `${signature} := by sorry\n\ndef main : IO Unit := IO.println "SYNTAX_CHECK"\n`;
+    const result = await this.executeLean(source, 10_000);
+
+    // Valid if no hard errors (sorry warning is expected and OK)
+    if (result.error && result.error.includes("error:")) return false;
+    return true;
+  }
+
+  /**
+   * Fires a rapid barrage of trivial decision procedures.
+   * Returns true if ANY trivial tactic solves the theorem (meaning it's too easy).
+   *
+   * @param theoremName - Name for the theorem declaration
+   * @param signature - Theorem signature (e.g., "(n : Nat) : n + 0 = n")
+   * @returns true if trivially solvable
+   */
+  async isTrivial(theoremName: string, signature: string): Promise<boolean> {
+    const trivialTactics = ["rfl", "simp", "omega", "trivial", "decide"];
+
+    for (const tactic of trivialTactics) {
+      const result = await this.checkProof(theoremName, signature, [tactic], 5_000);
+      if (result.isComplete) return true;
+    }
+
+    return false;
+  }
+
+  // ──────────────────────────────────────────────
+  // Sprint 19: Goal Parsing for AND/OR Topology
+  // ──────────────────────────────────────────────
+
+  /**
+   * Parses the Lean state output to determine the number of active goals.
+   * If the string contains "N goals", returns N. Otherwise, defaults to 1.
+   * If the state is empty or "no goals", returns 0.
+   */
+  parseGoalCount(leanState: string): number {
+    if (!leanState || leanState.trim() === "no goals") return 0;
+
+    const match = leanState.match(/^(\d+)\s+goals/i);
+    if (match) {
+      return parseInt(match[1]!, 10);
+    }
+    return 1;
+  }
+
+  /**
+   * Splits a multi-goal Lean state string into an array of individual goal strings.
+   */
+  splitGoals(leanState: string): string[] {
+    const count = this.parseGoalCount(leanState);
+    if (count <= 1) return [leanState.trim()];
+
+    // Split by "case " headers if present, otherwise by double-newlines
+    let parts: string[];
+    if (leanState.includes("\ncase ")) {
+      parts = leanState.split(/\n(?=case )/);
+    } else {
+      parts = leanState.split(/\n\n/);
+    }
+
+    return parts
+      .map(p => p.trim())
+      .filter(p => p.length > 0)
+      .filter(p => !/^\d+\s+goals$/i.test(p)); // Strip the "N goals" header
+  }
 }

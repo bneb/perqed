@@ -1,5 +1,5 @@
 /**
- * Sprint 8: Shared types for the Specialist Roster.
+ * Sprint 8/12b: Shared types for the Specialist Roster.
  *
  * These types are consumed by the AgentRouter, AgentFactory,
  * and the Orchestrator loop.
@@ -23,8 +23,10 @@ export type AgentRole = "TACTICIAN" | "REASONER" | "ARCHITECT";
 export interface RoutingSignals {
   /** Total number of attempts so far in this proof run. */
   totalAttempts: number;
-  /** Number of consecutive failures (resets on success). */
+  /** Number of consecutive failures at the active node (for REASONER). */
   consecutiveFailures: number;
+  /** Total failures across all active tree nodes (for ARCHITECT escalation). */
+  globalFailures: number;
   /** Number of open goals parsed from Lean tactic state. */
   goalCount: number;
   /** True if last 2+ errors are identical (stuck in a loop). */

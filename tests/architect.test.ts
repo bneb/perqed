@@ -99,12 +99,16 @@ describe("ArchitectClient — Schema Validation", () => {
     expect(result.new_directive).toContain("base case");
   });
 
-  test("throws on missing required fields", async () => {
+  test("returns fallback directive on missing required fields", async () => {
     globalThis.fetch = createGeminiMockFetch(MISSING_FIELD_JSON) as unknown as typeof fetch;
 
     const client = new ArchitectClient(TEST_CONFIG);
+    const result = await client.escalate("Context here...");
 
-    await expect(client.escalate("Context here...")).rejects.toThrow();
+    // Should return a fallback instead of crashing
+    expect(result.analysis).toContain("failed");
+    expect(result.steps_to_backtrack).toBe(0);
+    expect(result.new_directive).toBeTruthy();
   });
 
   test("zero backtrack steps is valid", async () => {

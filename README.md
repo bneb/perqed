@@ -1,58 +1,62 @@
 # Perqed
 
-**Neuro-symbolic AI proof engine.** An autonomous orchestrator that uses local LLMs to drive formal mathematical proofs through Lean 4 and Z3.
+**Automated theorem proving in Lean 4.** An open-source system that reads mathematical literature, generates conjectures, attempts proofs via MCTS-guided tactic search, and extracts training data from successful proofs.
+
+362 tests. Runs locally on Apple Silicon.
 
 ## Architecture
 
 ```mermaid
 graph TD
-    subgraph "Local Machine (24-32GB RAM)"
-        CLI["cli.ts / live_fire.ts"] --> ORC["Orchestrator v3"]
+    subgraph "Autonomous Research Pipeline"
+        ARXIV["arXiv API"] --> CHUNK["TextChunker"]
+        CHUNK --> EMBED["Ollama nomic-embed-text"]
+        EMBED --> LANCE["LanceDB (Vector Store)"]
+        LANCE --> CONJ["ConjecturerAgent (Gemini)"]
+        CONJ --> GAUNTLET["Lean Syntax + Triviality Filter"]
+        GAUNTLET --> QUEUE["open_conjectures.json"]
+    end
 
-        subgraph "Sprint 8: Specialist Routing"
-            ORC --> RS["buildRoutingSignals()"]
-            RS --> AR["AgentRouter"]
-            AR -->|"0 attempts"| FLASH["Architect Flash"]
-            AR -->|"5+ failures"| PRO["Architect Pro"]
-            AR -->|"3+ fail / loop / 2+ goals"| REASON["Reasoner"]
-            AR -->|"default"| TACT["Tactician"]
-            FLASH --> GEMF["Gemini 2.5 Flash"]
-            PRO --> GEMP["Gemini 2.5 Pro"]
-            REASON --> R1["deepseek-r1:8b"]
-            TACT --> PV2["deepseek-prover-v2:7b-q8"]
-            R1 --> OLLAMA["Ollama"]
-            PV2 --> OLLAMA
-        end
+    subgraph "MCTS Proof Engine"
+        QUEUE --> ORC["Orchestrator v3"]
+        ORC --> ROUTER["AgentRouter"]
+        ROUTER -->|"default"| TACT["Tactician (DeepSeek Prover V2)"]
+        ROUTER -->|"3+ failures"| REASON["Reasoner (Gemini Flash)"]
+        ROUTER -->|"strategic"| ARCH["Architect (Gemini Pro)"]
+        LANCE -.->|"RAG context"| ARCH
 
-        subgraph "Verification Layer"
-            ORC -->|"PROPOSE_LEAN_TACTICS"| PAR["Promise.all()"]
-            PAR --> LB["LeanBridge"]
-            LB -->|"lean --stdin --run"| LEAN["Lean 4.28.0"]
-            ORC -->|"FALSIFY_FIRST"| Z3B["SolverBridge"]
-            Z3B --> Z3["Z3 (Python)"]
-        end
+        ORC --> BATCH["getBestOpenNodes(3)"]
+        BATCH --> PALL["Promise.all()"]
+        PALL --> LEAN["Lean 4 Kernel"]
+        LEAN --> TREE["ProofTree (AND/OR)"]
+        TREE --> SCORER["TreeScorer"]
+        SCORER -->|"OR: max, AND: product"| TREE
+    end
 
-        PAR -->|"first isComplete"| VAULT["verified_lib/ (vault)"]
-
-        subgraph "File System State"
-            WM["WorkspaceManager v2"]
-            WM --> SCRATCH["scratch/ (volatile)"]
-            WM --> VAULT
-        end
+    subgraph "Learning & Publishing"
+        TREE -->|"SOLVED"| SFT["DatasetExtractor"]
+        SFT --> JSONL["sft_dataset.jsonl"]
+        TREE -->|"SOLVED"| SCRIBE["ScribeAgent (Gemini Pro)"]
+        SCRIBE --> TEX["draft_paper.tex (AMS-LaTeX)"]
+        LEAN -->|"verified"| VAULT["verified_lib/ (vault)"]
     end
 ```
 
 ## How It Works
 
-1. **Falsification First** — Before proving anything, Z3 hunts for counterexamples in a bounded domain. If the theorem is false, we find out in 50ms instead of wasting hours.
+1. **Read the Literature** — The Librarian fetches papers from arXiv, chunks abstracts at sentence boundaries, embeds them via Ollama `nomic-embed-text`, and stores vectors in LanceDB.
 
-2. **Lean-as-DSL** — Lean 4 is the single source of truth for proof state. The LLM reads tactic state, proposes tactics, and Lean verifies them. Z3 is called transparently via `omega`/`smt`.
+2. **Generate Conjectures** — The Conjecturer (Gemini) synthesizes Lean 4 theorem signatures from embedded literature. A dual-stage filter removes syntax errors and trivially solvable theorems.
 
-3. **Parallel Speculation** — Up to 5 tactics per iteration (sorted by confidence), run in parallel via `Promise.all()`. First complete proof wins.
+3. **Falsify First** — Before proof search begins, Z3 checks for counterexamples in bounded domains. False conjectures are typically caught in under 50ms.
 
-4. **The Vault** — Verified proofs go to `verified_lib/` (append-only, never overwritten). LLM can read but never write here.
+4. **AND/OR MCTS Search** — The Orchestrator selects batches of open nodes concurrently via `Promise.all()`. Tactics like `induction` that split into subgoals create AND nodes (all must succeed), while alternative tactics create OR nodes (any can succeed). The TreeScorer backpropagates: OR = max(children), AND = product(children).
 
-5. **Architect Escalation** — After 3 consecutive failures, Gemini analyzes the lab log and redirects strategy.
+5. **Lean as Ground Truth** — Lean 4 verifies every tactic step. The LLM reads tactic state and proposes tactics; Lean checks each one before it is committed.
+
+6. **Training Data Extraction** — Solved proofs are parsed into `(State, Tactic)` pairs and saved as deduplicated SFT training data in `sft_dataset.jsonl`.
+
+7. **Paper Generation** — A separate agent translates verified Lean 4 proofs into AMS-LaTeX documents with theorem environments and numbered equations.
 
 ## Quick Start
 
@@ -65,37 +69,45 @@ cp .env.example .env
 # Edit .env and add your GEMINI_API_KEY
 
 # Run the test suite
-bun test
+bun test   # 362 tests, 54 files
 
-# Run your first live proof
-bun run src/scripts/live_fire.ts           # R1 (sniper)
-bun run src/scripts/live_fire.ts --prover  # Prover-V2 Q8_0 (machine gun)
+# Seed the vector database
+bun run src/scripts/seed_mathlib.ts
+
+# Run a live proof
+bun run src/scripts/live_fire.ts
+
+# Generate conjectures from arXiv literature
+bun run src/scripts/generate_conjectures.ts
 ```
 
 ## Manual Setup
 
 | Tool | Install | Purpose |
-|------|---------|---------|
+|------|---------|---------| 
 | [Bun](https://bun.sh) | `curl -fsSL https://bun.sh/install \| bash` | Runtime + tests |
 | [Lean 4](https://lean-lang.org) | `curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \| sh -s -- -y` | Proof engine |
 | Z3 | `pip3 install z3-solver` | SMT solver |
-| [Ollama](https://ollama.com) | `brew install ollama` (macOS) or `curl -fsSL https://ollama.com/install.sh \| sh` (Linux) | Local LLM |
+| [Ollama](https://ollama.com) | `brew install ollama` (macOS) or `curl -fsSL https://ollama.com/install.sh \| sh` (Linux) | Local LLM + embeddings |
 
 ```bash
 bun install
 ollama serve &
-ollama pull deepseek-r1:8b
-PATH="$HOME/.elan/bin:$PATH" bun test  # verify 104/104 green
+ollama pull deepseek-prover-v2:7b-q8
+ollama pull nomic-embed-text
+bun test  # verify 362/362 green
 ```
 
 ## Model Stack
 
 | Role | Model | Speed | Purpose |
 |------|-------|-------|---------|
-| **Tactician** | `deepseek-prover-v2:7b-q8` | 1-2s | Raw Lean tactic generation (machine gun) |
-| **Reasoner** | `deepseek-r1:8b` | ~75s | Strategic analysis, JSON plans (sniper) |
-| **Architect (Flash)** | Gemini 3.0 Flash | Cloud | Proof planning, periodic sanity checks |
-| **Architect (Pro)** | Gemini 3.1 Pro | Cloud | Heavy structural rethink on total failure |
+| **Tactician** | `deepseek-prover-v2:7b-q8` | 1-2s | Raw Lean tactic generation |
+| **Reasoner** | Gemini 2.5 Flash | Cloud | Strategic unblock after failures |
+| **Architect** | Gemini 3.1 Pro | Cloud | Proof planning, directives |
+| **Conjecturer** | Gemini 3.1 Pro | Cloud | Novel theorem hypothesis generation |
+| **Scribe** | Gemini 3.1 Pro | Cloud | Lean 4 → AMS-LaTeX translation |
+| **Embedder** | `nomic-embed-text` | Local | 768-dim vectors for RAG |
 
 > [!NOTE]
 > `deepseek-prover-v2:7b-q8` requires manual GGUF install — Q8_0 quantization is critical (Q4_K_M produces unusable output). See [Modelfile.prover](Modelfile.prover) for the Ollama configuration.
@@ -108,51 +120,64 @@ PATH="$HOME/.elan/bin:$PATH" bun test  # verify 104/104 green
 ```
 perqed/
 ├── src/
-│   ├── orchestrator.ts       # Main proof loop v3.0 (specialist routing)
-│   ├── workspace.ts          # File-system state (scratch + vault)
-│   ├── lean_bridge.ts        # Lean 4 subprocess (stdin pipe)
-│   ├── solver.ts             # Z3 Python subprocess
-│   ├── schemas.ts            # Zod contracts
-│   ├── types.ts              # AgentRole, RoutingSignals, AttemptLog
-│   ├── architect_client.ts   # Gemini REST API client
+│   ├── orchestrator.ts           # Main proof loop v3 (specialist routing + async batch)
+│   ├── tree.ts                   # ProofTree — AND/OR MCTS with value backpropagation
+│   ├── workspace.ts              # File-system state (scratch + vault)
+│   ├── lean_bridge.ts            # Lean 4 subprocess + goal parsing
+│   ├── solver.ts                 # Z3 Python subprocess
+│   ├── schemas.ts                # Zod contracts
+│   ├── types.ts                  # AgentRole, RoutingSignals, AttemptLog
 │   ├── agents/
-│   │   ├── router.ts         # Signal-based agent routing
-│   │   ├── factory.ts        # SpecialistAgent interface + factory
-│   │   └── formalist.ts      # FormalistAgent (think-tag parsing)
-│   └── scripts/live_fire.ts  # Live proof entry point
-├── tests/                    # 161 tests (TDD red→green)
-├── .env.example              # API key template
-├── agent_workspace/          # Runtime state
-│   ├── global_config/        # System prompts, model config
+│   │   ├── router.ts             # Signal-based agent routing
+│   │   ├── factory.ts            # SpecialistAgent interface + factory
+│   │   ├── formalist.ts          # FormalistAgent (think-tag parsing)
+│   │   ├── conjecturer.ts        # Novel theorem hypothesis generation
+│   │   └── scribe.ts             # Lean 4 → AMS-LaTeX translator
+│   ├── embeddings/
+│   │   ├── embedder.ts           # Local Ollama embedding service
+│   │   └── vector_store.ts       # LanceDB vector database wrapper
+│   ├── ml/
+│   │   ├── tree_scorer.ts        # AND/OR value backpropagation
+│   │   └── dataset_extractor.ts  # Safe SFT training data harvester
+│   ├── utils/
+│   │   ├── tree_printer.ts       # MCTS tree visualization
+│   │   └── chunker.ts            # Semantic text chunking
+│   ├── telemetry/
+│   │   └── emitter.ts            # Gist-based telemetry
+│   └── scripts/
+│       ├── live_fire.ts          # Full integration boss fight
+│       ├── publish.ts            # Scribe + SFT pipeline
+│       ├── seed_mathlib.ts       # LanceDB seed data
+│       ├── arxiv_fetcher.ts      # arXiv ingestion pipeline
+│       └── generate_conjectures.ts  # Autonomous conjecture generation
+├── tests/                        # 362 tests across 54 files
+├── data/
+│   ├── sft_dataset.jsonl         # Harvested training pairs
+│   └── draft_paper.tex           # Latest AMS-LaTeX output
+├── agent_workspace/              # Runtime state
+│   ├── global_config/            # System prompts, model config
 │   └── runs/<name>/
-│       ├── scratch/          # Volatile (lab_log, progress)
-│       └── verified_lib/     # Vault (committed .lean proofs)
-└── scripts/setup.sh          # One-command bootstrap
+│       ├── scratch/              # Volatile (lab_log, progress)
+│       └── verified_lib/         # Vault (committed .lean proofs)
+└── scripts/setup.sh              # One-command bootstrap
 ```
 
 ## Tests
 
-161 tests across 17 files, all using real subprocesses for Lean and Z3:
+362 tests across 54 files:
 
-| File | Tests | Coverage |
-|------|-------|----------|
-| `router.test.ts` | 17 | Routing logic, goal parsing, priority rules |
-| `routing_signals.test.ts` | 13 | Signal extraction from attempt logs |
-| `routing_integration.test.ts` | 8 | Full pipeline: signals → router → factory |
-| `architect_tier.test.ts` | 8 | Flash/Pro tier selection, env fallback |
-| `factory.test.ts` | 7 | Agent instantiation, API key validation |
-| `lean_bridge.test.ts` | 10 | Real Lean subprocess (valid, failed, sorry, timeout) |
-| `dual_engine.test.ts` | 10 | Schemas + Lean loop + escalation + vault commit |
-| `workspace_v2.test.ts` | 12 | scratch/ + verified_lib/ + commitProof |
-| `formalist.test.ts` | 8 | think-tag parsing, bare-tactic wrapping, retry |
-| `council.test.ts` | 14 | FALSIFY_FIRST, parallel Z3, confidence scoring |
-| `orchestrator.test.ts` | 7 | Failure counting, backtracking, directives |
-| `resilience.test.ts` | 4 | Resume, append, max iterations, SOLVED |
-| `truncation.test.ts` | 4 | Context window budget, head+tail truncation |
-| `llm_client.test.ts` | 8 | JSON parsing, auto-correction |
-| `workspace.test.ts` | 16 | Init, lab log, happy path, context builder |
-| `solver.test.ts` | 5 | Z3 unsat/sat, timeout, isolation |
-| `architect.test.ts` | 5 | Gemini parsing, markdown, validation |
+| Area | Files | Tests | Coverage |
+|------|-------|-------|----------|
+| **Routing** | 3 | 38 | Signal extraction, agent routing, integration |
+| **Agents** | 4 | 37 | Factory, formalist, architect, council |
+| **Lean/Z3** | 3 | 19 | Subprocess, schemas, solver |
+| **Workspace** | 3 | 32 | Init, lab log, context, resilience |
+| **MCTS Tree** | 4 | 19 | Backtracking, winning path, async batch, AND/OR |
+| **Embedding** | 3 | 24 | Embedder, vector store, chunker |
+| **ML Pipeline** | 3 | 18 | arXiv, dataset extractor, tree scorer |
+| **Orchestrator** | 3 | 15 | Failure counting, directives, concurrent processing |
+| **Agents (Cloud)** | 3 | 14 | Conjecturer, scribe, Lean parser |
+| **Other** | 15 | 96 | Truncation, LLM client, telemetry, etc. |
 
 ## License
 
