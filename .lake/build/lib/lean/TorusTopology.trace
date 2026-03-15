@@ -1,15 +1,13 @@
 {"synthetic": false,
  "schemaVersion": "2025-09-10",
  "outputs":
- {"o": ["8520950f9f0f7172.olean"],
-  "i": "3151c5c0e085dd3f.ilean",
-  "c": "a21fc3e1172a6730.c"},
+ {"o": ["d985ac2e36fbd557.olean"],
+  "i": "20b147c38af3334a.ilean",
+  "c": "dfc9242a3f70ca61.c"},
  "log":
  [{"message":
    ".> LEAN_PATH=/Users/kevin/projects/perqed/.lake/build/lib/lean /Users/kevin/.elan/toolchains/leanprover--lean4---v4.28.0/bin/lean /Users/kevin/projects/perqed/src/lean/TorusTopology.lean -o /Users/kevin/projects/perqed/.lake/build/lib/lean/TorusTopology.olean -i /Users/kevin/projects/perqed/.lake/build/lib/lean/TorusTopology.ilean -c /Users/kevin/projects/perqed/.lake/build/ir/TorusTopology.c --setup /Users/kevin/projects/perqed/.lake/build/ir/TorusTopology.setup.json --json",
-   "level": "trace"},
-  {"message": "src/lean/TorusTopology.lean:178:8: declaration uses `sorry`",
-   "level": "warning"}],
+   "level": "trace"}],
  "inputs":
  [["TorusTopology:deps",
    [["deps",
@@ -24,7 +22,7 @@
   ["Lean 4.28.0, commit 7e01a1bf5c70fc6167d49c345d3bf80596e9a79b",
    "a96bc04a2e5e9630"],
   ["/Users/kevin/projects/perqed/src/lean/TorusTopology.lean",
-   "3fa2da66f6eb4550"],
+   "d01500364a816152"],
   ["options", [["-DautoImplicit=false", "4a85acb881fd49d0"]]],
   ["Module.leanArgs: #[]", "00000000000006bb"]],
- "depHash": "5ad419ddd0834787"}
+ "depHash": "6712c65e4c5568ec"}

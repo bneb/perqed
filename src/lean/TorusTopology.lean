@@ -1,9 +1,12 @@
 /-
-  TorusTopology.lean -- Pure Prop Hamiltonian Decomposition (Sprint 30)
+  TorusTopology.lean -- Zero-Sorry Prop-Valued Hamiltonian Decomposition
 
-  Defines Hamiltonicity via finite function iteration (not TransGen).
-  All propositions are Decidable over the finite domain Fin 4 x Fin 4 x Fin 4.
-  The final theorem is a pure mathematical Prop, verified by native_decide.
+  Architecture:
+    1. Custom Decidable instance for forall over Torus4
+    2. Pure Prop definitions (isTorusEdge, isHamiltonianCycle, etc.)
+    3. Payload decoded into three successor functions
+    4. Each sub-property proved individually by native_decide
+    5. Final theorem assembles the sub-proofs
 -/
 
 set_option autoImplicit false
@@ -22,7 +25,41 @@ instance instDecForallTorus4 {P : Torus4 → Prop}
   else .isFalse (fun h' => h (fun x y z => h' (x, y, z)))
 
 -- ============================================================
--- 2. Payload and Successor Functions
+-- 2. Mathematical Specification
+-- ============================================================
+
+def applyN (f : Torus4 → Torus4) : Nat → Torus4 → Torus4
+  | 0, x => x
+  | n + 1, x => applyN f n (f x)
+
+def root : Torus4 := ((0 : Fin 4), (0 : Fin 4), (0 : Fin 4))
+
+def isTorusEdge (u v : Torus4) : Prop :=
+  v = (u.1 + 1, u.2.1, u.2.2) ∨
+  v = (u.1, u.2.1 + 1, u.2.2) ∨
+  v = (u.1, u.2.1, u.2.2 + 1)
+
+instance instDecIsTorusEdge (u v : Torus4) : Decidable (isTorusEdge u v) :=
+  inferInstanceAs (Decidable (_ ∨ _ ∨ _))
+
+def isHamiltonianCycle (f : Torus4 → Torus4) : Prop :=
+  (∀ x y : Torus4, f x = f y → x = y) ∧
+  (applyN f 64 root = root) ∧
+  (∀ k : Fin 63, applyN f (k.val + 1) root ≠ root)
+
+def IsHamiltonianDecomposition (g0 g1 g2 : Torus4 → Torus4) : Prop :=
+  (∀ u : Torus4, isTorusEdge u (g0 u)) ∧
+  (∀ u : Torus4, isTorusEdge u (g1 u)) ∧
+  (∀ u : Torus4, isTorusEdge u (g2 u)) ∧
+  (∀ u : Torus4, g0 u ≠ g1 u) ∧
+  (∀ u : Torus4, g0 u ≠ g2 u) ∧
+  (∀ u : Torus4, g1 u ≠ g2 u) ∧
+  isHamiltonianCycle g0 ∧
+  isHamiltonianCycle g1 ∧
+  isHamiltonianCycle g2
+
+-- ============================================================
+-- 3. Payload and Successor Functions
 -- ============================================================
 
 def permDir : Fin 6 → Fin 3 → Fin 3
@@ -55,133 +92,71 @@ def f1 : Torus4 → Torus4 := succColor 1
 def f2 : Torus4 → Torus4 := succColor 2
 
 -- ============================================================
--- 3. Boolean Checker (Decidable, runs in the kernel)
+-- 4. Sub-Proofs (each by native_decide on a decidable sub-goal)
 -- ============================================================
 
-def applyN (f : Torus4 → Torus4) : Nat → Torus4 → Torus4
-  | 0, x => x
-  | n + 1, x => applyN f n (f x)
+-- Edge validity: each color produces valid torus edges
+set_option maxHeartbeats 4000000 in
+theorem edges_f0 : ∀ u : Torus4, isTorusEdge u (f0 u) := by native_decide
 
-def root : Torus4 := ((0 : Fin 4), (0 : Fin 4), (0 : Fin 4))
+set_option maxHeartbeats 4000000 in
+theorem edges_f1 : ∀ u : Torus4, isTorusEdge u (f1 u) := by native_decide
 
-def isTorusEdgeBool (u v : Torus4) : Bool :=
-  v == (u.1 + 1, u.2.1, u.2.2) ||
-  v == (u.1, u.2.1 + 1, u.2.2) ||
-  v == (u.1, u.2.1, u.2.2 + 1)
+set_option maxHeartbeats 4000000 in
+theorem edges_f2 : ∀ u : Torus4, isTorusEdge u (f2 u) := by native_decide
 
-def isInjectiveBool (f : Torus4 → Torus4) : Bool :=
-  -- Check all 64*64 pairs: if f x = f y then x = y
-  -- Route through Fin 64 for decidability
-  let check := fun (i : Fin 64) (j : Fin 64) =>
-    let vi : Torus4 := ((⟨i.val / 16, by omega⟩ : Fin 4),
-                         (⟨i.val / 4 % 4, by omega⟩ : Fin 4),
-                         (⟨i.val % 4, by omega⟩ : Fin 4))
-    let vj : Torus4 := ((⟨j.val / 16, by omega⟩ : Fin 4),
-                         (⟨j.val / 4 % 4, by omega⟩ : Fin 4),
-                         (⟨j.val % 4, by omega⟩ : Fin 4))
-    if f vi == f vj then vi == vj else true
-  (List.range 64).all fun i =>
-    (List.range 64).all fun j =>
-      if h1 : i < 64 then
-        if h2 : j < 64 then check ⟨i, h1⟩ ⟨j, h2⟩
-        else true
-      else true
+-- Disjointness: no two colors agree at any vertex
+set_option maxHeartbeats 4000000 in
+theorem disj_01 : ∀ u : Torus4, f0 u ≠ f1 u := by native_decide
 
-def orbitCloses64Bool (f : Torus4 → Torus4) : Bool :=
-  applyN f 64 root == root
+set_option maxHeartbeats 4000000 in
+theorem disj_02 : ∀ u : Torus4, f0 u ≠ f2 u := by native_decide
 
-def noShorterOrbitBool (f : Torus4 → Torus4) : Bool :=
-  (List.range 63).all fun k =>
-    applyN f (k + 1) root != root
+set_option maxHeartbeats 4000000 in
+theorem disj_12 : ∀ u : Torus4, f1 u ≠ f2 u := by native_decide
 
-def allEdgesValidBool (f : Torus4 → Torus4) : Bool :=
-  (List.range 64).all fun i =>
-    if h : i < 64 then
-      let v : Torus4 := ((⟨i / 16, by omega⟩ : Fin 4),
-                           (⟨i / 4 % 4, by omega⟩ : Fin 4),
-                           (⟨i % 4, by omega⟩ : Fin 4))
-      isTorusEdgeBool v (f v)
-    else true
+-- Injectivity: each color function is injective
+set_option maxHeartbeats 40000000 in
+theorem inj_f0 : ∀ x y : Torus4, f0 x = f0 y → x = y := by native_decide
 
-def allDisjointBool (f g : Torus4 → Torus4) : Bool :=
-  (List.range 64).all fun i =>
-    if h : i < 64 then
-      let v : Torus4 := ((⟨i / 16, by omega⟩ : Fin 4),
-                           (⟨i / 4 % 4, by omega⟩ : Fin 4),
-                           (⟨i % 4, by omega⟩ : Fin 4))
-      f v != g v
-    else true
+set_option maxHeartbeats 40000000 in
+theorem inj_f1 : ∀ x y : Torus4, f1 x = f1 y → x = y := by native_decide
 
-def checkDecomposition : Bool :=
-  allEdgesValidBool f0 &&
-  allEdgesValidBool f1 &&
-  allEdgesValidBool f2 &&
-  allDisjointBool f0 f1 &&
-  allDisjointBool f0 f2 &&
-  allDisjointBool f1 f2 &&
-  isInjectiveBool f0 &&
-  isInjectiveBool f1 &&
-  isInjectiveBool f2 &&
-  orbitCloses64Bool f0 &&
-  orbitCloses64Bool f1 &&
-  orbitCloses64Bool f2 &&
-  noShorterOrbitBool f0 &&
-  noShorterOrbitBool f1 &&
-  noShorterOrbitBool f2
+set_option maxHeartbeats 40000000 in
+theorem inj_f2 : ∀ x y : Torus4, f2 x = f2 y → x = y := by native_decide
 
--- ============================================================
--- 4. Prop-valued Mathematical Specification
--- ============================================================
+-- Orbit closes at exactly 64 steps
+set_option maxRecDepth 131072 in
+set_option maxHeartbeats 4000000 in
+theorem orbit_f0 : applyN f0 64 root = root := by native_decide
 
-def isTorusEdge (u v : Torus4) : Prop :=
-  v = (u.1 + 1, u.2.1, u.2.2) ∨
-  v = (u.1, u.2.1 + 1, u.2.2) ∨
-  v = (u.1, u.2.1, u.2.2 + 1)
+set_option maxRecDepth 131072 in
+set_option maxHeartbeats 4000000 in
+theorem orbit_f1 : applyN f1 64 root = root := by native_decide
 
-def isHamiltonianCycle (f : Torus4 → Torus4) : Prop :=
-  (∀ x y : Torus4, f x = f y → x = y) ∧
-  (applyN f 64 root = root) ∧
-  (∀ k : Fin 63, applyN f (k.val + 1) root ≠ root)
+set_option maxRecDepth 131072 in
+set_option maxHeartbeats 4000000 in
+theorem orbit_f2 : applyN f2 64 root = root := by native_decide
 
-def IsHamiltonianDecomposition (g0 g1 g2 : Torus4 → Torus4) : Prop :=
-  (∀ u : Torus4, isTorusEdge u (g0 u)) ∧
-  (∀ u : Torus4, isTorusEdge u (g1 u)) ∧
-  (∀ u : Torus4, isTorusEdge u (g2 u)) ∧
-  (∀ u : Torus4, g0 u ≠ g1 u) ∧
-  (∀ u : Torus4, g0 u ≠ g2 u) ∧
-  (∀ u : Torus4, g1 u ≠ g2 u) ∧
-  isHamiltonianCycle g0 ∧
-  isHamiltonianCycle g1 ∧
-  isHamiltonianCycle g2
-
--- ============================================================
--- 5. The Boolean Check Passes (Computational Fact)
--- ============================================================
+-- No shorter orbit (prevents sub-tours)
+set_option maxRecDepth 131072 in
+set_option maxHeartbeats 40000000 in
+theorem no_short_f0 : ∀ k : Fin 63, applyN f0 (k.val + 1) root ≠ root := by native_decide
 
 set_option maxRecDepth 131072 in
 set_option maxHeartbeats 40000000 in
-theorem check_passes : checkDecomposition = true := by native_decide
+theorem no_short_f1 : ∀ k : Fin 63, applyN f1 (k.val + 1) root ≠ root := by native_decide
+
+set_option maxRecDepth 131072 in
+set_option maxHeartbeats 40000000 in
+theorem no_short_f2 : ∀ k : Fin 63, applyN f2 (k.val + 1) root ≠ root := by native_decide
 
 -- ============================================================
--- 6. Soundness: Bool Check → Prop (The Reflection Bridge)
--- ============================================================
-
--- Helper: vertex from flat index
-def toV (i : Nat) (h : i < 64) : Torus4 :=
-  ((⟨i / 16, by omega⟩ : Fin 4),
-   (⟨i / 4 % 4, by omega⟩ : Fin 4),
-   (⟨i % 4, by omega⟩ : Fin 4))
-
--- The reflection theorem: if the boolean check passes, the Prop holds.
--- This requires showing each boolean sub-check implies the corresponding Prop.
--- For now we state it; the proof follows from the structure of the checkers.
-theorem checker_soundness :
-    checkDecomposition = true → IsHamiltonianDecomposition f0 f1 f2 := by
-  sorry
-
--- ============================================================
--- 7. The Final Theorem
+-- 5. The Final Theorem (Zero Sorry)
 -- ============================================================
 
 theorem torus_m4_valid : IsHamiltonianDecomposition f0 f1 f2 :=
-  checker_soundness check_passes
+  ⟨edges_f0, edges_f1, edges_f2, disj_01, disj_02, disj_12,
+   ⟨inj_f0, orbit_f0, no_short_f0⟩,
+   ⟨inj_f1, orbit_f1, no_short_f1⟩,
+   ⟨inj_f2, orbit_f2, no_short_f2⟩⟩
