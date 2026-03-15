@@ -1,32 +1,10 @@
 # Perqed
 
-**Automated theorem proving and formal verification in Lean 4.** An open-source system that reads mathematical literature, generates conjectures, attempts proofs via MCTS-guided tactic search, and extracts training data from successful proofs.
+**Automated theorem proving in Lean 4.** An open-source system that reads mathematical literature, generates conjectures, attempts proofs via MCTS-guided tactic search, and extracts training data from successful proofs.
 
 Runs locally on Apple Silicon.
 
----
-
-## Results
-
-### Directed Hamiltonian Torus Decomposition
-
-We provide machine-checked proofs of the $m=4$ and $m=6$ cases of the Directed Hamiltonian Torus Decomposition problem, originally posed by Knuth. The witnesses were discovered via Simulated Annealing and formally verified inside the Lean 4 kernel using the `decide` tactic.
-
-| Case | Vertices | Search space | Discovery time | Kernel verification |
-|------|----------|--------------|----------------|---------------------|
-| m=4  | 64       | 6^63         | 3.1 s          | < 1 s               |
-| m=6  | 216      | 6^215        | 99.5 s         | 57 s                |
-
-Together with Knuth's odd-*m* construction and the Aquino-Michaels construction for even *m* ≥ 8, this closes the problem for all *m* ≥ 3.
-
-- **Paper**: [`paper/torus_decomposition.pdf`](paper/torus_decomposition.pdf)
-- **Lean proofs**: [`src/lean/TorusTopology.lean`](src/lean/TorusTopology.lean) (m=4), [`src/lean/TorusTopologyM6.lean`](src/lean/TorusTopologyM6.lean) (m=6)
-
----
-
-## Proof Engine
-
-The core system reads mathematical literature, generates conjectures, and attempts to prove them in Lean 4 using MCTS-guided tactic search.
+## Architecture
 
 ```mermaid
 graph TD
@@ -64,15 +42,21 @@ graph TD
     end
 ```
 
-### How it works
+## How It Works
 
-1. **Read** — Fetch papers from arXiv, chunk abstracts, embed via `nomic-embed-text`, store in LanceDB.
-2. **Falsify** — Z3 checks for counterexamples in bounded domains before proof search begins.
-3. **Search** — AND/OR MCTS selects batches of open nodes concurrently. Tactics like `induction` create AND nodes; alternatives create OR nodes.
-4. **Verify** — Lean 4 checks every tactic step. The LLM proposes; Lean decides.
-5. **Learn** — Solved proofs are parsed into (State, Tactic) pairs for SFT training data.
+1. **Read the Literature** — The Librarian fetches papers from arXiv, chunks abstracts at sentence boundaries, embeds them via Ollama `nomic-embed-text`, and stores vectors in LanceDB.
 
----
+2. **Generate Conjectures** — The Conjecturer (Gemini) synthesizes Lean 4 theorem signatures from embedded literature. A dual-stage filter removes syntax errors and trivially solvable theorems.
+
+3. **Falsify First** — Before proof search begins, Z3 checks for counterexamples in bounded domains. False conjectures are typically caught in under 50ms.
+
+4. **AND/OR MCTS Search** — The Orchestrator selects batches of open nodes concurrently via `Promise.all()`. Tactics like `induction` that split into subgoals create AND nodes (all must succeed), while alternative tactics create OR nodes (any can succeed). The TreeScorer backpropagates: OR = max(children), AND = product(children).
+
+5. **Lean as Ground Truth** — Lean 4 verifies every tactic step. The LLM reads tactic state and proposes tactics; Lean checks each one before it is committed.
+
+6. **Training Data Extraction** — Solved proofs are parsed into `(State, Tactic)` pairs and saved as deduplicated SFT training data in `sft_dataset.jsonl`.
+
+7. **Paper Generation** — A separate agent translates verified Lean 4 proofs into AMS-LaTeX documents with theorem environments and numbered equations.
 
 ## Quick Start
 
@@ -89,20 +73,27 @@ bun test
 
 # Run a live proof
 bun run src/scripts/live_fire.ts
+
+# Generate conjectures from arXiv literature
+bun run src/scripts/generate_conjectures.ts
 ```
 
 ## Model Stack
 
-| Role | Model | Runtime | Purpose |
-|------|-------|---------|---------|
-| **Tactician** | `deepseek-prover-v2:7b-q8` | Local | Lean tactic generation |
+| Role | Model | Speed | Purpose |
+|------|-------|-------|---------|
+| **Tactician** | `deepseek-prover-v2:7b-q8` | 1-2s | Raw Lean tactic generation |
 | **Reasoner** | Gemini 2.5 Flash | Cloud | Strategic unblock after failures |
 | **Architect** | Gemini 3.1 Pro | Cloud | Proof planning, directives |
-| **Conjecturer** | Gemini 3.1 Pro | Cloud | Theorem hypothesis generation |
+| **Conjecturer** | Gemini 3.1 Pro | Cloud | Novel theorem hypothesis generation |
+| **Scribe** | Gemini 3.1 Pro | Cloud | Lean 4 → AMS-LaTeX translation |
 | **Embedder** | `nomic-embed-text` | Local | 768-dim vectors for RAG |
 
 > [!NOTE]
 > `deepseek-prover-v2:7b-q8` requires manual GGUF install — Q8_0 quantization is critical (Q4_K_M produces unusable output). See [Modelfile.prover](Modelfile.prover) for the Ollama configuration.
+
+> [!IMPORTANT]
+> Gemini requires an API key from [AI Studio](https://aistudio.google.com/apikey). Copy `.env.example` to `.env` and add your `GEMINI_API_KEY`. The free tier (5-15 RPM) is sufficient for proof runs.
 
 ## Project Structure
 
@@ -118,11 +109,17 @@ perqed/
 │   └── scripts/                  # CLI entry points
 ├── paper/
 │   └── torus_decomposition.tex   # Manuscript (LaTeX source + PDF)
-├── data/
-│   ├── claude_cycles_m4.json     # m=4 witness payload
-│   └── claude_cycles_m6.json     # m=6 witness payload
-└── tests/                        # Test suite
+├── data/                         # Witness payloads, training data
+├── tests/                        # Test suite
+└── website/                      # perqed.com (Astro)
 ```
+
+## Notable Results
+
+Machine-checked Lean 4 proofs of the *m*=4 and *m*=6 cases of the Directed Hamiltonian Torus Decomposition problem (Knuth, March 2026). Together with existing constructions for odd *m* and even *m* ≥ 8, this closes the problem for all *m* ≥ 3.
+
+- **Paper**: [`paper/torus_decomposition.pdf`](paper/torus_decomposition.pdf)
+- **Lean proofs**: [`TorusTopology.lean`](src/lean/TorusTopology.lean) (*m*=4) · [`TorusTopologyM6.lean`](src/lean/TorusTopologyM6.lean) (*m*=6)
 
 ## License
 
