@@ -2,18 +2,22 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>If you read my recent
-<a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf">paper</a>
-closing the final base cases of Knuth's Directed Hamiltonian Torus Decomposition, you saw the
-mathematical result: the arrays work, and the Lean 4 kernel proves they work.</p>
+<p>Imagine a 3D grid that wraps around in every direction — a torus. Every
+vertex has three outgoing edges: one along each axis. The question is whether
+you can color those edges with three colors so that each color, taken alone,
+traces a single Hamiltonian cycle through the entire graph. This is the
+Directed Hamiltonian Torus Decomposition problem, posed by
+<a href="https://cs.stanford.edu/~knuth/papers/claude.pdf">Knuth</a>
+in early 2026.</p>
+
+<p>Constructions exist for odd grid sizes and even sizes ≥ 8, but the
+small even cases — 4×4×4 and 6×6×6 — fell through the cracks. We found
+valid decompositions for both, and the Lean 4 kernel
+<a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf">proves they work</a>.</p>
 
 <p>But the paper skips the most interesting engineering problem: how do you actually
-<em>find</em> a working array when the search space is
+<em>find</em> a working configuration when the search space is
 6<sup>215</sup> ≈ 10<sup>167</sup> states?</p>
-
-<p>Brute force is physically impossible. Random guessing is statistically hopeless.
-Here's a look at the TypeScript search engine that found both witnesses, and the
-architectural choices that made it tractable.</p>
 
 <h2>The Bottleneck: O(N) Energy Evaluation</h2>
 
