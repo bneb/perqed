@@ -18,7 +18,7 @@ const TARGET_M = parseInt(process.argv[2] || "4", 10);
 const NUM_RESTARTS = parseInt(process.argv[3] || "10", 10);
 const ITERS_PER_RESTART = parseInt(process.argv[4] || "500000", 10);
 const START_TEMP = 50.0;
-const COOLING_RATE = 0.999998; // Much slower: T≈1.0 at iter 1.5M
+const COOLING_RATE = 0.999998; // Fast cooling: T≈1.0 at iter ~1.5M
 
 async function huntClaudeCycles() {
   const vCount = TARGET_M ** 3;
@@ -81,7 +81,7 @@ async function huntClaudeCycles() {
         join(dataDir, `claude_cycles_m${TARGET_M}.json`),
         JSON.stringify(
           {
-            m: 4,
+            m: TARGET_M,
             restart,
             elapsed_seconds: parseFloat(elapsed),
             payload: ultimateBestPayload,

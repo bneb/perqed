@@ -104,7 +104,7 @@ async function huntFast() {
 
       // Adaptive reheating with exponential backoff
       if (itersSinceImprovement >= currentReheatWindow) {
-        temperature = Math.max(2.0, 2.0 * Math.pow(bestEnergy, 0.4));
+        temperature = Math.max(1.0, Math.pow(bestEnergy, 0.4));
         itersSinceImprovement = 0;
         currentReheatWindow = Math.min(currentReheatWindow * 2, ITERS_PER_RESTART);
       }
