@@ -194,16 +194,20 @@ The $m=6$ solution was found at restart~10, iteration~2{,}807{,}777.
 
 \section{Formal Verification}
 
-Each witness is an array in $\{0,\ldots,5\}^{m^3}$. We decode it
+Each witness is a static array in $\{0,\ldots,5\}^{m^3}$. We decode it
 (Table~\ref{tab:permutations}) into three successor functions
 $f_0, f_1, f_2 :
 \texttt{Fin}\;m \times \texttt{Fin}\;m \times \texttt{Fin}\;m \to
 \texttt{Fin}\;m \times \texttt{Fin}\;m \times \texttt{Fin}\;m$.
+The decoding is formalized entirely within Lean; the successor
+functions natively evaluate the lexicographic mapping
+$(i,j,k) \mapsto im^2 + jm + k$ to index into the array.
 
-The specification uses Lean's \texttt{Prop} universe. We define the torus
-edge relation on
-$\texttt{Fin}\;m \times \texttt{Fin}\;m \times \texttt{Fin}\;m$:
+The specification uses Lean's \texttt{Prop} universe. For $m=6$, we
+define the vertex type alias and the torus edge relation:
 \begin{lstlisting}[language=ML,mathescape=true]
+abbrev Torus6 := Fin 6 $\times$ Fin 6 $\times$ Fin 6
+
 def isTorusEdge (u v : Torus6) : Prop :=
   v = (u.1 + 1, u.2.1, u.2.2) $\lor$
   v = (u.1, u.2.1 + 1, u.2.2) $\lor$
@@ -259,8 +263,10 @@ processor, with zero axioms and no unproven subgoals.
 
 We have given machine-checked proofs that $G_4$ and $G_6$ each admit a
 decomposition into three directed Hamiltonian cycles. Together with
-Knuth's construction for odd~$m$ and the Aquino-Michaels construction for
-even $m \ge 8$, this closes the problem for all~$m$.
+Knuth's construction for odd $m \ge 3$ and the Aquino-Michaels construction
+for even $m \ge 8$, this completes the categorization for all $m \ge 3$.
+(The degenerate cases $m=1$ and $m=2$ have fewer than $3m^3$ distinct arcs
+and do not admit decompositions of this form.)
 
 Source code, witnesses, and Lean~4 proofs are available at
 \url{https://github.com/bneb/perqed}.
