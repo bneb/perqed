@@ -10,3 +10,7 @@ package perqed where
 lean_lib KnuthTorusM4 where
   srcDir := "src/lean"
   roots := #[`KnuthTorusM4]
+
+lean_lib TorusTopology where
+  srcDir := "src/lean"
+  roots := #[`TorusTopology]

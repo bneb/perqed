@@ -66,8 +66,10 @@ Opus~4.6 found a generalized algebraic construction for all odd~$m$, which
 Knuth verified and proved correct. During the same exploration, Claude found
 isolated empirical solutions for $m = 4$, $m = 6$, and $m = 8$, but could
 not generalize them. In a March~6 revision, Knuth noted that Keston
-Aquino-Michaels found an elegant decomposition for general even~$m$ using a
-combination of GPT and Claude.
+Aquino-Michaels found an elegant decomposition for even~$m$, though the
+construction relies on a splice gadget that requires $m \ge 8$. The small
+even cases $m = 4$ and $m = 6$ remain outside the scope of that general
+proof.
 
 Morrison formalized Knuth's odd-$m$ proof in Lean~4 on March~4, 2026.
 To our knowledge, no machine-checked proof of any even-$m$ case has been
@@ -82,8 +84,7 @@ We make the following contributions:
   for in-degree regularity, avoiding a subtle failure mode in functional
   graphs.
   \item A non-monotonic cooling schedule with energy-proportional
-  reheating~\cite{kirkpatrick1983,marinari1992}, and a discussion of why
-  this approach may scale better than SAT encodings for larger~$m$.
+  reheating~\cite{kirkpatrick1983,marinari1992}.
 \end{enumerate}
 
 The empirical discovery of $m=4$ solutions is not new. Our contribution is
@@ -145,21 +146,19 @@ a standard non-monotonic cooling schedule~\cite{kirkpatrick1983,marinari1992}
 with a power-law reheat temperature that scales with the current difficulty
 of the optimization.
 
-\subsection{Scaling Considerations}
+\subsection{Comparison with Exact Solvers}
 
-A SAT or ILP encoding of Hamiltonian cycle decomposition requires sub-tour
-elimination constraints. In ILP, these are typically formulated via
-Miller-Tucker-Zemlin auxiliary variables~\cite{miller1960}; in pure Boolean
-SAT, positional or reachability encodings introduce $O(V^2 \log V)$ to
-$O(V^3)$ clauses. For $m = 4$ ($V = 64$), this is straightforward and
-exact solvers will outperform our approach. For $m = 8$ ($V = 512$), the
-encoding requires hundreds of thousands of auxiliary variables per color
-and millions of clauses, which degrades solver performance.
+For $m = 4$, the decomposition problem is small enough that exact solvers
+are practical. An ILP encoding using Miller-Tucker-Zemlin sub-tour
+elimination~\cite{miller1960}, or a pure Boolean SAT encoding using
+positional reachability constraints, would solve this instance in
+milliseconds. Our stochastic approach is not competitive with exact solvers
+at this scale.
 
-Our pipeline evaluates Hamiltonicity in $O(V)$ time with $V$ bytes of
-working memory, which remains practical at larger scales. We do not claim
-that SA is faster than SAT for small instances; rather, the memory profile
-of the stochastic approach is more favorable as $V$ grows.
+The SA pipeline evaluates Hamiltonicity in $O(V)$ time with $V$ bytes of
+working memory. Whether this memory advantage becomes relevant at larger
+scales (e.g., $m = 8$, $V = 512$) is an empirical question that we have
+not yet tested.
 
 \section{Results}
 
@@ -190,7 +189,7 @@ found at iteration 1{,}366{,}834 of restart~12, running at approximately
 The discovered witness is a 64-element array of integers in $\{0,\ldots,5\}$.
 We encode this array, the successor function, and the verification
 predicate as computable Lean~4 definitions using structural recursion on
-natural numbers. No Mathlib dependencies are required.
+natural numbers.
 
 The main theorem is:
 
@@ -214,19 +213,34 @@ color subgraph forms a single 64-vertex cycle, that all 192 arcs are
 covered without overlap, and that every vertex has in-degree~1 and
 out-degree~1 per color.
 
+\subsection{Limitations}
+
+Our verification proves that a specific Boolean predicate evaluates to
+\texttt{true} on a hardcoded array. It does not include a formal
+mathematical specification of the 3D torus topology or Hamiltonian cycles
+in Lean's \texttt{Prop} universe. In particular, the correctness of the
+\texttt{successor} function (i.e., that it faithfully encodes the edges of
+$G_4$) is trusted code, not a verified theorem.
+
+A fully rigorous formalization would define the torus as a directed graph
+over $\mathbb{Z}_4^3$, define Hamiltonian decomposition as a
+\texttt{Prop}-valued predicate, and prove a reflection theorem establishing
+that our Boolean checker implies the mathematical specification. We leave
+this to future work.
+
 \section{Conclusion}
 
-We have given a machine-checked proof that the $4 \times 4 \times 4$
-directed torus admits a decomposition into three Hamiltonian cycles. The
-proof is verified by Lean's kernel via \texttt{decide}. The corrected energy
-function with in-degree penalties and the non-monotonic cooling schedule
-provide a sound stochastic search that we hope will extend to $m = 6$ and
-$m = 8$.
+We have given a machine-checked proof that a specific Boolean predicate,
+encoding the Hamiltonian decomposition property of the $4 \times 4 \times 4$
+directed torus, evaluates to \texttt{true} on a discovered witness. The
+proof is verified entirely within Lean's trusted kernel via \texttt{decide}.
+The correctness of the encoding (that the Boolean predicate faithfully
+captures the graph-theoretic property) is argued informally but not
+formally verified.
 
-Aquino-Michaels' general even-$m$ construction, if formalized, would
-subsume all finite cases. In the meantime, individual case verification
-through stochastic search and kernel checking provides a practical route
-to building confidence in the conjecture.
+The Aquino-Michaels construction covers even $m \ge 8$. Formalizing that
+general proof, or closing the remaining base case $m = 6$, are natural
+next steps.
 
 All source code, the TypeScript stochastic engine, the witness payload, and
 the Lean~4 proof are available at \url{https://github.com/bneb/perqed}.
