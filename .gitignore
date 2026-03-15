@@ -54,3 +54,11 @@ models/
 # Website — Astro build output
 website/dist/
 website/node_modules/
+
+# Paper — private / generated files
+paper/cover_letter.*
+paper/*.pdf
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.zip
