@@ -1,0 +1,221 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>In March 2026, Donald Knuth posed the Directed Hamiltonian Torus Decomposition
+problem: partition the arcs of a 3D torus into three directed Hamiltonian
+cycles. Claude found a construction for odd <em>m</em>, and Aquino-Michaels
+solved even <em>m</em> ≥ 8. The small even cases — <em>m</em>=4 and
+<em>m</em>=6 — fell outside those constructions and remained open.</p>
+
+<p>We closed both. The witnesses are formally verified inside the Lean 4 kernel.
+This post covers the engineering side — the paper covers the
+<a href="/paper/torus_decomposition.pdf">math</a>.</p>
+
+<h2>The Search Problem</h2>
+
+<p>At each of the <em>m</em>³ vertices, three outgoing arcs are assigned to three
+colors. There are 3! = 6 valid assignments per vertex. After fixing the origin
+to break symmetry, the search space for <em>m</em>=6 is 6<sup>215</sup> ≈ 10<sup>167</sup>
+states. Exhaustive enumeration is not an option.</p>
+
+<p>We used Simulated Annealing with a single-vertex mutation operator: pick a
+random vertex, change its permutation to one of the five alternatives, accept
+or reject via the Metropolis criterion.</p>
+
+<h2>The Energy Function Bug</h2>
+
+<p>The first version of our energy function counted the number of directed
+cycles per color. A "good" state would have exactly one cycle per color
+(the Hamiltonian cycle). This seems correct, but it has a subtle failure
+mode: a functional graph with out-degree 1 can have components that are
+directed cycles with trees feeding into them. Our naive cycle count
+assigned <em>E</em> = 0 to non-Hamiltonian topologies.</p>
+
+<p>The fix: count weakly connected components <em>and</em> vertices with
+in-degree ≠ 1. Only a single Hamiltonian cycle has both one component
+and uniform in-degree across all vertices.</p>
+
+<h2>The 12× Speedup</h2>
+
+<p>For <em>m</em>=4 (64 vertices), the baseline engine — which recomputes the
+full energy from scratch on every mutation — solved the problem in 93 seconds.
+For <em>m</em>=6 (216 vertices), this approach was too slow. Each energy
+evaluation touched all 216 vertices across three color subgraphs.</p>
+
+<p>The incremental engine changed a single vertex's permutation, updated
+the in-degree counts in O(1), and recounted cycles only for the affected
+colors. Rejected mutations were rolled back in place. This gave roughly
+12× higher throughput on <em>m</em>=6.</p>
+
+<p>To validate correctness, we ran a 300,000-step fuzz test asserting exact
+agreement between the incremental and full-recalculation engines at every
+mutation. Zero discrepancies.</p>
+
+<table>
+<thead>
+<tr><th>Case</th><th>Engine</th><th>Time</th></tr>
+</thead>
+<tbody>
+<tr><td><em>m</em>=4</td><td>Baseline</td><td>93 s</td></tr>
+<tr><td><em>m</em>=4</td><td>Incremental</td><td>3.1 s</td></tr>
+<tr><td><em>m</em>=6</td><td>Incremental</td><td>99.5 s</td></tr>
+</tbody>
+</table>
+
+<p>Same algorithm, same hyperparameters (α = 0.999998, reheat to
+<em>E</em><sup>2/5</sup> on stagnation). The only difference was
+per-iteration throughput.</p>
+
+<h2>Cooling Schedule</h2>
+
+<p>Standard exponential cooling stalls on this problem. The energy landscape
+has deep local minima — states where two colors form Hamiltonian cycles but
+the third fragments into many components. A monotonic schedule gets trapped.</p>
+
+<p>We used non-monotonic cooling: when the best energy stagnates for <em>W</em>
+iterations, reset the temperature to max(1, <em>E</em><sub>best</sub><sup>2/5</sup>)
+and double the stagnation window. The reheat is proportional to the current
+best energy — gentle near the goal, aggressive when far away. Upon improvement,
+the window resets.</p>
+
+<p>This schedule was not tuned per problem size. The same parameters
+(T₀ = 50, α = 0.999998, E<sup>2/5</sup> reheat) solved both
+<em>m</em>=4 and <em>m</em>=6 without modification.</p>
+
+<h2>Lean 4 Verification</h2>
+
+<p>The solver produces a witness: a 216-element array of integers 0–5.
+The formal verification is completely independent of the search — it only
+takes the witness as input and proves it's valid.</p>
+
+<p>Each proof verifies 15 sub-theorems using Lean's <code>decide</code> tactic:</p>
+
+<ul>
+  <li>3 edge-validity checks (each successor lands on a valid torus neighbor)</li>
+  <li>3 disjointness checks (no two colors share an arc at any vertex)</li>
+  <li>3 injectivity checks (216² = 46,656 pairwise comparisons each)</li>
+  <li>3 orbit-length checks (the cycle visits all 216 vertices)</li>
+  <li>3 no-short-orbit checks (no sub-tour closes early)</li>
+</ul>
+
+<p>The <em>m</em>=6 proof required setting <code>maxHeartbeats</code> to
+4 × 10<sup>8</sup> — roughly 100× the default — because the kernel
+evaluates every comparison by reduction. It compiles in 57 seconds on an M4.</p>
+
+<h2>What We Learned</h2>
+
+<p><strong>Energy function design matters more than schedule tuning.</strong>
+Fixing the energy function (adding in-degree checking) was the difference
+between the search converging and not converging. The cooling schedule was
+the same across both problem sizes.</p>
+
+<p><strong>Incremental evaluation is the scaling lever.</strong> The
+algorithmic improvement (12× throughput) was worth more than any
+hyperparameter change. For <em>m</em>=6, the baseline engine likely
+would have needed hours.</p>
+
+<p><strong>Formal verification is surprisingly tractable.</strong>
+The Lean 4 kernel checked 46,656 pairwise injectivity comparisons
+per color in under a minute, with no Mathlib dependencies and no
+boolean reflection tricks. The <code>decide</code> tactic handled
+everything.</p>
+
+<p><strong>The search and proof are independent artifacts.</strong>
+The solver can be wrong, buggy, or nondeterministic. The Lean kernel
+doesn't care — it only checks the witness. This separation is the
+entire point of formal verification.</p>
+
+<hr>
+
+<p><em>The full paper is available as a
+<a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf">PDF</a>,
+and the Lean 4 proofs are in the
+<a href="https://github.com/bneb/perqed/tree/main/src/lean">repository</a>.</em></p>
+`;
+---
+
+<BaseLayout title="Closing Knuth's Torus Problem — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>March 15, 2026</time>
+            <span class="sep">·</span>
+            <span>8 min read</span>
+          </div>
+          <h1>Closing Knuth's Torus Problem</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  /* Tables inside prose */
+  .article :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+
+  .article :global(th) {
+    text-align: left;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+
+  .article :global(td) {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+  }
+
+  .article :global(tr:last-child td) {
+    border-bottom: none;
+  }
+
+  @media (max-width: 640px) {
+    .article { padding: 32px 0 48px; }
+
+    .article :global(table) {
+      font-size: 0.8rem;
+    }
+
+    .article :global(th),
+    .article :global(td) {
+      padding: 8px 10px;
+    }
+  }
+</style>
