@@ -91,10 +91,13 @@ $\{0, 1, 2\}$. There are $3! = 6$ valid assignments per vertex, giving a
 search space of $6^{m^3}$. This is $6^{64} \approx 10^{49}$ for $m=4$ and
 $6^{216} \approx 10^{168}$ for $m=6$.
 
-We represent a state as an array $\sigma \in \{0, \ldots, 5\}^{m^3}$, where
+We identify the vertex set $V$ with the index set $\{0, \ldots, m^3{-}1\}$
+via the lexicographic bijection $(i,j,k) \mapsto im^2 + jm + k$.
+A state is an array $\sigma \in \{0, \ldots, 5\}^{m^3}$, where
 $\sigma[v]$ selects which permutation of $\{0,1,2\}$ is applied to the
-outgoing directions $(+x, +y, +z)$ at vertex~$v$. We fix $\sigma[0] = 0$
-without loss of generality, reducing the search space by a factor of~6.
+outgoing directions $(+x, +y, +z)$ at vertex~$v$. The origin $(0,0,0)$
+corresponds to index~0. We fix $\sigma[0] = 0$ without loss of generality,
+breaking the color symmetry and reducing the search space by a factor of~6.
 
 \subsection{Energy Function}
 
@@ -170,7 +173,8 @@ The $m=6$ solution was found at restart~10, iteration~2{,}807{,}777.
 \section{Formal Verification}
 
 Each witness is an array in $\{0,\ldots,5\}^{m^3}$. We decode it into three
-successor functions $f_0, f_1, f_2 : \mathbb{Z}_m^3 \to \mathbb{Z}_m^3$.
+successor functions
+$f_0, f_1, f_2 : (\mathbb{Z}/m\mathbb{Z})^3 \to (\mathbb{Z}/m\mathbb{Z})^3$.
 
 The specification uses Lean's \texttt{Prop} universe. We define the torus
 edge relation on
@@ -212,6 +216,12 @@ theorem torus_m6_valid :
    $\langle$inj_f2, orbit_f2, no_short_f2$\rangle\rangle$
 \end{lstlisting}
 
+Because every vertex in $G_m$ has out-degree exactly~3, proving that the
+three successor functions are mutually disjoint at every vertex (verified
+by \texttt{disj\_01}, \texttt{disj\_02}, \texttt{disj\_12}) is necessary
+and sufficient to establish that the three Hamiltonian cycles partition
+the arc set.
+
 For $m=6$, the injectivity sub-theorems each check $216^2 = 46{,}656$ pairs,
 and the no-sub-tour sub-theorems each verify 215 orbit prefixes of length
 up to~215. We set \texttt{maxHeartbeats} to $4 \times 10^8$ to accommodate
@@ -249,10 +259,6 @@ annealing,'' \emph{Science}, vol.~220, no.~4598, pp.~671--680, 1983.
 E.~Marinari and G.~Parisi, ``Simulated tempering: a new Monte Carlo scheme,''
 \emph{Europhysics Letters}, vol.~19, no.~6, pp.~451--458, 1992.
 
-\bibitem{miller1960}
-C.~E.~Miller, A.~W.~Tucker, and R.~A.~Zemlin, ``Integer programming
-formulation of traveling salesman problems,'' \emph{Journal of the ACM},
-vol.~7, no.~4, pp.~326--329, 1960.
 \end{thebibliography}
 
 \end{document}
