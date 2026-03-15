@@ -191,6 +191,11 @@ identical hyperparameters.
 The $m=4$ baseline solution was found at restart~12, iteration~1{,}366{,}834.
 With the incremental engine, $m=4$ was solved at restart~3 in 3.1 seconds.
 The $m=6$ solution was found at restart~10, iteration~2{,}807{,}777.
+Because the search uses an unseeded pseudorandom generator
+(\texttt{Math.random}), these iteration counts reflect a single
+successful run and are not exactly reproducible. The published
+witnesses are reproducibly verified by the Lean kernel regardless
+of the search path that discovered them.
 
 \section{Formal Verification}
 
@@ -202,6 +207,10 @@ $f_0, f_1, f_2 :
 The decoding is formalized entirely within Lean; the successor
 functions natively evaluate the lexicographic mapping
 $(i,j,k) \mapsto im^2 + jm + k$ to index into the array.
+Array access uses Lean's \texttt{getD} (total with a default
+fallback), which is formally sound: any out-of-bounds access
+would yield an invalid permutation and fail the subsequent
+topological checks.
 
 The specification uses Lean's \texttt{Prop} universe. For $m=6$, we
 define the vertex type alias and the torus edge relation:
@@ -244,12 +253,13 @@ theorem torus_m6_valid :
    $\langle$inj_f2, orbit_f2, no_short_f2$\rangle\rangle$
 \end{lstlisting}
 
-Because the \texttt{isTorusEdge} relation restricts the outgoing
-neighborhood of any vertex to exactly three destinations, proving
-that the three successor functions are mutually disjoint at every
-vertex (verified by \texttt{disj\_01}, \texttt{disj\_02},
-\texttt{disj\_12}) is necessary and sufficient to establish that
-the three Hamiltonian cycles partition the $3m^3$ arcs.
+Lean formally verifies that the three successor functions are
+mutually disjoint at every vertex (via \texttt{disj\_01},
+\texttt{disj\_02}, \texttt{disj\_12}). Because the
+\texttt{isTorusEdge} relation restricts the outgoing neighborhood
+of any vertex to exactly three destinations, the complete partition
+of the $3m^3$ arcs follows as a metatheoretical corollary of the
+verified disjointness.
 
 For $m=6$, the injectivity sub-theorems each check $216^2 = 46{,}656$ pairs,
 and the no-sub-tour sub-theorems each verify 215 orbit prefixes of length
@@ -257,7 +267,8 @@ up to~215. We set \texttt{maxHeartbeats} to $4 \times 10^8$ to accommodate
 the larger evaluation. Lean's \texttt{decide} tactic handles the full
 verification without boolean reflection or \texttt{native\_decide}.
 The $m=6$ proof compiles in 57 seconds (wall time) on an Apple~M4
-processor, with zero axioms and no unproven subgoals.
+processor, with zero unproven subgoals (\texttt{sorry}) and relying
+only on Lean's standard axioms.
 
 \section{Conclusion}
 
