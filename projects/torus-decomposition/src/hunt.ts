@@ -9,8 +9,8 @@
  *   bun run src/scripts/claude_hunt.ts 20 1000000   # 20 restarts × 1M
  */
 
-import { SimulatedAnnealing } from "../math/optim/SimulatedAnnealing";
-import { ClaudeState } from "../math/claude_state";
+import { SimulatedAnnealing } from "../../../src/math/optim/SimulatedAnnealing";
+import { ClaudeState } from "./state";
 import * as fs from "node:fs/promises";
 import { join } from "node:path";
 

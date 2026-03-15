@@ -9,7 +9,7 @@
  *   bun run src/scripts/claude_hunt_fast.ts 6 50 5000000 # 50 restarts × 5M
  */
 
-import { ClaudeStateFast } from "../math/claude_state_fast";
+import { ClaudeStateFast } from "./state_fast";
 import * as fs from "node:fs/promises";
 import { join } from "node:path";
 

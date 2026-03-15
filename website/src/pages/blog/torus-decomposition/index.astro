@@ -13,7 +13,7 @@ in early 2026.</p>
 <p>Constructions exist for odd grid sizes and even sizes ≥ 8, but the
 small even cases — 4×4×4 and 6×6×6 — fell through the cracks. We found
 valid decompositions for both, and the Lean 4 kernel
-<a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf">proves they work</a>.</p>
+<a href="https://github.com/bneb/perqed/blob/main/projects/torus-decomposition/paper/torus_decomposition.pdf">proves they work</a>.</p>
 
 <p>But the paper skips the most interesting engineering problem: how do you actually
 <em>find</em> a working configuration when the search space is
@@ -130,11 +130,11 @@ sloppy in the search, as long as you're rigorous in the proof.</p>
 <hr>
 
 <p><em>The formal paper is available as a
-<a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf">PDF</a>.
+<a href="https://github.com/bneb/perqed/blob/main/projects/torus-decomposition/paper/torus_decomposition.pdf">PDF</a>.
 The SA engine is in
-<a href="https://github.com/bneb/perqed/tree/main/src/math">src/math/</a>,
+<a href="https://github.com/bneb/perqed/tree/main/projects/torus-decomposition/src">src/</a>,
 and the Lean 4 proofs are in
-<a href="https://github.com/bneb/perqed/tree/main/src/lean">src/lean/</a>.</em></p>
+<a href="https://github.com/bneb/perqed/tree/main/projects/torus-decomposition/lean">lean/</a>.</em></p>
 `;
 ---
 
@@ -150,7 +150,7 @@ and the Lean 4 proofs are in
             <span>8 min read</span>
           </div>
           <h1>Finding Needles in a 6<sup>215</sup> Haystack</h1>
-          <p class="paper-ref">📄 Our paper: <a href="https://github.com/bneb/perqed/blob/main/paper/torus_decomposition.pdf"><em>Machine-Checked Proofs of the m=4 and m=6 Directed Hamiltonian Torus Decompositions</em></a></p>
+          <p class="paper-ref">📄 Our paper: <a href="https://github.com/bneb/perqed/blob/main/projects/torus-decomposition/paper/torus_decomposition.pdf"><em>Machine-Checked Proofs of the m=4 and m=6 Directed Hamiltonian Torus Decompositions</em></a></p>
         </header>
 
         <div set:html={blogContent} />

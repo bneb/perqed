@@ -13,7 +13,7 @@
  * method that clones.
  */
 
-import type { IState } from "./optim/IState";
+import type { IState } from "../../../src/math/optim/IState";
 
 export class ClaudeStateFast implements IState<number[]> {
   readonly payload: number[];

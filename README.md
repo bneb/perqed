@@ -118,8 +118,8 @@ perqed/
 
 Machine-checked Lean 4 proofs of the *m*=4 and *m*=6 cases of the Directed Hamiltonian Torus Decomposition problem (Knuth, March 2026). Together with existing constructions for odd *m* and even *m* ≥ 8, this closes the problem for all *m* ≥ 3.
 
-- **Paper**: [`paper/torus_decomposition.pdf`](paper/torus_decomposition.pdf)
-- **Lean proofs**: [`TorusTopology.lean`](src/lean/TorusTopology.lean) (*m*=4) · [`TorusTopologyM6.lean`](src/lean/TorusTopologyM6.lean) (*m*=6)
+- **Paper**: [`torus_decomposition.pdf`](projects/torus-decomposition/paper/torus_decomposition.pdf)
+- **Lean proofs**: [`TorusTopologyM4.lean`](projects/torus-decomposition/lean/TorusTopologyM4.lean) (*m*=4) · [`TorusTopologyM6.lean`](projects/torus-decomposition/lean/TorusTopologyM6.lean) (*m*=6)
 
 ## License
 

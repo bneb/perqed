@@ -19,7 +19,7 @@
  *   Energy 0 = SOLUTION FOUND.
  */
 
-import type { IState } from "./optim/IState";
+import type { IState } from "../../../src/math/optim/IState";
 
 export class ClaudeState implements IState<number[]> {
   private readonly payload: number[];
