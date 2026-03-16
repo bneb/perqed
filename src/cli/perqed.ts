@@ -395,7 +395,7 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       const workers = sp.workers ?? 1;
       const strategy = sp.strategy ?? "single";
 
-      const orchResult = orchestratedSearch({
+      const orchResult = await orchestratedSearch({
         n: sp.vertices,
         r: sp.r,
         s: sp.s,

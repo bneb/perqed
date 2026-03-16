@@ -1,9 +1,9 @@
 /**
  * Ramsey Search Orchestrator — Multi-strategy search dispatcher.
  *
- * Runs multiple SA workers with diverse seeds and strategies,
- * returns the best result. The ARCHITECT can request any strategy
- * via the SearchPhase config.
+ * Runs multiple SA workers with diverse seeds and strategies.
+ * Uses Bun Worker threads for true parallelism — all workers
+ * race concurrently, and all are terminated when one hits E=0.
  */
 
 import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
@@ -47,68 +47,173 @@ export interface OrchestratedSearchResult {
 
 /**
  * Run the orchestrated search with the given strategy.
+ * For island_model with multiple workers, uses Bun Worker threads
+ * for true parallelism. Single strategy runs in the main thread.
  */
-export function orchestratedSearch(config: OrchestratedSearchConfig): OrchestratedSearchResult {
-  const startTime = Date.now();
-  const numWorkers = config.strategy === "island_model" ? config.workers : 1;
+export async function orchestratedSearch(config: OrchestratedSearchConfig): Promise<OrchestratedSearchResult> {
+  if (config.strategy === "island_model" && config.workers > 1) {
+    return parallelSearch(config);
+  }
+  return singleSearch(config);
+}
 
-  // Build seed graphs
+/**
+ * Single-threaded search — runs in main thread.
+ */
+function singleSearch(config: OrchestratedSearchConfig): OrchestratedSearchResult {
+  const startTime = Date.now();
+  const seeds = buildSeeds(config, 1);
+  const edges = config.n * (config.n - 1) / 2;
+  const tInit = edges < 50 ? 1.0 : edges < 200 ? 2.0 : edges < 600 ? 3.0 : 5.0;
+  const coolingRate = Math.exp(Math.log(0.01 / tInit) / (0.8 * config.saIterations));
+
+  const saConfig: RamseySearchConfig = {
+    n: config.n,
+    r: config.r,
+    s: config.s,
+    maxIterations: config.saIterations,
+    initialTemp: tInit,
+    coolingRate,
+    initialGraph: seeds[0],
+  };
+
+  let result: RamseySearchResult;
+  if (config.onProgress) {
+    const progress = (iter: number, energy: number, best: number, temp: number) => {
+      config.onProgress!(0, iter, energy, best, temp);
+    };
+    result = ramseySearch(saConfig, progress);
+  } else {
+    result = ramseySearch(saConfig);
+  }
+
+  return {
+    best: result,
+    workersRan: 1,
+    bestWorkerIndex: 0,
+    totalWallTime: (Date.now() - startTime) / 1000,
+  };
+}
+
+/**
+ * Parallel search — spawns Bun Worker threads.
+ * All workers race concurrently. When one hits E=0,
+ * all others are terminated immediately.
+ */
+async function parallelSearch(config: OrchestratedSearchConfig): Promise<OrchestratedSearchResult> {
+  const startTime = Date.now();
+  const numWorkers = config.workers;
   const seeds = buildSeeds(config, numWorkers);
 
-  // Run workers sequentially (Bun Workers for true parallelism is a future enhancement)
+  const edges = config.n * (config.n - 1) / 2;
+  const tInit = edges < 50 ? 1.0 : edges < 200 ? 2.0 : edges < 600 ? 3.0 : 5.0;
+  const itersPerWorker = config.saIterations;
+  const coolingRate = Math.exp(Math.log(0.01 / tInit) / (0.8 * itersPerWorker));
+
+  // Shared state
   let bestResult: RamseySearchResult | null = null;
   let bestWorkerIndex = 0;
+  let resolved = false;
+
+  // Spawn workers
+  const workers: Worker[] = [];
+  const workerPromises: Promise<void>[] = [];
+  const resolvers: (() => void)[] = [];
 
   for (let w = 0; w < numWorkers; w++) {
-    const itersPerWorker = config.strategy === "island_model"
-      ? Math.floor(config.saIterations / numWorkers)
-      : config.saIterations;
+    const worker = new Worker(new URL("./ramsey_worker_thread.ts", import.meta.url).href);
+    workers.push(worker);
 
-    const edges = config.n * (config.n - 1) / 2;
-    const tInit = edges < 50 ? 1.0 : edges < 200 ? 2.0 : edges < 600 ? 3.0 : 5.0;
-    const coolingRate = Math.exp(Math.log(0.01 / tInit) / (0.8 * itersPerWorker));
+    const promise = new Promise<void>((resolve) => {
+      resolvers.push(resolve);
 
-    const saConfig: RamseySearchConfig = {
+      worker.onmessage = (event: MessageEvent) => {
+        const msg = event.data;
+
+        if (msg.type === "progress" && config.onProgress) {
+          config.onProgress(msg.worker, msg.iter, msg.energy, msg.best, msg.temp);
+        }
+
+        if (msg.type === "done") {
+          // Reconstruct AdjacencyMatrix from serialized worker data
+          const raw = msg.result;
+          let witness: AdjacencyMatrix | null = null;
+          if (raw.witnessRaw && raw.witnessN) {
+            witness = new AdjacencyMatrix(raw.witnessN);
+            const data = new Int8Array(raw.witnessRaw);
+            for (let i = 0; i < data.length; i++) {
+              witness.raw[i] = data[i]!;
+            }
+          }
+          const result: RamseySearchResult = {
+            bestEnergy: raw.bestEnergy,
+            witness,
+            iterations: raw.iterations,
+            ips: raw.ips,
+            telemetry: raw.telemetry,
+          };
+
+          if (!bestResult || result.bestEnergy < bestResult.bestEnergy) {
+            bestResult = result;
+            bestWorkerIndex = msg.worker;
+          }
+
+          // If a witness was found, terminate all other workers
+          // and resolve their promises so Promise.all completes
+          if (result.bestEnergy === 0 && !resolved) {
+            resolved = true;
+            for (let i = 0; i < workers.length; i++) {
+              try { workers[i]!.terminate(); } catch {}
+              resolvers[i]!(); // Resolve all promises including this one
+            }
+            return;
+          }
+
+          resolve();
+        }
+      };
+
+      worker.onerror = (error: ErrorEvent) => {
+        console.error(`[W${w}] Worker error:`, error.message);
+        resolve();
+      };
+    });
+
+    workerPromises.push(promise);
+
+    // Build config for this worker (seeds need to be serialized as raw data)
+    const seedGraph = seeds[w];
+    const saConfigForWorker: any = {
       n: config.n,
       r: config.r,
       s: config.s,
       maxIterations: itersPerWorker,
       initialTemp: tInit,
       coolingRate,
-      initialGraph: seeds[w],
     };
 
-    if (config.onProgress) {
-      const workerNum = w;
-      const workerProgress = (iter: number, energy: number, best: number, temp: number) => {
-        config.onProgress!(workerNum, iter, energy, best, temp);
-      };
-
-      const result = ramseySearch(saConfig, workerProgress);
-      if (!bestResult || result.bestEnergy < bestResult.bestEnergy) {
-        bestResult = result;
-        bestWorkerIndex = w;
-      }
-
-      // Early exit if witness found
-      if (result.bestEnergy === 0) break;
-    } else {
-      const result = ramseySearch(saConfig);
-      if (!bestResult || result.bestEnergy < bestResult.bestEnergy) {
-        bestResult = result;
-        bestWorkerIndex = w;
-      }
-      if (result.bestEnergy === 0) break;
+    // Serialize the seed graph as raw Int8Array if present
+    if (seedGraph) {
+      saConfigForWorker.initialGraphRaw = seedGraph.raw;
+      saConfigForWorker.initialGraphN = seedGraph.n;
     }
+
+    worker.postMessage({ type: "start", config: saConfigForWorker, workerIndex: w });
   }
 
-  const totalWallTime = (Date.now() - startTime) / 1000;
+  // Wait for all workers or early termination
+  await Promise.all(workerPromises);
+
+  // Clean up any remaining workers
+  for (const w of workers) {
+    try { w.terminate(); } catch {}
+  }
 
   return {
     best: bestResult!,
     workersRan: numWorkers,
     bestWorkerIndex,
-    totalWallTime,
+    totalWallTime: (Date.now() - startTime) / 1000,
   };
 }
 
