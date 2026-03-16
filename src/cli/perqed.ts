@@ -27,6 +27,11 @@ import {
   buildSearchFailureDigest,
   formatSearchDigestForArchitect,
 } from "../search/search_failure_digest";
+import {
+  isConstructiveExistence,
+  classifyProblem,
+  extractSearchConfig,
+} from "../search/witness_detector";
 import { TreePrinter } from "../utils/tree_printer";
 
 // ──────────────────────────────────────────────
@@ -90,24 +95,7 @@ export interface RunConfig {
   max_iterations: number;
   objective_md: string;
   domain_skills_md: string;
-  /** If present, run a search phase before Lean proof */
-  search_phase?: SearchPhase;
 }
-
-const SEARCH_PHASE_SCHEMA = {
-  type: SchemaType.OBJECT as const,
-  properties: {
-    type: { type: SchemaType.STRING as const, enum: ["ramsey_sa"] },
-    vertices: { type: SchemaType.NUMBER as const, description: "Number of vertices in the graph" },
-    r: { type: SchemaType.NUMBER as const, description: "Clique size (red)" },
-    s: { type: SchemaType.NUMBER as const, description: "Independent set size (blue)" },
-    sa_iterations: { type: SchemaType.NUMBER as const, description: "SA iterations (default 10M)" },
-    strategy: { type: SchemaType.STRING as const, enum: ["single", "island_model"], description: "Search strategy. Use island_model for harder problems." },
-    workers: { type: SchemaType.NUMBER as const, description: "Number of workers for island_model (default 5)" },
-    seed: { type: SchemaType.STRING as const, enum: ["random", "paley", "circulant"], description: "Graph seed type. Use paley for R(k,k) symmetric problems where n is prime and ≡ 1 mod 4." },
-  },
-  required: ["type", "vertices", "r", "s"],
-};
 
 const RUN_CONFIG_SCHEMA = {
   type: SchemaType.OBJECT as const,
@@ -139,10 +127,6 @@ const RUN_CONFIG_SCHEMA = {
     domain_skills_md: {
       type: SchemaType.STRING as const,
       description: "Problem-specific tips and tactics for the TACTICIAN.",
-    },
-    search_phase: {
-      ...SEARCH_PHASE_SCHEMA,
-      description: "REQUIRED for constructive existence proofs (e.g., Ramsey lower bounds). Describes the SA search to find the witness graph before Lean verification.",
     },
   },
   required: [
@@ -185,23 +169,6 @@ The Perqed engine has:
 - Lean 4 kernel verification via \`decide\` tactic
 - DeepSeek Prover (local) + Gemini (cloud) multi-agent tactic search
 
-## CRITICAL: When to Include search_phase
-
-If the theorem is a **constructive existence proof** (starts with \`∃\`), the proof requires a **witness**.
-For graph existence problems (Ramsey lower bounds, SRG existence, etc.), you MUST include a \`search_phase\` field:
-
-\`\`\`json
-"search_phase": {
-  "type": "ramsey_sa",
-  "vertices": 36,
-  "r": 4,
-  "s": 6,
-  "sa_iterations": 10000000
-}
-\`\`\`
-
-The engine handles strategy selection, seeding, and hyperparameters automatically.
-
 ## The User's Problem Description
 
 `;
@@ -240,10 +207,6 @@ function displayConfig(config: RunConfig, configPath: string) {
   console.log(`  Theorem:   ${config.theorem_name}`);
   console.log(`  Budget:    ${config.max_iterations} iterations`);
   console.log(`  Signature: ${config.theorem_signature.slice(0, 100)}...`);
-  if (config.search_phase) {
-    const sp = config.search_phase;
-    console.log(`  Search:    ${sp.type} — ${sp.vertices} vertices, R(${sp.r},${sp.s}), ${(sp.sa_iterations ?? 10_000_000).toLocaleString()} iters`);
-  }
   console.log(`  Config:    ${configPath}`);
   console.log();
 }
@@ -364,9 +327,33 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   const startTime = Date.now();
   const MAX_ARCHITECT_PIVOTS = 5;
 
+  // ── Auto-detect constructive existence proofs ──
+  const needsSearch = isConstructiveExistence(config.theorem_signature);
+  let searchPhase: SearchPhase | null = null;
+
+  if (needsSearch) {
+    const problemClass = classifyProblem(config.problem_description);
+    const searchConfig = extractSearchConfig(problemClass);
+
+    if (searchConfig) {
+      searchPhase = {
+        type: searchConfig.type as "ramsey_sa",
+        vertices: searchConfig.n,
+        r: searchConfig.r,
+        s: searchConfig.s,
+        sa_iterations: searchConfig.saIterations,
+      };
+      console.log(`\n🔍 Auto-detected constructive existence proof (∃)`);
+      console.log(`   Problem class: ${problemClass.type}`);
+      console.log(`   Search config: ${searchConfig.n} vertices, R(${searchConfig.r},${searchConfig.s}), ${searchConfig.saIterations.toLocaleString()} iters`);
+    } else {
+      console.log(`\n⚠️  Constructive existence detected but problem class unknown — skipping search phase`);
+    }
+  }
+
   // ── Search Phase: SA with ARCHITECT Escalation Loop ──
-  if (config.search_phase) {
-    let sp = { ...config.search_phase };
+  if (searchPhase) {
+    let sp = { ...searchPhase };
     let witnessFound = false;
     let attempt = 0;
 
