@@ -1,21 +1,19 @@
 /**
- * IncrementalSRGEngine — Zero-allocation O(n) delta energy evaluator.
+ * IncrementalSRGEngine — Hyper-Optimized O(n) Delta Energy Evaluator
  *
- * Designed for bare-metal Metropolis-Hastings hot loops.
+ * Zero-allocation Metropolis-Hastings hot loop API for SRG search.
  *
- * API lifecycle (zero object allocation per iteration):
- *   1. delta = engine.proposeRandomSwap()   // stages swap, returns ΔE
- *   2. if accept: engine.commitSwap()       // applies to typed arrays
- *      else:      engine.discardSwap()      // no-op
+ * Three critical optimizations over the naive approach:
+ *   1. O(1) edge sampling via fixed adjacency list (Int32Array, n×k)
+ *      + O(k) adjList updates on commit instead of O(n²) rebuild
+ *   2. Scratchpad CN caching: compute CN delta once in propose,
+ *      replay on commit with zero recomputation
+ *   3. Versioned affected tracker: no array fill(0) per proposal
  *
- * Internal state:
- *   - Flat adjacency array (Uint8Array, n×n)
- *   - Common-neighbor cache (Int32Array, n×n)
- *   - Edge list (Int32Array, 2×maxEdges) for O(1) random sampling
- *   - Running energy (number)
- *
- * On edge swap affecting 4 vertices, ~4n pairs are recomputed out of
- * n(n-1)/2 total — giving ~12× throughput for n=99.
+ * API lifecycle:
+ *   delta = engine.proposeRandomSwap()  // stages, returns ΔE
+ *   if accept: engine.commitSwap()      // O(4k + scratchSize) apply
+ *   else:      engine.discardSwap()     // no-op
  */
 
 import { AdjacencyMatrix } from "./AdjacencyMatrix";
@@ -30,35 +28,44 @@ export interface SwapResult {
 
 export class IncrementalSRGEngine {
   private graph: AdjacencyMatrix;
+  readonly n: number;
   private readonly k: number;
   private readonly lambda: number;
   private readonly mu: number;
-  readonly n: number;
-
-  /** Precomputed constants for energy calculation */
   private readonly lm: number;   // lambda - mu
   private readonly km: number;   // k - mu
 
-  /** Cached common-neighbor counts: cn[i*n + j] = |N(i) ∩ N(j)| */
+  /** Common-neighbor cache: cn[i*n + j] = |N(i) ∩ N(j)| */
   private cn: Int32Array;
 
-  /** Current energy (maintained incrementally) */
+  /** Current energy */
   energy: number;
 
-  /** Edge list: edges[2*i] and edges[2*i+1] are endpoints of edge i */
-  private edges: Int32Array;
-  private edgeCount: number;
+  // ── Optimization 1: Fixed adjacency list for O(1) edge sampling ──
+  /** adjList[v*k + i] = ith neighbor of vertex v */
+  private adjList: Int32Array;
 
-  /** Staged swap state (avoids allocation in hot loop) */
+  // ── Optimization 2: Scratchpad CN caching ──
+  /** Keys (i*n+j) of CN entries to update on commit */
+  private scratchKeys: Int32Array;
+  /** Corresponding new CN values */
+  private scratchVals: Int32Array;
+  /** Number of valid entries in scratchpad */
+  private scratchSize: number = 0;
+
+  // ── Optimization 3: Versioned affected tracking ──
+  /** Version counter, incremented per proposal */
+  private affectedVersion: number = 0;
+  /** affected[v] === affectedVersion means v is affected */
+  private affectedArr: Uint32Array;
+
+  // ── Staged swap state (all primitives, zero allocation) ──
   private staged: boolean = false;
-  private stageRA = 0; private stageRB = 0; // removed edge 1
-  private stageRC = 0; private stageRD = 0; // removed edge 2
-  private stageNA = 0; private stageNB = 0; // added edge 1
-  private stageNC = 0; private stageND = 0; // added edge 2
+  private stageRA = 0; private stageRB = 0;
+  private stageRC = 0; private stageRD = 0;
+  private stageNA = 0; private stageNB = 0;
+  private stageNC = 0; private stageND = 0;
   private stageDelta = 0;
-
-  /** Dedup bitmap for affected pair tracking (avoids Set allocation) */
-  private affected: Uint8Array;
 
   constructor(graph: AdjacencyMatrix, k: number, lambda: number, mu: number) {
     this.graph = graph.clone();
@@ -68,36 +75,34 @@ export class IncrementalSRGEngine {
     this.n = graph.n;
     this.lm = lambda - mu;
     this.km = k - mu;
+
     this.cn = new Int32Array(this.n * this.n);
-    this.affected = new Uint8Array(this.n);
+    this.adjList = new Int32Array(this.n * k);
+    this.affectedArr = new Uint32Array(this.n);
 
-    // Build edge list
-    const maxEdges = (this.n * k) / 2;
-    this.edges = new Int32Array(maxEdges * 2);
-    this.edgeCount = 0;
-    this.rebuildEdgeList();
+    // Max scratchpad: ~4 affected vertices × n pairs × 2 directions ≈ 8n
+    const maxScratch = 8 * this.n + 16;
+    this.scratchKeys = new Int32Array(maxScratch);
+    this.scratchVals = new Int32Array(maxScratch);
 
-    // Build initial common-neighbor matrix
+    this.buildAdjList();
     this.buildFullCN();
-
-    // Compute initial energy from the CN matrix
     this.energy = this.computeEnergyFromCN();
   }
 
   // ──────────────────────────────────────────────
-  //  Initialization helpers
+  //  Initialization
   // ──────────────────────────────────────────────
 
-  private rebuildEdgeList(): void {
-    const n = this.n;
-    this.edgeCount = 0;
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        if (this.graph.hasEdge(i, j)) {
-          const idx = this.edgeCount * 2;
-          this.edges[idx] = i;
-          this.edges[idx + 1] = j;
-          this.edgeCount++;
+  private buildAdjList(): void {
+    const { n, k } = this;
+    for (let v = 0; v < n; v++) {
+      let idx = 0;
+      const base = v * k;
+      for (let w = 0; w < n && idx < k; w++) {
+        if (this.graph.hasEdge(v, w)) {
+          this.adjList[base + idx] = w;
+          idx++;
         }
       }
     }
@@ -119,50 +124,28 @@ export class IncrementalSRGEngine {
   }
 
   private computeEnergyFromCN(): number {
-    const n = this.n;
-    const lm = this.lm;
-    const km = this.km;
-    const mu = this.mu;
+    const { n, lm, km, mu } = this;
     let energy = 0;
-
     for (let i = 0; i < n; i++) {
-      for (let j = i; j < n; j++) {
+      // Skip diagonal: for k-regular graphs, M_ii = k - (k-μ) - μ = 0 always
+      for (let j = i + 1; j < n; j++) {
         const a2 = this.cn[i * n + j]!;
         const aij = this.graph.hasEdge(i, j) ? 1 : 0;
-        const iij = i === j ? 1 : 0;
-        const mij = a2 - lm * aij - km * iij - mu;
-
-        if (i === j) {
-          energy += mij * mij;
-        } else {
-          energy += 2 * mij * mij;
-        }
+        const mij = a2 - lm * aij - mu;
+        energy += 2 * mij * mij;
       }
     }
-
     return energy;
   }
 
-  /**
-   * Compute Frobenius contribution for a single pair using CURRENT state.
-   * For off-diagonal pairs, returns 2×m² (both entries).
-   */
-  private pairEnergy(i: number, j: number): number {
-    const a2 = this.cn[i * this.n + j]!;
-    const aij = this.graph.hasEdge(i, j) ? 1 : 0;
-    const iij = i === j ? 1 : 0;
-    const mij = a2 - this.lm * aij - this.km * iij - this.mu;
-    return i === j ? mij * mij : 2 * mij * mij;
-  }
+  // ──────────────────────────────────────────────
+  //  Pair energy helpers
+  // ──────────────────────────────────────────────
 
-  /**
-   * Compute Frobenius contribution for a pair using GIVEN cn value and adjacency.
-   */
-  private pairEnergyWith(i: number, j: number, cnVal: number, adj: boolean): number {
-    const aij = adj ? 1 : 0;
-    const iij = i === j ? 1 : 0;
-    const mij = cnVal - this.lm * aij - this.km * iij - this.mu;
-    return i === j ? mij * mij : 2 * mij * mij;
+  /** Frobenius contribution for off-diagonal pair (always ×2). */
+  private pairE(cnVal: number, adj: boolean): number {
+    const mij = cnVal - this.lm * (adj ? 1 : 0) - this.mu;
+    return 2 * mij * mij;
   }
 
   // ──────────────────────────────────────────────
@@ -171,25 +154,26 @@ export class IncrementalSRGEngine {
 
   /**
    * Propose a random degree-preserving edge swap.
-   * Returns ΔE (energy change), or null if no valid swap found.
-   * Does NOT mutate state — call commitSwap() or discardSwap() after.
+   * Returns ΔE, or null if no valid swap found.
+   * Does NOT mutate persistent state.
    */
   proposeRandomSwap(): number | null {
-    if (this.edgeCount < 2) return null;
+    const { n, k } = this;
 
     for (let attempt = 0; attempt < 20; attempt++) {
-      // Sample two random edges
-      const idx1 = Math.floor(Math.random() * this.edgeCount);
-      let idx2 = Math.floor(Math.random() * (this.edgeCount - 1));
-      if (idx2 >= idx1) idx2++;
+      // O(1) edge sampling via adjacency list
+      const a = Math.floor(Math.random() * n);
+      const aIdx = Math.floor(Math.random() * k);
+      const b = this.adjList[a * k + aIdx]!;
 
-      const a = this.edges[idx1 * 2]!;
-      const b = this.edges[idx1 * 2 + 1]!;
-      const c = this.edges[idx2 * 2]!;
-      const d = this.edges[idx2 * 2 + 1]!;
+      const c = Math.floor(Math.random() * n);
+      const cIdx = Math.floor(Math.random() * k);
+      const d = this.adjList[c * k + cIdx]!;
 
       // All four must be distinct
       if (a === c || a === d || b === c || b === d) continue;
+      // Must be different edges
+      if (a === d && b === c) continue;
 
       // Try variant 1: remove (a,b)+(c,d), add (a,c)+(b,d)
       if (!this.graph.hasEdge(a, c) && !this.graph.hasEdge(b, d)) {
@@ -206,14 +190,15 @@ export class IncrementalSRGEngine {
   }
 
   /**
-   * Compute the energy delta for a proposed swap WITHOUT mutating state.
-   * Stages the swap internally for later commit/discard.
+   * Compute ΔE for a proposed swap.
+   * Temporarily applies swap to adjacency for CN computation,
+   * then restores. Stores new CN values in scratchpad.
    */
   private computeDelta(
     ra: number, rb: number, rc: number, rd: number,
     na: number, nb: number, nc: number, nd: number,
   ): number {
-    const n = this.n;
+    const { n, lm, mu } = this;
 
     // Stage the swap
     this.stageRA = ra; this.stageRB = rb;
@@ -221,70 +206,73 @@ export class IncrementalSRGEngine {
     this.stageNA = na; this.stageNB = nb;
     this.stageNC = nc; this.stageND = nd;
 
-    // Mark affected vertices
-    this.affected.fill(0);
-    this.affected[ra] = 1;
-    this.affected[rb] = 1;
-    this.affected[rc] = 1;
-    this.affected[rd] = 1;
+    // Optimization 3: version-based affected marking (no fill)
+    this.affectedVersion++;
+    const ver = this.affectedVersion;
+    this.affectedArr[ra] = ver;
+    this.affectedArr[rb] = ver;
+    this.affectedArr[rc] = ver;
+    this.affectedArr[rd] = ver;
 
-    // Temporarily apply the swap to the adjacency matrix
+    // Temporarily apply swap to adjacency matrix
     this.graph.removeEdge(ra, rb);
     this.graph.removeEdge(rc, rd);
     this.graph.addEdge(na, nb);
     this.graph.addEdge(nc, nd);
 
-    // Compute delta energy: subtract old contributions, add new ones
-    // for all pairs involving at least one affected vertex
+    // Reset scratchpad
+    this.scratchSize = 0;
+
+    // Compute delta: only off-diagonal pairs involving affected vertices
     let delta = 0;
 
-    for (let v = 0; v < n; v++) {
-      if (!this.affected[v]) continue;
+    for (let vi = 0; vi < n; vi++) {
+      if (this.affectedArr[vi] !== ver) continue;
 
-      // Diagonal pair (v, v)
-      const oldDiag = this.pairEnergyWith(v, v, this.cn[v * n + v]!, false);
-      let newDiagCN = 0;
       for (let w = 0; w < n; w++) {
-        if (this.graph.hasEdge(v, w) && this.graph.hasEdge(v, w)) newDiagCN++;
-      }
-      const newDiag = this.pairEnergyWith(v, v, newDiagCN, false);
-      delta += newDiag - oldDiag;
+        if (w === vi) continue;
+        // Skip if both affected and w < vi (handled when w is processed)
+        if (this.affectedArr[w] === ver && w < vi) continue;
 
-      // Off-diagonal pairs (v, w) for all w > v that are NOT affected
-      // (pairs between two affected vertices will be counted once by the lower-index vertex)
-      for (let w = 0; w < n; w++) {
-        if (w === v) continue;
-        // Skip if both affected and w < v (will be handled when we process w)
-        if (this.affected[w] && w < v) continue;
+        // Old CN value (from cache, pre-swap)
+        const oldCN = this.cn[vi * n + w]!;
 
-        const oldCN = this.cn[v * n + w]!;
+        // Compute new CN using current (post-swap) adjacency
         let newCN = 0;
         for (let x = 0; x < n; x++) {
-          if (this.graph.hasEdge(v, x) && this.graph.hasEdge(w, x)) newCN++;
+          if (this.graph.hasEdge(vi, x) && this.graph.hasEdge(w, x)) newCN++;
         }
 
-        const oldE = this.pairEnergyWith(v, w, oldCN, this.graph.hasEdge(v, w));
-        // Wait — adjacency already changed. Need old adjacency for old energy.
-        // We need to un-apply to check old adjacency... but that's expensive.
-        // Instead, reconstruct old adjacency from the swap:
+        // Determine old adjacency for this pair
         let wasAdj: boolean;
-        if ((v === ra && w === rb) || (v === rb && w === ra) ||
-            (v === rc && w === rd) || (v === rd && w === rc)) {
-          wasAdj = true; // was an edge, now removed
-        } else if ((v === na && w === nb) || (v === nb && w === na) ||
-                   (v === nc && w === nd) || (v === nd && w === nc)) {
-          wasAdj = false; // was not an edge, now added
+        if ((vi === ra && w === rb) || (vi === rb && w === ra) ||
+            (vi === rc && w === rd) || (vi === rd && w === rc)) {
+          wasAdj = true;   // was an edge, now removed
+        } else if ((vi === na && w === nb) || (vi === nb && w === na) ||
+                   (vi === nc && w === nd) || (vi === nd && w === nc)) {
+          wasAdj = false;  // was not an edge, now added
         } else {
-          wasAdj = this.graph.hasEdge(v, w); // unchanged
+          wasAdj = this.graph.hasEdge(vi, w);  // unchanged by swap
         }
 
-        const oldContrib = this.pairEnergyWith(v, w, oldCN, wasAdj);
-        const newContrib = this.pairEnergyWith(v, w, newCN, this.graph.hasEdge(v, w));
-        delta += newContrib - oldContrib;
+        const newAdj = this.graph.hasEdge(vi, w);
+
+        // Energy delta for this pair
+        const oldE = this.pairE(oldCN, wasAdj);
+        const newE = this.pairE(newCN, newAdj);
+        delta += newE - oldE;
+
+        // Optimization 2: store to scratchpad for zero-cost commit
+        const s = this.scratchSize;
+        this.scratchKeys[s] = vi * n + w;
+        this.scratchVals[s] = newCN;
+        this.scratchKeys[s + 1] = w * n + vi;
+        this.scratchVals[s + 1] = newCN;
+        this.scratchSize = s + 2;
       }
     }
 
-    // Un-apply the swap (restore original state)
+    // Restore adjacency matrix (un-apply swap)
     this.graph.removeEdge(na, nb);
     this.graph.removeEdge(nc, nd);
     this.graph.addEdge(ra, rb);
@@ -295,82 +283,94 @@ export class IncrementalSRGEngine {
     return delta;
   }
 
-  /** Commit the staged swap: apply to adjacency + update CN cache + update energy. */
+  /** Commit the staged swap. O(4k + scratchSize) — zero CN recomputation. */
   commitSwap(): void {
     if (!this.staged) return;
     this.staged = false;
 
-    const n = this.n;
+    const { k } = this;
     const ra = this.stageRA, rb = this.stageRB;
     const rc = this.stageRC, rd = this.stageRD;
     const na = this.stageNA, nb = this.stageNB;
     const nc = this.stageNC, nd = this.stageND;
 
-    // Apply the swap to adjacency
+    // 1. Apply swap to adjacency matrix
     this.graph.removeEdge(ra, rb);
     this.graph.removeEdge(rc, rd);
     this.graph.addEdge(na, nb);
     this.graph.addEdge(nc, nd);
 
-    // Update energy
+    // 2. Update energy
     this.energy += this.stageDelta;
 
-    // Update CN cache for all pairs involving affected vertices
-    for (let v = 0; v < n; v++) {
-      if (!this.affected[v]) continue;
+    // 3. Optimization 2: replay scratchpad into CN cache (zero math)
+    for (let s = 0; s < this.scratchSize; s++) {
+      this.cn[this.scratchKeys[s]!] = this.scratchVals[s]!;
+    }
 
-      for (let w = v; w < n; w++) {
-        let count = 0;
-        for (let x = 0; x < n; x++) {
-          if (this.graph.hasEdge(v, x) && this.graph.hasEdge(w, x)) count++;
-        }
-        this.cn[v * n + w] = count;
-        this.cn[w * n + v] = count;
-      }
-
-      // Also update pairs (w, v) where w < v and w is NOT affected
-      for (let w = 0; w < v; w++) {
-        if (this.affected[w]) continue; // already handled above
-        let count = 0;
-        for (let x = 0; x < n; x++) {
-          if (this.graph.hasEdge(w, x) && this.graph.hasEdge(v, x)) count++;
-        }
-        this.cn[w * n + v] = count;
-        this.cn[v * n + w] = count;
+    // 4. Also update diagonal CN for affected vertices
+    //    (A²)_vv = degree(v) = k for k-regular graphs, always
+    const ver = this.affectedVersion;
+    for (let v = 0; v < this.n; v++) {
+      if (this.affectedArr[v] === ver) {
+        this.cn[v * this.n + v] = k;
       }
     }
 
-    // Rebuild edge list (simple and reliable)
-    this.rebuildEdgeList();
+    // 5. Optimization 1: O(k) adjacency list update per affected vertex
+    //    Each affected vertex lost one neighbor and gained one.
+    //    Vertex ra: lost rb, gained (whichever new edge endpoint pairs with ra)
+    this.updateAdj(ra, rb, this.findGain(ra, na, nb, nc, nd));
+    this.updateAdj(rb, ra, this.findGain(rb, na, nb, nc, nd));
+    this.updateAdj(rc, rd, this.findGain(rc, na, nb, nc, nd));
+    this.updateAdj(rd, rc, this.findGain(rd, na, nb, nc, nd));
   }
 
-  /** Discard the staged swap — no-op (state was never mutated). */
+  /** Find what vertex v gained from the new edges. */
+  private findGain(v: number, na: number, nb: number, nc: number, nd: number): number {
+    if (v === na) return nb;
+    if (v === nb) return na;
+    if (v === nc) return nd;
+    if (v === nd) return nc;
+    return -1; // should never happen
+  }
+
+  /** Replace lostNeighbor with gainedNeighbor in vertex's adjList. O(k). */
+  private updateAdj(vertex: number, lost: number, gained: number): void {
+    const base = vertex * this.k;
+    for (let i = 0; i < this.k; i++) {
+      if (this.adjList[base + i] === lost) {
+        this.adjList[base + i] = gained;
+        return;
+      }
+    }
+  }
+
+  /** Discard the staged swap — no-op. */
   discardSwap(): void {
     this.staged = false;
   }
 
   // ──────────────────────────────────────────────
-  //  Legacy API (for compatibility with existing tests)
+  //  Legacy API (for existing tests)
   // ──────────────────────────────────────────────
 
   trySwap(): SwapResult | null {
     const delta = this.proposeRandomSwap();
     if (delta === null) return null;
 
-    // Build a SwapResult for the legacy API
-    const na = this.stageNA, nb = this.stageNB;
-    const nc = this.stageNC, nd = this.stageND;
     const ra = this.stageRA, rb = this.stageRB;
     const rc = this.stageRC, rd = this.stageRD;
+    const na = this.stageNA, nb = this.stageNB;
+    const nc = this.stageNC, nd = this.stageND;
 
-    // Create the new graph
     const newGraph = this.graph.clone();
     newGraph.removeEdge(ra, rb);
     newGraph.removeEdge(rc, rd);
     newGraph.addEdge(na, nb);
     newGraph.addEdge(nc, nd);
 
-    this.staged = false; // consume the staged state
+    this.staged = false;
 
     return {
       graph: newGraph,
@@ -385,9 +385,8 @@ export class IncrementalSRGEngine {
     this.graph = result.graph;
     this.energy = result.newEnergy;
 
-    const affected = new Set(result.vertices);
     const n = this.n;
-
+    const affected = new Set(result.vertices);
     for (const v of affected) {
       for (let w = 0; w < n; w++) {
         let count = 0;
@@ -398,8 +397,7 @@ export class IncrementalSRGEngine {
         this.cn[w * n + v] = count;
       }
     }
-
-    this.rebuildEdgeList();
+    this.buildAdjList();
   }
 
   /** Get a clone of the current graph. */
