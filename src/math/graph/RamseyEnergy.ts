@@ -280,12 +280,23 @@ export function flipEdge(adj: AdjacencyMatrix, u: number, v: number): void {
  * Compute the energy delta if all edges in `edges` are simultaneously flipped.
  *
  * Used for circulant SA where a distance-mutation flips N edges at once.
- * Strategy: full recompute before and after — acceptable because for N=35
- * a full recompute is ~C(35,4)+C(35,6) ≈ 65K ops, and the batch mutation
- * is infrequent relative to the gain from the 2^578 space reduction.
  *
- * The function applies all flips, computes newEnergy - oldEnergy, then
- * rolls back every flip. The caller is responsible for re-applying on accept.
+ * Strategy: full recompute before and after — apply all flips, measure
+ * newEnergy - oldEnergy, then roll back every flip.
+ *
+ * ⚠️  SCALABILITY WARNING — Do NOT use this on large unconstrained searches.
+ *
+ * Actual recompute cost for R(4,6) on N=35:
+ *   C(35,4) = 52,360  (red K_4 cliques)
+ *   C(35,6) = 1,623,160  (blue K_6 independent sets)
+ *   Total = ~1.675 MILLION ops per call (not the ~50K originally estimated — off by 30x)
+ *
+ * This is only acceptable here because the circulant search space is 2^17 (131,072
+ * states), so SA converges in hundreds to low-thousands of steps regardless.
+ * At 1.675M ops/step, a thousand steps = ~1.675B ops = a few seconds. Survivable.
+ *
+ * For any larger graph or unconstrained search, implement a proper incremental
+ * batch delta that maintains a clique-count data structure across multi-edge flips.
  *
  * @returns delta = newEnergy - oldEnergy (negative = improvement)
  */
