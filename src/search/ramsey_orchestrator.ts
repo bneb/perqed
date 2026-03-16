@@ -30,6 +30,8 @@ export interface OrchestratedSearchConfig {
   seed: SeedType;
   /** Circulant connections (only for seed="circulant") */
   circulantConnections?: number[];
+  /** Symmetry constraint passed to each SA worker */
+  symmetry?: 'none' | 'circulant';
   /** Progress callback */
   onProgress?: (worker: number, iter: number, energy: number, bestEnergy: number, temp: number) => void;
 }
@@ -75,6 +77,7 @@ function singleSearch(config: OrchestratedSearchConfig): OrchestratedSearchResul
     initialTemp: tInit,
     coolingRate,
     initialGraph: seeds[0],
+    symmetry: config.symmetry,
   };
 
   let result: RamseySearchResult;
@@ -190,10 +193,12 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
       maxIterations: itersPerWorker,
       initialTemp: tInit,
       coolingRate,
+      symmetry: config.symmetry, // Pass symmetry constraint to worker thread
     };
 
     // Serialize the seed graph as raw Int8Array if present
-    if (seedGraph) {
+    // Note: for circulant mode, the worker ignores the seed and builds its own random circulant
+    if (seedGraph && config.symmetry !== 'circulant') {
       saConfigForWorker.initialGraphRaw = seedGraph.raw;
       saConfigForWorker.initialGraphN = seedGraph.n;
     }

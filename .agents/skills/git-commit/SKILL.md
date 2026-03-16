@@ -1,41 +1,51 @@
 ---
 name: git-commit
-description: How to make git commits safely without breaking the terminal (special characters in -m flag cause shell escaping issues)
+description: How to make git commits safely without breaking the terminal (special characters in -m flag and heredoc EOF both cause shell escaping issues in zsh)
 ---
 
 # Git Commit Skill
 
 ## The Problem
 
-Using `git commit -m "..."` with multi-line messages or special characters (backticks, quotes, unicode, emoji, angle brackets) causes the terminal to break due to shell escaping issues.
+Two patterns break the zsh terminal:
+1. `git commit -m "..."` — multi-line or special characters cause shell escaping issues
+2. `cat > /tmp/msg.txt << 'EOF' ... EOF` — heredoc also breaks zsh
 
 ## The Rule
 
-**Always write the commit message to a temp file and use `-F`.**
+**Always use `write_to_file` to write the commit message, then `git commit -F`.**
+
+This avoids the terminal entirely for text with special chars.
 
 ## Pattern
 
-```bash
-# 1. Write commit message to a temp file
-cat > /tmp/commit_msg.txt << 'EOF'
-type: short summary line
+```
+Step 1: Use write_to_file tool to write /tmp/commit_msg.txt
+         (plain text, no escaping needed, special chars are safe)
 
-- bullet point detail
-- another detail
-- special chars like ∃, →, `backticks`, "quotes" are safe here
-EOF
-
-# 2. Commit using -F
-git add -A && git commit -F /tmp/commit_msg.txt
-
-# 3. Push
-git push
+Step 2: Run in terminal:
+git -C /path/to/repo add -A && git -C /path/to/repo commit -F /tmp/commit_msg.txt && git -C /path/to/repo push
 ```
 
-## Notes
+## Commit Message Format
 
-- The heredoc `<< 'EOF'` (single-quoted) prevents shell expansion inside the message
-- `/tmp/commit_msg.txt` is fine — it gets cleaned up automatically
-- Follow conventional commits: `feat:`, `fix:`, `refactor:`, `arch:`, `test:`, `docs:`
-- First line: ≤72 chars, imperative mood ("fix:" not "fixed:")
-- Body: bullet points with what and why, not how
+```
+type: short summary line (≤72 chars, imperative mood)
+
+- bullet point: what and why, not how
+- another detail
+- special chars like ∃, →, backticks, "quotes" are safe in the file
+```
+
+## Conventional Commit Types
+- `feat:` — new feature
+- `fix:` — bug fix
+- `refactor:` — code restructure, no behavior change
+- `arch:` — architectural change
+- `test:` — tests only
+- `docs:` — documentation only
+
+## Notes
+- Use `git -C /path/to/repo` instead of `cd && git` — avoids shell state issues
+- `/tmp/commit_msg.txt` is cleaned up automatically
+- Never use `-m` for anything beyond a single short line with no special chars

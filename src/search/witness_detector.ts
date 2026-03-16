@@ -32,6 +32,8 @@ export interface RamseyArchitectConfig {
   s?: number;
   /** List of forbidden monochromatic cliques — detailed form */
   forbidden_subgraphs?: ForbiddenSubgraph[];
+  /** Symmetry constraint: 'circulant' reduces R(4,6) search from 2^595 → 2^17 */
+  symmetry?: 'none' | 'circulant';
 }
 
 export interface UnknownArchitectConfig {
@@ -53,6 +55,8 @@ export interface SearchConfig {
   saIterations: number;
   workers: number;
   strategy: "single" | "island_model";
+  /** Symmetry constraint passed to the SA engine */
+  symmetry?: 'none' | 'circulant';
 }
 
 // ──────────────────────────────────────────────
@@ -123,7 +127,7 @@ export function extractSearchConfig(cfg: ArchitectSearchConfig): SearchConfig | 
         strategy = "island_model";
       }
 
-      return { type: "ramsey_sa", n, r, s, saIterations, workers, strategy };
+      return { type: "ramsey_sa", n, r, s, saIterations, workers, strategy, symmetry: cfg.symmetry };
     }
 
     case "unknown":

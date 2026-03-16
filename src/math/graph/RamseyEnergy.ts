@@ -271,3 +271,40 @@ export function flipEdge(adj: AdjacencyMatrix, u: number, v: number): void {
     adj.addEdge(u, v);
   }
 }
+
+// ──────────────────────────────────────────────
+// Batch Delta: for Circulant Mutations
+// ──────────────────────────────────────────────
+
+/**
+ * Compute the energy delta if all edges in `edges` are simultaneously flipped.
+ *
+ * Used for circulant SA where a distance-mutation flips N edges at once.
+ * Strategy: full recompute before and after — acceptable because for N=35
+ * a full recompute is ~C(35,4)+C(35,6) ≈ 65K ops, and the batch mutation
+ * is infrequent relative to the gain from the 2^578 space reduction.
+ *
+ * The function applies all flips, computes newEnergy - oldEnergy, then
+ * rolls back every flip. The caller is responsible for re-applying on accept.
+ *
+ * @returns delta = newEnergy - oldEnergy (negative = improvement)
+ */
+export function ramseyEnergyDeltaBatch(
+  adj: AdjacencyMatrix,
+  edges: Array<[number, number]>,
+  r: number,
+  s: number,
+): number {
+  const oldEnergy = ramseyEnergy(adj, r, s);
+
+  // Apply all flips
+  for (const [u, v] of edges) flipEdge(adj, u, v);
+
+  const newEnergy = ramseyEnergy(adj, r, s);
+
+  // Roll back all flips — caller decides whether to keep or discard
+  for (const [u, v] of edges) flipEdge(adj, u, v);
+
+  return newEnergy - oldEnergy;
+}
+

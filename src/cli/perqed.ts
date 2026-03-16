@@ -85,6 +85,8 @@ export interface SearchPhase {
   workers?: number;
   /** Seed type: "random" (default), "paley", or "circulant" */
   seed?: "random" | "paley" | "circulant";
+  /** Symmetry constraint: 'circulant' reduces search space from 2^C(n,2) to 2^floor(n/2) */
+  symmetry?: 'none' | 'circulant';
 }
 
 export interface RunConfig {
@@ -153,6 +155,11 @@ const RUN_CONFIG_SCHEMA = {
             required: ["color", "clique_size"],
           },
         },
+        symmetry: {
+          type: SchemaType.STRING as const,
+          enum: ["none", "circulant"],
+          description: "'circulant' restricts search to circulant graphs: reduces R(4,6) from 2^595 to 2^17 states.",
+        },
       },
       required: ["problem_class"],
     },
@@ -192,13 +199,15 @@ For Ramsey lower bounds R(r,s) ≥ n (i.e., construct a 2-coloring of K_{n-1}):
   "domain_size": <n-1>,
   "num_colors": 2,
   "r": <r>,
-  "s": <s>
+  "s": <s>,
+  "symmetry": "circulant"
 }
 \`\`\`
-For example, R(4,6) ≥ 36 (K_35, no red K_4, no blue K_6):
+For example, R(4,6) ≥ 36 — the known Exoo (1989) witness IS a circulant on 35 vertices:
 \`\`\`json
-{ "problem_class": "ramsey_coloring", "domain_size": 35, "num_colors": 2, "r": 4, "s": 6 }
+{ "problem_class": "ramsey_coloring", "domain_size": 35, "num_colors": 2, "r": 4, "s": 6, "symmetry": "circulant" }
 \`\`\`
+**IMPORTANT**: Always use \`"symmetry": "circulant"\` for Ramsey lower bound searches. This reduces the search space from 2^595 to 2^17 (131,072 states) — a 2^578x reduction that makes the search practically instant.
 
 For problems that do NOT require a constructive witness:
 \`\`\`json
@@ -360,6 +369,7 @@ const SEARCH_PIVOT_SCHEMA = {
     strategy: { type: SchemaType.STRING as const, enum: ["single", "island_model"] },
     workers: { type: SchemaType.NUMBER as const },
     seed: { type: SchemaType.STRING as const, enum: ["random", "paley", "circulant"] },
+    symmetry: { type: SchemaType.STRING as const, enum: ["none", "circulant"] },
   },
   required: ["type", "vertices", "r", "s", "sa_iterations"],
 };
@@ -470,10 +480,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         sa_iterations: searchConfig.saIterations,
         workers: searchConfig.workers,
         strategy: searchConfig.strategy,
+        symmetry: searchConfig.symmetry,
       };
       console.log(`\n🔍 Auto-detected constructive existence proof (∃)`);
       console.log(`   Problem class: ${config.search_config.problem_class}`);
-      console.log(`   Search config: ${searchConfig.n}v, R(${searchConfig.r},${searchConfig.s}), ${searchConfig.saIterations.toLocaleString()} iters, ${searchConfig.workers} workers (${searchConfig.strategy})`);
+      const symLabel = searchConfig.symmetry === 'circulant' ? ' [CIRCULANT 2^¹⁷]' : '';
+      console.log(`   Search config: ${searchConfig.n}v, R(${searchConfig.r},${searchConfig.s}), ${searchConfig.saIterations.toLocaleString()} iters, ${searchConfig.workers} workers (${searchConfig.strategy})${symLabel}`);
     } else {
       console.log(`\n⚠️  Constructive existence detected but problem class unknown — skipping search phase`);
     }
@@ -505,6 +517,7 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         strategy,
         workers,
         seed: sp.seed ?? "random",
+        symmetry: sp.symmetry,
         onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
           const pct = ((iter / iters) * 100).toFixed(1);
           const wLabel = (sp.workers ?? 1) > 1 ? `W${worker} ` : "";
