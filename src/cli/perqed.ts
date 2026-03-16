@@ -20,7 +20,7 @@ import { SolverBridge } from "../solver";
 import { LeanBridge } from "../lean_bridge";
 import { AgentFactory } from "../agents/factory";
 import { runDynamicLoop } from "../orchestrator";
-import { adjToMatrix } from "../search/ramsey_worker";
+import { TreePrinter } from "../utils/tree_printer";
 import { orchestratedSearch } from "../search/ramsey_orchestrator";
 import { ProofRegistry } from "../search/proof_registry";
 import {
@@ -32,7 +32,8 @@ import {
   extractSearchConfig,
   type ArchitectSearchConfig,
 } from "../search/witness_detector";
-import { TreePrinter } from "../utils/tree_printer";
+import { solveWithZ3, isZ3Available } from "../search/z3_ramsey_solver";
+import { adjToMatrix } from "../search/ramsey_worker";
 
 // ──────────────────────────────────────────────
 // CLI Argument Parsing
@@ -501,10 +502,53 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       attempt++;
       const iters = sp.sa_iterations ?? 10_000_000;
 
-      console.log(`\n🔎 Search Phase — Attempt ${attempt}/${MAX_ARCHITECT_PIVOTS}`);
-      console.log(`   Type: ${sp.type}`);
-      console.log(`   Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${iters.toLocaleString()} iters`);
-      console.log(`   Strategy: ${sp.strategy ?? "single"}, Seed: ${sp.seed ?? "random"}, Workers: ${sp.workers ?? 1}\n`);
+      // ── Z3 Fast Path: try exact SMT solver first for circulant searches ──
+      if (sp.symmetry === 'circulant') {
+        console.log(`\n⚡ Z3 Fast Path — attempting exact SMT solve (circulant 2^¹⁷ space)...`);
+        try {
+          const z3Available = await isZ3Available();
+          if (z3Available) {
+            const z3Result = await solveWithZ3(sp.vertices, sp.r, sp.s, { timeoutMs: 120_000 });
+
+            if (z3Result === null) {
+              // UNSAT — no circulant witness exists. Log and abort.
+              console.log(`   ❌ Z3 UNSAT — no circulant witness for R(${sp.r},${sp.s}) on N=${sp.vertices}`);
+              console.log(`   The Ramsey witness is not circulant. Falling back to unconstrained SA.`);
+              sp = { ...sp, symmetry: undefined }; // Strip circulant, retry with SA
+            } else {
+              // SAT — witness found! Skip SA entirely.
+              console.log(`   ✅ Z3 found witness in ${z3Result.solveTimeMs}ms!`);
+              console.log(`   Distance colors: ${z3Result.distanceBits}`);
+
+              // Save witness and go directly to Lean proof generation
+              const matrix = adjToMatrix(z3Result.adj);
+              const witnessPath = join(workspace.paths.scratch, "witness.json");
+              await Bun.write(witnessPath, JSON.stringify({ n: sp.vertices, r: sp.r, s: sp.s, adjacency: matrix }, null, 2));
+
+              const registry = ProofRegistry.withDefaults();
+              const proofClass = config.search_config.problem_class === "ramsey_coloring" ? "ramsey" : config.search_config.problem_class;
+              const generator = registry.getGenerator(proofClass);
+              if (generator) {
+                const proofInput = { theoremName: config.theorem_name, witness: z3Result.adj, params: { r: sp.r, s: sp.s, n: sp.vertices } };
+                const leanSource = generator.generateLean(proofInput);
+                const leanPath = join(workspace.paths.scratch, "Witness.lean");
+                await Bun.write(leanPath, leanSource);
+                console.log(`\n📄 Lean proof generated: ${leanPath}`);
+              }
+              witnessFound = true;
+              break;
+            }
+          } else {
+            console.log(`   ⚠️  Z3 not available — falling back to SA`);
+          }
+        } catch (e) {
+          console.log(`   ⚠️  Z3 error — falling back to SA: ${e}`);
+        }
+      }
+
+      if (witnessFound) break;
+
+      // ── SA Path: heuristic search (fallback or symmetry=none) ──
 
       const workers = sp.workers ?? 1;
       const strategy = sp.strategy ?? "single";

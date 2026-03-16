@@ -37,6 +37,14 @@ src/math/optim/
 3. **Choose a mutation operator**:
    - For k-regular graphs: use `degreePreservingSwap` (preserves degree invariant)
    - For unconstrained graphs: single edge flip (add/remove one edge)
+   - For **symmetry-constrained graphs** (e.g. circulant): flip all N edges at a given distance atomically
+     using `ramseyEnergyDeltaBatch`. This requires a full recompute (apply flips, measure Δ, roll back).
+
+   > **⚠️ C(n,k) Scalability Warning**: Full recompute costs C(n,r) + C(n,s) per step.
+   > For R(4,6) on N=35: C(35,4)=52,360 + C(35,6)=**1,623,160** = **~1.675M ops/step**.
+   > This is only acceptable when the search space is tiny (e.g. 2^17 for circulant on 35v).
+   > For unconstrained or large-N searches, use the incremental single-edge delta (`ramseyEnergyDelta`)
+   > or implement a proper clique-count data structure for batch flips.
 
 4. **Implement `IState<T>`**:
    ```typescript
