@@ -34,6 +34,7 @@ import {
 } from "../search/witness_detector";
 import { solveWithZ3, isZ3Available } from "../search/z3_ramsey_solver";
 import { adjToMatrix } from "../search/ramsey_worker";
+import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
 import { runLNS } from "../search/lns_solver";
 import {
   ResearchJournal,
@@ -396,6 +397,29 @@ const SEARCH_PIVOT_SCHEMA = {
 };
 
 /**
+ * Build a dynamically-pruned pivot schema by stripping symmetry options
+ * that the ResearchJournal has already proven empty.
+ * e.g. if journal has [LEMMA] "No circulant..." → remove 'circulant' from enum.
+ */
+function buildPrunedPivotSchema(journalEntries: Array<{ type: string; claim: string }>): typeof SEARCH_PIVOT_SCHEMA {
+  const circulantInvalidated = journalEntries.some(
+    e => e.type === 'lemma' && e.claim.toLowerCase().includes('circulant')
+  );
+
+  const allowedSymmetries = ['none', circulantInvalidated ? null : 'circulant'].filter(Boolean) as string[];
+  const allowedSeeds = ['random', 'paley', circulantInvalidated ? null : 'circulant'].filter(Boolean) as string[];
+
+  return {
+    ...SEARCH_PIVOT_SCHEMA,
+    properties: {
+      ...SEARCH_PIVOT_SCHEMA.properties,
+      symmetry: { type: SchemaType.STRING as const, enum: allowedSymmetries },
+      seed: { type: SchemaType.STRING as const, enum: allowedSeeds },
+    },
+  };
+}
+
+/**
  * Generic retry wrapper for fallible LLM calls.
  *
  * Calls fn(previousError?) up to maxRetries times. On each failure,
@@ -435,6 +459,7 @@ async function requestSearchPivot(
   apiKey: string,
   digestText: string,
   currentConfig: SearchPhase,
+  prunedSchema: typeof SEARCH_PIVOT_SCHEMA,
   previousError?: string,
 ): Promise<SearchPhase> {
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -445,7 +470,7 @@ async function requestSearchPivot(
     generationConfig: {
       temperature: 0.2,
       responseMimeType: "application/json",
-      responseSchema: SEARCH_PIVOT_SCHEMA as any,
+      responseSchema: prunedSchema as any,
       maxOutputTokens: 2000,
     },
   });
@@ -481,6 +506,10 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   await Bun.write(workspace.paths.objective, config.objective_md);
   const skillsPath = join(workspace.paths.domainSkills, "problem_context.md");
   await Bun.write(skillsPath, config.domain_skills_md);
+
+  // Memetic warm-start: carry best graph across all pivot attempts
+  let memeticSeed: AdjacencyMatrix | null = null;
+  let memeticSeedEnergy: number | null = null;
 
   console.log("═══════════════════════════════════════════════");
   console.log("  🔥 PERQED — Execution");
@@ -624,7 +653,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         workers,
         seed: sp.seed ?? "random",
         symmetry: sp.symmetry,
+        // Memetic warm-start: seed first worker with best graph from prior attempt
+        initialGraph: memeticSeed ?? undefined,
         onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
+          // Scale report interval: single-worker runs at 10M intervals same as multi-worker
+          const reportEvery = Math.max(10_000_000, Math.floor(iters / 50));
+          if (iter % reportEvery !== 0) return;
           const pct = ((iter / iters) * 100).toFixed(1);
           const wLabel = (sp.workers ?? 1) > 1 ? `W${worker} ` : "";
           console.log(`   ${wLabel}[${pct}%] iter=${iter.toLocaleString()} E=${energy} best=${best} T=${temp.toFixed(4)}`);
@@ -645,6 +679,13 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       });
 
       const result = orchResult.best;
+
+      // Track global best graph across all pivot attempts for memetic warm-start
+      if (!memeticSeed || result.bestEnergy < (memeticSeedEnergy ?? Infinity)) {
+        memeticSeed = result.bestAdj;
+        memeticSeedEnergy = result.bestEnergy;
+        if (attempt > 1) console.log(`   🧬 Memetic seed updated: E=${memeticSeedEnergy} → next attempt warm-starts here`);
+      }
       console.log(`\n   SA complete: best E=${result.bestEnergy}, ${result.ips.toLocaleString()} IPS`);
       if (orchResult.workersRan > 1) {
         console.log(`   Workers: ${orchResult.workersRan} ran, best from worker ${orchResult.bestWorkerIndex}`);
@@ -834,13 +875,17 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       console.log(`\n   📋 Diagnosis: ${digest.diagnosis.failureMode}`);
       console.log(`   💡 ${digest.diagnosis.recommendation.slice(0, 120)}...`);
       // Augment digest with journal context so ARCHITECT sees what's been proven
-      const journalContext = distillJournalForPrompt(await journal.getEntriesForGoal(targetGoal));
+      const journalEntries = await journal.getEntriesForGoal(targetGoal);
+      const journalContext = distillJournalForPrompt(journalEntries);
       const augmentedDigest = journalContext ? journalContext + "\n" + digestText : digestText;
+
+      // Prune schema: strip symmetry/seed options that journal has proven impossible
+      const prunedSchema = buildPrunedPivotSchema(journalEntries);
 
       console.log(`\n   🏛️  Asking ARCHITECT for search pivot...\n`);
 
       const pivotedConfig = await callSafe(
-        (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, previousError),
+        (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, prunedSchema, previousError),
         3,
         "ARCHITECT pivot",
       );

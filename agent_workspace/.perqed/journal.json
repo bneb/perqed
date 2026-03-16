@@ -72,6 +72,38 @@
       "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
       "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
       "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "b77fc449-d84f-4807-bd0e-24dc0f847ec0",
+      "timestamp": "2026-03-16T22:27:48.731Z",
+      "type": "lemma",
+      "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
+      "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "ddfe22f8-3159-4c82-b49c-07c88e4870c4",
+      "timestamp": "2026-03-16T23:01:41.786Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=14 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 136 edges has no valid coloring for R(4,6) on K_35; 136 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "dcfc6d21-7b6b-41b3-a29a-5ed07aeb14bf",
+      "timestamp": "2026-03-16T23:01:43.044Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=18 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 141 edges has no valid coloring for R(4,6) on K_35; 141 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "0c14a77d-7747-478f-9977-9aba84f5e2f5",
+      "timestamp": "2026-03-16T23:01:43.044Z",
+      "type": "observation",
+      "claim": "SA on K_35 R(4,6) converged at E_min=14 (attempt 1)",
+      "evidence": "500,000,000 iters × 8 workers, strategy=island_model, seed=random",
+      "target_goal": "R(4,6) >= 36"
     }
   ]
 }

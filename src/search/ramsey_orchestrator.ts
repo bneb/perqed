@@ -32,6 +32,8 @@ export interface OrchestratedSearchConfig {
   circulantConnections?: number[];
   /** Symmetry constraint passed to each SA worker */
   symmetry?: 'none' | 'circulant';
+  /** Optional warm-start graph (memetic handoff from previous SA run) */
+  initialGraph?: AdjacencyMatrix;
   /** Progress callback */
   onProgress?: (worker: number, iter: number, energy: number, bestEnergy: number, temp: number) => void;
 }
@@ -78,7 +80,8 @@ function singleSearch(config: OrchestratedSearchConfig): OrchestratedSearchResul
     maxIterations: config.saIterations,
     initialTemp: tInit,
     coolingRate,
-    initialGraph: seeds[0],
+    // Memetic warm-start: prefer explicit initialGraph over random seed
+    initialGraph: config.initialGraph ?? seeds[0],
     symmetry: config.symmetry,
   };
 
@@ -225,7 +228,7 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
     workerPromises.push(promise);
 
     // Build config for this worker (seeds need to be serialized as raw data)
-    const seedGraph = seeds[w];
+    const seedGraph = w === 0 && config.initialGraph ? config.initialGraph : seeds[w];
     const wCoolingRate = workerCoolingRate(w);
     const wPatience = workerPatience(w);
     const saConfigForWorker: any = {
