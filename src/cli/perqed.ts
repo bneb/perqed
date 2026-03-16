@@ -22,6 +22,10 @@ import { AgentFactory } from "../agents/factory";
 import { runDynamicLoop } from "../orchestrator";
 import { ramseySearch, adjToMatrix, type RamseySearchConfig } from "../search/ramsey_worker";
 import { generateRamseyLean } from "../codegen/lean_codegen";
+import {
+  buildSearchFailureDigest,
+  formatSearchDigestForArchitect,
+} from "../search/search_failure_digest";
 import { TreePrinter } from "../utils/tree_printer";
 
 // ──────────────────────────────────────────────
@@ -260,6 +264,73 @@ async function confirmOrAbort(): Promise<void> {
 }
 
 // ──────────────────────────────────────────────
+// Search Pivot: ARCHITECT Escalation
+// ──────────────────────────────────────────────
+
+const SEARCH_PIVOT_PREAMBLE = `You are the Perqed Search Orchestrator. A Simulated Annealing search for a Ramsey witness has FAILED.
+
+You will receive a SearchFailureDigest containing full thermodynamic telemetry: best energy, temperature trajectory, IPS, failure diagnosis, and a recommendation.
+
+You must produce an UPDATED search_phase configuration that addresses the diagnosed failure.
+
+## Pivot Strategies (choose based on diagnosis)
+
+1. **TEMPERATURE_NOT_COOLING**: Fix the cooling rate. Use: coolingRate = exp(ln(0.01/T_init) / (0.8 * iters))
+2. **REHEAT_TOO_AGGRESSIVE**: Increase reheatAfter by 10x, or use geometric reheat decay
+3. **GLASS_FLOOR**: Increase sa_iterations by 5-10x. If that was already tried, this problem may need a structural approach.
+4. **INSUFFICIENT_BUDGET**: Increase sa_iterations by 5-10x
+
+## CRITICAL RULES
+- You MUST NOT change the problem (vertices, r, s) — only the search hyperparameters
+- You MUST increase sa_iterations if the previous attempt ran out of budget
+- If this is attempt 3+, try dramatically larger budgets (50M-100M iterations)
+- Output ONLY the updated search_phase JSON
+
+`;
+
+const SEARCH_PIVOT_SCHEMA = {
+  type: SchemaType.OBJECT as const,
+  properties: {
+    type: { type: SchemaType.STRING as const, enum: ["ramsey_sa"] },
+    vertices: { type: SchemaType.NUMBER as const },
+    r: { type: SchemaType.NUMBER as const },
+    s: { type: SchemaType.NUMBER as const },
+    sa_iterations: { type: SchemaType.NUMBER as const },
+  },
+  required: ["type", "vertices", "r", "s", "sa_iterations"],
+};
+
+async function requestSearchPivot(
+  apiKey: string,
+  digestText: string,
+  currentConfig: SearchPhase,
+): Promise<SearchPhase | null> {
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction:
+        "You are the Perqed Search Orchestrator. Output an updated search_phase JSON.",
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: "application/json",
+        responseSchema: SEARCH_PIVOT_SCHEMA as any,
+      },
+    });
+
+    const prompt = SEARCH_PIVOT_PREAMBLE +
+      `## Current Configuration\n\`\`\`json\n${JSON.stringify(currentConfig, null, 2)}\n\`\`\`\n\n` +
+      `## SearchFailureDigest\n${digestText}`;
+
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text()) as SearchPhase;
+  } catch (err) {
+    console.error("   ❌ ARCHITECT pivot failed:", err);
+    return null;
+  }
+}
+
+// ──────────────────────────────────────────────
 // Phase 3: Run
 // ──────────────────────────────────────────────
 
@@ -280,80 +351,124 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   console.log("═══════════════════════════════════════════════\n");
 
   const startTime = Date.now();
+  const MAX_ARCHITECT_PIVOTS = 5;
 
-  // ── Search Phase: Run SA to find witness ──
+  // ── Search Phase: SA with ARCHITECT Escalation Loop ──
   if (config.search_phase) {
-    const sp = config.search_phase;
-    const iters = sp.sa_iterations ?? 10_000_000;
+    let sp = { ...config.search_phase };
+    let witnessFound = false;
+    let attempt = 0;
 
-    console.log(`🔎 Search Phase: ${sp.type}`);
-    console.log(`   Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${iters.toLocaleString()} iterations\n`);
+    while (!witnessFound && attempt < MAX_ARCHITECT_PIVOTS) {
+      attempt++;
+      const iters = sp.sa_iterations ?? 10_000_000;
 
-    const saConfig: RamseySearchConfig = {
-      n: sp.vertices,
-      r: sp.r,
-      s: sp.s,
-      maxIterations: iters,
-      initialTemp: 2.0,
-      coolingRate: 1 - (1 / iters),  // reach ~0.37 at end
-      reheatTemp: 1.5,
-      reheatAfter: 50000,
-    };
+      console.log(`\n🔎 Search Phase — Attempt ${attempt}/${MAX_ARCHITECT_PIVOTS}`);
+      console.log(`   Type: ${sp.type}`);
+      console.log(`   Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${iters.toLocaleString()} iters\n`);
 
-    const result = ramseySearch(saConfig, (iter, energy, best, temp) => {
-      const pct = ((iter / iters) * 100).toFixed(1);
-      console.log(`   [${pct}%] iter=${iter.toLocaleString()} E=${energy} best=${best} T=${temp.toFixed(4)}`);
-    });
+      // Build SA config with proper hyperparameters
+      const edges = sp.vertices * (sp.vertices - 1) / 2;
+      const tInit = edges < 50 ? 1.0 : edges < 200 ? 2.0 : edges < 600 ? 3.0 : 5.0;
+      const tFinal = 0.01;
+      const coolingRate = Math.exp(Math.log(tFinal / tInit) / (0.8 * iters));
+      const reheatAfter = Math.max(200_000, Math.floor(iters / 50));
 
-    console.log(`\n   SA complete: best E=${result.bestEnergy}, ${result.ips.toLocaleString()} IPS`);
+      const saConfig: RamseySearchConfig = {
+        n: sp.vertices,
+        r: sp.r,
+        s: sp.s,
+        maxIterations: iters,
+        initialTemp: tInit,
+        coolingRate,
+        reheatTemp: tInit * 0.75,
+        reheatAfter,
+      };
 
-    if (result.witness) {
-      console.log(`   🏆 WITNESS FOUND! E=0 at iteration ${result.iterations.toLocaleString()}\n`);
+      console.log(`   Hyperparameters: T₀=${tInit}, rate=${coolingRate.toFixed(8)}, reheatAfter=${reheatAfter.toLocaleString()}`);
 
-      // Save witness as JSON
-      const matrix = adjToMatrix(result.witness);
-      const witnessPath = join(workspace.paths.scratch, "witness.json");
-      await Bun.write(witnessPath, JSON.stringify({ n: sp.vertices, r: sp.r, s: sp.s, adjacency: matrix }, null, 2));
-      console.log(`   📁 Witness saved: ${witnessPath}`);
-
-      // Generate Lean proof
-      const leanSource = generateRamseyLean(config.theorem_name, sp.vertices, sp.r, sp.s, matrix);
-      const leanPath = join(workspace.paths.verifiedLib, `${config.theorem_name}.lean`);
-      await Bun.write(leanPath, leanSource);
-      console.log(`   📜 Lean proof generated: ${leanPath}`);
-      console.log(`   ⏳ Verifying with Lean kernel...\n`);
-
-      // Verify with Lean
-      const proc = Bun.spawn(["lake", "env", "lean", leanPath], {
-        cwd: workspaceBase + "/..",
-        stdout: "pipe",
-        stderr: "pipe",
+      const result = ramseySearch(saConfig, (iter, energy, best, temp) => {
+        const pct = ((iter / iters) * 100).toFixed(1);
+        console.log(`   [${pct}%] iter=${iter.toLocaleString()} E=${energy} best=${best} T=${temp.toFixed(4)}`);
       });
-      const exitCode = await proc.exited;
-      const stderr = await new Response(proc.stderr).text();
 
-      if (exitCode === 0) {
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log("══════════════════════════════════════════════");
-        console.log(`  🏆 VERIFIED: ${config.theorem_name} proved in ${elapsed}s`);
-        console.log(`  Witness: ${sp.vertices}-vertex graph, R(${sp.r},${sp.s}) ≥ ${sp.vertices + 1}`);
-        console.log("══════════════════════════════════════════════\n");
-        return;
-      } else {
-        console.log(`   ⚠️  Lean verification failed: ${stderr.slice(0, 200)}`);
-        console.log(`   Falling back to tactic search...\n`);
+      console.log(`\n   SA complete: best E=${result.bestEnergy}, ${result.ips.toLocaleString()} IPS`);
+
+      if (result.witness) {
+        console.log(`   🏆 WITNESS FOUND! E=0 at iteration ${result.iterations.toLocaleString()}\n`);
+
+        // Save witness as JSON
+        const matrix = adjToMatrix(result.witness);
+        const witnessPath = join(workspace.paths.scratch, "witness.json");
+        await Bun.write(witnessPath, JSON.stringify({ n: sp.vertices, r: sp.r, s: sp.s, adjacency: matrix }, null, 2));
+        console.log(`   📁 Witness saved: ${witnessPath}`);
+
+        // Generate Lean proof
+        const leanSource = generateRamseyLean(config.theorem_name, sp.vertices, sp.r, sp.s, matrix);
+        const leanPath = join(workspace.paths.verifiedLib, `${config.theorem_name}.lean`);
+        await Bun.write(leanPath, leanSource);
+        console.log(`   📜 Lean proof generated: ${leanPath}`);
+        console.log(`   ⏳ Verifying with Lean kernel...\n`);
+
+        // Verify with Lean
+        const proc = Bun.spawn(["lake", "env", "lean", leanPath], {
+          cwd: workspaceBase + "/..",
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        const exitCode = await proc.exited;
+        const stderr = await new Response(proc.stderr).text();
+
+        if (exitCode === 0) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          console.log("══════════════════════════════════════════════");
+          console.log(`  🏆 VERIFIED: ${config.theorem_name} proved in ${elapsed}s`);
+          console.log(`  Witness: ${sp.vertices}-vertex graph, R(${sp.r},${sp.s}) ≥ ${sp.vertices + 1}`);
+          console.log(`  Attempts: ${attempt}`);
+          console.log("══════════════════════════════════════════════\n");
+          return;
+        } else {
+          console.log(`   ⚠️  Lean verification failed: ${stderr.slice(0, 200)}`);
+          console.log(`   Falling back to tactic search...\n`);
+          break; // Exit search loop, try tactic phase
+        }
       }
-    } else {
-      console.log(`   ❌ No witness found (best E=${result.bestEnergy})`);
-      console.log(`   The search exhausted its budget. Try more iterations or a different approach.\n`);
 
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log("══════════════════════════════════════════════");
-      console.log(`  ❌ SEARCH EXHAUSTED after ${elapsed}s`);
-      console.log(`  Best energy: ${result.bestEnergy}`);
-      console.log("══════════════════════════════════════════════\n");
-      return;
+      // ── SEARCH FAILED: Build digest and escalate to ARCHITECT ──
+      console.log(`   ❌ No witness found (best E=${result.bestEnergy})`);
+
+      if (attempt >= MAX_ARCHITECT_PIVOTS) {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`\n══════════════════════════════════════════════`);
+        console.log(`  ❌ ALL ${MAX_ARCHITECT_PIVOTS} SEARCH ATTEMPTS EXHAUSTED after ${elapsed}s`);
+        console.log(`  Best energy ever: ${result.bestEnergy}`);
+        console.log(`══════════════════════════════════════════════\n`);
+        return;
+      }
+
+      // Build SearchFailureDigest
+      const digest = buildSearchFailureDigest(result.telemetry, {
+        n: sp.vertices, r: sp.r, s: sp.s, attemptNumber: attempt,
+      });
+      const digestText = formatSearchDigestForArchitect(digest);
+
+      console.log(`\n   📋 Diagnosis: ${digest.diagnosis.failureMode}`);
+      console.log(`   💡 ${digest.diagnosis.recommendation.slice(0, 120)}...`);
+      console.log(`\n   🏛️  Asking ARCHITECT for search pivot...\n`);
+
+      // Ask ARCHITECT for a new search config
+      const pivotedConfig = await requestSearchPivot(apiKey, digestText, sp);
+      if (pivotedConfig) {
+        sp = pivotedConfig;
+        console.log(`   ✅ ARCHITECT pivoted:`);
+        console.log(`      Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${(sp.sa_iterations ?? 10_000_000).toLocaleString()} iters`);
+      } else {
+        console.log(`   ❌ ARCHITECT could not produce a pivot. Aborting search.`);
+        break;
+      }
     }
+
+    witnessFound = false; // If we get here, search loop ended without success
   }
 
   // ── Tactic Phase: LLM-driven proof search (for non-constructive proofs) ──

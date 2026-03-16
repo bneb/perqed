@@ -14,6 +14,8 @@ import {
   flipEdge,
 } from "../math/graph/RamseyEnergy";
 
+import type { SearchTelemetry } from "./search_failure_digest";
+
 export interface RamseySearchConfig {
   /** Number of vertices in the graph */
   n: number;
@@ -42,14 +44,12 @@ export interface RamseySearchResult {
   iterations: number;
   /** Iterations per second */
   ips: number;
+  /** Full thermodynamic telemetry for diagnosis */
+  telemetry: SearchTelemetry;
 }
 
 /**
  * Run a single SA worker searching for a Ramsey witness.
- *
- * @param config SA search configuration
- * @param onProgress Optional callback for progress reporting
- * @returns search result with best energy and witness (if found)
  */
 export function ramseySearch(
   config: RamseySearchConfig,
@@ -70,6 +70,12 @@ export function ramseySearch(
   let bestAdj = adj.clone();
   let temp = initialTemp;
   let staleCount = 0;
+  let reheatCount = 0;
+
+  // Trajectory tracking: 10 checkpoints at 10%, 20%, ..., 100%
+  const checkpointInterval = Math.max(1, Math.floor(maxIterations / 10));
+  const energyTrajectory: number[] = [];
+  const temperatureTrajectory: number[] = [];
 
   const startTime = Date.now();
 
@@ -95,8 +101,22 @@ export function ramseySearch(
         if (energy === 0) {
           // 🏆 Found witness!
           const elapsed = (Date.now() - startTime) / 1000;
-          const ips = Math.round(iter / elapsed);
-          return { bestEnergy: 0, witness: bestAdj, iterations: iter, ips };
+          const ips = elapsed > 0 ? Math.round(iter / elapsed) : Infinity;
+          // Fill remaining trajectory points
+          while (energyTrajectory.length < 10) energyTrajectory.push(0);
+          while (temperatureTrajectory.length < 10) temperatureTrajectory.push(temp);
+          return {
+            bestEnergy: 0,
+            witness: bestAdj,
+            iterations: iter,
+            ips,
+            telemetry: {
+              bestEnergy: 0, finalEnergy: 0, finalTemperature: temp,
+              initialTemperature: initialTemp, totalIterations: iter,
+              ips, wallTimeSeconds: elapsed, reheatCount,
+              energyTrajectory, temperatureTrajectory,
+            },
+          };
         }
       }
     }
@@ -109,6 +129,13 @@ export function ramseySearch(
     if (staleCount >= reheatAfter) {
       temp = reheatTemp;
       staleCount = 0;
+      reheatCount++;
+    }
+
+    // Trajectory checkpoint
+    if ((iter + 1) % checkpointInterval === 0 && energyTrajectory.length < 10) {
+      energyTrajectory.push(bestEnergy);
+      temperatureTrajectory.push(temp);
     }
 
     // Progress callback
@@ -117,9 +144,25 @@ export function ramseySearch(
     }
   }
 
+  // Fill trajectory if needed
+  while (energyTrajectory.length < 10) energyTrajectory.push(bestEnergy);
+  while (temperatureTrajectory.length < 10) temperatureTrajectory.push(temp);
+
   const elapsed = (Date.now() - startTime) / 1000;
-  const ips = Math.round(maxIterations / elapsed);
-  return { bestEnergy, witness: bestEnergy === 0 ? bestAdj : null, iterations: maxIterations, ips };
+  const ips = elapsed > 0 ? Math.round(maxIterations / elapsed) : Infinity;
+
+  return {
+    bestEnergy,
+    witness: bestEnergy === 0 ? bestAdj : null,
+    iterations: maxIterations,
+    ips,
+    telemetry: {
+      bestEnergy, finalEnergy: energy, finalTemperature: temp,
+      initialTemperature: initialTemp, totalIterations: maxIterations,
+      ips, wallTimeSeconds: elapsed, reheatCount,
+      energyTrajectory, temperatureTrajectory,
+    },
+  };
 }
 
 /**
