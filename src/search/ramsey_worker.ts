@@ -55,7 +55,9 @@ export function ramseySearch(
   config: RamseySearchConfig,
   onProgress?: (iter: number, energy: number, bestEnergy: number, temp: number) => void,
 ): RamseySearchResult {
-  const { n, r, s, maxIterations, initialTemp, coolingRate, reheatTemp, reheatAfter } = config;
+  const { n, r, s, maxIterations, initialTemp, coolingRate } = config;
+  // Adaptive reheat: patience = % of budget, strength decays over time
+  const minPatience = Math.max(100_000, Math.floor(maxIterations * 0.1));
 
   // Initialize random graph (~50% density)
   const adj = new AdjacencyMatrix(n);
@@ -125,9 +127,14 @@ export function ramseySearch(
     temp *= coolingRate;
     staleCount++;
 
-    // Reheat if stuck
-    if (staleCount >= reheatAfter) {
-      temp = reheatTemp;
+    // Adaptive reheat: fires only when stuck long enough, strength proportional to stale duration
+    if (staleCount >= minPatience) {
+      // Reheat strength: how much of the budget has been spent stuck?
+      const staleFraction = staleCount / maxIterations;
+      // Reheat to a fraction of initialTemp, proportional to how stuck we are
+      // staleFraction=0.1 → mild reheat (30% of T₀), staleFraction=0.5 → strong reheat (80% of T₀)
+      const reheatStrength = Math.min(0.9, 0.2 + staleFraction * 1.5);
+      temp = initialTemp * reheatStrength;
       staleCount = 0;
       reheatCount++;
     }
