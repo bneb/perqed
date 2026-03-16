@@ -188,35 +188,19 @@ The Perqed engine has:
 ## CRITICAL: When to Include search_phase
 
 If the theorem is a **constructive existence proof** (starts with \`∃\`), the proof requires a **witness**.
-For graph existence problems (Ramsey lower bounds, SRG existence, etc.), you MUST include a \`search_phase\` field.
+For graph existence problems (Ramsey lower bounds, SRG existence, etc.), you MUST include a \`search_phase\` field:
 
-Example for R(4,6) ≥ 37:
 \`\`\`json
 "search_phase": {
   "type": "ramsey_sa",
   "vertices": 36,
   "r": 4,
   "s": 6,
-  "sa_iterations": 10000000,
-  "strategy": "single",
-  "seed": "random"
+  "sa_iterations": 10000000
 }
 \`\`\`
 
-### Strategy Options
-- **strategy**: "single" (one worker) or "island_model" (multiple workers with diverse seeds).
-  Use "island_model" for harder problems (n > 15 vertices).
-- **workers**: Number of independent SA workers when using island_model (default: 5). Budget is split among workers.
-- **seed**: Graph initialization strategy:
-  - "random" — default, random 50% density
-  - "paley" — Paley graph seed. Use for R(k,k) symmetric problems where n is prime and n ≡ 1 mod 4.
-    The Paley(17) graph IS the R(4,4) witness. For larger n, perturbed Paley variants explore nearby space.
-  - "circulant" — circulant graph seed.
-
-The Perqed engine will:
-1. Run SA search with the given parameters to find E=0 witness
-2. Generate Lean 4 source with the witness hardcoded
-3. Verify via \`decide\`
+The engine handles strategy selection, seeding, and hyperparameters automatically.
 
 ## The User's Problem Description
 
