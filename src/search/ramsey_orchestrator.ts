@@ -114,7 +114,33 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
   const edges = config.n * (config.n - 1) / 2;
   const tInit = edges < 50 ? 1.0 : edges < 200 ? 2.0 : edges < 600 ? 3.0 : 5.0;
   const itersPerWorker = config.saIterations;
-  const coolingRate = Math.exp(Math.log(0.01 / tInit) / (0.8 * itersPerWorker));
+
+  // ── Per-worker hyperparam diversity ──
+  // Worker 0 = fastest cooling / most impatient (rapid basin hopper)
+  // Worker N-1 = slowest cooling / most patient (deep explorer)
+  // Spread is configurable; defaults give a 50x cooling range and 5x patience range.
+  const coolingSpread = (config as any).coolingSpread ?? 50;  // max/min cooling rate ratio
+  const patienceSpread = (config as any).patienceSpread ?? 5; // max/min patience ratio
+  const baseCoolingRate = Math.exp(Math.log(0.01 / tInit) / (0.8 * itersPerWorker));
+  const basePatience = Math.max(100_000, Math.floor(itersPerWorker * 0.1));
+
+  function workerCoolingRate(w: number): number {
+    // Spread cooling rates from baseCoolingRate (fastest) to baseCoolingRate/coolingSpread (slowest)
+    // t ∈ [0,1]: 0 = fastest worker, 1 = slowest worker
+    const t = numWorkers > 1 ? w / (numWorkers - 1) : 0;
+    // Higher coolingRate = faster cooling. We want spread across log scale.
+    const logFast = Math.log(Math.abs(baseCoolingRate));
+    const logSlow = logFast - Math.log(coolingSpread); // divide by spread → slower cooling
+    return Math.exp(logFast + t * (logSlow - logFast));
+  }
+
+  function workerPatience(w: number): number {
+    // Spread patience from basePatience/patienceSpread (impatient) to basePatience*patienceSpread (patient)
+    const t = numWorkers > 1 ? w / (numWorkers - 1) : 0;
+    const logBase = Math.log(basePatience);
+    const logSpread = Math.log(patienceSpread);
+    return Math.round(Math.exp(logBase + t * 2 * logSpread - logSpread));
+  }
 
   // Shared state
   let bestResult: RamseySearchResult | null = null;
@@ -200,14 +226,17 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
 
     // Build config for this worker (seeds need to be serialized as raw data)
     const seedGraph = seeds[w];
+    const wCoolingRate = workerCoolingRate(w);
+    const wPatience = workerPatience(w);
     const saConfigForWorker: any = {
       n: config.n,
       r: config.r,
       s: config.s,
       maxIterations: itersPerWorker,
       initialTemp: tInit,
-      coolingRate,
-      symmetry: config.symmetry, // Pass symmetry constraint to worker thread
+      coolingRate: wCoolingRate,
+      minPatience: wPatience,
+      symmetry: config.symmetry,
     };
 
     // Serialize the seed graph as raw Int8Array if present

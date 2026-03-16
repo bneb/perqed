@@ -45,7 +45,13 @@ export interface RamseySearchConfig {
    * For R(4,6) on n=35: reduces space from 2^595 → 2^17.
    * The known Exoo (1989) witness IS a circulant graph.
    */
+  /** Symmetry constraint */
   symmetry?: 'none' | 'circulant';
+  /**
+   * Reheat patience: iterations without improvement before adaptive reheat fires.
+   * Defaults to 10% of maxIterations. Lower = faster basin escape, higher = deeper search.
+   */
+  minPatience?: number;
 }
 
 export interface RamseySearchResult {
@@ -75,8 +81,8 @@ export function ramseySearch(
   // For circulant search, track distance colors (17 bits for N=35)
   let distanceColors: Map<number, number> | null = null;
   const maxDist = Math.floor(n / 2);
-  // Adaptive reheat: patience = % of budget, strength decays over time
-  const minPatience = Math.max(100_000, Math.floor(maxIterations * 0.1));
+  // Adaptive reheat patience — configurable per worker (default: 10% of budget)
+  const minPatience = config.minPatience ?? Math.max(100_000, Math.floor(maxIterations * 0.1));
 
   // Initialize: use seed graph, or random (circulant or unconstrained)
   let adj: AdjacencyMatrix;

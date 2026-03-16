@@ -27,6 +27,8 @@ self.onmessage = (event: MessageEvent) => {
       maxIterations: config.maxIterations,
       initialTemp: config.initialTemp,
       coolingRate: config.coolingRate,
+      symmetry: config.symmetry,
+      minPatience: config.minPatience, // per-worker patience from orchestrator
     };
 
     if (config.initialGraphRaw && config.initialGraphN) {
