@@ -1,0 +1,18 @@
+{
+  "name": "Gewirtz Graph",
+  "description": "SRG(56, 10, 0, 2) — The unique strongly regular graph on 56 vertices. 10-regular, lambda=0 (no two adjacent vertices share a neighbor), mu=2 (non-adjacent vertices share exactly 2 neighbors). Named after Allan Gewirtz (1969). This graph is triangle-free (lambda=0).",
+  "parameters": {
+    "v": 56,
+    "k": 10,
+    "lambda": 0,
+    "mu": 2
+  },
+  "eigenvalues": {
+    "k": { "value": 10, "multiplicity": 1 },
+    "r": { "value": 2, "multiplicity": 35 },
+    "s": { "value": -4, "multiplicity": 20 }
+  },
+  "targetTriangles": 0,
+  "known": true,
+  "notes": "Unique up to isomorphism. Also known as the Sims-Gewirtz graph. Can be constructed from the Steiner system S(3,6,22)."
+}

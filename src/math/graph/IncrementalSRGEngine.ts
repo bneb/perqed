@@ -72,6 +72,9 @@ export class IncrementalSRGEngine {
   private stageNC = 0; private stageND = 0;
   private stageDelta = 0;
 
+  /** Frozen edge mask: frozen[i*n+j] = 1 means edge (i,j) cannot be removed */
+  private frozen: Uint8Array;
+
   constructor(graph: AdjacencyMatrix, k: number, lambda: number, mu: number) {
     this.graph = graph.clone();
     this.k = k;
@@ -93,10 +96,23 @@ export class IncrementalSRGEngine {
     this.netDeltaTracker = new Uint32Array(this.n * this.n);
     this.dirtyPairs = new Int32Array(1024);
 
+    this.frozen = new Uint8Array(this.n * this.n);
+
     this.buildAdjList();
     this.buildFullCN();
     this.energy = this.computeEnergyFromCN();
     this.triangles = this.countTrianglesFromCN();
+  }
+
+  /** Mark edge (u,v) as frozen — it cannot be removed by swaps. */
+  freezeEdge(u: number, v: number): void {
+    this.frozen[u * this.n + v] = 1;
+    this.frozen[v * this.n + u] = 1;
+  }
+
+  /** Check if an edge is frozen. */
+  isFrozen(u: number, v: number): boolean {
+    return this.frozen[u * this.n + v] === 1;
   }
 
   /** Compute triangle count from CN cache: T = Σ_{(i,j)∈E} CN(i,j) / 3 */
@@ -258,6 +274,9 @@ export class IncrementalSRGEngine {
 
       if (a === c || a === d || b === c || b === d) continue;
       if (a === d && b === c) continue;
+
+      // Reject if removing a frozen edge
+      if (this.frozen[a * n + b] || this.frozen[c * n + d]) continue;
 
       if (!this.graph.hasEdge(a, c) && !this.graph.hasEdge(b, d)) {
         return this.computeDelta(a, b, c, d, a, c, b, d);
@@ -493,6 +512,7 @@ export class IncrementalSRGEngine {
   getGraph(): AdjacencyMatrix { return this.graph.clone(); }
   getCNCache(): Int32Array { return new Int32Array(this.cn); }
   getTriangleCount(): number { return this.triangles; }
+  getProposedTriangleDelta(): number { return this.stageTriangleDelta; }
 
   // ──────────────────────────────────────────────
   //  Legacy API

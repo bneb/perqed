@@ -1,0 +1,17 @@
+{
+  "name": "Conway 99",
+  "description": "SRG(99, 14, 1, 2) — Conway's $1,000 prize graph. Existence unknown.",
+  "parameters": {
+    "v": 99,
+    "k": 14,
+    "lambda": 1,
+    "mu": 2
+  },
+  "eigenvalues": {
+    "k": { "value": 14, "multiplicity": 1 },
+    "r": { "value": 4, "multiplicity": 22 },
+    "s": { "value": -3, "multiplicity": 76 }
+  },
+  "targetTriangles": 350,
+  "known": false
+}
