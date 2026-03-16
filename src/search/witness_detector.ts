@@ -25,6 +25,8 @@ export interface SearchConfig {
   r: number;
   s: number;
   saIterations: number;
+  workers: number;
+  strategy: "single" | "island_model";
 }
 
 // ──────────────────────────────────────────────
@@ -100,6 +102,11 @@ export function classifyProblem(description: string): ProblemClass {
 /**
  * Given a problem class, build the search configuration.
  * Returns null if the problem class is unknown or unsupported.
+ *
+ * Auto-scales concurrency:
+ *   - Small (≤20 vertices): single worker, 10M iterations
+ *   - Medium (21-30 vertices): 4 workers, 100M iterations each
+ *   - Large (>30 vertices): 8 workers, 500M iterations each
  */
 export function extractSearchConfig(pc: ProblemClass): SearchConfig | null {
   switch (pc.type) {
@@ -107,12 +114,27 @@ export function extractSearchConfig(pc: ProblemClass): SearchConfig | null {
       const { r, s, vertices } = pc.params;
       if (!r || !s || !vertices) return null;
 
-      // Scale iterations with search space complexity
-      const edges = vertices * (vertices - 1) / 2;
-      const baseIters = 10_000_000;
-      // Rough scaling: double iterations for every 50 edges beyond 50
-      const scaleFactor = Math.max(1, Math.pow(2, (edges - 50) / 50));
-      const saIterations = Math.round(baseIters * scaleFactor);
+      // Scale based on vertex count tiers
+      let saIterations: number;
+      let workers: number;
+      let strategy: "single" | "island_model";
+
+      if (vertices <= 20) {
+        // Small: single core is fast enough
+        saIterations = 10_000_000;
+        workers = 1;
+        strategy = "single";
+      } else if (vertices <= 30) {
+        // Medium: moderate parallelism
+        saIterations = 100_000_000;
+        workers = 4;
+        strategy = "island_model";
+      } else {
+        // Large: full parallelism, long budget
+        saIterations = 500_000_000;
+        workers = 8;
+        strategy = "island_model";
+      }
 
       return {
         type: "ramsey_sa",
@@ -120,6 +142,8 @@ export function extractSearchConfig(pc: ProblemClass): SearchConfig | null {
         r,
         s,
         saIterations,
+        workers,
+        strategy,
       };
     }
 

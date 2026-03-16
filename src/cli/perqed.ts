@@ -366,10 +366,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         r: searchConfig.r,
         s: searchConfig.s,
         sa_iterations: searchConfig.saIterations,
+        workers: searchConfig.workers,
+        strategy: searchConfig.strategy,
       };
       console.log(`\n🔍 Auto-detected constructive existence proof (∃)`);
       console.log(`   Problem class: ${problemClass.type}`);
-      console.log(`   Search config: ${searchConfig.n} vertices, R(${searchConfig.r},${searchConfig.s}), ${searchConfig.saIterations.toLocaleString()} iters`);
+      console.log(`   Search config: ${searchConfig.n}v, R(${searchConfig.r},${searchConfig.s}), ${searchConfig.saIterations.toLocaleString()} iters, ${searchConfig.workers} workers (${searchConfig.strategy})`);
     } else {
       console.log(`\n⚠️  Constructive existence detected but problem class unknown — skipping search phase`);
     }
@@ -390,13 +392,16 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       console.log(`   Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${iters.toLocaleString()} iters`);
       console.log(`   Strategy: ${sp.strategy ?? "single"}, Seed: ${sp.seed ?? "random"}, Workers: ${sp.workers ?? 1}\n`);
 
+      const workers = sp.workers ?? 1;
+      const strategy = sp.strategy ?? "single";
+
       const orchResult = orchestratedSearch({
         n: sp.vertices,
         r: sp.r,
         s: sp.s,
         saIterations: iters,
-        strategy: sp.strategy ?? "single",
-        workers: sp.workers ?? 1,
+        strategy,
+        workers,
         seed: sp.seed ?? "random",
         onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
           const pct = ((iter / iters) * 100).toFixed(1);
