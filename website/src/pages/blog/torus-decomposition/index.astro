@@ -7,11 +7,13 @@ vertex has three outgoing edges: one along each axis. The question is whether
 you can color those edges with three colors so that each color, taken alone,
 traces a single Hamiltonian cycle through the entire graph. This is the
 Directed Hamiltonian Torus Decomposition problem, posed by
-<a href="https://cs.stanford.edu/~knuth/papers/claude-cycles.pdf">Knuth</a>
+<a href="https://www-cs-faculty.stanford.edu/~knuth/papers/claude-cycles.pdf">Knuth</a>
 in early 2026.</p>
 
-<p>Constructions exist for odd grid sizes and even sizes ≥ 8, but the
-small even cases — 4×4×4 and 6×6×6 — fell through the cracks. We found
+<p>Claude Opus 4.6 <a href="https://www-cs-faculty.stanford.edu/~knuth/papers/claude-cycles.pdf">found a construction</a>
+for all odd grid sizes, GPT-5.4 Pro solved even sizes ≥ 8, and
+Aquino-Michaels further explored that construction — but the
+small even cases, 4×4×4 and 6×6×6, fell through the cracks. We found
 valid decompositions for both, and the Lean 4 kernel
 <a href="https://github.com/bneb/perqed/blob/main/projects/torus-decomposition/paper/torus_decomposition.pdf">proves they work</a>.</p>
 
