@@ -216,8 +216,22 @@ async function formulate(prompt: string, apiKey: string): Promise<RunConfig> {
     // Ollama or LanceDB not available — proceed without library context
   }
 
-  const result = await model.generateContent(FORMULATION_PREAMBLE + prompt + libraryContext);
-  return JSON.parse(result.response.text()) as RunConfig;
+  const doFormulate = async (previousError?: string) => {
+    let p = FORMULATION_PREAMBLE + prompt + libraryContext;
+    if (previousError) {
+      p += `\n\n## ⚠️ Previous Response Error\nYour last response caused this error:\n\`\`\`\n${previousError}\n\`\`\`\nPlease respond with a valid JSON object only. No markdown.`;
+    }
+    const result = await model.generateContent(p);
+    let text = result.response.text().trim();
+    if (text.startsWith("```json")) text = text.replace(/^```json/i, "");
+    else if (text.startsWith("```")) text = text.replace(/^```/, "");
+    if (text.endsWith("```")) text = text.replace(/```$/, "");
+    return JSON.parse(text.trim()) as RunConfig;
+  };
+
+  const config = await callSafe(doFormulate, 3, "ARCHITECT formulate");
+  if (!config) throw new Error("ARCHITECT failed to produce a valid run configuration after 3 attempts.");
+  return config;
 }
 
 // ──────────────────────────────────────────────
