@@ -205,13 +205,29 @@ export function ramseySearch(
     temp *= coolingRate;
     staleCount++;
 
-    // Adaptive reheat: fires only when stuck long enough, strength proportional to stale duration
-    if (staleCount >= minPatience) {
-      // Reheat strength: how much of the budget has been spent stuck?
-      const staleFraction = staleCount / maxIterations;
-      // Reheat to a fraction of initialTemp, proportional to how stuck we are
-      // staleFraction=0.1 → mild reheat (30% of T₀), staleFraction=0.5 → strong reheat (80% of T₀)
-      const reheatStrength = Math.min(0.9, 0.2 + staleFraction * 1.5);
+    // ── Adaptive reheat: dual-trigger ──
+    // Trigger 1 (patience): stuck long enough without improvement
+    // Trigger 2 (dead temp): T is near-zero but energy is still high
+    //   → fast-cooling workers (high coolingSpread) cool in <1% of budget;
+    //     without this they'd spend 99% frozen in a local minimum.
+    const tempRatio = temp / initialTemp;
+    const DEAD_TEMP_FRAC = 0.005;  // T < 0.5% of T₀ → "cold dead"
+    const tempIsDead = tempRatio < DEAD_TEMP_FRAC;
+    const isStale = staleCount >= minPatience;
+
+    if (isStale || tempIsDead) {
+      // Staleness component: how long have we been stuck (0 → mild, long → strong)
+      const staleFraction = Math.min(staleCount / maxIterations, 1.0);
+      const stalenessStrength = 0.15 + staleFraction * 1.5; // 0.15..1.65 (clamped below)
+
+      // Energy component: scale reheat by how far we are from E=0
+      // bestEnergy=0 → 0 bonus, bestEnergy=50 → ~0.15, saturates at 0.25
+      const energyBonus = Math.min(0.25, bestEnergy / 200);
+
+      // Dead-temp bonus: worker cooled too fast, needs a stronger kick
+      const deadTempBonus = tempIsDead && !isStale ? 0.15 : 0;
+
+      const reheatStrength = Math.min(0.92, stalenessStrength + energyBonus + deadTempBonus);
       temp = initialTemp * reheatStrength;
       staleCount = 0;
       reheatCount++;

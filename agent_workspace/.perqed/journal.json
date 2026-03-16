@@ -56,6 +56,14 @@
       "claim": "SA on K_35 R(4,6) converged at E_min=12 (attempt 1)",
       "evidence": "500,000,000 iters × 8 workers, strategy=island_model, seed=random",
       "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "0d454c10-da65-452e-8799-4533ad737468",
+      "timestamp": "2026-03-16T22:15:26.769Z",
+      "type": "lemma",
+      "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
+      "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
+      "target_goal": "R(4,6) >= 36"
     }
   ]
 }
