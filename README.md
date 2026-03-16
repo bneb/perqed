@@ -82,10 +82,9 @@ bun run src/scripts/generate_conjectures.ts
 
 | Role | Model | Tier | Purpose |
 |------|-------|------|---------| 
-| **Tactician** | `deepseek-r1:8b` | Local | Lean 4 tactic generation + JSON reasoning |
-| **Prover** | `deepseek-prover-v2:7b` | Local | Dedicated Lean 4 proof specialist (fallback) |
+| **Tactician** | `deepseek-prover-v2:7b-q8` | Local | Lean 4 tactic generation |
 | **Reasoner** | `gemini-2.5-flash` | Cloud (free) | Strategic unblock after tactic failures |
-| **Architect** | `gemini-3.1-flash-lite-preview` → `gemini-3.1-pro-preview` | Cloud (paid) | Proof planning, directives (escalates on failure) |
+| **Architect** | `gemini-2.5-flash` → `gemini-3.1-pro-preview` | Cloud | Proof planning, directives (escalates on failure) |
 | **Scribe** | `gemini-3.1-pro-preview` | Cloud (paid) | Lean 4 → AMS-LaTeX translation |
 | **Embedder** | `nomic-embed-text` | Local | 768-dim vectors for RAG |
 
