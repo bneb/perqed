@@ -1,12 +1,16 @@
 /**
- * Sprint 23: SimulatedAnnealing — Generalized Metropolis-Hastings Engine
+ * SimulatedAnnealing — Generalized Metropolis-Hastings Engine
  *
  * A pure, domain-agnostic implementation of Simulated Annealing.
  * Only interacts with the IState<T> interface — zero knowledge of
  * graphs, cycles, or any specific mathematical structure.
+ *
+ * Uses AnnealingSchedule for temperature management, so the same
+ * cooling/reheat logic is available to custom hot loops.
  */
 
 import type { IState } from "./IState";
+import { AnnealingSchedule } from "./AnnealingSchedule";
 
 export interface AnnealingResult<T> {
   bestState: IState<T>;
@@ -27,7 +31,7 @@ export interface AnnealingConfig {
   progressInterval?: number;
   /**
    * Enable adaptive reheating with energy-proportional temperature.
-   * When the chain stagnates, temperature is set to max(1, bestEnergy).
+   * When the chain stagnates, temperature is set to max(1, bestEnergy^0.4).
    * The stagnation window uses exponential backoff (doubles each reheat).
    * Set to the initial stagnation window size, or undefined to disable.
    */
@@ -56,17 +60,21 @@ export class SimulatedAnnealing {
       reheatInterval = 100_000,
     } = config;
 
+    // Delegate temperature management to AnnealingSchedule
+    const schedule = new AnnealingSchedule({
+      initialTemp,
+      coolingRate,
+      reheatWindow: adaptiveReheatWindow,
+      maxIterations,
+      legacyReheatTemp: reheatTemp,
+      legacyReheatInterval: reheatInterval,
+    });
+
     let currentState = initialState;
     let currentEnergy = currentState.getEnergy();
 
     let globalBestState = currentState;
     let globalBestEnergy = currentEnergy;
-
-    let temperature = initialTemp;
-    let itersSinceImprovement = 0;
-    let currentReheatWindow = adaptiveReheatWindow ?? reheatInterval;
-    const useAdaptiveReheat = adaptiveReheatWindow !== undefined;
-    const useLegacyReheat = !useAdaptiveReheat && reheatTemp !== undefined;
 
     for (let i = 0; i < maxIterations; i++) {
       if (currentEnergy === 0) {
@@ -74,47 +82,31 @@ export class SimulatedAnnealing {
       }
 
       const candidateState = currentState.mutate();
-      if (!candidateState) continue;
+      if (!candidateState) {
+        schedule.step();
+        continue;
+      }
 
       const candidateEnergy = candidateState.getEnergy();
       const deltaE = candidateEnergy - currentEnergy;
 
-      // Metropolis-Hastings acceptance criterion
-      if (deltaE < 0 || Math.random() < Math.exp(-deltaE / temperature)) {
+      // Metropolis-Hastings acceptance via schedule
+      if (deltaE < 0 || Math.random() < schedule.acceptProbability(deltaE)) {
         currentState = candidateState;
         currentEnergy = candidateEnergy;
 
         if (currentEnergy < globalBestEnergy) {
           globalBestEnergy = currentEnergy;
           globalBestState = currentState;
-          itersSinceImprovement = 0;
-          // Reset backoff window on genuine improvement
-          if (useAdaptiveReheat) {
-            currentReheatWindow = adaptiveReheatWindow!;
-          }
-          onImprovement?.(i, globalBestEnergy, temperature);
+          schedule.recordImprovement(globalBestEnergy);
+          onImprovement?.(i, globalBestEnergy, schedule.temp);
         }
       }
 
-      temperature *= coolingRate;
-      itersSinceImprovement++;
-
-      // Adaptive reheating: energy-proportional temperature with exponential backoff
-      if (useAdaptiveReheat && itersSinceImprovement >= currentReheatWindow) {
-        // Reheat to E^(2/5): power-law scaling across energy landscape
-        temperature = Math.max(1.0, Math.pow(globalBestEnergy, 0.4));
-        itersSinceImprovement = 0;
-        // Exponential backoff: wait longer before next reheat
-        currentReheatWindow = Math.min(currentReheatWindow * 2, maxIterations);
-      }
-      // Legacy fixed reheating (backward compatibility)
-      else if (useLegacyReheat && itersSinceImprovement >= reheatInterval) {
-        temperature = reheatTemp!;
-        itersSinceImprovement = 0;
-      }
+      schedule.step();
 
       if (onProgress && i > 0 && i % progressInterval === 0) {
-        onProgress(i, currentEnergy, globalBestEnergy, temperature);
+        onProgress(i, currentEnergy, globalBestEnergy, schedule.temp);
       }
     }
 
