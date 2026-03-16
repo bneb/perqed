@@ -192,7 +192,31 @@ async function formulate(prompt: string, apiKey: string): Promise<RunConfig> {
     },
   });
 
-  const result = await model.generateContent(FORMULATION_PREAMBLE + prompt);
+  // ── Librarian: inject relevant literature context ──
+  let libraryContext = "";
+  try {
+    const { LocalEmbedder } = await import("../embeddings/embedder");
+    const { VectorDatabase } = await import("../embeddings/vector_store");
+    const embedder = new LocalEmbedder();
+    const db = new VectorDatabase();
+    await db.initialize();
+
+    const queryVector = await embedder.embed(prompt);
+    if (queryVector.length > 0) {
+      const matches = await db.search(queryVector, 5);
+      if (matches.length > 0) {
+        libraryContext = "\n\n## Relevant Literature (from vector DB)\n\n";
+        matches.forEach((m, i) => {
+          libraryContext += `${i + 1}. **${m.theoremSignature}**\n   ${m.successfulTactic}\n\n`;
+        });
+        console.log(`📚 Librarian found ${matches.length} relevant premises`);
+      }
+    }
+  } catch {
+    // Ollama or LanceDB not available — proceed without library context
+  }
+
+  const result = await model.generateContent(FORMULATION_PREAMBLE + prompt + libraryContext);
   return JSON.parse(result.response.text()) as RunConfig;
 }
 

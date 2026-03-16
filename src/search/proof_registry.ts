@@ -73,13 +73,13 @@ export class RamseyProofGenerator implements ProofGenerator {
   }
 
   generateLatex(input: LatexGenInput): string {
-    const { theoremName, witness, params, problemDescription, wallTimeSeconds, iterations, ips } = input;
+    const { theoremName, witness, params, wallTimeSeconds, iterations, ips } = input;
     const n = params.n!;
     const r = params.r!;
     const s = params.s!;
     const matrix = adjToMatrix(witness);
 
-    // Build adjacency matrix display (compact upper triangle)
+    // Build adjacency matrix rows
     const adjRows: string[] = [];
     for (let i = 0; i < n; i++) {
       const row: string[] = [];
@@ -98,79 +98,100 @@ export class RamseyProofGenerator implements ProofGenerator {
 
     const date = new Date().toISOString().split("T")[0]!;
 
-    return `\\documentclass[11pt]{article}
-\\usepackage[margin=1in]{geometry}
-\\usepackage{amsmath, amssymb, amsthm}
-\\usepackage{booktabs}
-\\usepackage{array}
+    // For large matrices (n>20), use tabular instead of pmatrix
+    let matrixBlock: string;
+    if (n <= 20) {
+      matrixBlock = [
+        "{\\small",
+        "\\[",
+        "A = \\begin{pmatrix}",
+        ...adjRows,
+        "\\end{pmatrix}",
+        "\\]}",
+      ].join("\n");
+    } else {
+      matrixBlock = [
+        "{\\tiny",
+        "\\begin{center}",
+        `\\begin{tabular}{${"c".repeat(n)}}`,
+        ...adjRows,
+        "\\end{tabular}",
+        "\\end{center}}",
+      ].join("\n");
+    }
 
-\\newtheorem{theorem}{Theorem}
-\\newtheorem{lemma}[theorem]{Lemma}
+    const lines = [
+      "\\documentclass[11pt]{article}",
+      "\\usepackage[margin=1in]{geometry}",
+      "\\usepackage{amsmath, amssymb, amsthm}",
+      "\\usepackage{booktabs}",
+      "\\usepackage{array}",
+      "",
+      "\\newtheorem{theorem}{Theorem}",
+      "\\newtheorem{lemma}[theorem]{Lemma}",
+      "",
+      `\\title{Computer-Verified Proof: \\( R(${r},${s}) \\geq ${n + 1} \\)}`,
+      "\\author{Perqed Autonomous Proof Engine}",
+      `\\date{${date}}`,
+      "",
+      "\\begin{document}",
+      "\\maketitle",
+      "",
+      "\\begin{abstract}",
+      `We prove \\( R(${r},${s}) \\geq ${n + 1} \\) by constructing a ${n}-vertex graph \\( G \\)`,
+      `that contains no clique of size~${r} and no independent set of size~${s}.`,
+      `The witness was discovered by simulated annealing (${iterations.toLocaleString()} iterations,`,
+      `${ips.toLocaleString()} iterations/sec) and verified by the Lean~4 kernel`,
+      `via \\texttt{native\\_decide} in ${wallTimeSeconds.toFixed(1)}s.`,
+      "\\end{abstract}",
+      "",
+      "\\section{Statement}",
+      "",
+      "\\begin{theorem}",
+      `\\( R(${r},${s}) \\geq ${n + 1} \\).`,
+      "\\end{theorem}",
+      "",
+      "\\begin{proof}",
+      `We exhibit a graph \\( G \\) on \\( ${n} \\) vertices with \\( ${edgeCount} \\) edges such that:`,
+      "\\begin{enumerate}",
+      `  \\item \\( G \\) contains no complete subgraph \\( K_{${r}} \\) (no ${r}-clique), and`,
+      `  \\item the complement \\( \\overline{G} \\) contains no complete subgraph \\( K_{${s}} \\)`,
+      `        (equivalently, \\( G \\) has no independent set of size~${s}).`,
+      "\\end{enumerate}",
+      "Both properties are verified computationally by exhaustive enumeration",
+      `of all \\( \\binom{${n}}{${r}} \\) and \\( \\binom{${n}}{${s}} \\) subsets respectively,`,
+      "executed within the Lean~4 trusted kernel.",
+      "\\end{proof}",
+      "",
+      "\\section{Witness: Adjacency Matrix}",
+      "",
+      `The adjacency matrix \\( A \\) of the witness graph \\( G \\) on \\( ${n} \\) vertices:`,
+      "",
+      matrixBlock,
+      "",
+      "\\section{Verification}",
+      "",
+      "\\begin{table}[h]",
+      "\\centering",
+      "\\begin{tabular}{ll}",
+      "\\toprule",
+      "Property & Value \\\\",
+      "\\midrule",
+      `Lean 4 theorem & \\texttt{${theoremName}} \\\\`,
+      "Verification method & \\texttt{native\\_decide} \\\\",
+      `Wall time & ${wallTimeSeconds.toFixed(1)}s \\\\`,
+      `SA iterations & ${iterations.toLocaleString()} \\\\`,
+      `Throughput & ${ips.toLocaleString()} IPS \\\\`,
+      `Vertices & ${n} \\\\`,
+      `Edges & ${edgeCount} \\\\`,
+      "\\bottomrule",
+      "\\end{tabular}",
+      "\\end{table}",
+      "",
+      "\\end{document}",
+      "",
+    ];
 
-\\title{Computer-Verified Proof: \\( R(${r},${s}) \\geq ${n + 1} \\)}
-\\author{Perqed Autonomous Proof Engine}
-\\date{${date}}
-
-\\begin{document}
-\\maketitle
-
-\\begin{abstract}
-We prove \\( R(${r},${s}) \\geq ${n + 1} \\) by constructing a ${n}-vertex graph \\( G \\)
-that contains no clique of size~${r} and no independent set of size~${s}.
-The witness was discovered by simulated annealing (${iterations.toLocaleString()} iterations,
-${ips.toLocaleString()} iterations/sec) and verified by the Lean~4 kernel
-via \\texttt{native\\_decide} in ${wallTimeSeconds.toFixed(1)}s.
-\\end{abstract}
-
-\\section{Statement}
-
-\\begin{theorem}
-\\( R(${r},${s}) \\geq ${n + 1} \\).
-\\end{theorem}
-
-\\begin{proof}
-We exhibit a graph \\( G \\) on \\( ${n} \\) vertices with \\( ${edgeCount} \\) edges such that:
-\\begin{enumerate}
-  \\item \\( G \\) contains no complete subgraph \\( K_{${r}} \\) (no ${r}-clique), and
-  \\item the complement \\( \\overline{G} \\) contains no complete subgraph \\( K_{${s}} \\)
-        (equivalently, \\( G \\) has no independent set of size~${s}).
-\\end{enumerate}
-Both properties are verified computationally by exhaustive enumeration
-of all \\( \\binom{${n}}{${r}} \\) and \\( \\binom{${n}}{${s}} \\) subsets respectively,
-executed within the Lean~4 trusted kernel.
-\\end{proof}
-
-\\section{Witness: Adjacency Matrix}
-
-The adjacency matrix \\( A \\) of the witness graph \\( G \\) on \\( ${n} \\) vertices:
-
-{\\small
-\\[
-A = \\begin{pmatrix}
-${adjRows.join("\n")}
-\\end{pmatrix}
-\\]}
-
-\\section{Verification}
-
-\\begin{table}[h]
-\\centering
-\\begin{tabular}{ll}
-\\toprule
-Property & Value \\\\
-\\midrule
-Lean 4 theorem & \\texttt{${theoremName}} \\\\
-Verification method & \\texttt{native\\_decide} \\\\
-Wall time & ${wallTimeSeconds.toFixed(1)}s \\\\
-SA iterations & ${iterations.toLocaleString()} \\\\
-Throughput & ${ips.toLocaleString()} IPS \\\\
-Vertices & ${n} \\\\
-Edges & ${edgeCount} \\\\
-\\bottomrule
-\\end{tabular}
-\\end{table}
-
-\\end{document}
-`;
+    return lines.join("\n");
   }
 }
