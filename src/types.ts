@@ -35,6 +35,10 @@ export interface RoutingSignals {
   lastErrors: string[];
   /** True if an architect directive file exists (active guidance). */
   hasArchitectDirective: boolean;
+  /** Middle-Out: count of consecutive identical error messages. */
+  identicalErrorCount: number;
+  /** Middle-Out: cumulative TACTICIAN invocations in this run. */
+  totalTacticianCalls: number;
 }
 
 // ──────────────────────────────────────────────

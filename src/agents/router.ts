@@ -4,17 +4,19 @@
  * Pure function. No I/O, no side effects. Analyzes telemetry
  * signals to determine which specialist should handle the next move.
  *
- * 4-Tier Escalation (evaluated top-to-bottom):
+ * 5-Tier Escalation (evaluated top-to-bottom):
  *   1. Initial state (no attempts)                → ARCHITECT (build proof plan)
- *   2. 6+ global tree failures                    → ARCHITECT (break glass / structural rethink)
- *   3. 3+ local failures / stuck / multigoal      → REASONER  (tactical unblock)
- *   4. Default                                     → TACTICIAN (fast tactic spray)
+ *   2. Middle-Out tripwires (budget/stuck)         → ARCHITECT (forced strategic review)
+ *   3. 6+ global tree failures                    → ARCHITECT (break glass / structural rethink)
+ *   4. 3+ local failures / stuck / multigoal      → REASONER  (tactical unblock)
+ *   5. Default                                     → TACTICIAN (fast tactic spray)
  *
  * The ARCHITECT sees global tree health; the REASONER sees local node state.
  * Gemini tier selection is handled by the AgentFactory, not the router.
  */
 
 import type { AgentRole, RoutingSignals } from "../types";
+import { MAX_TACTIC_ATTEMPTS, MAX_IDENTICAL_ERRORS } from "./failure_digest";
 
 export class AgentRouter {
 
@@ -30,7 +32,15 @@ export class AgentRouter {
       return "ARCHITECT";
     }
 
-    // ── Priority 2: Global tree failure (N=6+) — Architect must intervene structurally ──
+    // ── Priority 2: Middle-Out Tripwires — deterministic forced escalation ──
+    if (signals.totalTacticianCalls >= MAX_TACTIC_ATTEMPTS) {
+      return "ARCHITECT";
+    }
+    if (signals.identicalErrorCount >= MAX_IDENTICAL_ERRORS) {
+      return "ARCHITECT";
+    }
+
+    // ── Priority 3: Global tree failure (N=6+) — Architect must intervene structurally ──
     // Requires BOTH global tree health to be poor AND an active local crisis
     // (consecutive failures >= 6). Prevents infinite ARCHITECT loops when
     // tree-accumulated errors persist after a DIRECTIVE reset.
@@ -38,7 +48,7 @@ export class AgentRouter {
       return "ARCHITECT";
     }
 
-    // ── Priority 3: Struggling (3+) — Reasoner analyzes and unblocks ──
+    // ── Priority 4: Struggling (3+) — Reasoner analyzes and unblocks ──
     if (
       signals.consecutiveFailures >= 3 ||
       signals.isStuckInLoop ||
@@ -47,7 +57,7 @@ export class AgentRouter {
       return "REASONER";
     }
 
-    // ── Priority 4: Normal operation — Tactician fires fast tactics ──
+    // ── Priority 5: Normal operation — Tactician fires fast tactics ──
     return "TACTICIAN";
   }
 

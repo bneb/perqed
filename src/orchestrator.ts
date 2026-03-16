@@ -169,6 +169,28 @@ export function buildRoutingSignals(
   // Parse goal count from Lean tactic state
   const goalCount = AgentRouter.parseGoalCount(tacticState);
 
+  // Middle-Out: count consecutive identical errors from the tail
+  let identicalErrorCount = 0;
+  if (attemptLogs.length > 0) {
+    const lastLog = attemptLogs[attemptLogs.length - 1]!;
+    if (!lastLog.success && lastLog.error) {
+      identicalErrorCount = 1;
+      for (let i = attemptLogs.length - 2; i >= 0; i--) {
+        const log = attemptLogs[i]!;
+        if (!log.success && log.error === lastLog.error) {
+          identicalErrorCount++;
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  // Middle-Out: count total TACTICIAN invocations
+  const totalTacticianCalls = attemptLogs.filter(
+    (l) => l.agent === "TACTICIAN",
+  ).length;
+
   return {
     totalAttempts,
     consecutiveFailures,
@@ -177,6 +199,8 @@ export function buildRoutingSignals(
     isStuckInLoop,
     lastErrors,
     hasArchitectDirective,
+    identicalErrorCount,
+    totalTacticianCalls,
   };
 }
 
