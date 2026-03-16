@@ -63,7 +63,7 @@ Perqed is a computational math pipeline: **SA search → witness → Lean 4 proo
 
 | Project | Result | Path |
 |---------|--------|------|
-| Erdős-Gyárfás n=4 | Proved (4-cycle in min-deg-3 graphs) | `projects/erdos-gyarfas/` |
+| Erdős-Gyárfás n=4 | Base case only (trivial: K₄ has 4-cycle) | `projects/erdos-gyarfas/` |
 | Torus Decomposition | Proved (m=4, m=6 Knuth torus) | `projects/torus-decomposition/` |
 | Conway 99 | Paused at E≈4000 (SA floor) | `projects/conway99/` |
 
@@ -74,3 +74,23 @@ Perqed is a computational math pipeline: **SA search → witness → Lean 4 proo
 3. Frozen anchor eliminates isomorphic paths with zero IPS cost
 4. Larger move operators (3-edge, 4-edge) needed for hard landscapes
 5. Calibrate on known instances before attacking open problems
+
+## Agent Sandbox Pattern
+
+**DO NOT build directly in `src/` or `projects/`.** Use the sandbox:
+
+```
+agent_workspace/runs/<run-id>/
+├── objective.md          # What to prove/find
+├── scratch/              # Working scripts, experiments, temp files
+├── verified_lib/         # Lean proofs (once they compile)
+├── lab_log.md            # Running log of attempts and results
+└── domain_skills/        # Problem-specific reference material
+```
+
+### Rules
+1. **All new code goes in `agent_workspace/runs/<run-id>/`** — never pollute `src/` or `projects/`
+2. Import from `src/math/graph/` to reuse the core library (use relative paths like `../../../../src/math/graph/AdjacencyMatrix`)
+3. Write tests in `scratch/` — they won't interfere with the main `bun test` suite
+4. When a run produces a verified result, the **user** promotes it to `projects/<name>/` via `/archive-project`
+5. Use `lab_log.md` to record every experiment, hypothesis, and result
