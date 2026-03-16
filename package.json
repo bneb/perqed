@@ -3,6 +3,10 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "perqed": "bun run src/cli/perqed.ts",
+    "perqed:run": "bun run src/cli/run.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
