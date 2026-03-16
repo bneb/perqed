@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# perqed — entry point
+exec bun run "$(dirname "$0")/src/cli/perqed.ts" "$@"
