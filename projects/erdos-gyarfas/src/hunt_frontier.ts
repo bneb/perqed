@@ -12,8 +12,8 @@
  *   bun run src/scripts/hunt_frontier.ts 20 1000000  # 1M iterations
  */
 
-import { EnergyCalculator } from "../math/energy_calculator";
-import { GraphMutator } from "../math/graph_mutator";
+import { EnergyCalculator } from "./energy_calculator";
+import { GraphMutator } from "./graph_mutator";
 import * as fs from "node:fs/promises";
 import { join } from "node:path";
 
@@ -72,7 +72,7 @@ async function runSimulatedAnnealing(n: number, maxIterations: number) {
       console.log("═══════════════════════════════════════════════\n");
 
       // Write to file
-      const dataDir = join(import.meta.dir, "../../data");
+      const dataDir = join(import.meta.dir, "../data");
       await fs.mkdir(dataDir, { recursive: true });
       await fs.writeFile(
         join(dataDir, "counterexample.json"),

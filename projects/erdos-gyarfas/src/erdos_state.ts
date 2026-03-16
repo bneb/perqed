@@ -6,7 +6,7 @@
  * and immutability guarantees via deep cloning.
  */
 
-import type { IState } from "./optim/IState";
+import type { IState } from "../../../src/math/optim/IState";
 import { EnergyCalculator } from "./energy_calculator";
 import { GraphMutator } from "./graph_mutator";
 

@@ -15,7 +15,7 @@
 
 import { join } from "node:path";
 import * as fs from "node:fs/promises";
-import { ScribeAgent } from "../agents/scribe";
+import { ScribeAgent } from "../../../src/agents/scribe";
 
 // ──────────────────────────────────────────────
 // Configuration
@@ -261,8 +261,8 @@ async function main() {
 
     const latex = await scribe.draftPaper(theorem, syntheticPath);
 
-    await fs.mkdir("./data", { recursive: true });
-    const outputPath = "./data/erdos_gyarfas_paper.tex";
+    await fs.mkdir(join(import.meta.dir, "../data"), { recursive: true });
+    const outputPath = join(import.meta.dir, "../data/erdos_gyarfas_paper.tex");
     await fs.writeFile(outputPath, latex, "utf-8");
     console.log(`   📄 Paper written to ${outputPath} (${latex.split("\n").length} lines)`);
   }

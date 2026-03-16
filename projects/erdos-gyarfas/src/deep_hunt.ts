@@ -10,9 +10,9 @@
  *   bun run src/scripts/deep_hunt.ts 24 5 100000 # 5 restarts × 100K iters
  */
 
-import { SimulatedAnnealing } from "../math/optim/SimulatedAnnealing";
-import { ErdosState } from "../math/erdos_state";
-import { HunterTelemetry } from "../telemetry/hunter_telemetry";
+import { SimulatedAnnealing } from "../../../src/math/optim/SimulatedAnnealing";
+import { ErdosState } from "./erdos_state";
+import { HunterTelemetry } from "../../../src/telemetry/hunter_telemetry";
 import * as fs from "node:fs/promises";
 import { join } from "node:path";
 
@@ -93,7 +93,7 @@ async function runDeepHunt() {
       console.log(`  Graph: ${JSON.stringify(ultimateBestGraph)}`);
       console.log("═══════════════════════════════════════════════\n");
 
-      const dataDir = join(import.meta.dir, "../../data");
+      const dataDir = join(import.meta.dir, "../data");
       await fs.mkdir(dataDir, { recursive: true });
       await fs.writeFile(
         join(dataDir, "counterexample.json"),
