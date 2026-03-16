@@ -408,6 +408,9 @@ async function callSafe<T>(
   label = "call",
 ): Promise<T | null> {
   let lastError: string | undefined;
+  const BASE_DELAY_MS = 1000;
+  const MAX_DELAY_MS = 30_000;
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await fn(lastError);
@@ -415,7 +418,12 @@ async function callSafe<T>(
       lastError = String(err);
       console.log(`   ⚠️  ${label} attempt ${attempt}/${maxRetries} failed: ${lastError.slice(0, 100)}`);
       if (attempt < maxRetries) {
-        console.log(`   🔄 Retrying with error context...`);
+        // Exponential backoff with ±25% jitter
+        const base = Math.min(BASE_DELAY_MS * Math.pow(2, attempt - 1), MAX_DELAY_MS);
+        const jitter = base * 0.25 * (Math.random() * 2 - 1);
+        const delay = Math.round(base + jitter);
+        console.log(`   🔄 Retrying with error context in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }

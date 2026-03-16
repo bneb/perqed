@@ -126,6 +126,8 @@ export class GeminiAgent {
    */
   async generateMove(contextWindow: string, retries: number = 3): Promise<any> {
     let lastError = "";
+    const BASE_DELAY_MS = 1000;
+    const MAX_DELAY_MS = 30_000;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -139,6 +141,15 @@ export class GeminiAgent {
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);
         console.log(`   ⚠️ [GeminiAgent:${this.role}] attempt ${attempt}/${retries} failed: ${lastError}`);
+
+        if (attempt < retries) {
+          // Exponential backoff with ±25% jitter
+          const base = Math.min(BASE_DELAY_MS * Math.pow(2, attempt - 1), MAX_DELAY_MS);
+          const jitter = base * 0.25 * (Math.random() * 2 - 1); // ±25%
+          const delay = Math.round(base + jitter);
+          console.log(`   ⏳ [GeminiAgent:${this.role}] backing off ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
     }
 
