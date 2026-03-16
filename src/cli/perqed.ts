@@ -22,7 +22,7 @@ import { AgentFactory } from "../agents/factory";
 import { runDynamicLoop } from "../orchestrator";
 import { adjToMatrix } from "../search/ramsey_worker";
 import { orchestratedSearch } from "../search/ramsey_orchestrator";
-import { generateRamseyLean } from "../codegen/lean_codegen";
+import { ProofRegistry } from "../search/proof_registry";
 import {
   buildSearchFailureDigest,
   formatSearchDigestForArchitect,
@@ -330,9 +330,9 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   // ── Auto-detect constructive existence proofs ──
   const needsSearch = isConstructiveExistence(config.theorem_signature);
   let searchPhase: SearchPhase | null = null;
+  let problemClass = classifyProblem(config.problem_description);
 
   if (needsSearch) {
-    const problemClass = classifyProblem(config.problem_description);
     const searchConfig = extractSearchConfig(problemClass);
 
     if (searchConfig) {
@@ -388,20 +388,28 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       }
 
       if (result.witness) {
-        console.log(`   🏆 WITNESS FOUND! E=0 at iteration ${result.iterations.toLocaleString()}\n`);
-
         // Save witness as JSON
         const matrix = adjToMatrix(result.witness);
         const witnessPath = join(workspace.paths.scratch, "witness.json");
         await Bun.write(witnessPath, JSON.stringify({ n: sp.vertices, r: sp.r, s: sp.s, adjacency: matrix }, null, 2));
-        console.log(`   📁 Witness saved: ${witnessPath}`);
 
-        // Generate Lean proof
-        const leanSource = generateRamseyLean(config.theorem_name, sp.vertices, sp.r, sp.s, matrix);
+        // Generate Lean proof via registry
+        const registry = ProofRegistry.withDefaults();
+        const generator = registry.getGenerator(problemClass.type);
+        if (!generator) {
+          console.log(`\n❌ No proof generator for problem class: ${problemClass.type}`);
+          break;
+        }
+
+        const proofInput = {
+          theoremName: config.theorem_name,
+          witness: result.witness,
+          params: { r: sp.r, s: sp.s, n: sp.vertices },
+        };
+
+        const leanSource = generator.generateLean(proofInput);
         const leanPath = join(workspace.paths.verifiedLib, `${config.theorem_name}.lean`);
         await Bun.write(leanPath, leanSource);
-        console.log(`   📜 Lean proof generated: ${leanPath}`);
-        console.log(`   ⏳ Verifying with Lean kernel...\n`);
 
         // Verify with Lean
         const proc = Bun.spawn(["lake", "env", "lean", leanPath], {
@@ -413,29 +421,62 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         const stderr = await new Response(proc.stderr).text();
 
         if (exitCode === 0) {
-          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          const elapsed = ((Date.now() - startTime) / 1000);
+
+          // Generate LaTeX proof document
+          const latexSource = generator.generateLatex({
+            ...proofInput,
+            problemDescription: config.problem_description,
+            wallTimeSeconds: elapsed,
+            iterations: result.iterations,
+            ips: result.ips,
+          });
+          const latexPath = join(workspace.paths.verifiedLib, `${config.theorem_name}.tex`);
+          await Bun.write(latexPath, latexSource);
+
+          // Compile to PDF via tectonic
+          let pdfPath: string | null = null;
+          try {
+            const tectonic = Bun.spawn(["tectonic", latexPath], {
+              cwd: workspace.paths.verifiedLib,
+              stdout: "pipe",
+              stderr: "pipe",
+            });
+            const texExit = await tectonic.exited;
+            if (texExit === 0) {
+              pdfPath = latexPath.replace(".tex", ".pdf");
+            }
+          } catch { /* tectonic not installed — skip PDF */ }
+
+          // ── Success Blurb ──
+          console.log();
           console.log("══════════════════════════════════════════════");
-          console.log(`  🏆 VERIFIED: ${config.theorem_name} proved in ${elapsed}s`);
-          console.log(`  Witness: ${sp.vertices}-vertex graph, R(${sp.r},${sp.s}) ≥ ${sp.vertices + 1}`);
-          console.log(`  Attempts: ${attempt}`);
-          console.log("══════════════════════════════════════════════\n");
+          console.log(`  ✅ PROVED: R(${sp.r},${sp.s}) ≥ ${sp.vertices + 1}`);
+          console.log(`  ${sp.vertices}-vertex witness verified by Lean 4 kernel in ${elapsed.toFixed(1)}s`);
+          console.log();
+          console.log(`  Lean proof:  ${leanPath}`);
+          console.log(`  LaTeX proof: ${latexPath}`);
+          if (pdfPath) console.log(`  PDF:         ${pdfPath}`);
+          console.log("══════════════════════════════════════════════");
+          console.log();
           return;
         } else {
-          console.log(`   ⚠️  Lean verification failed: ${stderr.slice(0, 200)}`);
+          console.log(`\n❌ Lean verification failed: ${stderr.slice(0, 200)}`);
           console.log(`   Falling back to tactic search...\n`);
-          break; // Exit search loop, try tactic phase
+          break;
         }
       }
 
-      // ── SEARCH FAILED: Build digest and escalate to ARCHITECT ──
-      console.log(`   ❌ No witness found (best E=${result.bestEnergy})`);
+      // ── SEARCH FAILED: Build digest and escalate ──
 
       if (attempt >= MAX_ARCHITECT_PIVOTS) {
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`\n══════════════════════════════════════════════`);
-        console.log(`  ❌ ALL ${MAX_ARCHITECT_PIVOTS} SEARCH ATTEMPTS EXHAUSTED after ${elapsed}s`);
-        console.log(`  Best energy ever: ${result.bestEnergy}`);
-        console.log(`══════════════════════════════════════════════\n`);
+        console.log();
+        console.log("══════════════════════════════════════════════");
+        console.log(`  ❌ FAILED: Could not find witness for R(${sp.r},${sp.s}) ≥ ${sp.vertices + 1}`);
+        console.log(`  ${MAX_ARCHITECT_PIVOTS} attempts exhausted in ${elapsed}s (best E=${result.bestEnergy})`);
+        console.log("══════════════════════════════════════════════");
+        console.log();
         return;
       }
 
