@@ -302,13 +302,14 @@ async function requestSearchPivot(
   apiKey: string,
   digestText: string,
   currentConfig: SearchPhase,
+  previousError?: string,
 ): Promise<SearchPhase | null> {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
       systemInstruction:
-        "You are the Perqed Search Orchestrator. Output an updated search_phase JSON.",
+        "You are the Perqed Search Orchestrator. Output an updated search_phase JSON object only. No markdown, no code blocks.",
       generationConfig: {
         temperature: 0.2,
         responseMimeType: "application/json",
@@ -316,15 +317,24 @@ async function requestSearchPivot(
       },
     });
 
-    const prompt = SEARCH_PIVOT_PREAMBLE +
+    let prompt = SEARCH_PIVOT_PREAMBLE +
       `## Current Configuration\n\`\`\`json\n${JSON.stringify(currentConfig, null, 2)}\n\`\`\`\n\n` +
       `## SearchFailureDigest\n${digestText}`;
 
+    if (previousError) {
+      prompt += `\n\n## ⚠️ Previous Response Error\nYour last response caused this error and was rejected:\n\`\`\`\n${previousError}\n\`\`\`\nPlease respond with a plain JSON object only. No markdown, no code fences.`;
+    }
+
     const result = await model.generateContent(prompt);
-    return JSON.parse(result.response.text()) as SearchPhase;
+    let text = result.response.text().trim();
+    // Strip any markdown code fences the model added despite instructions
+    if (text.startsWith("```json")) text = text.replace(/^```json/i, "");
+    else if (text.startsWith("```")) text = text.replace(/^```/, "");
+    if (text.endsWith("```")) text = text.replace(/```$/, "");
+
+    return JSON.parse(text.trim()) as SearchPhase;
   } catch (err) {
-    console.error("   ❌ ARCHITECT pivot failed:", err);
-    return null;
+    throw err; // Caller handles retries
   }
 }
 
@@ -519,14 +529,30 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       console.log(`   💡 ${digest.diagnosis.recommendation.slice(0, 120)}...`);
       console.log(`\n   🏛️  Asking ARCHITECT for search pivot...\n`);
 
-      // Ask ARCHITECT for a new search config
-      const pivotedConfig = await requestSearchPivot(apiKey, digestText, sp);
+      // Ask ARCHITECT for a new search config — retry up to 3 times,
+      // feeding each error back into the next prompt
+      const MAX_PIVOT_RETRIES = 3;
+      let pivotedConfig: SearchPhase | null = null;
+      let lastPivotError: string | undefined;
+      for (let pivotAttempt = 1; pivotAttempt <= MAX_PIVOT_RETRIES; pivotAttempt++) {
+        try {
+          pivotedConfig = await requestSearchPivot(apiKey, digestText, sp, lastPivotError);
+          break; // Success
+        } catch (err) {
+          lastPivotError = String(err);
+          console.log(`   ⚠️  Pivot attempt ${pivotAttempt}/${MAX_PIVOT_RETRIES} failed: ${lastPivotError.slice(0, 80)}`);
+          if (pivotAttempt < MAX_PIVOT_RETRIES) {
+            console.log(`   🔄 Retrying with error context...`);
+          }
+        }
+      }
+
       if (pivotedConfig) {
         sp = pivotedConfig;
         console.log(`   ✅ ARCHITECT pivoted:`);
         console.log(`      Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${(sp.sa_iterations ?? 10_000_000).toLocaleString()} iters`);
       } else {
-        console.log(`   ❌ ARCHITECT could not produce a pivot. Aborting search.`);
+        console.log(`   ❌ ARCHITECT could not produce a pivot after ${MAX_PIVOT_RETRIES} attempts. Aborting search.`);
         break;
       }
     }
