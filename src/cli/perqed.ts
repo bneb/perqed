@@ -29,8 +29,8 @@ import {
 } from "../search/search_failure_digest";
 import {
   isConstructiveExistence,
-  classifyProblem,
   extractSearchConfig,
+  type ArchitectSearchConfig,
 } from "../search/witness_detector";
 import { TreePrinter } from "../utils/tree_printer";
 
@@ -95,6 +95,8 @@ export interface RunConfig {
   max_iterations: number;
   objective_md: string;
   domain_skills_md: string;
+  /** Structured search config emitted by the ARCHITECT — no regex needed */
+  search_config: ArchitectSearchConfig;
 }
 
 const RUN_CONFIG_SCHEMA = {
@@ -128,10 +130,35 @@ const RUN_CONFIG_SCHEMA = {
       type: SchemaType.STRING as const,
       description: "Problem-specific tips and tactics for the TACTICIAN.",
     },
+    search_config: {
+      type: SchemaType.OBJECT as const,
+      description: "Structured search configuration. problem_class must be 'ramsey_coloring' or 'unknown'.",
+      properties: {
+        problem_class: {
+          type: SchemaType.STRING as const,
+          enum: ["ramsey_coloring", "unknown"],
+        },
+        domain_size: { type: SchemaType.NUMBER as const },
+        num_colors: { type: SchemaType.NUMBER as const },
+        forbidden_subgraphs: {
+          type: SchemaType.ARRAY as const,
+          items: {
+            type: SchemaType.OBJECT as const,
+            properties: {
+              color: { type: SchemaType.NUMBER as const },
+              clique_size: { type: SchemaType.NUMBER as const },
+            },
+            required: ["color", "clique_size"],
+          },
+        },
+      },
+      required: ["problem_class"],
+    },
   },
   required: [
     "run_name", "problem_description", "theorem_name",
     "theorem_signature", "max_iterations", "objective_md", "domain_skills_md",
+    "search_config",
   ],
 };
 
@@ -150,22 +177,43 @@ Your job is to produce a structured run configuration that the Perqed proof engi
 3. **objective_md**: A detailed markdown description of the problem for the TACTICIAN agents
 4. **domain_skills_md**: Problem-specific tactical advice (which Lean tactics work for this class of problem, common pitfalls)
 5. **max_iterations**: How many orchestrator iterations to budget
+6. **search_config**: Structured parameters for the search engine (REQUIRED — see below)
+
+## search_config (CRITICAL)
+
+If the problem requires constructing a witness (∃ in the theorem signature), you must populate search_config:
+
+For Ramsey lower bounds R(r,s) ≥ n (i.e., construct a 2-coloring of K_{n-1}):
+\`\`\`json
+{
+  "problem_class": "ramsey_coloring",
+  "domain_size": <n-1>,
+  "num_colors": 2,
+  "forbidden_subgraphs": [
+    { "color": 0, "clique_size": <r> },
+    { "color": 1, "clique_size": <s> }
+  ]
+}
+\`\`\`
+
+For problems that do NOT require a constructive witness:
+\`\`\`json
+{ "problem_class": "unknown" }
+\`\`\`
 
 ## Important Rules
 
 - The theorem must be **formally expressible** in Lean 4 using Fin types, Bool functions, or Nat
 - For graph theory problems, encode graphs as \`Fin n → Fin n → Bool\` (adjacency function)
-- For Ramsey lower bounds, the theorem should state: "there exists a 2-coloring of K_n with no monochromatic K_r and no monochromatic independent set of size s"
+- For Ramsey lower bounds R(r,s) ≥ n, the theorem states: ∃ coloring of K_{n-1} with no red K_r and no blue K_s
 - Break large problems into decidable finite instances when possible
-- If the problem requires a witness (constructive existence), structure the theorem accordingly
 - Include relevant Mathlib imports if needed, but prefer self-contained proofs
 
 ## Available Infrastructure
 
 The Perqed engine has:
-- Simulated Annealing search engine (graph-level, ~500K IPS)
-- IncrementalSRGEngine with O(k) CN delta, triangle tracking, frozen anchors
-- Multi-core Island Model orchestrator (10 workers, ~3.2M IPS)
+- Simulated Annealing search engine (graph-level, ~500K IPS per core)
+- Multi-core Island Model orchestrator (8 workers, ~4M IPS total)
 - Lean 4 kernel verification via \`decide\` tactic
 - DeepSeek Prover (local) + Gemini (cloud) multi-agent tactic search
 
@@ -400,12 +448,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   const MAX_ARCHITECT_PIVOTS = 5;
 
   // ── Auto-detect constructive existence proofs ──
-  const needsSearch = isConstructiveExistence(config.theorem_signature);
+  const needsSearch = isConstructiveExistence(config.theorem_signature)
+    && config.search_config?.problem_class !== "unknown";
   let searchPhase: SearchPhase | null = null;
-  let problemClass = classifyProblem(config.problem_description);
 
   if (needsSearch) {
-    const searchConfig = extractSearchConfig(problemClass);
+    const searchConfig = extractSearchConfig(config.search_config);
 
     if (searchConfig) {
       searchPhase = {
@@ -418,7 +466,7 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         strategy: searchConfig.strategy,
       };
       console.log(`\n🔍 Auto-detected constructive existence proof (∃)`);
-      console.log(`   Problem class: ${problemClass.type}`);
+      console.log(`   Problem class: ${config.search_config.problem_class}`);
       console.log(`   Search config: ${searchConfig.n}v, R(${searchConfig.r},${searchConfig.s}), ${searchConfig.saIterations.toLocaleString()} iters, ${searchConfig.workers} workers (${searchConfig.strategy})`);
     } else {
       console.log(`\n⚠️  Constructive existence detected but problem class unknown — skipping search phase`);
@@ -472,9 +520,10 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
 
         // Generate Lean proof via registry
         const registry = ProofRegistry.withDefaults();
-        const generator = registry.getGenerator(problemClass.type);
+        const proofClass = config.search_config.problem_class === "ramsey_coloring" ? "ramsey" : config.search_config.problem_class;
+        const generator = registry.getGenerator(proofClass);
         if (!generator) {
-          console.log(`\n❌ No proof generator for problem class: ${problemClass.type}`);
+          console.log(`\n❌ No proof generator for problem class: ${proofClass}`);
           break;
         }
 

@@ -1,141 +1,108 @@
 /**
- * Witness Detection Tests — TDD Red-to-Green
+ * witness_detector tests — TDD (red → green)
  *
- * Tests the general-purpose constructive existence detection:
- *   1. isConstructiveExistence: detects ∃ in theorem signatures
- *   2. classifyProblem: maps problem descriptions to problem classes
- *   3. extractSearchConfig: produces search config from problem class + params
+ * Tests the new architecture: structured SearchConfig from ARCHITECT JSON,
+ * no regex parsing of English descriptions.
  */
 
 import { describe, test, expect } from "bun:test";
 import {
   isConstructiveExistence,
-  classifyProblem,
   extractSearchConfig,
-  type ProblemClass,
-  type SearchConfig,
+  type ArchitectSearchConfig,
 } from "../src/search/witness_detector";
 
-// ──────────────────────────────────────────────
-// isConstructiveExistence
-// ──────────────────────────────────────────────
-
-describe("WitnessDetector — isConstructiveExistence", () => {
-
-  test("detects ∃ at start of signature", () => {
-    const sig = ": ∃ (G : Fin 17 → Fin 17 → Bool), ...";
+describe("isConstructiveExistence", () => {
+  test("detects ∃ with leading colon (ARCHITECT output style)", () => {
+    const sig = ": ∃ (coloring : Fin 35 → Fin 35 → Bool), ...";
     expect(isConstructiveExistence(sig)).toBe(true);
   });
 
-  test("detects ∃ with leading colon and whitespace", () => {
-    const sig = " : ∃ (G : Fin 5 → Fin 5 → Bool), ...";
-    expect(isConstructiveExistence(sig)).toBe(true);
+  test("detects bare ∃", () => {
+    expect(isConstructiveExistence("∃ x : Nat, x > 0")).toBe(true);
   });
 
-  test("returns false for ∀ (universal, not constructive)", () => {
-    const sig = ": ∀ (n : Nat), n + 0 = n";
-    expect(isConstructiveExistence(sig)).toBe(false);
+  test("detects Exists keyword", () => {
+    expect(isConstructiveExistence("Exists (fun x => x > 0)")).toBe(true);
   });
 
-  test("returns false for plain equality", () => {
-    const sig = ": 2 + 2 = 4";
-    expect(isConstructiveExistence(sig)).toBe(false);
-  });
-
-  test("detects Exists keyword (ASCII alternative)", () => {
-    const sig = ": Exists (fun G => ...)";
-    expect(isConstructiveExistence(sig)).toBe(true);
+  test("rejects non-existence statements", () => {
+    expect(isConstructiveExistence("∀ x : Nat, x ≥ 0")).toBe(false);
+    expect(isConstructiveExistence(": (n : Nat) → n + 0 = n")).toBe(false);
   });
 });
 
-// ──────────────────────────────────────────────
-// classifyProblem
-// ──────────────────────────────────────────────
+describe("extractSearchConfig — ramsey_coloring", () => {
+  const ramseyConfig: ArchitectSearchConfig = {
+    problem_class: "ramsey_coloring",
+    domain_size: 35,
+    num_colors: 2,
+    forbidden_subgraphs: [
+      { color: 0, clique_size: 4 },
+      { color: 1, clique_size: 6 },
+    ],
+  };
 
-describe("WitnessDetector — classifyProblem", () => {
-
-  test("classifies Ramsey R(4,4) lower bound", () => {
-    const desc = "R(4,4) >= 18, find a 17-vertex graph with no K4 clique and no independent set of size 4";
-    const result = classifyProblem(desc);
-    expect(result.type).toBe("ramsey");
-    expect(result.params.r).toBe(4);
-    expect(result.params.s).toBe(4);
-    expect(result.params.vertices).toBe(17);
+  test("extracts correct vertex count", () => {
+    const result = extractSearchConfig(ramseyConfig);
+    expect(result).not.toBeNull();
+    expect(result!.n).toBe(35);
   });
 
-  test("classifies Ramsey R(3,3) lower bound", () => {
-    const desc = "Ramsey R(3,3) >= 6, find 5-vertex triangle-free graph with no independent set of size 3";
-    const result = classifyProblem(desc);
-    expect(result.type).toBe("ramsey");
-    expect(result.params.r).toBe(3);
-    expect(result.params.s).toBe(3);
-    expect(result.params.vertices).toBe(5);
+  test("extracts r and s from forbidden_subgraphs", () => {
+    const result = extractSearchConfig(ramseyConfig);
+    expect(result!.r).toBe(4);
+    expect(result!.s).toBe(6);
   });
 
-  test("classifies asymmetric Ramsey R(4,6)", () => {
-    const desc = "R(4,6) >= 37, find a 36-vertex graph that is K4-free and has no independent set of size 6";
-    const result = classifyProblem(desc);
-    expect(result.type).toBe("ramsey");
-    expect(result.params.r).toBe(4);
-    expect(result.params.s).toBe(6);
-    expect(result.params.vertices).toBe(36);
+  test("auto-scales to 8 workers (island_model) for n=35", () => {
+    const result = extractSearchConfig(ramseyConfig);
+    expect(result!.workers).toBe(8);
+    expect(result!.strategy).toBe("island_model");
+    expect(result!.saIterations).toBe(500_000_000);
   });
 
-  test("classifies natural language: 'R(4,4) is at least 18'", () => {
-    const desc = "Prove that the Ramsey number R(4,4) is at least 18 by constructing a 2-coloring of K_17 with no monochromatic K_4.";
-    const result = classifyProblem(desc);
-    expect(result.type).toBe("ramsey");
-    expect(result.params.r).toBe(4);
-    expect(result.params.s).toBe(4);
-    expect(result.params.vertices).toBe(17);
+  test("auto-scales to single worker for small problems (n≤20)", () => {
+    const small: ArchitectSearchConfig = {
+      problem_class: "ramsey_coloring",
+      domain_size: 5,
+      num_colors: 2,
+      forbidden_subgraphs: [
+        { color: 0, clique_size: 3 },
+        { color: 1, clique_size: 3 },
+      ],
+    };
+    const result = extractSearchConfig(small);
+    expect(result!.workers).toBe(1);
+    expect(result!.strategy).toBe("single");
   });
 
-  test("classifies natural language: 'K_17 with no monochromatic K_4'", () => {
-    const desc = "Construct a 2-coloring of K_17 with no monochromatic K_4.";
-    const result = classifyProblem(desc);
-    expect(result.type).toBe("ramsey");
-    expect(result.params.vertices).toBe(17);
-    expect(result.params.r).toBe(4);
+  test("auto-scales to 4 workers for medium problems (21-30v)", () => {
+    const medium: ArchitectSearchConfig = {
+      problem_class: "ramsey_coloring",
+      domain_size: 25,
+      num_colors: 2,
+      forbidden_subgraphs: [
+        { color: 0, clique_size: 4 },
+        { color: 1, clique_size: 5 },
+      ],
+    };
+    const result = extractSearchConfig(medium);
+    expect(result!.workers).toBe(4);
+    expect(result!.strategy).toBe("island_model");
   });
 
-  test("returns unknown for unrecognized problems", () => {
-    const desc = "Prove that every even number greater than 2 is the sum of two primes";
-    const result = classifyProblem(desc);
-    expect(result.type).toBe("unknown");
+  test("type is ramsey_sa", () => {
+    const result = extractSearchConfig(ramseyConfig);
+    expect(result!.type).toBe("ramsey_sa");
   });
 });
 
-// ──────────────────────────────────────────────
-// extractSearchConfig
-// ──────────────────────────────────────────────
-
-describe("WitnessDetector — extractSearchConfig", () => {
-
-  test("Ramsey problem produces ramsey_sa search config", () => {
-    const pc: ProblemClass = { type: "ramsey", params: { r: 4, s: 4, vertices: 17 } };
-    const config = extractSearchConfig(pc);
-
-    expect(config).not.toBeNull();
-    expect(config!.type).toBe("ramsey_sa");
-    expect(config!.n).toBe(17);
-    expect(config!.r).toBe(4);
-    expect(config!.s).toBe(4);
-    expect(config!.saIterations).toBeGreaterThan(0);
-  });
-
-  test("scales iterations with problem size", () => {
-    const small: ProblemClass = { type: "ramsey", params: { r: 3, s: 3, vertices: 5 } };
-    const large: ProblemClass = { type: "ramsey", params: { r: 4, s: 6, vertices: 36 } };
-
-    const smallConfig = extractSearchConfig(small)!;
-    const largeConfig = extractSearchConfig(large)!;
-
-    expect(largeConfig.saIterations).toBeGreaterThan(smallConfig.saIterations);
-  });
-
-  test("unknown problem returns null", () => {
-    const pc: ProblemClass = { type: "unknown", params: {} };
-    const config = extractSearchConfig(pc);
-    expect(config).toBeNull();
+describe("extractSearchConfig — unknown", () => {
+  test("returns null for unknown problem class", () => {
+    const unknown: ArchitectSearchConfig = {
+      problem_class: "unknown",
+    };
+    expect(extractSearchConfig(unknown)).toBeNull();
   });
 });

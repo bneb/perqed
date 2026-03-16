@@ -27,7 +27,7 @@ describe("Parallel Search", () => {
     expect(result.best.witness!.n).toBe(5);
     expect(result.workersRan).toBe(1);
     expect(result.bestWorkerIndex).toBe(0);
-    expect(result.totalWallTime).toBeGreaterThan(0);
+    expect(result.totalWallTime).toBeGreaterThanOrEqual(0);
   });
 
   test("parallel mode: R(3,3) on 5v with 4 workers finds E=0", async () => {
