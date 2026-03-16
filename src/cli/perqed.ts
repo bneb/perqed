@@ -20,7 +20,8 @@ import { SolverBridge } from "../solver";
 import { LeanBridge } from "../lean_bridge";
 import { AgentFactory } from "../agents/factory";
 import { runDynamicLoop } from "../orchestrator";
-import { ramseySearch, adjToMatrix, type RamseySearchConfig } from "../search/ramsey_worker";
+import { adjToMatrix } from "../search/ramsey_worker";
+import { orchestratedSearch } from "../search/ramsey_orchestrator";
 import { generateRamseyLean } from "../codegen/lean_codegen";
 import {
   buildSearchFailureDigest,
@@ -73,6 +74,12 @@ export interface SearchPhase {
   s: number;
   /** Number of SA iterations (default: 10M) */
   sa_iterations?: number;
+  /** Search strategy: "single" (default) or "island_model" (multi-worker) */
+  strategy?: "single" | "island_model";
+  /** Number of workers for island_model (default: 5) */
+  workers?: number;
+  /** Seed type: "random" (default), "paley", or "circulant" */
+  seed?: "random" | "paley" | "circulant";
 }
 
 export interface RunConfig {
@@ -95,6 +102,9 @@ const SEARCH_PHASE_SCHEMA = {
     r: { type: SchemaType.NUMBER as const, description: "Clique size (red)" },
     s: { type: SchemaType.NUMBER as const, description: "Independent set size (blue)" },
     sa_iterations: { type: SchemaType.NUMBER as const, description: "SA iterations (default 10M)" },
+    strategy: { type: SchemaType.STRING as const, enum: ["single", "island_model"], description: "Search strategy. Use island_model for harder problems." },
+    workers: { type: SchemaType.NUMBER as const, description: "Number of workers for island_model (default 5)" },
+    seed: { type: SchemaType.STRING as const, enum: ["random", "paley", "circulant"], description: "Graph seed type. Use paley for R(k,k) symmetric problems where n is prime and ≡ 1 mod 4." },
   },
   required: ["type", "vertices", "r", "s"],
 };
@@ -283,7 +293,9 @@ You must produce an UPDATED search_phase configuration that addresses the diagno
 ## CRITICAL RULES
 - You MUST NOT change the problem (vertices, r, s) — only the search hyperparameters
 - You MUST increase sa_iterations if the previous attempt ran out of budget
-- If this is attempt 3+, try dramatically larger budgets (50M-100M iterations)
+- If this is attempt 2+, switch strategy to "island_model" with 5-10 workers
+- If this is attempt 3+, also try seed="paley" (if n is prime and ≡ 1 mod 4) or increase workers
+- If nothing works, try dramatically larger budgets (50M-100M iterations)
 - Output ONLY the updated search_phase JSON
 
 `;
@@ -296,6 +308,9 @@ const SEARCH_PIVOT_SCHEMA = {
     r: { type: SchemaType.NUMBER as const },
     s: { type: SchemaType.NUMBER as const },
     sa_iterations: { type: SchemaType.NUMBER as const },
+    strategy: { type: SchemaType.STRING as const, enum: ["single", "island_model"] },
+    workers: { type: SchemaType.NUMBER as const },
+    seed: { type: SchemaType.STRING as const, enum: ["random", "paley", "circulant"] },
   },
   required: ["type", "vertices", "r", "s", "sa_iterations"],
 };
@@ -365,34 +380,29 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
 
       console.log(`\n🔎 Search Phase — Attempt ${attempt}/${MAX_ARCHITECT_PIVOTS}`);
       console.log(`   Type: ${sp.type}`);
-      console.log(`   Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${iters.toLocaleString()} iters\n`);
+      console.log(`   Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${iters.toLocaleString()} iters`);
+      console.log(`   Strategy: ${sp.strategy ?? "single"}, Seed: ${sp.seed ?? "random"}, Workers: ${sp.workers ?? 1}\n`);
 
-      // Build SA config with proper hyperparameters
-      const edges = sp.vertices * (sp.vertices - 1) / 2;
-      const tInit = edges < 50 ? 1.0 : edges < 200 ? 2.0 : edges < 600 ? 3.0 : 5.0;
-      const tFinal = 0.01;
-      const coolingRate = Math.exp(Math.log(tFinal / tInit) / (0.8 * iters));
-      const reheatAfter = Math.max(200_000, Math.floor(iters / 50));
-
-      const saConfig: RamseySearchConfig = {
+      const orchResult = orchestratedSearch({
         n: sp.vertices,
         r: sp.r,
         s: sp.s,
-        maxIterations: iters,
-        initialTemp: tInit,
-        coolingRate,
-        reheatTemp: tInit * 0.75,
-        reheatAfter,
-      };
-
-      console.log(`   Hyperparameters: T₀=${tInit}, rate=${coolingRate.toFixed(8)}, reheatAfter=${reheatAfter.toLocaleString()}`);
-
-      const result = ramseySearch(saConfig, (iter, energy, best, temp) => {
-        const pct = ((iter / iters) * 100).toFixed(1);
-        console.log(`   [${pct}%] iter=${iter.toLocaleString()} E=${energy} best=${best} T=${temp.toFixed(4)}`);
+        saIterations: iters,
+        strategy: sp.strategy ?? "single",
+        workers: sp.workers ?? 1,
+        seed: sp.seed ?? "random",
+        onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
+          const pct = ((iter / iters) * 100).toFixed(1);
+          const wLabel = (sp.workers ?? 1) > 1 ? `W${worker} ` : "";
+          console.log(`   ${wLabel}[${pct}%] iter=${iter.toLocaleString()} E=${energy} best=${best} T=${temp.toFixed(4)}`);
+        },
       });
 
+      const result = orchResult.best;
       console.log(`\n   SA complete: best E=${result.bestEnergy}, ${result.ips.toLocaleString()} IPS`);
+      if (orchResult.workersRan > 1) {
+        console.log(`   Workers: ${orchResult.workersRan} ran, best from worker ${orchResult.bestWorkerIndex}`);
+      }
 
       if (result.witness) {
         console.log(`   🏆 WITNESS FOUND! E=0 at iteration ${result.iterations.toLocaleString()}\n`);

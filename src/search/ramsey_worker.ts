@@ -29,10 +29,8 @@ export interface RamseySearchConfig {
   initialTemp: number;
   /** Cooling rate (multiplied each step, e.g. 0.99999) */
   coolingRate: number;
-  /** Reheat temperature when stuck */
-  reheatTemp: number;
-  /** Iterations without improvement before reheat */
-  reheatAfter: number;
+  /** Optional: start from this graph instead of random */
+  initialGraph?: AdjacencyMatrix;
 }
 
 export interface RamseySearchResult {
@@ -59,11 +57,16 @@ export function ramseySearch(
   // Adaptive reheat: patience = % of budget, strength decays over time
   const minPatience = Math.max(100_000, Math.floor(maxIterations * 0.1));
 
-  // Initialize random graph (~50% density)
-  const adj = new AdjacencyMatrix(n);
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      if (Math.random() < 0.5) adj.addEdge(i, j);
+  // Initialize: use seed graph or random (~50% density)
+  let adj: AdjacencyMatrix;
+  if (config.initialGraph) {
+    adj = config.initialGraph.clone();
+  } else {
+    adj = new AdjacencyMatrix(n);
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        if (Math.random() < 0.5) adj.addEdge(i, j);
+      }
     }
   }
 
