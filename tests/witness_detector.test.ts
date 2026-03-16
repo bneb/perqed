@@ -81,6 +81,23 @@ describe("WitnessDetector — classifyProblem", () => {
     expect(result.params.vertices).toBe(36);
   });
 
+  test("classifies natural language: 'R(4,4) is at least 18'", () => {
+    const desc = "Prove that the Ramsey number R(4,4) is at least 18 by constructing a 2-coloring of K_17 with no monochromatic K_4.";
+    const result = classifyProblem(desc);
+    expect(result.type).toBe("ramsey");
+    expect(result.params.r).toBe(4);
+    expect(result.params.s).toBe(4);
+    expect(result.params.vertices).toBe(17);
+  });
+
+  test("classifies natural language: 'K_17 with no monochromatic K_4'", () => {
+    const desc = "Construct a 2-coloring of K_17 with no monochromatic K_4.";
+    const result = classifyProblem(desc);
+    expect(result.type).toBe("ramsey");
+    expect(result.params.vertices).toBe(17);
+    expect(result.params.r).toBe(4);
+  });
+
   test("returns unknown for unrecognized problems", () => {
     const desc = "Prove that every even number greater than 2 is the sum of two primes";
     const result = classifyProblem(desc);

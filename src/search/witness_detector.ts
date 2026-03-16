@@ -47,6 +47,10 @@ export function isConstructiveExistence(signature: string): boolean {
 // Pattern: R(r,s) >= bound  or  Ramsey R(r,s)
 // Captures: r, s, and (bound - 1) = vertices
 const RAMSEY_PATTERN = /R\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)\s*>=?\s*(\d+)/i;
+// Natural language: "Ramsey number R(r,s) is at least N"
+const RAMSEY_NL_PATTERN = /R\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)\s+(?:is\s+)?at\s+least\s+(\d+)/i;
+// Pattern: "K_n with no monochromatic K_r"
+const MONO_K_PATTERN = /K[_\s]*(\d+)\s+with\s+no\s+monochromatic\s+K[_\s]*(\d+)/i;
 // Pattern: find a N-vertex graph
 const VERTEX_PATTERN = /(\d+)\s*-?\s*vertex/i;
 
@@ -54,15 +58,14 @@ const VERTEX_PATTERN = /(\d+)\s*-?\s*vertex/i;
  * Classify a problem description into a known problem class + parameters.
  */
 export function classifyProblem(description: string): ProblemClass {
-  // Try Ramsey pattern
-  const ramseyMatch = description.match(RAMSEY_PATTERN);
+  // Try structured Ramsey pattern: R(4,4) >= 18
+  const ramseyMatch = description.match(RAMSEY_PATTERN) ?? description.match(RAMSEY_NL_PATTERN);
   if (ramseyMatch) {
     const r = parseInt(ramseyMatch[1]!, 10);
     const s = parseInt(ramseyMatch[2]!, 10);
     const bound = parseInt(ramseyMatch[3]!, 10);
     const vertices = bound - 1;
 
-    // Also check for explicit vertex count in description
     const vertexMatch = description.match(VERTEX_PATTERN);
     const explicitVertices = vertexMatch ? parseInt(vertexMatch[1]!, 10) : null;
 
@@ -73,6 +76,17 @@ export function classifyProblem(description: string): ProblemClass {
         s,
         vertices: explicitVertices ?? vertices,
       },
+    };
+  }
+
+  // Try: "K_17 with no monochromatic K_4" pattern
+  const monoMatch = description.match(MONO_K_PATTERN);
+  if (monoMatch) {
+    const n = parseInt(monoMatch[1]!, 10);
+    const k = parseInt(monoMatch[2]!, 10);
+    return {
+      type: "ramsey",
+      params: { r: k, s: k, vertices: n },
     };
   }
 
