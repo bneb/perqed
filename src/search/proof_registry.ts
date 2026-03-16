@@ -79,12 +79,13 @@ export class RamseyProofGenerator implements ProofGenerator {
     const s = params.s!;
     const matrix = adjToMatrix(witness);
 
-    // Build adjacency matrix rows
+    const dot = "$\\cdot$"; // tabular is text mode
+
     const adjRows: string[] = [];
     for (let i = 0; i < n; i++) {
       const row: string[] = [];
       for (let j = 0; j < n; j++) {
-        if (i === j) row.push("\\cdot");
+        if (i === j) row.push(dot);
         else row.push(matrix[i]![j]! ? "1" : "0");
       }
       adjRows.push(`    ${row.join(" & ")} \\\\`);
@@ -97,28 +98,18 @@ export class RamseyProofGenerator implements ProofGenerator {
         if (matrix[i]![j]!) edgeCount++;
 
     const date = new Date().toISOString().split("T")[0]!;
+    const texName = theoremName.replace(/_/g, "\\_");
 
-    // For large matrices (n>20), use tabular instead of pmatrix
-    let matrixBlock: string;
-    if (n <= 20) {
-      matrixBlock = [
-        "{\\small",
-        "\\[",
-        "A = \\begin{pmatrix}",
-        ...adjRows,
-        "\\end{pmatrix}",
-        "\\]}",
-      ].join("\n");
-    } else {
-      matrixBlock = [
-        "{\\tiny",
-        "\\begin{center}",
-        `\\begin{tabular}{${"c".repeat(n)}}`,
-        ...adjRows,
-        "\\end{tabular}",
-        "\\end{center}}",
-      ].join("\n");
-    }
+    // Always use tabular — pmatrix has a 10-column limit that's fragile to override
+    const fontSize = n <= 10 ? "\\small" : "\\tiny";
+    const matrixBlock = [
+      `{${fontSize}`,
+      "\\begin{center}",
+      `\\begin{tabular}{${"c".repeat(n)}}`,
+      ...adjRows,
+      "\\end{tabular}",
+      "\\end{center}}",
+    ].join("\n");
 
     const lines = [
       "\\documentclass[11pt]{article}",
@@ -177,7 +168,7 @@ export class RamseyProofGenerator implements ProofGenerator {
       "\\toprule",
       "Property & Value \\\\",
       "\\midrule",
-      `Lean 4 theorem & \\texttt{${theoremName}} \\\\`,
+      `Lean 4 theorem & \\texttt{${texName}} \\\\`,
       "Verification method & \\texttt{native\\_decide} \\\\",
       `Wall time & ${wallTimeSeconds.toFixed(1)}s \\\\`,
       `SA iterations & ${iterations.toLocaleString()} \\\\`,
