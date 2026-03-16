@@ -4,8 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "perqed": "bun run src/cli/perqed.ts",
-    "perqed:run": "bun run src/cli/run.ts"
+    "perqed": "bun run src/cli/perqed.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
