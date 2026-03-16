@@ -108,6 +108,7 @@ export function ramseySearch(
   }
 
   let energy = ramseyEnergy(adj, r, s);
+  const initialEnergy = energy;     // capture for energy-urgency normalization in reheat
   let bestEnergy = energy;
   let bestAdj = adj.clone();
   let temp = initialTemp;
@@ -208,26 +209,37 @@ export function ramseySearch(
     // ── Adaptive reheat: dual-trigger ──
     // Trigger 1 (patience): stuck long enough without improvement
     // Trigger 2 (dead temp): T is near-zero but energy is still high
-    //   → fast-cooling workers (high coolingSpread) cool in <1% of budget;
-    //     without this they'd spend 99% frozen in a local minimum.
     const tempRatio = temp / initialTemp;
     const DEAD_TEMP_FRAC = 0.005;  // T < 0.5% of T₀ → "cold dead"
     const tempIsDead = tempRatio < DEAD_TEMP_FRAC;
     const isStale = staleCount >= minPatience;
 
     if (isStale || tempIsDead) {
-      // Staleness component: how long have we been stuck (0 → mild, long → strong)
-      const staleFraction = Math.min(staleCount / maxIterations, 1.0);
-      const stalenessStrength = 0.15 + staleFraction * 1.5; // 0.15..1.65 (clamped below)
+      // ─ Staleness component ─
+      // Normalized by THIS worker's minPatience, not total iterations.
+      // staleness=1.0 at patience threshold, grows linearly beyond.
+      const staleness = Math.min(2.0, staleCount / minPatience);
 
-      // Energy component: scale reheat by how far we are from E=0
-      // bestEnergy=0 → 0 bonus, bestEnergy=50 → ~0.15, saturates at 0.25
-      const energyBonus = Math.min(0.25, bestEnergy / 200);
+      // ─ Energy urgency component ─
+      // Normalized by THIS run's initial energy so it's dimensionless.
+      // 0 = solved (E=0), 1 = at starting energy (no progress).
+      const energyUrgency = Math.min(1.0, bestEnergy / Math.max(1, initialEnergy));
 
-      // Dead-temp bonus: worker cooled too fast, needs a stronger kick
-      const deadTempBonus = tempIsDead && !isStale ? 0.15 : 0;
+      // Reheat strength formula:
+      //   base:        always reheat to at least 15% of T₀
+      //   staleness:   +30% scaled by how long stuck (vs own patience)
+      //   energy:      +35% scaled by how far from E=0 (vs initial E)
+      //   interaction: +12% when BOTH stuck AND high-energy compound
+      //   dead-temp:   +10% extra kick when T-dead trigger (not patience) fired
+      const deadTempBonus = tempIsDead && !isStale ? 0.10 : 0;
+      const reheatStrength = Math.min(0.92,
+        0.15
+        + staleness    * 0.30
+        + energyUrgency * 0.35
+        + staleness * energyUrgency * 0.12
+        + deadTempBonus
+      );
 
-      const reheatStrength = Math.min(0.92, stalenessStrength + energyBonus + deadTempBonus);
       temp = initialTemp * reheatStrength;
       staleCount = 0;
       reheatCount++;
