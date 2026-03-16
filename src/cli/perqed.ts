@@ -20,6 +20,8 @@ import { SolverBridge } from "../solver";
 import { LeanBridge } from "../lean_bridge";
 import { AgentFactory } from "../agents/factory";
 import { runDynamicLoop } from "../orchestrator";
+import { ramseySearch, adjToMatrix, type RamseySearchConfig } from "../search/ramsey_worker";
+import { generateRamseyLean } from "../codegen/lean_codegen";
 import { TreePrinter } from "../utils/tree_printer";
 
 // ──────────────────────────────────────────────
@@ -57,6 +59,18 @@ function parseArgs(): CliArgs {
 // Run Config Schema
 // ──────────────────────────────────────────────
 
+export interface SearchPhase {
+  type: "ramsey_sa";
+  /** Number of vertices */
+  vertices: number;
+  /** Clique size (red) */
+  r: number;
+  /** Independent set size (blue) */
+  s: number;
+  /** Number of SA iterations (default: 10M) */
+  sa_iterations?: number;
+}
+
 export interface RunConfig {
   run_name: string;
   problem_description: string;
@@ -65,7 +79,21 @@ export interface RunConfig {
   max_iterations: number;
   objective_md: string;
   domain_skills_md: string;
+  /** If present, run a search phase before Lean proof */
+  search_phase?: SearchPhase;
 }
+
+const SEARCH_PHASE_SCHEMA = {
+  type: SchemaType.OBJECT as const,
+  properties: {
+    type: { type: SchemaType.STRING as const, enum: ["ramsey_sa"] },
+    vertices: { type: SchemaType.NUMBER as const, description: "Number of vertices in the graph" },
+    r: { type: SchemaType.NUMBER as const, description: "Clique size (red)" },
+    s: { type: SchemaType.NUMBER as const, description: "Independent set size (blue)" },
+    sa_iterations: { type: SchemaType.NUMBER as const, description: "SA iterations (default 10M)" },
+  },
+  required: ["type", "vertices", "r", "s"],
+};
 
 const RUN_CONFIG_SCHEMA = {
   type: SchemaType.OBJECT as const,
@@ -97,6 +125,10 @@ const RUN_CONFIG_SCHEMA = {
     domain_skills_md: {
       type: SchemaType.STRING as const,
       description: "Problem-specific tips and tactics for the TACTICIAN.",
+    },
+    search_phase: {
+      ...SEARCH_PHASE_SCHEMA,
+      description: "REQUIRED for constructive existence proofs (e.g., Ramsey lower bounds). Describes the SA search to find the witness graph before Lean verification.",
     },
   },
   required: [
@@ -139,6 +171,27 @@ The Perqed engine has:
 - Lean 4 kernel verification via \`decide\` tactic
 - DeepSeek Prover (local) + Gemini (cloud) multi-agent tactic search
 
+## CRITICAL: When to Include search_phase
+
+If the theorem is a **constructive existence proof** (starts with \`∃\`), the proof requires a **witness**.
+For graph existence problems (Ramsey lower bounds, SRG existence, etc.), you MUST include a \`search_phase\` field.
+
+Example for R(4,6) ≥ 37:
+\`\`\`json
+"search_phase": {
+  "type": "ramsey_sa",
+  "vertices": 36,
+  "r": 4,
+  "s": 6,
+  "sa_iterations": 10000000
+}
+\`\`\`
+
+The Perqed engine will:
+1. Run SA search with the given parameters to find E=0 witness
+2. Generate Lean 4 source with the witness hardcoded
+3. Verify via \`decide\`
+
 ## The User's Problem Description
 
 `;
@@ -177,6 +230,10 @@ function displayConfig(config: RunConfig, configPath: string) {
   console.log(`  Theorem:   ${config.theorem_name}`);
   console.log(`  Budget:    ${config.max_iterations} iterations`);
   console.log(`  Signature: ${config.theorem_signature.slice(0, 100)}...`);
+  if (config.search_phase) {
+    const sp = config.search_phase;
+    console.log(`  Search:    ${sp.type} — ${sp.vertices} vertices, R(${sp.r},${sp.s}), ${(sp.sa_iterations ?? 10_000_000).toLocaleString()} iters`);
+  }
   console.log(`  Config:    ${configPath}`);
   console.log();
 }
@@ -217,16 +274,92 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   await Bun.write(skillsPath, config.domain_skills_md);
 
   console.log("═══════════════════════════════════════════════");
-  console.log("  🔥 PERQED — Proof Search Execution");
+  console.log("  🔥 PERQED — Execution");
   console.log("═══════════════════════════════════════════════");
   console.log(`  Workspace: ${workspace.paths.runDir}`);
   console.log("═══════════════════════════════════════════════\n");
 
+  const startTime = Date.now();
+
+  // ── Search Phase: Run SA to find witness ──
+  if (config.search_phase) {
+    const sp = config.search_phase;
+    const iters = sp.sa_iterations ?? 10_000_000;
+
+    console.log(`🔎 Search Phase: ${sp.type}`);
+    console.log(`   Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${iters.toLocaleString()} iterations\n`);
+
+    const saConfig: RamseySearchConfig = {
+      n: sp.vertices,
+      r: sp.r,
+      s: sp.s,
+      maxIterations: iters,
+      initialTemp: 2.0,
+      coolingRate: 1 - (1 / iters),  // reach ~0.37 at end
+      reheatTemp: 1.5,
+      reheatAfter: 50000,
+    };
+
+    const result = ramseySearch(saConfig, (iter, energy, best, temp) => {
+      const pct = ((iter / iters) * 100).toFixed(1);
+      console.log(`   [${pct}%] iter=${iter.toLocaleString()} E=${energy} best=${best} T=${temp.toFixed(4)}`);
+    });
+
+    console.log(`\n   SA complete: best E=${result.bestEnergy}, ${result.ips.toLocaleString()} IPS`);
+
+    if (result.witness) {
+      console.log(`   🏆 WITNESS FOUND! E=0 at iteration ${result.iterations.toLocaleString()}\n`);
+
+      // Save witness as JSON
+      const matrix = adjToMatrix(result.witness);
+      const witnessPath = join(workspace.paths.scratch, "witness.json");
+      await Bun.write(witnessPath, JSON.stringify({ n: sp.vertices, r: sp.r, s: sp.s, adjacency: matrix }, null, 2));
+      console.log(`   📁 Witness saved: ${witnessPath}`);
+
+      // Generate Lean proof
+      const leanSource = generateRamseyLean(config.theorem_name, sp.vertices, sp.r, sp.s, matrix);
+      const leanPath = join(workspace.paths.verifiedLib, `${config.theorem_name}.lean`);
+      await Bun.write(leanPath, leanSource);
+      console.log(`   📜 Lean proof generated: ${leanPath}`);
+      console.log(`   ⏳ Verifying with Lean kernel...\n`);
+
+      // Verify with Lean
+      const proc = Bun.spawn(["lake", "env", "lean", leanPath], {
+        cwd: workspaceBase + "/..",
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const exitCode = await proc.exited;
+      const stderr = await new Response(proc.stderr).text();
+
+      if (exitCode === 0) {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log("══════════════════════════════════════════════");
+        console.log(`  🏆 VERIFIED: ${config.theorem_name} proved in ${elapsed}s`);
+        console.log(`  Witness: ${sp.vertices}-vertex graph, R(${sp.r},${sp.s}) ≥ ${sp.vertices + 1}`);
+        console.log("══════════════════════════════════════════════\n");
+        return;
+      } else {
+        console.log(`   ⚠️  Lean verification failed: ${stderr.slice(0, 200)}`);
+        console.log(`   Falling back to tactic search...\n`);
+      }
+    } else {
+      console.log(`   ❌ No witness found (best E=${result.bestEnergy})`);
+      console.log(`   The search exhausted its budget. Try more iterations or a different approach.\n`);
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log("══════════════════════════════════════════════");
+      console.log(`  ❌ SEARCH EXHAUSTED after ${elapsed}s`);
+      console.log(`  Best energy: ${result.bestEnergy}`);
+      console.log("══════════════════════════════════════════════\n");
+      return;
+    }
+  }
+
+  // ── Tactic Phase: LLM-driven proof search (for non-constructive proofs) ──
   const factory = new AgentFactory({ geminiApiKey: apiKey });
   const solver = new SolverBridge();
   const lean = new LeanBridge();
-
-  const startTime = Date.now();
 
   const result = await runDynamicLoop(workspace, solver, {
     maxGlobalIterations: config.max_iterations,
@@ -240,7 +373,6 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
-  // Report
   console.log("\n══════════════════════════════════════════════");
   if (result.status === "SOLVED") {
     console.log(`  🏆 SUCCESS: ${config.theorem_name} proved in ${elapsed}s`);
