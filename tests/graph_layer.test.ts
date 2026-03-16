@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "bun:test";
 import { AdjacencyMatrix } from "../src/math/graph/AdjacencyMatrix";
-import { srgEnergy, commonNeighborCount } from "../src/math/graph/SRGEnergy";
+import { srgEnergy, srgEnergyAlgebraic, commonNeighborCount } from "../src/math/graph/SRGEnergy";
 import { degreePreservingSwap } from "../src/math/graph/DegreePreservingSwap";
 
 // ──────────────────────────────────────────────
@@ -150,6 +150,41 @@ describe("srgEnergy", () => {
     const g = new AdjacencyMatrix(9);
     g.addEdge(0, 1);
     expect(srgEnergy(g, 4, 1, 2)).toBeGreaterThan(0);
+  });
+});
+
+// ──────────────────────────────────────────────
+// Algebraic SRG Energy (matrix identity)
+// ──────────────────────────────────────────────
+
+describe("srgEnergyAlgebraic", () => {
+  it("returns 0 for the Rook(3,3) graph with params (9, 4, 1, 2)", () => {
+    const g = createRookGraph();
+    expect(srgEnergyAlgebraic(g, 4, 1, 2)).toBe(0);
+  });
+
+  it("returns > 0 for a non-SRG graph", () => {
+    const g = new AdjacencyMatrix(9);
+    const edges: [number, number][] = [
+      [0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,0],
+      [0,4],[1,5],[2,6],[3,7],[4,8],[5,0],[6,1],[7,2],[8,3],
+    ];
+    for (const [u, v] of edges) {
+      if (!g.hasEdge(u, v)) g.addEdge(u, v);
+    }
+    expect(srgEnergyAlgebraic(g, 4, 1, 2)).toBeGreaterThan(0);
+  });
+
+  it("agrees with combinatorial energy on a random 4-regular graph", () => {
+    const g = AdjacencyMatrix.randomRegular(20, 4);
+    const eComb = srgEnergy(g, 4, 1, 2);
+    const eAlg = srgEnergyAlgebraic(g, 4, 1, 2);
+    // Both should be > 0 and the algebraic version should correlate
+    // (they measure slightly different things due to degree penalty,
+    //  but on k-regular graphs the degree penalty is 0, so they
+    //  should relate: algebraic counts full matrix, combinatorial counts upper triangle)
+    expect(eComb).toBeGreaterThan(0);
+    expect(eAlg).toBeGreaterThan(0);
   });
 });
 

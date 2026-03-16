@@ -1,0 +1,73 @@
+{
+  "spec_version": "1.0",
+  "problem_name": "conways_99_graph",
+  "description": "Find a Strongly Regular Graph with parameters v=99, k=14, λ=1, μ=2.",
+  
+  "state_representation": {
+    "type": "AdjacencyMatrix",
+    "dimensions": [99, 99],
+    "dtype": "boolean",
+    "invariants": [
+      "symmetric",
+      "zero_diagonal",
+      "constant_row_sum_14"
+    ]
+  },
+
+  "initialization_strategy": {
+    "type": "RandomRegularGraph",
+    "degree": 14,
+    "vertices": 99,
+    "notes": "Must guarantee the initial state is a valid simple 14-regular graph."
+  },
+
+  "mutation_operator": {
+    "name": "degree_preserving_topological_swap",
+    "mechanism": "2_edge_swap",
+    "algorithm": [
+      "1. Uniformly sample two disjoint existing edges (u,v) and (x,y).",
+      "2. Verify that edges (u,x) and (v,y) do NOT currently exist.",
+      "3. If they exist, reject and resample.",
+      "4. Delete edges (u,v) and (x,y).",
+      "5. Insert edges (u,x) and (v,y).",
+      "6. Symmetrize the matrix."
+    ],
+    "invariants_maintained": ["symmetric", "zero_diagonal", "constant_row_sum_14"]
+  },
+
+  "energy_function": {
+    "name": "srg_algebraic_deviation",
+    "description": "Computes the Frobenius norm of the deviation from the SRG identity. Perfect SRG evaluates to E=0.",
+    "matrices": {
+      "A": "Current adjacency matrix (state)",
+      "I": "99x99 Identity matrix",
+      "J": "99x99 All-ones matrix"
+    },
+    "equation": "M = A^2 + A - 2*J - 12*I",
+    "cost_evaluation": "sum(M ∘ M)",
+    "notes": "Because A is guaranteed 14-regular by the mutation operator, degree penalty terms are omitted. The diagonal inherently maps to 0."
+  },
+
+  "lean_4_verification": {
+    "module_name": "Conway99Verification",
+    "definitions": {
+      "matrix_type": "Fin 99 → Fin 99 → Bool",
+      "adj": "Witness adjacency function from SA"
+    },
+    "properties": [
+      "irreflexive: ∀ i, adj i i = false",
+      "symmetric: ∀ i j, adj i j = adj j i",
+      "14-regular: ∀ i, (Finset.univ.filter (adj i)).card = 14",
+      "λ=1: ∀ i j, adj i j → commonNeighbors adj i j = 1",
+      "μ=2: ∀ i j, ¬adj i j → i ≠ j → commonNeighbors adj i j = 2"
+    ],
+    "tactic": "by decide"
+  },
+
+  "simulated_annealing_hyperparameters": {
+    "adaptive_reheat": true,
+    "reheat_trigger_stagnation_epochs": 10000,
+    "initial_temperature": 50.0,
+    "cooling_rate": 0.9995
+  }
+}

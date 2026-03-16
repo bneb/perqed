@@ -7,7 +7,7 @@
 
 import type { IState } from "../../../src/math/optim/IState";
 import { AdjacencyMatrix } from "../../../src/math/graph/AdjacencyMatrix";
-import { srgEnergy } from "../../../src/math/graph/SRGEnergy";
+import { srgEnergyAlgebraic } from "../../../src/math/graph/SRGEnergy";
 import { degreePreservingSwap } from "../../../src/math/graph/DegreePreservingSwap";
 
 const N = 99;
@@ -29,7 +29,7 @@ export class Conway99State implements IState<Uint8Array> {
 
   getEnergy(): number {
     if (this.cachedEnergy === null) {
-      this.cachedEnergy = srgEnergy(this.graph, K, LAMBDA, MU);
+      this.cachedEnergy = srgEnergyAlgebraic(this.graph, K, LAMBDA, MU);
     }
     return this.cachedEnergy;
   }
