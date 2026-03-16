@@ -29,6 +29,11 @@ export interface ScheduleConfig {
   reheatWindow?: number;
   /** Maximum iterations (caps the backoff window). */
   maxIterations?: number;
+  /**
+   * Custom reheat formula. Given the best energy, returns the new temperature.
+   * Default: (e) => Math.max(1.0, Math.pow(e, 0.4))
+   */
+  reheatFormula?: (bestEnergy: number) => number;
   /** @deprecated Fixed reheat temperature (legacy). */
   legacyReheatTemp?: number;
   /** @deprecated Fixed reheat interval (legacy). */
@@ -45,6 +50,7 @@ export class AnnealingSchedule {
   // Adaptive reheat state
   private readonly useAdaptiveReheat: boolean;
   private readonly initialReheatWindow: number;
+  private readonly reheatFormula: (bestEnergy: number) => number;
   private currentReheatWindow: number;
   private itersSinceImprovement: number;
   private bestEnergy: number;
@@ -64,6 +70,7 @@ export class AnnealingSchedule {
     this.currentReheatWindow = this.initialReheatWindow;
     this.itersSinceImprovement = 0;
     this.bestEnergy = Infinity;
+    this.reheatFormula = config.reheatFormula ?? ((e) => Math.max(1.0, Math.pow(e, 0.4)));
 
     this.useLegacyReheat = !this.useAdaptiveReheat && config.legacyReheatTemp !== undefined;
     this.legacyReheatTemp = config.legacyReheatTemp ?? 0;
@@ -103,8 +110,7 @@ export class AnnealingSchedule {
 
     // Adaptive reheating: energy-proportional temperature with exponential backoff
     if (this.useAdaptiveReheat && this.itersSinceImprovement >= this.currentReheatWindow) {
-      // Reheat to E^(2/5): power-law scaling across energy landscape
-      this.temp = Math.max(1.0, Math.pow(this.bestEnergy, 0.4));
+      this.temp = this.reheatFormula(this.bestEnergy);
       this.itersSinceImprovement = 0;
       // Exponential backoff: wait longer before next reheat
       this.currentReheatWindow = Math.min(this.currentReheatWindow * 2, this.maxIterations);

@@ -159,4 +159,50 @@ describe("AnnealingSchedule", () => {
     // 0.01^0.4 ≈ 0.04, but floor is 1.0
     expect(s.temp).toBe(1.0);
   });
+
+  // ── Custom reheatFormula tests ──
+
+  test("custom reheatFormula: linear E/10", () => {
+    const s = new AnnealingSchedule({
+      initialTemp: 50,
+      coolingRate: 1.0,
+      reheatWindow: 1,
+      maxIterations: 1000,
+      reheatFormula: (e) => Math.max(1, e / 10),
+    });
+
+    s.recordImprovement(200);
+    s.step();
+    // Custom formula: 200 / 10 = 20
+    expect(s.temp).toBe(20);
+  });
+
+  test("custom reheatFormula: logarithmic", () => {
+    const s = new AnnealingSchedule({
+      initialTemp: 50,
+      coolingRate: 1.0,
+      reheatWindow: 1,
+      maxIterations: 1000,
+      reheatFormula: (e) => Math.max(1, Math.log(e)),
+    });
+
+    s.recordImprovement(1000);
+    s.step();
+    // Custom formula: ln(1000) ≈ 6.91
+    expect(s.temp).toBeCloseTo(Math.log(1000), 2);
+  });
+
+  test("default formula used when reheatFormula not provided", () => {
+    const s = new AnnealingSchedule({
+      initialTemp: 50,
+      coolingRate: 1.0,
+      reheatWindow: 1,
+      maxIterations: 1000,
+      // no reheatFormula — should use default E^0.4
+    });
+
+    s.recordImprovement(100);
+    s.step();
+    expect(s.temp).toBeCloseTo(Math.pow(100, 0.4), 1);
+  });
 });
