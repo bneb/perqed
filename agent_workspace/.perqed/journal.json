@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "443e541b-22dd-4566-89f4-e836176c94b5",
+      "timestamp": "2026-03-16T20:13:19.192Z",
+      "type": "lemma",
+      "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
+      "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
+      "target_goal": "R(4,6) >= 36"
+    }
+  ]
+}

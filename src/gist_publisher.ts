@@ -38,8 +38,8 @@ export class GistPublisher {
    * Create a GistPublisher from env vars, or return null if not configured.
    */
   static fromEnv(): GistPublisher | null {
-    const gistId = process.env.PERQED_GIST_ID;
-    const token = process.env.GITHUB_TOKEN;
+    const gistId = process.env.GITHUB_GIST_ID;
+    const token = process.env.GITHUB_GIST_TOKEN;
     if (!gistId || !token) return null;
     return new GistPublisher(gistId, token);
   }

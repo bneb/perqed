@@ -40,6 +40,7 @@ import {
   distillJournalForPrompt,
   defaultJournalPath,
 } from "../search/research_journal";
+import { GistPublisher } from "../gist_publisher";
 
 // ──────────────────────────────────────────────
 // CLI Argument Parsing
@@ -479,6 +480,16 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   const startTime = Date.now();
   const MAX_ARCHITECT_PIVOTS = 5;
 
+  // ── Live telemetry (non-blocking — fire-and-forget on all publishes) ──
+  const gist = GistPublisher.fromEnv();
+  let lastPublishMs = 0; // throttle: max 1 publish per 30s during SA
+  const publish = (state: Parameters<GistPublisher['publishState']>[0]) => {
+    gist?.publishState(state); // intentionally un-awaited
+  };
+  const addEvent = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
+    gist?.addEvent(msg, type);
+  };
+
   // ── Research Journal: persistent cross-run memory ──
   const journalPath = defaultJournalPath(join(workspace.paths.runDir, "..", ".."));
   const journal = new ResearchJournal(journalPath);
@@ -565,6 +576,7 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
                 target_goal: targetGoal,
               });
               console.log(`   📓 Lemma recorded: "${claim}"`);
+              addEvent(`Z3 UNSAT: no circulant R(${sp.r},${sp.s}) witness on K_${sp.vertices}`, 'info');
               console.log(`   Circulant space is empty. Retrying with unconstrained SA.`);
               sp = { ...sp, symmetry: undefined };
 
@@ -605,6 +617,19 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
           const pct = ((iter / iters) * 100).toFixed(1);
           const wLabel = (sp.workers ?? 1) > 1 ? `W${worker} ` : "";
           console.log(`   ${wLabel}[${pct}%] iter=${iter.toLocaleString()} E=${energy} best=${best} T=${temp.toFixed(4)}`);
+          // Throttled publish — at most once per 30s
+          const now = Date.now();
+          if (gist && now - lastPublishMs > 30_000) {
+            lastPublishMs = now;
+            publish({
+              theorem: config.theorem_name,
+              iteration: iter,
+              status: 'proving',
+              tacticState: `Best E=${best} (W${worker}) · ${pct}% through budget`,
+              thinking: `SA searching K_${sp.vertices} for R(${sp.r},${sp.s}) witness (attempt ${attempt})`,
+              tactics: [],
+            });
+          }
         },
       });
 
@@ -613,6 +638,7 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       if (orchResult.workersRan > 1) {
         console.log(`   Workers: ${orchResult.workersRan} ran, best from worker ${orchResult.bestWorkerIndex}`);
       }
+      addEvent(`SA complete: best E=${result.bestEnergy} after ${result.iterations.toLocaleString()} iters`);
 
       if (result.witness) {
         // Save witness as JSON
@@ -687,10 +713,20 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
           if (pdfPath) console.log(`  PDF:         ${pdfPath}`);
           console.log("══════════════════════════════════════════════");
           console.log();
+          addEvent(`✅ PROVED: R(${sp.r},${sp.s}) ≥ ${sp.vertices + 1} — Lean verified in ${elapsed.toFixed(1)}s`, 'success');
+          publish({
+            theorem: config.theorem_name,
+            iteration: result.iterations,
+            status: 'solved',
+            tacticState: `R(${sp.r},${sp.s}) ≥ ${sp.vertices + 1} — Lean 4 kernel verified`,
+            thinking: `Proof complete in ${elapsed.toFixed(1)}s`,
+            tactics: [],
+          });
           return;
         } else {
           console.log(`\n❌ Lean verification failed: ${stderr.slice(0, 200)}`);
           console.log(`   Falling back to tactic search...\n`);
+          addEvent(`Lean verification failed — falling back`, 'error');
           break;
         }
       }
@@ -708,11 +744,13 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
             );
             if (lnsResult.status === 'sat') {
               console.log(`   ✅ LNS SAT — Z3 repaired ${lnsResult.freeEdgeCount} edges in ${lnsResult.solveTimeMs}ms`);
+              addEvent(`LNS SAT: Z3 repaired ${lnsResult.freeEdgeCount} edges in ${lnsResult.solveTimeMs}ms`, 'success');
               // Hand off as witness → normal Lean proof path
               result.witness = lnsResult.adj;
               result.bestEnergy = 0;
             } else if (lnsResult.status === 'unsat') {
               console.log(`   ❌ LNS UNSAT: ${lnsResult.clue}`);
+              addEvent(`LNS UNSAT: basin at E=${result.bestEnergy} is irrecoverable`, 'error');
               await journal.addEntry({
                 type: 'failure_mode',
                 claim: `LNS could not repair E=${result.bestEnergy} basin for R(${sp.r},${sp.s}) on K_${sp.vertices}`,
