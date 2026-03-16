@@ -34,6 +34,11 @@ import {
 } from "../search/witness_detector";
 import { solveWithZ3, isZ3Available } from "../search/z3_ramsey_solver";
 import { adjToMatrix } from "../search/ramsey_worker";
+import {
+  ResearchJournal,
+  distillJournalForPrompt,
+  defaultJournalPath,
+} from "../search/research_journal";
 
 // ──────────────────────────────────────────────
 // CLI Argument Parsing
@@ -176,7 +181,7 @@ const RUN_CONFIG_SCHEMA = {
 // ARCHITECT Preamble
 // ──────────────────────────────────────────────
 
-const FORMULATION_PREAMBLE = `You are the Perqed Problem Formulator. A user has described a mathematical problem they want to prove in Lean 4.
+const FORMULATION_PREAMBLE_BASE = `You are the Perqed Problem Formulator. A user has described a mathematical problem they want to prove in Lean 4.
 
 Your job is to produce a structured run configuration that the Perqed proof engine can execute autonomously.
 
@@ -208,7 +213,7 @@ For example, R(4,6) ≥ 36 — the known Exoo (1989) witness IS a circulant on 3
 \`\`\`json
 { "problem_class": "ramsey_coloring", "domain_size": 35, "num_colors": 2, "r": 4, "s": 6, "symmetry": "circulant" }
 \`\`\`
-**IMPORTANT**: Always use \`"symmetry": "circulant"\` for Ramsey lower bound searches. This reduces the search space from 2^595 to 2^17 (131,072 states) — a 2^578x reduction that makes the search practically instant.
+**IMPORTANT**: When \`symmetry: circulant\` is used, the Z3 SMT solver is attempted first (exact, ~5-30s). If Z3 returns UNSAT, the circulant space is provably empty and the engine will retry unconstrained.
 
 For problems that do NOT require a constructive witness:
 \`\`\`json
@@ -231,9 +236,21 @@ The Perqed engine has:
 - Lean 4 kernel verification via \`decide\` tactic
 - DeepSeek Prover (local) + Gemini (cloud) multi-agent tactic search
 
-## The User's Problem Description
-
 `;
+
+// Build the preamble with journal context injected
+/** Build the ARCHITECT preamble, injecting distilled journal context before the problem statement. */
+async function buildPreamble(journalPath: string, goal: string): Promise<string> {
+  const journal = new ResearchJournal(journalPath);
+  const entries = await journal.getEntriesForGoal(goal);
+  const journalContext = distillJournalForPrompt(entries);
+  if (!journalContext) return FORMULATION_PREAMBLE_BASE + "## The User's Problem Description\n\n";
+  return (
+    FORMULATION_PREAMBLE_BASE +
+    journalContext + "\n" +
+    "## The User's Problem Description\n\n"
+  );
+}
 
 // ──────────────────────────────────────────────
 // Phase 1: Formulate
@@ -279,7 +296,7 @@ async function formulate(prompt: string, apiKey: string): Promise<RunConfig> {
   }
 
   const doFormulate = async (previousError?: string) => {
-    let p = FORMULATION_PREAMBLE + prompt + libraryContext;
+    let p = FORMULATION_PREAMBLE_BASE + "## The User's Problem Description\n\n" + prompt + libraryContext;
     if (previousError) {
       p += `\n\n## ⚠️ Previous Response Error\nYour last response caused this error:\n\`\`\`\n${previousError}\n\`\`\`\nPlease respond with a valid JSON object only. No markdown.`;
     }
@@ -461,6 +478,11 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   const startTime = Date.now();
   const MAX_ARCHITECT_PIVOTS = 5;
 
+  // ── Research Journal: persistent cross-run memory ──
+  const journalPath = defaultJournalPath(join(workspace.paths.runDir, "..", ".."));
+  const journal = new ResearchJournal(journalPath);
+  const targetGoal = `R(${config.search_config?.r ?? "?"},${config.search_config?.s ?? "?"}) >= ${(config.search_config?.domain_size ?? 0) + 1}`;
+
   // ── Search Phase: triggered by ARCHITECT-emitted search_config ──
   // search_config.problem_class is the authoritative signal — the ARCHITECT
   // emits it as structured JSON so it's reliable regardless of theorem_signature format.
@@ -533,8 +555,15 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
               break;
 
             } else if (z3Result.status === 'unsat') {
-              // Provably no circulant witness — fall back to unconstrained SA
-              console.log(`   ❌ Z3 UNSAT — no circulant witness for R(${sp.r},${sp.s}) on N=${sp.vertices}`);
+              // Provably no circulant witness — record as a permanent LEMMA
+              const claim = `No circulant 2-coloring of K_${sp.vertices} witnesses R(${sp.r},${sp.s})`;
+              await journal.addEntry({
+                type: 'lemma',
+                claim,
+                evidence: `Z3 UNSAT: 17-var SAT encoding, circulant 2^${Math.floor(sp.vertices/2)} search space exhausted`,
+                target_goal: targetGoal,
+              });
+              console.log(`   📓 Lemma recorded: "${claim}"`);
               console.log(`   Circulant space is empty. Retrying with unconstrained SA.`);
               sp = { ...sp, symmetry: undefined };
 
@@ -678,7 +707,16 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         return;
       }
 
-      // Build SearchFailureDigest
+      // ── Build digest and record glass floor observation ──
+      const glassFloorClaim = `SA on K_${sp.vertices} R(${sp.r},${sp.s}) converged at E_min=${result.bestEnergy} (attempt ${attempt})`;
+      await journal.addEntry({
+        type: 'observation',
+        claim: glassFloorClaim,
+        evidence: `${iters.toLocaleString()} iters × ${workers} workers, strategy=${strategy}, seed=${sp.seed ?? 'random'}`,
+        target_goal: targetGoal,
+      });
+      console.log(`   📓 Observation recorded: "${glassFloorClaim}"`);
+
       const digest = buildSearchFailureDigest(result.telemetry, {
         n: sp.vertices, r: sp.r, s: sp.s, attemptNumber: attempt,
       });
@@ -686,10 +724,14 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
 
       console.log(`\n   📋 Diagnosis: ${digest.diagnosis.failureMode}`);
       console.log(`   💡 ${digest.diagnosis.recommendation.slice(0, 120)}...`);
+      // Augment digest with journal context so ARCHITECT sees what's been proven
+      const journalContext = distillJournalForPrompt(await journal.getEntriesForGoal(targetGoal));
+      const augmentedDigest = journalContext ? journalContext + "\n" + digestText : digestText;
+
       console.log(`\n   🏛️  Asking ARCHITECT for search pivot...\n`);
 
       const pivotedConfig = await callSafe(
-        (previousError) => requestSearchPivot(apiKey, digestText, sp, previousError),
+        (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, previousError),
         3,
         "ARCHITECT pivot",
       );
