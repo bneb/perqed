@@ -510,17 +510,11 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
           if (z3Available) {
             const z3Result = await solveWithZ3(sp.vertices, sp.r, sp.s, { timeoutMs: 120_000 });
 
-            if (z3Result === null) {
-              // UNSAT — no circulant witness exists. Log and abort.
-              console.log(`   ❌ Z3 UNSAT — no circulant witness for R(${sp.r},${sp.s}) on N=${sp.vertices}`);
-              console.log(`   The Ramsey witness is not circulant. Falling back to unconstrained SA.`);
-              sp = { ...sp, symmetry: undefined }; // Strip circulant, retry with SA
-            } else {
-              // SAT — witness found! Skip SA entirely.
+            if (z3Result.status === 'sat') {
+              // Witness found — skip SA entirely
               console.log(`   ✅ Z3 found witness in ${z3Result.solveTimeMs}ms!`);
               console.log(`   Distance colors: ${z3Result.distanceBits}`);
 
-              // Save witness and go directly to Lean proof generation
               const matrix = adjToMatrix(z3Result.adj);
               const witnessPath = join(workspace.paths.scratch, "witness.json");
               await Bun.write(witnessPath, JSON.stringify({ n: sp.vertices, r: sp.r, s: sp.s, adjacency: matrix }, null, 2));
@@ -537,12 +531,27 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
               }
               witnessFound = true;
               break;
+
+            } else if (z3Result.status === 'unsat') {
+              // Provably no circulant witness — fall back to unconstrained SA
+              console.log(`   ❌ Z3 UNSAT — no circulant witness for R(${sp.r},${sp.s}) on N=${sp.vertices}`);
+              console.log(`   Circulant space is empty. Retrying with unconstrained SA.`);
+              sp = { ...sp, symmetry: undefined };
+
+            } else if (z3Result.status === 'timeout') {
+              console.log(`   ⏱  Z3 timed out — falling back to SA (not UNSAT, space may have witnesses)`);
+              sp = { ...sp, symmetry: undefined };
+
+            } else {
+              // error
+              console.log(`   ⚠️  Z3 error: ${z3Result.message} — falling back to SA`);
+              sp = { ...sp, symmetry: undefined };
             }
           } else {
             console.log(`   ⚠️  Z3 not available — falling back to SA`);
           }
         } catch (e) {
-          console.log(`   ⚠️  Z3 error — falling back to SA: ${e}`);
+          console.log(`   ⚠️  Z3 exception — falling back to SA: ${e}`);
         }
       }
 

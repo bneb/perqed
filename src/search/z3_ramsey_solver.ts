@@ -16,13 +16,29 @@ import { buildCirculantGraph } from "./symmetry";
 import { generateRamseyZ3Script } from "./z3_circulant_generator";
 
 export interface Z3WitnessResult {
+  status: 'sat';
   /** The adjacency matrix of the found witness */
   adj: AdjacencyMatrix;
-  /** The 17-bit distance-color string from Z3 (e.g. "10110100110110100") */
+  /** The distance-color bit string from Z3 (e.g. "10110100110110100") */
   distanceBits: string;
   /** Wall time for Z3 to solve in milliseconds */
   solveTimeMs: number;
 }
+
+export interface Z3UnsatResult {
+  status: 'unsat';
+}
+
+export interface Z3TimeoutResult {
+  status: 'timeout';
+}
+
+export interface Z3ErrorResult {
+  status: 'error';
+  message: string;
+}
+
+export type Z3Result = Z3WitnessResult | Z3UnsatResult | Z3TimeoutResult | Z3ErrorResult;
 
 export interface Z3SolverOptions {
   /** Timeout for the Z3 process in milliseconds (default 120s) */
@@ -54,17 +70,16 @@ export async function isZ3Available(pythonBinary = "python3"): Promise<boolean> 
 /**
  * Solve the circulant Ramsey witness problem using Z3.
  *
- * @param N  Number of vertices (e.g. 35)
- * @param r  Red clique size to forbid (e.g. 4)
- * @param s  Blue clique size to forbid (e.g. 6)
- * @returns  Z3WitnessResult if SAT, null if UNSAT or timeout
+ * @returns Z3WitnessResult if SAT, Z3UnsatResult if provably no witness,
+ *          Z3TimeoutResult if solver exceeded the time limit,
+ *          Z3ErrorResult on process/parse failure
  */
 export async function solveWithZ3(
   N: number,
   r: number,
   s: number,
   options: Z3SolverOptions = {},
-): Promise<Z3WitnessResult | null> {
+): Promise<Z3Result> {
   const { timeoutMs = 120_000, pythonBinary = "python3" } = options;
 
   const script = generateRamseyZ3Script(N, r, s);
@@ -97,7 +112,7 @@ export async function solveWithZ3(
     if (race === "timeout") {
       proc.kill();
       console.error(`[Z3] Timed out after ${timeoutMs}ms for R(${r},${s}) on N=${N}`);
-      return null;
+      return { status: 'timeout' };
     }
 
     const { stdout, stderr, exitCode } = race;
@@ -105,31 +120,31 @@ export async function solveWithZ3(
 
     if (exitCode !== 0) {
       console.error(`[Z3] Process error (exit ${exitCode}): ${stderr || stdout}`);
-      return null;
+      return { status: 'error', message: stderr || stdout || `exit ${exitCode}` };
     }
 
     if (stdout === "UNSAT") {
       console.log(`[Z3] UNSAT — no circulant R(${r},${s}) witness exists on N=${N}`);
-      return null;
+      return { status: 'unsat' };
     }
 
     if (stdout.startsWith("ERROR:")) {
       console.error(`[Z3] Solver error: ${stdout}`);
-      return null;
+      return { status: 'error', message: stdout };
     }
 
     // Parse SAT:{bits}
     const match = stdout.match(/^SAT:([01]+)$/);
     if (!match) {
       console.error(`[Z3] Unexpected output: ${stdout}`);
-      return null;
+      return { status: 'error', message: `Unexpected output: ${stdout}` };
     }
 
     const distanceBits = match[1]!;
     const expectedLen = Math.floor(N / 2);
     if (distanceBits.length !== expectedLen) {
       console.error(`[Z3] Bit string length ${distanceBits.length} != expected ${expectedLen}`);
-      return null;
+      return { status: 'error', message: `Bit string length ${distanceBits.length} != expected ${expectedLen}` };
     }
 
     // Reconstruct AdjacencyMatrix from distance-color bits
@@ -142,7 +157,7 @@ export async function solveWithZ3(
     console.log(`[Z3] SAT in ${solveTimeMs}ms — witness found for R(${r},${s}) on N=${N}`);
     console.log(`[Z3] Distance colors: ${distanceBits}`);
 
-    return { adj, distanceBits, solveTimeMs };
+    return { status: 'sat', adj, distanceBits, solveTimeMs };
   } finally {
     // Clean up temp file
     try {
