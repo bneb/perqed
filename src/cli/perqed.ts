@@ -34,6 +34,7 @@ import {
 } from "../search/witness_detector";
 import { solveWithZ3, isZ3Available } from "../search/z3_ramsey_solver";
 import { adjToMatrix } from "../search/ramsey_worker";
+import { runLNS } from "../search/lns_solver";
 import {
   ResearchJournal,
   distillJournalForPrompt,
@@ -691,6 +692,38 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
           console.log(`\n❌ Lean verification failed: ${stderr.slice(0, 200)}`);
           console.log(`   Falling back to tactic search...\n`);
           break;
+        }
+      }
+
+      // ── LNS Finisher: attempt Z3 repair on glass floor ──
+      if (!result.witness && result.bestAdj) {
+        const lnsThreshold = (config.search_config as any).lns_energy_threshold ?? 20;
+        if (result.bestEnergy > 0 && result.bestEnergy <= lnsThreshold) {
+          const z3Available = await isZ3Available();
+          if (z3Available) {
+            console.log(`\n🔬 LNS Finisher — E=${result.bestEnergy} within threshold (≤${lnsThreshold}), attempting Z3 repair...`);
+            const lnsResult = await runLNS(
+              result.bestAdj, sp.vertices, sp.r, sp.s,
+              { extraFreePercent: 0.05, timeoutMs: 90_000 }
+            );
+            if (lnsResult.status === 'sat') {
+              console.log(`   ✅ LNS SAT — Z3 repaired ${lnsResult.freeEdgeCount} edges in ${lnsResult.solveTimeMs}ms`);
+              // Hand off as witness → normal Lean proof path
+              result.witness = lnsResult.adj;
+              result.bestEnergy = 0;
+            } else if (lnsResult.status === 'unsat') {
+              console.log(`   ❌ LNS UNSAT: ${lnsResult.clue}`);
+              await journal.addEntry({
+                type: 'failure_mode',
+                claim: `LNS could not repair E=${result.bestEnergy} basin for R(${sp.r},${sp.s}) on K_${sp.vertices}`,
+                evidence: `${lnsResult.clue}; ${lnsResult.freeEdgeCount} free edges tried`,
+                target_goal: targetGoal,
+              });
+              console.log(`   📓 Failure mode recorded in journal.`);
+            } else {
+              console.log(`   ⚠️  LNS ${lnsResult.status} — continuing to SA pivot`);
+            }
+          }
         }
       }
 

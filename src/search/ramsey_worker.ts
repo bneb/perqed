@@ -53,6 +53,8 @@ export interface RamseySearchResult {
   bestEnergy: number;
   /** The witness graph (if E=0) */
   witness: AdjacencyMatrix | null;
+  /** Best graph regardless of energy (for LNS repair when E>0) */
+  bestAdj: AdjacencyMatrix;
   /** Total iterations performed */
   iterations: number;
   /** Iterations per second */
@@ -144,7 +146,7 @@ export function ramseySearch(
             while (energyTrajectory.length < 10) energyTrajectory.push(0);
             while (temperatureTrajectory.length < 10) temperatureTrajectory.push(temp);
             return {
-              bestEnergy: 0, witness: bestAdj, iterations: iter, ips,
+              bestEnergy: 0, witness: bestAdj, bestAdj, iterations: iter, ips,
               telemetry: {
                 bestEnergy: 0, finalEnergy: 0, finalTemperature: temp,
                 initialTemperature: initialTemp, totalIterations: iter,
@@ -180,7 +182,7 @@ export function ramseySearch(
             while (energyTrajectory.length < 10) energyTrajectory.push(0);
             while (temperatureTrajectory.length < 10) temperatureTrajectory.push(temp);
             return {
-              bestEnergy: 0, witness: bestAdj, iterations: iter, ips,
+              bestEnergy: 0, witness: bestAdj, bestAdj, iterations: iter, ips,
               telemetry: {
                 bestEnergy: 0, finalEnergy: 0, finalTemperature: temp,
                 initialTemperature: initialTemp, totalIterations: iter,
@@ -231,6 +233,7 @@ export function ramseySearch(
   return {
     bestEnergy,
     witness: bestEnergy === 0 ? bestAdj : null,
+    bestAdj,
     iterations: maxIterations,
     ips,
     telemetry: {
