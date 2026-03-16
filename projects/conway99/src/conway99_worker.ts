@@ -1,12 +1,17 @@
 /**
- * Conway 99 Worker — Independent SA island running in a Web Worker.
+ * Conway 99 Worker — Valley-Depth Proportional Reheat
  *
- * Runs an infinite Metropolis-Hastings loop against IncrementalSRGEngine.
- * Communicates with orchestrator via postMessage:
- *   - HEARTBEAT every 500K iterations (workerId, energy, temp, ips, iter)
- *   - NEW_BEST when a new local best is found (includes adjacency matrix)
+ * Reheat strategy: the deeper the valley (measured by iterations since
+ * new best), the harder the kick.
  *
- * Uses E^(2/5) adaptive reheat with exponential backoff.
+ *   reheatTemp = E^(2/5) × min(1, log₂(itersSinceBest / BASE_WINDOW))
+ *
+ * - Stuck < BASE_WINDOW: no reheat (still exploring current basin)
+ * - Stuck 2× BASE_WINDOW: gentle (1× scale)
+ * - Stuck 10× BASE_WINDOW: moderate (3.3× scale)
+ * - Stuck 100× BASE_WINDOW: full (6.6× scale)
+ *
+ * Cooling rate: α = 0.999999 (10× slower than original for deeper exploration)
  */
 
 import { AdjacencyMatrix } from "../../../src/math/graph/AdjacencyMatrix";
@@ -16,45 +21,41 @@ declare var self: Worker;
 
 // SA hyperparameters
 const T0 = 100.0;
-const ALPHA = 0.99999;
-const REHEAT_WINDOW_INIT = 50_000;
-const REHEAT_EXPONENT = 0.4;    // E^(2/5) reheat
+const ALPHA = 0.999999;          // 10× slower cooling
+const REHEAT_EXPONENT = 0.4;     // E^(2/5) base
+const BASE_WINDOW = 500_000;     // minimum iters before first reheat
+const MAX_REHEAT_SCALE = 6.0;    // cap on log₂ scale
+
 const HEARTBEAT_INTERVAL = 500_000;
 
 self.onmessage = (event: MessageEvent) => {
   const { workerId } = event.data;
 
-  // Generate random initial graph
   const g = AdjacencyMatrix.randomRegular(99, 14);
   const engine = new IncrementalSRGEngine(g, 14, 1, 2);
 
   let temp = T0;
   let bestEnergy = engine.energy;
-  let lastImproveIter = 0;
-  let reheatWindow = REHEAT_WINDOW_INIT;
+  let lastBestIter = 0;
   let iter = 0;
   let lastHeartbeatTime = performance.now();
 
-  // Signal ready
   self.postMessage({
     type: "READY",
     workerId,
     initialEnergy: engine.energy,
   });
 
-  // The infinite hot loop
   while (true) {
-    // Check for E=0
     if (engine.energy === 0) {
-      const raw = engine.getGraph().raw;
       self.postMessage({
         type: "SOLUTION",
         workerId,
         energy: 0,
         iter,
-        state: new Uint8Array(raw),
+        state: new Uint8Array(engine.getGraph().raw),
       });
-      return; // Exit worker — we found it!
+      return;
     }
 
     const delta = engine.proposeRandomSwap();
@@ -65,17 +66,14 @@ self.onmessage = (event: MessageEvent) => {
 
         if (engine.energy < bestEnergy) {
           bestEnergy = engine.energy;
-          lastImproveIter = iter;
-          reheatWindow = REHEAT_WINDOW_INIT;
+          lastBestIter = iter;
 
-          // Report new local best with state
-          const raw = engine.getGraph().raw;
           self.postMessage({
             type: "NEW_BEST",
             workerId,
             energy: bestEnergy,
             iter,
-            state: new Uint8Array(raw),
+            state: new Uint8Array(engine.getGraph().raw),
           });
         }
       } else {
@@ -86,15 +84,18 @@ self.onmessage = (event: MessageEvent) => {
     // Exponential cooling
     temp *= ALPHA;
 
-    // Adaptive E^(2/5) reheat with exponential backoff
-    if (iter - lastImproveIter > reheatWindow) {
-      const reheatTemp = Math.max(1, Math.pow(bestEnergy, REHEAT_EXPONENT));
-      temp = reheatTemp;
-      lastImproveIter = iter;
-      reheatWindow = Math.min(reheatWindow * 2, 10_000_000);
+    // Valley-depth proportional reheat
+    const itersSinceBest = iter - lastBestIter;
+    if (itersSinceBest > BASE_WINDOW && temp < 0.01) {
+      // Scale proportional to log₂(depth / BASE_WINDOW)
+      const depthRatio = itersSinceBest / BASE_WINDOW;
+      const scale = Math.min(MAX_REHEAT_SCALE, Math.log2(depthRatio));
+      const reheatTemp = Math.pow(bestEnergy, REHEAT_EXPONENT) * (scale / MAX_REHEAT_SCALE);
+      temp = Math.max(1, reheatTemp);
+      lastBestIter = iter; // reset to prevent immediate re-trigger
     }
 
-    // Heartbeat every 500K iters
+    // Heartbeat
     if (iter > 0 && iter % HEARTBEAT_INTERVAL === 0) {
       const now = performance.now();
       const ips = Math.round(HEARTBEAT_INTERVAL / ((now - lastHeartbeatTime) / 1000));
