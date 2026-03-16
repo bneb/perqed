@@ -21,7 +21,7 @@ import { FormalistResponseSchema, type FormalistResponse } from "../schemas";
 export interface FormalistConfig {
   /** Ollama API endpoint base. Default: http://localhost:11434 */
   endpoint: string;
-  /** Model name. Default: deepseek-r1:8b */
+  /** Model name. Default: deepseek-prover-v2:7b-q8 */
   model: string;
   /** Sampling temperature (0.0–1.0). */
   temperature: number;
@@ -37,7 +37,7 @@ export interface FormalistConfig {
 
 const DEFAULT_CONFIG: FormalistConfig = {
   endpoint: "http://localhost:11434",
-  model: "deepseek-r1:8b",
+  model: "deepseek-prover-v2:7b-q8",
   temperature: 0.6,
   systemPrompt: "",
   mode: "chat",
