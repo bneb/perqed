@@ -71,10 +71,11 @@ by Filip Stappers, discovered a construction for all odd~$m > 1$ through
 31 autonomous exploration steps; Knuth subsequently published a formal
 mathematical proof~\cite{knuth2026}. During that exploration, Claude also
 found isolated solutions for $m = 4$, $m = 6$, and $m = 8$, but could
-not generalize them. Shortly after, the general even-$m$ case ($m \ge 8$)
-was resolved via autonomous LLM exploration (GPT-5.4 Pro), using a splice
-gadget on the final two modular fibers that requires $m \ge 8$ for
-topological stability. This construction was further explored by
+not generalize them. Shortly after, under the direction of Ho Boon
+Suan, GPT-5.4~Pro autonomously generated a closed-form algorithm for
+all even $m \ge 8$~\cite{hoboonsuan2026}, using a splice gadget on
+the final two modular fibers that requires $m \ge 8$ for topological
+stability. This construction was further explored by
 Aquino-Michaels~\cite{aquino2026}.
 The cases $m = 4$ and $m = 6$ fall outside that construction.
 
@@ -305,9 +306,11 @@ Source code, witnesses, and Lean~4 proofs are available at
 We thank Donald Knuth for posing the problem and for his detailed
 verification of the odd-$m$ construction~\cite{knuth2026}, Kim Morrison
 for the contemporaneous Lean~4 formalization of the odd-$m$
-case~\cite{morrison2026}, and the teams behind Claude Opus~4.6 (Anthropic)
-and GPT-5.4~Pro (OpenAI) whose autonomous explorations resolved the
-generalized odd and even cases respectively.
+case~\cite{morrison2026}, Ho Boon Suan for directing the GPT-5.4~Pro
+discovery of the even-$m$ construction~\cite{hoboonsuan2026},
+Keston Aquino-Michaels for further exploration of that
+construction~\cite{aquino2026}, and the teams behind Claude Opus~4.6
+(Anthropic) and GPT-5.4~Pro (OpenAI).
 
 The TypeScript search engine, incremental energy evaluator, Lean~4 proof
 architecture, and this manuscript were developed with assistance from
@@ -317,21 +320,30 @@ coding and writing assistants throughout the project.
 \begin{thebibliography}{9}
 
 \bibitem{knuth2026}
-D.~E. Knuth, ``Claude's Cycles,'' February 2026 (revised March 6, 2026).
+D.~E. Knuth, ``Claude's Cycles,'' Stanford Computer Science Department,
+February 28, 2026 (revised March 6, 2026).
 Available: \url{https://www-cs-faculty.stanford.edu/~knuth/papers/claude-cycles.pdf}
 
 \bibitem{darijani2025}
 I.~Darijani, B.~Miraftab, and D.~Witte~Morris, ``Arc-disjoint hamiltonian
 paths in Cartesian products of directed cycles,'' \emph{Ars Mathematica
 Contemporanea}, vol.~25, no.~2, P2.10, 2025.
+DOI: \url{https://doi.org/10.26493/1855-3974.3047.c2d}
+
+\bibitem{hoboonsuan2026}
+H.~Boon Suan, ``even\_closed\_form.c'' and
+``even\_closed\_form\_proof\_final.pdf,'' March 2026.
+Available: \url{https://www-cs-faculty.stanford.edu/~knuth/even_closed_form.c}
+and \url{https://www-cs-faculty.stanford.edu/~knuth/even_closed_form_proof_final.pdf}
 
 \bibitem{aquino2026}
 K.~Aquino-Michaels, ``Completing Claude's cycles: Multi-agent structured
-exploration on an open combinatorial problem,'' 2026.
+exploration on an open combinatorial problem,'' No Way Labs, March 2026.
+Available: \url{https://github.com/no-way-labs/residue}
 
 \bibitem{morrison2026}
 K.~Morrison, ``KnuthClaudeLean: Lean 4 formalization of Knuth's odd-$m$
-torus decomposition,'' GitHub repository, March 2026.
+torus decomposition,'' GitHub repository, March 4, 2026.
 Available: \url{https://github.com/kim-em/KnuthClaudeLean}
 
 \bibitem{kirkpatrick1983}
