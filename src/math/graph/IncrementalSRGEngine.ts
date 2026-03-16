@@ -37,6 +37,12 @@ export class IncrementalSRGEngine {
   /** Current energy */
   energy: number;
 
+  /** Current triangle count (3-cycles) */
+  private triangles: number = 0;
+
+  /** Staged triangle delta */
+  private stageTriangleDelta: number = 0;
+
   /** Fixed adjacency list: adjList[v*k + i] = ith neighbor of v */
   private adjList: Int32Array;
 
@@ -90,6 +96,24 @@ export class IncrementalSRGEngine {
     this.buildAdjList();
     this.buildFullCN();
     this.energy = this.computeEnergyFromCN();
+    this.triangles = this.countTrianglesFromCN();
+  }
+
+  /** Compute triangle count from CN cache: T = Σ_{(i,j)∈E} CN(i,j) / 3 */
+  private countTrianglesFromCN(): number {
+    const { n, k } = this;
+    let sum = 0;
+    for (let v = 0; v < n; v++) {
+      const base = v * k;
+      for (let i = 0; i < k; i++) {
+        const w = this.adjList[base + i]!;
+        if (w > v) { // each edge once
+          sum += this.cn[v * n + w]!;
+        }
+      }
+    }
+    // Each triangle {u,v,w} is counted 3 times: once for each edge
+    return sum / 3;
   }
 
   // ──────────────────────────────────────────────
@@ -294,7 +318,24 @@ export class IncrementalSRGEngine {
       this.netDelta[key] += delta;
     }
 
-    // Step 5: Compute energy delta from net CN changes
+    // Step 5: Compute triangle delta
+    // Triangles through edge (p,q) = CN(p,q).
+    // Removed edges: lose CN_old triangles each.
+    // Added edges: gain CN_new = CN_old + netDelta triangles each.
+    {
+      const cnRA_RB = this.cn[ra * n + rb]!;
+      const cnRC_RD = this.cn[rc * n + rd]!;
+
+      // Net CN delta for added edge endpoints (may have changed due to swap)
+      const dNA_NB = (this.netDeltaTracker[na * n + nb] === ver) ? this.netDelta[na * n + nb]! : 0;
+      const dNC_ND = (this.netDeltaTracker[nc * n + nd] === ver) ? this.netDelta[nc * n + nd]! : 0;
+      const cnNA_NB_new = this.cn[na * n + nb]! + dNA_NB;
+      const cnNC_ND_new = this.cn[nc * n + nd]! + dNC_ND;
+
+      this.stageTriangleDelta = (cnNA_NB_new + cnNC_ND_new) - (cnRA_RB + cnRC_RD);
+    }
+
+    // Step 6: Compute energy delta from net CN changes
     let energyDelta = 0;
 
     // Also need to account for adjacency changes in energy:
@@ -403,8 +444,9 @@ export class IncrementalSRGEngine {
     this.graph.addEdge(na, nb);
     this.graph.addEdge(nc, nd);
 
-    // Update energy
+    // Update energy and triangle count
     this.energy += this.stageDelta;
+    this.triangles += this.stageTriangleDelta;
 
     // Replay net deltas into CN cache
     const ver = this.netDeltaVersion;
@@ -450,6 +492,7 @@ export class IncrementalSRGEngine {
 
   getGraph(): AdjacencyMatrix { return this.graph.clone(); }
   getCNCache(): Int32Array { return new Int32Array(this.cn); }
+  getTriangleCount(): number { return this.triangles; }
 
   // ──────────────────────────────────────────────
   //  Legacy API

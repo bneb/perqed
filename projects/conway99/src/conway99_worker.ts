@@ -21,7 +21,7 @@ declare var self: Worker;
 
 // SA hyperparameters
 const T0 = 100.0;
-const ALPHA = 0.999999;          // 10× slower cooling
+const ALPHA = 0.999995;          // 2× slower cooling
 const REHEAT_EXPONENT = 0.4;     // E^(2/5) base
 const BASE_WINDOW = 500_000;     // minimum iters before first reheat
 const MAX_REHEAT_SCALE = 6.0;    // cap on log₂ scale
@@ -87,12 +87,12 @@ self.onmessage = (event: MessageEvent) => {
     // Valley-depth proportional reheat
     const itersSinceBest = iter - lastBestIter;
     if (itersSinceBest > BASE_WINDOW && temp < 0.01) {
-      // Scale proportional to log₂(depth / BASE_WINDOW)
+      // Scale proportional to (depth / BASE_WINDOW)^(2/5)
       const depthRatio = itersSinceBest / BASE_WINDOW;
-      const scale = Math.min(MAX_REHEAT_SCALE, Math.log2(depthRatio));
-      const reheatTemp = Math.pow(bestEnergy, REHEAT_EXPONENT) * (scale / MAX_REHEAT_SCALE);
+      const scale = Math.pow(depthRatio, REHEAT_EXPONENT);
+      const reheatTemp = Math.pow(bestEnergy, REHEAT_EXPONENT) * Math.min(1, scale / MAX_REHEAT_SCALE);
       temp = Math.max(1, reheatTemp);
-      lastBestIter = iter; // reset to prevent immediate re-trigger
+      lastBestIter = iter;
     }
 
     // Heartbeat
