@@ -1,0 +1,222 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>We didn't design Perqed's solver stack. We got stuck, and then we got unstuck, and
+when we looked back at what we'd reached for, there was an architecture.</p>
+
+<h2>The Run That Wouldn't Converge</h2>
+
+<p>We were trying to prove R(4,6) ≥ 36 — a known Ramsey lower bound from 1989.
+The certificate is a 2-coloring of the edges of K<sub>35</sub> with no red K<sub>4</sub>
+and no blue K<sub>6</sub>. Simulated Annealing (SA) is the standard move for this kind of
+search: define an energy function that counts violations, anneal until energy hits zero,
+hand the adjacency matrix to Lean for verification.</p>
+
+<p>Except SA didn't converge. Eight workers. Five hundred million iterations. The best
+energy across all workers: <strong>E = 12</strong>. Not zero. Not trending toward zero.
+Just sitting there across multiple seeds and reheat schedules — a glass floor.</p>
+
+<p>This is where a human mathematician's instinct kicks in: something structural is wrong.
+SA doesn't hit consistent floors by accident.</p>
+
+<h2>The Symmetry Reduction</h2>
+
+<p>The first move was to restrict the search space. Every known R(4,6) witness in the
+literature is a <em>circulant graph</em>: a graph on N vertices where the adjacency
+relation depends only on the circular distance between vertices. On N=35, the full
+graph coloring search space is 2<sup>595</sup>. Restricting to circulant colorings
+reduces it to 2<sup>17</sup> — 131,072 states. That's not a search problem, that's a
+<em>table</em>.</p>
+
+<p>We implemented circulant SA — a mutation operator that flips an entire distance class
+at once instead of individual edges. The energy floor moved slightly but held. Something
+was fundamentally wrong with the circulant space itself, not just our annealing schedule.</p>
+
+<h2>The Right Question</h2>
+
+<p>At this point, the obvious thing is to tune hyperparameters. More workers. Different
+cooling schedules. Reheats. But 2<sup>17</sup> states is enumerable — a modern
+computer can touch every point in that space in milliseconds. The real question wasn't
+<em>how to search better</em>, it was <em>whether a solution exists at all</em>.</p>
+
+<p>This is where we reached for an SMT solver.</p>
+
+<p>SMT (Satisfiability Modulo Theories) solvers like Z3 work differently from heuristic
+search. They don't explore the space — they reason about it. The core engine is
+CDCL (Conflict-Driven Clause Learning): when the solver hits a contradiction, it doesn't
+just backtrack, it synthesizes a new clause that captures <em>why</em> that branch failed
+and adds it permanently to its knowledge base. The solver learns the geometry of the
+problem in real-time. For a 2<sup>17</sup>-state boolean space, this is almost unfairly fast.</p>
+
+<p>We encoded the problem as 17 boolean variables — one per circulant distance class. The
+clique constraints became SAT clauses. We fed it to Z3 and waited.</p>
+
+<p>Z3 came back in seconds: <strong>UNSAT</strong>.</p>
+
+<h2>What UNSAT Actually Means</h2>
+
+<p>This is the result that changed the project's direction. UNSAT doesn't mean "we couldn't
+find a solution." It means <em>no solution exists</em>. Z3 proved — not found, not estimated,
+<strong>proved</strong> — that there is no circulant 2-coloring of K<sub>35</sub> that witnesses
+R(4,6).</p>
+
+<p>The glass floor wasn't a search failure. SA was correctly reporting that the circulant
+space has no valid coloring. We were looking in the wrong place.</p>
+
+<p>That's a mathematical lemma. A standalone result, independently interesting, machine-verifiable.
+And until we built the ResearchJournal, Perqed was just going to discard it.</p>
+
+<h2>The Statefulness Problem</h2>
+
+<p>Human mathematicians don't throw away dead ends. Their notebooks are full of lemmas that
+didn't lead to the main result but are still true. A failed proof attempt isn't wasted
+work — it's negative evidence that constrains future attempts.</p>
+
+<p>Perqed was stateless. Every run started from scratch. The ARCHITECT had no memory of what
+had been proven in previous runs. It would plausibly try circulant SA again on the next
+attempt, not knowing Z3 had already closed that door permanently.</p>
+
+<p>We built the ResearchJournal to fix this: a typed, persistent store of lemmas,
+observations, and dead ends. Critically, it includes a distillation step before
+anything enters the ARCHITECT's context — only structured, claim-sized entries get
+injected, never raw logs. The ARCHITECT now begins each attempt knowing what has already
+been established:</p>
+
+<pre><code>### PREVIOUSLY ESTABLISHED LEMMAS & OBSERVATIONS ###
+- [LEMMA] No circulant 2-coloring of K_35 witnesses R(4,6)
+  (Evidence: Z3 UNSAT: 17-var encoding, circulant 2^17 space exhausted)
+- [OBSERVATION] SA on K_35 R(4,6) converged at E_min=12 (attempt 1)
+  (Evidence: 500,000,000 iters × 8 workers)</code></pre>
+
+<h2>The Stack We Ended Up With</h2>
+
+<p>None of this was planned. It emerged from following what was broken:</p>
+
+<table>
+<thead>
+<tr><th>Layer</th><th>Tool</th><th>Role</th><th>How we got here</th></tr>
+</thead>
+<tbody>
+<tr><td>Formulation</td><td>LLM (Gemini)</td><td>Translate problem → search config</td><td>Always planned</td></tr>
+<tr><td>Exploration</td><td>Simulated Annealing</td><td>Heuristic witness search over 2<sup>595</sup> graphs</td><td>Standard tool for Ramsey search</td></tr>
+<tr><td>Exact verification</td><td>Z3 (SMT)</td><td>Prove or disprove constrained sub-spaces</td><td>SA hit a glass floor we couldn't escape</td></tr>
+<tr><td>Certification</td><td>Lean 4</td><td>Formally verify every claimed result</td><td>Always planned</td></tr>
+<tr><td>Memory</td><td>ResearchJournal</td><td>Accumulate proven intermediate results</td><td>Z3 returned UNSAT and we almost threw it away</td></tr>
+</tbody>
+</table>
+
+<p>The insight isn't that these tools are good — it's that they're good for <em>different
+subproblems</em>. SA is excellent at rapid, unconstrained exploration over enormous spaces.
+Z3 is exact and complete over small, constrained ones. Lean rejects anything either tool
+gets wrong. And the LLM navigates between them, deciding which subproblem to attack next.</p>
+
+<p>What we didn't anticipate was that the solver outputs themselves — including the UNSAT
+proofs — are results worth keeping. The ResearchJournal turns a pipeline of attempts
+into a cumulative record of mathematical knowledge. That's the step from search engine
+to theorem prover.</p>
+
+<h2>What's Next</h2>
+
+<p>We still don't have the R(4,6) witness. The Z3 UNSAT result tells us it isn't circulant —
+which rules out the simplest class of candidates and rules in an entire research direction:
+the witness, if it exists at 35 vertices, has a structure we don't yet understand.</p>
+
+<p>The architecture's job is now to figure out what kind of structure that is. The ARCHITECT
+knows the circulant space is closed. The next pivot might be partial symmetry, or a MaxSAT
+solver to prove the exact minimum energy achievable in the unconstrained space, or something
+neither of us has thought of yet.</p>
+
+<p>That's the point. We're not guiding the search anymore — we're building an engine that learns
+what to search.</p>
+
+<hr>
+
+<p><em>Perqed is open source. <a href="https://github.com/bneb/perqed">Follow us on GitHub</a>
+or <a href="/minutiae/">watch the agent think in real time</a>.</em></p>
+`;
+---
+
+<BaseLayout title="We Got Stuck, and Then We Had an Architecture — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>March 16, 2026</time>
+            <span class="sep">·</span>
+            <span>8 min read</span>
+          </div>
+          <h1>We Got Stuck, and Then We Had an Architecture</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+
+  .article :global(th) {
+    text-align: left;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+
+  .article :global(td) {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+  }
+
+  .article :global(tr:last-child td) {
+    border-bottom: none;
+  }
+
+  @media (max-width: 640px) {
+    .article { padding: 32px 0 48px; }
+
+    .article :global(table) {
+      font-size: 0.8rem;
+    }
+
+    .article :global(th),
+    .article :global(td) {
+      padding: 8px 10px;
+    }
+  }
+</style>
