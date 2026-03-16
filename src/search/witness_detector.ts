@@ -27,8 +27,11 @@ export interface RamseyArchitectConfig {
   domain_size: number;
   /** Number of colors in the edge coloring */
   num_colors: number;
-  /** List of forbidden monochromatic cliques */
-  forbidden_subgraphs: ForbiddenSubgraph[];
+  /** Clique sizes: r for color 0 (red), s for color 1 (blue) — simplified form */
+  r?: number;
+  s?: number;
+  /** List of forbidden monochromatic cliques — detailed form */
+  forbidden_subgraphs?: ForbiddenSubgraph[];
 }
 
 export interface UnknownArchitectConfig {
@@ -83,17 +86,23 @@ export function extractSearchConfig(cfg: ArchitectSearchConfig): SearchConfig | 
   switch (cfg.problem_class) {
     case "ramsey_coloring": {
       const n = cfg.domain_size;
+      if (!n) return null;
+
+      // Resolve r and s — try forbidden_subgraphs first, then top-level r/s fields
+      let r: number | undefined;
+      let s: number | undefined;
+
       const fg = cfg.forbidden_subgraphs;
+      if (fg && fg.length >= 2) {
+        r = fg.find(f => f.color === 0)?.clique_size;
+        s = fg.find(f => f.color === 1)?.clique_size;
+      }
 
-      if (!n || !fg || fg.length < 2) return null;
+      // Fallback: top-level r/s (simpler form the ARCHITECT sometimes emits)
+      r = r ?? cfg.r;
+      s = s ?? cfg.s;
 
-      // Extract r (color 0) and s (color 1) clique sizes
-      const red = fg.find(f => f.color === 0);
-      const blue = fg.find(f => f.color === 1);
-      if (!red || !blue) return null;
-
-      const r = red.clique_size;
-      const s = blue.clique_size;
+      if (!r || !s) return null;
 
       // Auto-scale concurrency
       let saIterations: number;

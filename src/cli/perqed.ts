@@ -138,8 +138,10 @@ const RUN_CONFIG_SCHEMA = {
           type: SchemaType.STRING as const,
           enum: ["ramsey_coloring", "unknown"],
         },
-        domain_size: { type: SchemaType.NUMBER as const },
+        domain_size: { type: SchemaType.NUMBER as const, description: "Number of vertices, e.g. 35 for K_35" },
         num_colors: { type: SchemaType.NUMBER as const },
+        r: { type: SchemaType.NUMBER as const, description: "Clique size for color 0 (red)" },
+        s: { type: SchemaType.NUMBER as const, description: "Clique size for color 1 (blue)" },
         forbidden_subgraphs: {
           type: SchemaType.ARRAY as const,
           items: {
@@ -189,11 +191,13 @@ For Ramsey lower bounds R(r,s) ≥ n (i.e., construct a 2-coloring of K_{n-1}):
   "problem_class": "ramsey_coloring",
   "domain_size": <n-1>,
   "num_colors": 2,
-  "forbidden_subgraphs": [
-    { "color": 0, "clique_size": <r> },
-    { "color": 1, "clique_size": <s> }
-  ]
+  "r": <r>,
+  "s": <s>
 }
+\`\`\`
+For example, R(4,6) ≥ 36 (K_35, no red K_4, no blue K_6):
+\`\`\`json
+{ "problem_class": "ramsey_coloring", "domain_size": 35, "num_colors": 2, "r": 4, "s": 6 }
 \`\`\`
 
 For problems that do NOT require a constructive witness:
