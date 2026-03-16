@@ -52,6 +52,9 @@ self.onmessage = (event: MessageEvent) => {
       telemetry: result.telemetry,
       witnessRaw: result.witness ? Array.from(result.witness.raw) : null,
       witnessN: result.witness?.n ?? 0,
+      // Always serialize bestAdj for multi-candidate LNS selection
+      bestAdjRaw: Array.from(result.bestAdj.raw),
+      bestAdjN: result.bestAdj.n,
     };
 
     self.postMessage({ type: "done", worker: workerIndex, result: serializedResult });

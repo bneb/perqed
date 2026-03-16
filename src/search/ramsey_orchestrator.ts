@@ -39,6 +39,8 @@ export interface OrchestratedSearchConfig {
 export interface OrchestratedSearchResult {
   /** Best result across all workers */
   best: RamseySearchResult;
+  /** All individual worker results (for multi-candidate LNS) */
+  allResults: RamseySearchResult[];
   /** Number of workers that ran */
   workersRan: number;
   /** Which worker found the best result */
@@ -92,6 +94,7 @@ function singleSearch(config: OrchestratedSearchConfig): OrchestratedSearchResul
 
   return {
     best: result,
+    allResults: [result],
     workersRan: 1,
     bestWorkerIndex: 0,
     totalWallTime: (Date.now() - startTime) / 1000,
@@ -117,6 +120,7 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
   let bestResult: RamseySearchResult | null = null;
   let bestWorkerIndex = 0;
   let resolved = false;
+  const allResults: RamseySearchResult[] = [];
 
   // Spawn workers
   const workers: Worker[] = [];
@@ -148,14 +152,24 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
               witness.raw[i] = data[i]!;
             }
           }
+          let bestAdj: AdjacencyMatrix;
+          if (raw.bestAdjRaw && raw.bestAdjN) {
+            bestAdj = new AdjacencyMatrix(raw.bestAdjN);
+            const data = new Int8Array(raw.bestAdjRaw);
+            for (let i = 0; i < data.length; i++) bestAdj.raw[i] = data[i]!;
+          } else {
+            bestAdj = witness ?? new AdjacencyMatrix(config.n);
+          }
           const result: RamseySearchResult = {
             bestEnergy: raw.bestEnergy,
             witness,
+            bestAdj,
             iterations: raw.iterations,
             ips: raw.ips,
             telemetry: raw.telemetry,
           };
 
+          allResults.push(result);
           if (!bestResult || result.bestEnergy < bestResult.bestEnergy) {
             bestResult = result;
             bestWorkerIndex = msg.worker;
@@ -216,6 +230,7 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
 
   return {
     best: bestResult!,
+    allResults,
     workersRan: numWorkers,
     bestWorkerIndex,
     totalWallTime: (Date.now() - startTime) / 1000,

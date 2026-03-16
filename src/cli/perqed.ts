@@ -732,34 +732,61 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       }
 
       // ── LNS Finisher: attempt Z3 repair on glass floor ──
-      if (!result.witness && result.bestAdj) {
+      // Try top-J candidates within K energy of the global best.
+      // Workers explore different basins — a structurally diverse pool
+      // may succeed on E=14 where E=13 is irrecoverably entangled.
+      if (!result.witness) {
         const lnsThreshold = (config.search_config as any).lns_energy_threshold ?? 20;
+        const lnsJ = (config.search_config as any).lns_candidate_j ?? 3;
+        const lnsK = (config.search_config as any).lns_candidate_k ?? 4;
+
         if (result.bestEnergy > 0 && result.bestEnergy <= lnsThreshold) {
           const z3Available = await isZ3Available();
           if (z3Available) {
-            console.log(`\n🔬 LNS Finisher — E=${result.bestEnergy} within threshold (≤${lnsThreshold}), attempting Z3 repair...`);
-            const lnsResult = await runLNS(
-              result.bestAdj, sp.vertices, sp.r, sp.s,
-              { extraFreePercent: 0.05, timeoutMs: 90_000 }
-            );
-            if (lnsResult.status === 'sat') {
-              console.log(`   ✅ LNS SAT — Z3 repaired ${lnsResult.freeEdgeCount} edges in ${lnsResult.solveTimeMs}ms`);
-              addEvent(`LNS SAT: Z3 repaired ${lnsResult.freeEdgeCount} edges in ${lnsResult.solveTimeMs}ms`, 'success');
-              // Hand off as witness → normal Lean proof path
-              result.witness = lnsResult.adj;
-              result.bestEnergy = 0;
-            } else if (lnsResult.status === 'unsat') {
-              console.log(`   ❌ LNS UNSAT: ${lnsResult.clue}`);
-              addEvent(`LNS UNSAT: basin at E=${result.bestEnergy} is irrecoverable`, 'error');
-              await journal.addEntry({
-                type: 'failure_mode',
-                claim: `LNS could not repair E=${result.bestEnergy} basin for R(${sp.r},${sp.s}) on K_${sp.vertices}`,
-                evidence: `${lnsResult.clue}; ${lnsResult.freeEdgeCount} free edges tried`,
-                target_goal: targetGoal,
-              });
-              console.log(`   📓 Failure mode recorded in journal.`);
-            } else {
-              console.log(`   ⚠️  LNS ${lnsResult.status} — continuing to SA pivot`);
+            // Build candidate pool: all worker results within K energy of best, sorted asc
+            const globalBest = result.bestEnergy;
+            const candidates = orchResult.allResults
+              .filter(r => r.bestEnergy > 0 && r.bestEnergy <= globalBest + lnsK)
+              .sort((a, b) => a.bestEnergy - b.bestEnergy)
+              .slice(0, lnsJ);
+
+            console.log(`\n🔬 LNS Finisher — global best E=${globalBest}, trying ${candidates.length} candidate(s) (J=${lnsJ}, K=${lnsK}):`);
+            candidates.forEach((c, i) => console.log(`   #${i + 1}: E=${c.bestEnergy}`));
+
+            let lnsSat = false;
+            for (let ci = 0; ci < candidates.length; ci++) {
+              const candidate = candidates[ci]!;
+              console.log(`\n   🔬 Candidate #${ci + 1} (E=${candidate.bestEnergy}):`);
+              addEvent(`LNS candidate #${ci + 1}: E=${candidate.bestEnergy}`, 'info');
+
+              const lnsResult = await runLNS(
+                candidate.bestAdj, sp.vertices, sp.r, sp.s,
+                { extraFreePercent: 0.05, timeoutMs: 90_000 }
+              );
+
+              if (lnsResult.status === 'sat') {
+                console.log(`   ✅ LNS SAT on candidate #${ci + 1} — Z3 repaired ${lnsResult.freeEdgeCount} edges in ${lnsResult.solveTimeMs}ms`);
+                addEvent(`LNS SAT (#${ci + 1}): Z3 repaired ${lnsResult.freeEdgeCount} edges in ${lnsResult.solveTimeMs}ms`, 'success');
+                result.witness = lnsResult.adj;
+                result.bestEnergy = 0;
+                lnsSat = true;
+                break;
+              } else if (lnsResult.status === 'unsat') {
+                console.log(`   ❌ LNS UNSAT (#${ci + 1}): ${lnsResult.clue}`);
+                addEvent(`LNS UNSAT (#${ci + 1}): E=${candidate.bestEnergy} basin irrecoverable`, 'error');
+                await journal.addEntry({
+                  type: 'failure_mode',
+                  claim: `LNS could not repair E=${candidate.bestEnergy} basin for R(${sp.r},${sp.s}) on K_${sp.vertices}`,
+                  evidence: `${lnsResult.clue}; ${lnsResult.freeEdgeCount} free edges tried`,
+                  target_goal: targetGoal,
+                });
+              } else {
+                console.log(`   ⚠️  LNS ${lnsResult.status} (#${ci + 1}) — skipping to next candidate`);
+              }
+            }
+
+            if (!lnsSat) {
+              console.log(`\n   📓 All ${candidates.length} LNS candidates exhausted — failure modes recorded.`);
             }
           }
         }
