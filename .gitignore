@@ -59,6 +59,7 @@ website/node_modules/
 **/paper/cover_letter.*
 **/paper/*.pdf
 !projects/torus-decomposition/paper/torus_decomposition.pdf
+!paper/torus_decomposition.pdf
 **/paper/*.aux
 **/paper/*.log
 **/paper/*.out
