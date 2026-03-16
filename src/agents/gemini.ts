@@ -12,6 +12,7 @@
 
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import type { AgentRole } from "../types";
+import { repairJSON } from "../util/json_repair";
 
 // ──────────────────────────────────────────────
 // Model Tiers
@@ -137,7 +138,19 @@ export class GeminiAgent {
         console.log(`   🌐 [GeminiAgent:${this.role}] ${this.modelTier} → ${text.length} chars`);
         console.log(`   🌐 [GeminiAgent:${this.role}] preview: ${text.slice(0, 200)}`);
 
-        return JSON.parse(text);
+        // Try clean parse first, then structural repair
+        let parsed: any;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          parsed = repairJSON(text);
+          if (parsed) {
+            console.log(`   🔧 [GeminiAgent:${this.role}] JSON repaired from truncated response`);
+          } else {
+            throw new Error(`JSON unparseable even after repair: ${text.slice(0, 100)}`);
+          }
+        }
+        return parsed;
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);
         console.log(`   ⚠️ [GeminiAgent:${this.role}] attempt ${attempt}/${retries} failed: ${lastError}`);

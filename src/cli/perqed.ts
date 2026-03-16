@@ -41,6 +41,7 @@ import {
   defaultJournalPath,
 } from "../search/research_journal";
 import { GistPublisher } from "../gist_publisher";
+import { repairJSON } from "../util/json_repair";
 
 // ──────────────────────────────────────────────
 // CLI Argument Parsing
@@ -445,7 +446,7 @@ async function requestSearchPivot(
       temperature: 0.2,
       responseMimeType: "application/json",
       responseSchema: SEARCH_PIVOT_SCHEMA as any,
-      maxOutputTokens: 500,
+      maxOutputTokens: 2000,
     },
   });
 
@@ -462,7 +463,9 @@ async function requestSearchPivot(
 
   const result = await model.generateContent(prompt);
   const text = result.response.text().trim();
-  return JSON.parse(text) as SearchPhase; // responseSchema guarantees valid JSON
+  const parsed = repairJSON(text);
+  if (!parsed) throw new Error(`Search pivot JSON unparseable: ${text.slice(0, 100)}`);
+  return parsed as SearchPhase;
 }
 
 // ──────────────────────────────────────────────
