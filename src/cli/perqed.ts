@@ -407,25 +407,24 @@ async function requestSearchPivot(
       temperature: 0.2,
       responseMimeType: "application/json",
       responseSchema: SEARCH_PIVOT_SCHEMA as any,
+      maxOutputTokens: 500,
     },
   });
 
+  // Cap digest to first 1500 chars — prevents prompt bloat eating into output budget
+  const digestSummary = digestText.slice(0, 1500);
+
   let prompt = SEARCH_PIVOT_PREAMBLE +
-    `## Current Configuration\n\`\`\`json\n${JSON.stringify(currentConfig, null, 2)}\n\`\`\`\n\n` +
-    `## SearchFailureDigest\n${digestText}`;
+    `## Current Configuration\n${JSON.stringify(currentConfig)}\n\n` +
+    `## SearchFailureDigest\n${digestSummary}`;
 
   if (previousError) {
-    prompt += `\n\n## ⚠️ Previous Response Error\nYour last response caused this error and was rejected:\n\`\`\`\n${previousError}\n\`\`\`\nPlease respond with a plain JSON object only. No markdown, no code fences.`;
+    prompt += `\n\n## Previous Error\n${previousError.slice(0, 200)}`;
   }
 
   const result = await model.generateContent(prompt);
-  let text = result.response.text().trim();
-  // Strip any markdown code fences the model added despite instructions
-  if (text.startsWith("```json")) text = text.replace(/^```json/i, "");
-  else if (text.startsWith("```")) text = text.replace(/^```/, "");
-  if (text.endsWith("```")) text = text.replace(/```$/, "");
-
-  return JSON.parse(text.trim()) as SearchPhase; // throws on bad JSON — callSafe retries
+  const text = result.response.text().trim();
+  return JSON.parse(text) as SearchPhase; // responseSchema guarantees valid JSON
 }
 
 // ──────────────────────────────────────────────
