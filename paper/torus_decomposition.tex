@@ -74,7 +74,8 @@ found isolated solutions for $m = 4$, $m = 6$, and $m = 8$, but could
 not generalize them. Shortly after, the general even-$m$ case ($m \ge 8$)
 was resolved via autonomous LLM exploration (GPT-5.4 Pro), using a splice
 gadget on the final two modular fibers that requires $m \ge 8$ for
-topological stability.
+topological stability. This construction was further explored by
+Aquino-Michaels~\cite{aquino2026}.
 The cases $m = 4$ and $m = 6$ fall outside that construction.
 
 Morrison formalized Knuth's odd-$m$ proof in Lean~4~\cite{morrison2026},
@@ -239,7 +240,9 @@ def isTorusEdge (u v : Torus6) : Prop :=
 We define the vertex coordinate space using Lean's core
 \texttt{Fin\;m} type rather than the \texttt{ZMod\;m} ring provided by
 Mathlib. This choice eliminates all external library dependencies,
-keeping the trusted computing base minimal. Formally, our code verifies
+keeping the trusted computing base (TCB) minimal---an approach also
+utilized successfully in Morrison's formalization of the odd-$m$
+cases~\cite{morrison2026}. Formally, our code verifies
 the decomposition over this \texttt{Fin\;m} topology.
 Metatheoretically, because Lean~4 defines addition on $\texttt{Fin}\;n$
 as $(a + b) \bmod n$, this topology is structurally identical to the
@@ -312,19 +315,23 @@ Claude (Anthropic) and Gemini (Google DeepMind), used as interactive
 coding and writing assistants throughout the project.
 
 \begin{thebibliography}{9}
+
 \bibitem{knuth2026}
-D.~E. Knuth, ``Claude's Cycles: Three-dimensional Hamiltonian cycles
-in a torus,'' February 2026 (revised March 6, 2026).
-Available: \url{https://cs.stanford.edu/~knuth/papers/claude-cycles.pdf}
+D.~E. Knuth, ``Claude's Cycles,'' February 2026 (revised March 6, 2026).
+Available: \url{https://www-cs-faculty.stanford.edu/~knuth/papers/claude-cycles.pdf}
 
 \bibitem{darijani2025}
 I.~Darijani, B.~Miraftab, and D.~Witte~Morris, ``Arc-disjoint hamiltonian
 paths in Cartesian products of directed cycles,'' \emph{Ars Mathematica
-Contemporanea}, 2025.
+Contemporanea}, vol.~25, no.~2, P2.10, 2025.
+
+\bibitem{aquino2026}
+K.~Aquino-Michaels, ``Completing Claude's cycles: Multi-agent structured
+exploration on an open combinatorial problem,'' 2026.
 
 \bibitem{morrison2026}
 K.~Morrison, ``KnuthClaudeLean: Lean 4 formalization of Knuth's odd-$m$
-torus decomposition,'' March 2026.
+torus decomposition,'' GitHub repository, March 2026.
 Available: \url{https://github.com/kim-em/KnuthClaudeLean}
 
 \bibitem{kirkpatrick1983}
