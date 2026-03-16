@@ -450,9 +450,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   const startTime = Date.now();
   const MAX_ARCHITECT_PIVOTS = 5;
 
-  // ── Auto-detect constructive existence proofs ──
-  const needsSearch = isConstructiveExistence(config.theorem_signature)
-    && config.search_config?.problem_class !== "unknown";
+  // ── Search Phase: triggered by ARCHITECT-emitted search_config ──
+  // search_config.problem_class is the authoritative signal — the ARCHITECT
+  // emits it as structured JSON so it's reliable regardless of theorem_signature format.
+  // isConstructiveExistence is a secondary sanity check only.
+  const needsSearch = config.search_config?.problem_class !== "unknown"
+    && config.search_config?.problem_class !== undefined;
   let searchPhase: SearchPhase | null = null;
 
   if (needsSearch) {
