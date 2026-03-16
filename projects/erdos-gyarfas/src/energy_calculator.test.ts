@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { EnergyCalculator } from "../src/math/energy_calculator";
+import { EnergyCalculator } from "./energy_calculator";
 
 describe("EnergyCalculator", () => {
   test("K_4 has positive energy (contains 4-cycles)", () => {

@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { GraphMutator } from "../src/math/graph_mutator";
+import { GraphMutator } from "./graph_mutator";
 
 describe("GraphMutator", () => {
   test("mutate returns a valid adjacency list or null", () => {

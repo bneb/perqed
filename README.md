@@ -104,13 +104,12 @@ perqed/
 │   ├── tree.ts                   # ProofTree — AND/OR MCTS with value backpropagation
 │   ├── lean_bridge.ts            # Lean 4 subprocess + goal parsing
 │   ├── agents/                   # Router, formalist, conjecturer, scribe
-│   ├── math/                     # Simulated Annealing engine + energy evaluators
-│   ├── lean/                     # Lean 4 formal proofs (torus m=4, m=6)
+│   ├── math/optim/               # Shared SA framework (IState, SimulatedAnnealing)
 │   └── scripts/                  # CLI entry points
-├── paper/
-│   └── torus_decomposition.tex   # Manuscript (LaTeX source + PDF)
-├── data/                         # Witness payloads, training data
-├── tests/                        # Test suite
+├── projects/
+│   ├── torus-decomposition/      # Knuth m=4, m=6 — SA engine, Lean proofs, paper
+│   └── erdos-gyarfas/            # EG conjecture — graph search, Lean, Z3
+├── tests/                        # Core engine test suite (370 tests)
 └── website/                      # perqed.com (Astro)
 ```
 

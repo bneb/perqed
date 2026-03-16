@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { ErdosState } from "../src/math/erdos_state";
+import { ErdosState } from "./erdos_state";
 
 describe("ErdosState", () => {
   test("createCubic(6) generates a valid 3-regular graph", () => {

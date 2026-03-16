@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { CycleFinder } from "../src/math/cycle_finder";
+import { CycleFinder } from "./cycle_finder";
 
 describe("CycleFinder", () => {
   test("K_4 has a 4-cycle (power of 2)", () => {

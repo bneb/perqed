@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { ClaudeState } from "../src/math/claude_state";
+import { ClaudeState } from "./state";
 
 describe("ClaudeState", () => {
   test("createRandom returns payload with 64 elements, all in [0,5]", () => {

@@ -75,7 +75,7 @@ async function huntClaudeCycles() {
       console.log("═══════════════════════════════════════════════\n");
 
       // Save solution
-      const dataDir = join(import.meta.dir, "../../data");
+      const dataDir = join(import.meta.dir, "../data");
       await fs.mkdir(dataDir, { recursive: true });
       await fs.writeFile(
         join(dataDir, `claude_cycles_m${TARGET_M}.json`),

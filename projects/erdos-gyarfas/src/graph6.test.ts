@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { Graph6Decoder } from "../src/math/graph6";
+import { Graph6Decoder } from "./graph6";
 
 describe("Graph6Decoder", () => {
   test("decodes empty string to empty adjacency list", () => {

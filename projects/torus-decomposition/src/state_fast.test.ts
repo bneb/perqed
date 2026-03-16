@@ -6,8 +6,8 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { ClaudeStateFast } from "../src/math/claude_state_fast";
-import { ClaudeState } from "../src/math/claude_state";
+import { ClaudeStateFast } from "./state_fast";
+import { ClaudeState } from "./state";
 
 describe("ClaudeStateFast", () => {
   test("constructor produces same energy as ClaudeState for random payloads", () => {

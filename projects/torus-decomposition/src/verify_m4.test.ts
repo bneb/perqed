@@ -5,7 +5,7 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { ClaudeState } from "../src/math/claude_state";
+import { ClaudeState } from "./state";
 
 const SOLUTION_PAYLOAD = [
   2,3,1,3,1,3,4,0,4,1,5,3,3,0,1,4,
