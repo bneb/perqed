@@ -63,7 +63,6 @@ Perqed is a computational math pipeline: **SA search → witness → Lean 4 proo
 
 | Project | Result | Path |
 |---------|--------|------|
-| Erdős-Gyárfás n=4 | Base case only (trivial: K₄ has 4-cycle) | `projects/erdos-gyarfas/` |
 | Torus Decomposition | Proved (m=4, m=6 Knuth torus) | `projects/torus-decomposition/` |
 | Conway 99 | Paused at E≈4000 (SA floor) | `projects/conway99/` |
 
