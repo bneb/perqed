@@ -80,17 +80,17 @@ bun run src/scripts/generate_conjectures.ts
 
 ## Model Stack
 
-| Role | Model | Speed | Purpose |
-|------|-------|-------|---------|
-| **Tactician** | `deepseek-prover-v2:7b-q8` | 1-2s | Raw Lean tactic generation |
-| **Reasoner** | Gemini 2.5 Flash | Cloud | Strategic unblock after failures |
-| **Architect** | Gemini 3.1 Pro | Cloud | Proof planning, directives |
-| **Conjecturer** | Gemini 3.1 Pro | Cloud | Novel theorem hypothesis generation |
-| **Scribe** | Gemini 3.1 Pro | Cloud | Lean 4 → AMS-LaTeX translation |
+| Role | Model | Tier | Purpose |
+|------|-------|------|---------| 
+| **Tactician** | `deepseek-r1:8b` | Local | Lean 4 tactic generation + JSON reasoning |
+| **Prover** | `deepseek-prover-v2:7b` | Local | Dedicated Lean 4 proof specialist (fallback) |
+| **Reasoner** | `gemini-2.5-flash` | Cloud (free) | Strategic unblock after tactic failures |
+| **Architect** | `gemini-3.1-flash-lite-preview` → `gemini-3.1-pro-preview` | Cloud (paid) | Proof planning, directives (escalates on failure) |
+| **Scribe** | `gemini-3.1-pro-preview` | Cloud (paid) | Lean 4 → AMS-LaTeX translation |
 | **Embedder** | `nomic-embed-text` | Local | 768-dim vectors for RAG |
 
 > [!NOTE]
-> `deepseek-prover-v2:7b-q8` requires manual GGUF install — Q8_0 quantization is critical (Q4_K_M produces unusable output). See [Modelfile.prover](Modelfile.prover) for the Ollama configuration.
+> Cloud models use a 3-tier escalation to keep costs down: `gemini-2.5-flash` (free) → `gemini-3.1-flash-lite-preview` (paid flash) → `gemini-3.1-pro-preview` (break glass). Most proof runs stay on the free tier.
 
 > [!IMPORTANT]
 > Gemini requires an API key from [AI Studio](https://aistudio.google.com/apikey). Copy `.env.example` to `.env` and add your `GEMINI_API_KEY`. The free tier (5-15 RPM) is sufficient for proof runs.
