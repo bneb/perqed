@@ -507,9 +507,26 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   const skillsPath = join(workspace.paths.domainSkills, "problem_context.md");
   await Bun.write(skillsPath, config.domain_skills_md);
 
-  // Memetic warm-start: carry best graph across all pivot attempts
+  // Memetic warm-start: carry best graph across all pivot attempts.
+  // Persisted to disk so it survives kills, reboots, and cross-machine moves.
+  const seedPath = join(workspace.paths.runDir, "best_seed.json");
   let memeticSeed: AdjacencyMatrix | null = null;
   let memeticSeedEnergy: number | null = null;
+
+  // Attempt to reload a prior seed from disk
+  try {
+    const seedFile = Bun.file(seedPath);
+    if (await seedFile.exists()) {
+      const saved = await seedFile.json() as { energy: number; edges: [number, number][] };
+      const loaded = new AdjacencyMatrix(saved.edges.reduce((n, [u, v]) => Math.max(n, u, v), 0) + 1);
+      for (const [u, v] of saved.edges) loaded.addEdge(u, v);
+      memeticSeed = loaded;
+      memeticSeedEnergy = saved.energy;
+      console.log(`   🧬 Memetic seed loaded from disk: E=${saved.energy} (${saved.edges.length} edges)`);
+    }
+  } catch {
+    // No seed or corrupt file — start fresh
+  }
 
   console.log("═══════════════════════════════════════════════");
   console.log("  🔥 PERQED — Execution");
@@ -688,7 +705,14 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       if (!memeticSeed || result.bestEnergy < (memeticSeedEnergy ?? Infinity)) {
         memeticSeed = result.bestAdj;
         memeticSeedEnergy = result.bestEnergy;
-        if (attempt > 1) console.log(`   🧬 Memetic seed updated: E=${memeticSeedEnergy} → next attempt warm-starts here`);
+        // Persist to disk: survives kills, reboots, cross-machine moves
+        const n = result.bestAdj.n;
+        const edges: [number, number][] = [];
+        for (let u = 0; u < n; u++)
+          for (let v = u + 1; v < n; v++)
+            if (result.bestAdj.hasEdge(u, v)) edges.push([u, v]);
+        await Bun.write(seedPath, JSON.stringify({ energy: memeticSeedEnergy, n, edges }));
+        console.log(`   🧬 Memetic seed updated: E=${memeticSeedEnergy} → saved to disk (${edges.length} edges)`);
       }
       console.log(`\n   SA complete: best E=${result.bestEnergy}, ${result.ips.toLocaleString()} IPS`);
       if (orchResult.workersRan > 1) {
