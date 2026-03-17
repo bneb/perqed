@@ -641,8 +641,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
 
       // ── SA Path: heuristic search (fallback or symmetry=none) ──
 
-      const workers = sp.workers ?? 1;
-      const strategy = sp.strategy ?? "single";
+      // Clamp workers: default to 8, never exceed available CPU cores.
+      // ARCHITECT sometimes omits this field (→ Infinity) — guard both.
+      const cpuCount = require("os").cpus().length;
+      const workers = Math.min(Math.max(1, sp.workers ?? 8), cpuCount);
+      const strategy = sp.strategy ?? "island_model";
+
 
       const orchResult = await orchestratedSearch({
         n: sp.vertices,
