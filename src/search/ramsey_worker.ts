@@ -249,8 +249,12 @@ export function ramseySearch(
       temp = initialTemp * reheatStrength;
       staleCount = 0;
       reheatCount++;
-      // Suppress dead-temp trigger for minPatience iters after each reheat
-      reheatCooldown = minPatience;
+      // Suppress dead-temp trigger after reheat, but cap cooldown at 1% of budget.
+      // Without the cap, patient workers (minPatience≈97M) would freeze at T≈0
+      // for nearly 20% of the run before the dead-temp trigger could fire again.
+      const maxCooldown = Math.max(1_000_000, Math.floor(maxIterations / 100));
+      reheatCooldown = Math.min(minPatience, maxCooldown);
+
     }
 
     // Trajectory checkpoint
