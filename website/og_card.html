@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perqed OG Card</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #og-canvas {
+            width: 1280px;
+            height: 640px;
+            background: #07070f;
+            position: relative;
+            overflow: hidden;
+        }
+
+        svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1280px;
+            height: 640px;
+        }
+
+        .text-container {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            bottom: 40px;
+            width: 42%;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .brand {
+            color: #ffffff;
+            font-size: 88px;
+            font-weight: 800;
+            font-family: 'Inter', sans-serif;
+            line-height: 1;
+            margin: 0;
+            letter-spacing: -3px;
+        }
+
+        .subtitle {
+            color: #9b8ec4;
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            margin-top: 8px;
+            letter-spacing: 1px;
+        }
+
+        .url {
+            color: #44445a;
+            font-size: 17px;
+            font-family: 'Courier New', monospace;
+            margin-top: 32px;
+        }
+
+        #export-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: #3b0764;
+            color: #a855f7;
+            border: 1px solid #a855f7;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: sans-serif;
+            font-size: 12px;
+            z-index: 200;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+    <div id="og-canvas">
+        <svg id="graph-svg" viewBox="0 0 1280 640" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <radialGradient id="glow" cx="1600" cy="900" r="1400" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#3b0764" stop-opacity="0.6" />
+                    <stop offset="100%" stop-color="#07070f" stop-opacity="0" />
+                </radialGradient>
+            </defs>
+
+            <filter id="pinkGlow" x="-100%" y="-100%" width="300%" height="300%" color-interpolation-filters="sRGB">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+                <feColorMatrix in="blur" type="matrix"
+                    values="0.66 0 0 0 0.66
+                            0    0 0 0 0.21
+                            0    0 0 0 0.97
+                            0    0 0 0.7 0" result="glow"/>
+                <feMerge><feMergeNode in="glow"/></feMerge>
+            </filter>
+            <filter id="tealGlow" x="-100%" y="-100%" width="300%" height="300%" color-interpolation-filters="sRGB">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+                <feColorMatrix in="blur" type="matrix"
+                    values="0    0 0 0 0.18
+                            0.83 0 0 0 0.83
+                            0    0 0 0 0.75
+                            0    0 0 0.65 0" result="glow"/>
+                <feMerge><feMergeNode in="glow"/></feMerge>
+            </filter>
+
+            <rect width="1280" height="640" fill="url(#glow)" />
+
+            <g id="edges"></g>
+            <g id="nodes"></g>
+        </svg>
+
+        <div class="text-container">
+            <h1 class="brand">PERQED</h1>
+            <div class="subtitle">⊢ Autonomous Proof Engine</div>
+            <div class="url">perqed.com</div>
+        </div>
+    </div>
+
+    <button id="export-btn" onclick="exportImage()">CAPTURE OG.PNG</button>
+
+    <script>
+        const edgesGroup = document.getElementById('edges');
+        const nodesGroup = document.getElementById('nodes');
+
+        const centerX = 1600;
+        const centerY = 900;
+        const radius = 1200;
+        const totalNodes = 35;
+
+        // Full circle — nodes distributed all around, edges span the whole canvas
+        // Only visible nodes get halos/dots, but all participate in edge drawing
+        const startAngle = 0;
+        const endAngle = Math.PI * 2;
+
+        const points = [];
+
+        for (let i = 0; i < totalNodes; i++) {
+            const angle = startAngle + (i / totalNodes) * (endAngle - startAngle);
+            const x = centerX + radius * Math.cos(angle);
+            const y = centerY + radius * Math.sin(angle);
+            points.push({ x, y });
+        }
+
+        for (let i = 0; i < points.length; i++) {
+            for (let j = i + 1; j < points.length; j++) {
+                const isRed = (i + j) % 2 === 0;
+                const color = isRed ? "#ff3030" : "#4080ff";
+                const rand = Math.random();
+                const addGlow = rand < 0.25;
+
+                if (addGlow) {
+                    const glow = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    glow.setAttribute("x1", points[i].x);
+                    glow.setAttribute("y1", points[i].y);
+                    glow.setAttribute("x2", points[j].x);
+                    glow.setAttribute("y2", points[j].y);
+                    glow.setAttribute("stroke", color);
+                    glow.setAttribute("stroke-width", "1.5");
+                    glow.setAttribute("stroke-opacity", "0.5");
+                    glow.setAttribute("filter", isRed ? "url(#pinkGlow)" : "url(#tealGlow)");
+                    edgesGroup.appendChild(glow);
+                }
+
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", points[i].x);
+                line.setAttribute("y1", points[i].y);
+                line.setAttribute("x2", points[j].x);
+                line.setAttribute("y2", points[j].y);
+                line.setAttribute("stroke", color);
+                line.setAttribute("stroke-width", "0.8");
+                line.setAttribute("stroke-opacity", "0.3");
+                edgesGroup.appendChild(line);
+            }
+        }
+
+        points.forEach((p, idx) => {
+            // Only render node markers for on-screen nodes
+            if (p.x > -50 && p.x < 1330 && p.y > -50 && p.y < 690) {
+                // Random star brightness: some dim, some brilliant
+                const brightness = Math.random();
+                const r = 6 + brightness * 18;          // radius: 6–24px
+                const coreOpacity = 0.5 + brightness * 0.5; // 0.5–1.0
+
+                // Unique gradient id per node
+                const gradId = `star${idx}`;
+                const defs = document.querySelector('defs');
+                const grad = document.createElementNS("http://www.w3.org/2000/svg", "radialGradient");
+                grad.setAttribute("id", gradId);
+                grad.setAttribute("cx", "50%"); grad.setAttribute("cy", "50%"); grad.setAttribute("r", "50%");
+                const s1 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+                s1.setAttribute("offset", "0%");
+                s1.setAttribute("stop-color", "#ffffff");
+                s1.setAttribute("stop-opacity", coreOpacity.toFixed(2));
+                const s2 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+                s2.setAttribute("offset", "40%");
+                s2.setAttribute("stop-color", "#ddd6fe"); // soft lavender-white
+                s2.setAttribute("stop-opacity", (coreOpacity * 0.3).toFixed(2));
+                const s3 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+                s3.setAttribute("offset", "100%");
+                s3.setAttribute("stop-color", "#ffffff");
+                s3.setAttribute("stop-opacity", "0");
+                grad.appendChild(s1); grad.appendChild(s2); grad.appendChild(s3);
+                defs.appendChild(grad);
+
+                const star = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                star.setAttribute("cx", p.x);
+                star.setAttribute("cy", p.y);
+                star.setAttribute("r", r.toFixed(1));
+                star.setAttribute("fill", `url(#${gradId})`);
+                nodesGroup.appendChild(star);
+            }
+        });
+
+        function exportImage() {
+            const btn = document.getElementById('export-btn');
+            btn.style.display = 'none';
+            html2canvas(document.querySelector("#og-canvas"), {
+                width: 1280,
+                height: 640,
+                scale: 2,
+                logging: false,
+                useCORS: true
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'og.png';
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                btn.style.display = 'block';
+            });
+        }
+    </script>
+</body>
+</html>
