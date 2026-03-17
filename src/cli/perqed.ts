@@ -658,10 +658,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
 
       // ── SA Path: heuristic search (fallback or symmetry=none) ──
 
-      // Clamp workers: default to 8, never exceed available CPU cores.
-      // ARCHITECT sometimes omits this field (→ Infinity) — guard both.
+      // Clamp workers to PHYSICAL cores, not logical threads.
+      // os.cpus().length returns logical threads (SMT). Two SA workers on one
+      // physical core thrash each other's L1/L2 cache, killing IPS.
       const cpuCount = require("os").cpus().length;
-      const workers = Math.min(Math.max(1, sp.workers ?? 8), cpuCount);
+      const physicalCores = Math.max(1, Math.floor(cpuCount / 2));
+      const workers = Math.min(Math.max(1, sp.workers ?? 8), physicalCores);
       const strategy = sp.strategy ?? "island_model";
 
 
