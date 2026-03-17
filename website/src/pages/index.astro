@@ -9,12 +9,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <div class="container">
       <p class="eyebrow animate-in">Autonomous Proof Engine</p>
       <h1 class="hero-title animate-in animate-in-1">
-        Automated theorem<br>proving in Lean&nbsp;4.
+        Automated theorem&nbsp;proving in Lean&nbsp;4.
       </h1>
       <p class="hero-sub animate-in animate-in-2">
-        Perqed is an open-source system that reads mathematical literature,
-        generates conjectures, and attempts to prove them in Lean&nbsp;4
-        using MCTS-guided tactic search. It runs locally on Apple Silicon.
+        Perqed is an open-source system that searches for mathematical witnesses,
+        verifies them in Lean&nbsp;4, and uses LLMs to direct the search when it
+        gets stuck. Currently targeting open Ramsey number problems.
       </p>
       <div class="hero-actions animate-in animate-in-3">
         <a href="https://github.com/bneb/perqed" target="_blank" rel="noopener" class="btn btn-primary">
@@ -33,79 +33,74 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <p class="eyebrow">Architecture</p>
       <h2 class="section-heading">The proof loop</h2>
       <p class="section-lede">
-        LLMs propose tactics, Lean&nbsp;4 verifies each step, Z3 pre-filters false conjectures.
+        A hybrid search engine: heuristic annealing finds near-witnesses, Z3 repairs them, Lean&nbsp;4 verifies them.
       </p>
 
       <div class="steps">
         <div class="step">
           <span class="step-n">01</span>
-          <h3 class="step-title">Read the Literature</h3>
+          <h3 class="step-title">Formulate the Problem</h3>
           <p class="step-body">
-            The Librarian fetches papers from arXiv, chunks abstracts, embeds them via
-            <code>nomic-embed-text</code>, and stores vectors in LanceDB for semantic retrieval.
+            The ARCHITECT reads the conjecture (e.g. <code>R(4,6) ≥ 36</code>),
+            determines the proof strategy—constructive witness or tactic
+            search—and generates the Lean&nbsp;4 theorem signature.
           </p>
-          <span class="step-tech">LanceDB · Ollama · RAG</span>
+          <span class="step-tech">Gemini 2.5 Flash · Lean 4</span>
         </div>
 
         <div class="step">
           <span class="step-n">02</span>
-          <h3 class="step-title">Falsify First</h3>
+          <h3 class="step-title">Fast-Path SMT Check</h3>
           <p class="step-body">
-            Before attempting a proof, Z3 checks for counterexamples in bounded domains.
-            False conjectures are typically caught in under 50ms.
+            Before expensive search, Z3 attempts an exact SMT solve
+            over structured subspaces (e.g. circulant graphs). Proven
+            empty subspaces are recorded as permanent lemmas.
           </p>
-          <span class="step-tech">Z3 · SMT Solver</span>
+          <span class="step-tech">Z3 · SMT Solver · ResearchJournal</span>
         </div>
 
         <div class="step">
           <span class="step-n">03</span>
-          <h3 class="step-title">AND/OR MCTS</h3>
+          <h3 class="step-title">Island-Model SA</h3>
           <p class="step-body">
-            Tactics like <code>induction</code> split goals into AND nodes (all must succeed).
-            Alternative tactics form OR nodes (any can succeed). The TreeScorer backpropagates
-            win probabilities: OR&nbsp;=&nbsp;max, AND&nbsp;=&nbsp;product.
+            8 parallel Simulated Annealing workers run with a diversity
+            spectrum of cooling rates and patience—from rapid basin-hopper
+            to deep explorer. Workers share their best result at round end.
           </p>
-          <span class="step-tech">ProofTree · TreeScorer · Value Backpropagation</span>
+          <span class="step-tech">Bun Workers · Adaptive Reheat · Hyperparameter Diversity</span>
         </div>
 
         <div class="step">
           <span class="step-n">04</span>
-          <h3 class="step-title">Async Batch Search</h3>
+          <h3 class="step-title">LNS Finisher</h3>
           <p class="step-body">
-            Up to 3 nodes expand concurrently via <code>Promise.all()</code>. Tactic
-            generation and proof checking run in parallel.
+            Large Neighborhood Search selects the top J near-witnesses
+            within energy K of the global minimum. Z3 attempts to repair
+            each one by solving the residual constraint neighborhood.
           </p>
-          <span class="step-tech">DeepSeek Prover V2 · Promise.all</span>
+          <span class="step-tech">Z3 · LNS · Multi-Candidate Selection</span>
         </div>
 
         <div class="step">
           <span class="step-n">05</span>
-          <h3 class="step-title">Lean-as-DSL</h3>
+          <h3 class="step-title">Lean Verification</h3>
           <p class="step-body">
-            Lean 4 is the ground truth. The LLM reads tactic state and proposes
-            tactics; Lean verifies each step before it is committed.
+            When a witness is found, it is compiled into a Lean&nbsp;4
+            proof using <code>decide</code> and kernel-checked. For
+            non-constructive goals, DeepSeek Prover drives tactic search.
           </p>
-          <span class="step-tech">Lean 4 · Formal Verification</span>
+          <span class="step-tech">Lean 4 · DeepSeek Prover V2 · decide</span>
         </div>
 
         <div class="step">
           <span class="step-n">06</span>
-          <h3 class="step-title">Self-Improvement</h3>
+          <h3 class="step-title">Memetic Pivot</h3>
           <p class="step-body">
-            Solved proofs are parsed into (State, Tactic) pairs
-            and saved as deduplicated SFT training data.
+            If search fails, the ARCHITECT reads the ResearchJournal—accumulated
+            lemmas, failure modes, and energy trajectories—and proposes a new
+            strategy. The best near-witness warm-starts the next attempt.
           </p>
-          <span class="step-tech">DatasetExtractor · sft_dataset.jsonl</span>
-        </div>
-
-        <div class="step">
-          <span class="step-n">07</span>
-          <h3 class="step-title">Auto-Publish</h3>
-          <p class="step-body">
-            A separate agent translates verified Lean 4 proofs into
-            AMS-LaTeX documents with theorem environments and numbered equations.
-          </p>
-          <span class="step-tech">ScribeAgent · AMS-LaTeX</span>
+          <span class="step-tech">Gemini 2.5 Flash · ResearchJournal · Warm-Start</span>
         </div>
       </div>
     </div>
@@ -117,39 +112,34 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <p class="eyebrow">Model Stack</p>
       <h2 class="section-heading">Runs on your hardware</h2>
       <p class="section-lede">
-        Core proving runs locally. Cloud APIs are optional for strategic planning.
+        Core search and tactic generation run locally. Gemini handles strategic planning.
       </p>
 
       <div class="stack">
         <div class="stack-item">
+          <h3 class="stack-name">Gemini 2.5 Flash</h3>
+          <p class="stack-role">ARCHITECT · REASONER</p>
+          <p class="stack-detail">Formulates problems, directs search pivots, interprets failure modes. ~$0.02/run blended.</p>
+        </div>
+        <div class="stack-item">
           <h3 class="stack-name">DeepSeek Prover V2:7B Q8</h3>
-          <p class="stack-role">Tactician</p>
-          <p class="stack-detail">Raw Lean 4 tactic generation. 1-2s per completion on Apple Silicon. ~7 GB VRAM.</p>
+          <p class="stack-role">TACTICIAN</p>
+          <p class="stack-detail">Raw Lean 4 tactic generation via local Ollama. 1–2s per completion on Apple Silicon. ~7 GB VRAM.</p>
         </div>
         <div class="stack-item">
-          <h3 class="stack-name">Lean 4.28.0</h3>
+          <h3 class="stack-name">Lean 4</h3>
           <p class="stack-role">Proof Kernel</p>
-          <p class="stack-detail">Formal verification via tactic mode. All proof steps are kernel-checked.</p>
-        </div>
-        <div class="stack-item">
-          <h3 class="stack-name">nomic-embed-text</h3>
-          <p class="stack-role">Embedder (RAG)</p>
-          <p class="stack-detail">768-dim local embeddings for semantic premise retrieval from the arXiv corpus.</p>
-        </div>
-        <div class="stack-item">
-          <h3 class="stack-name">LanceDB</h3>
-          <p class="stack-role">Vector Store</p>
-          <p class="stack-detail">Serverless embedded database. Stores arXiv chunks and Mathlib theorems for retrieval.</p>
+          <p class="stack-detail">Formal verification via tactic mode and <code>decide</code>. All proof steps are kernel-checked before acceptance.</p>
         </div>
         <div class="stack-item">
           <h3 class="stack-name">Z3</h3>
-          <p class="stack-role">SMT Pre-flight</p>
-          <p class="stack-detail">Bounded model checking. Filters out false conjectures before proof search begins.</p>
+          <p class="stack-role">SMT Solver · LNS Repair</p>
+          <p class="stack-detail">Two roles: fast-path exact SMT search over structured subspaces, and Large Neighborhood Search repair of near-witness graphs.</p>
         </div>
         <div class="stack-item">
-          <h3 class="stack-name">Gemini 2.5 Flash / 3.1 Pro</h3>
-          <p class="stack-role">Architect · Reasoner · Scribe</p>
-          <p class="stack-detail">Strategic redirect, proof planning, RAG-augmented directives, and LaTeX paper generation. ~$0.03/proof blended.</p>
+          <h3 class="stack-name">Bun Workers</h3>
+          <p class="stack-role">SA Island Model</p>
+          <p class="stack-detail">8 parallel worker threads running Simulated Annealing with a diversity spectrum of hyperparameters. ~4M iterations/sec total throughput.</p>
         </div>
       </div>
     </div>
