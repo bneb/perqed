@@ -114,6 +114,9 @@ export function ramseySearch(
   let temp = initialTemp;
   let staleCount = 0;
   let reheatCount = 0;
+  // Cooldown: prevents dead-temp trigger from firing again immediately after a reheat.
+  // After each reheat, dead-temp is suppressed for minPatience iterations.
+  let reheatCooldown = 0;
 
   // Trajectory tracking: 10 checkpoints at 10%, 20%, ..., 100%
   const checkpointInterval = Math.max(1, Math.floor(maxIterations / 10));
@@ -205,13 +208,16 @@ export function ramseySearch(
     // Cooling
     temp *= coolingRate;
     staleCount++;
+    if (reheatCooldown > 0) reheatCooldown--;
 
     // ── Adaptive reheat: dual-trigger ──
     // Trigger 1 (patience): stuck long enough without improvement
     // Trigger 2 (dead temp): T is near-zero but energy is still high
+    //   Dead-temp is suppressed for minPatience iters after each reheat
+    //   to prevent the spike-crash rolling-boil loop on steep cooling rates.
     const tempRatio = temp / initialTemp;
     const DEAD_TEMP_FRAC = 0.005;  // T < 0.5% of T₀ → "cold dead"
-    const tempIsDead = tempRatio < DEAD_TEMP_FRAC;
+    const tempIsDead = tempRatio < DEAD_TEMP_FRAC && reheatCooldown === 0;
     const isStale = staleCount >= minPatience;
 
     if (isStale || tempIsDead) {
@@ -243,6 +249,8 @@ export function ramseySearch(
       temp = initialTemp * reheatStrength;
       staleCount = 0;
       reheatCount++;
+      // Suppress dead-temp trigger for minPatience iters after each reheat
+      reheatCooldown = minPatience;
     }
 
     // Trajectory checkpoint

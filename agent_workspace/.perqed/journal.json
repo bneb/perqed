@@ -104,6 +104,102 @@
       "claim": "SA on K_35 R(4,6) converged at E_min=14 (attempt 1)",
       "evidence": "500,000,000 iters × 8 workers, strategy=island_model, seed=random",
       "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "14f387da-1910-4099-bd16-3c27c45562aa",
+      "timestamp": "2026-03-16T23:34:10.718Z",
+      "type": "lemma",
+      "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
+      "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "85ba5408-cfa0-44d9-aa43-4862f317e37c",
+      "timestamp": "2026-03-16T23:43:24.970Z",
+      "type": "lemma",
+      "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
+      "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "50deb300-4722-4850-beee-67ceac2b73cb",
+      "timestamp": "2026-03-17T00:20:27.275Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=15 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 130 edges has no valid coloring for R(4,6) on K_35; 130 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "ab3f4d8f-9ed3-4f42-92f5-d62244324b25",
+      "timestamp": "2026-03-17T00:20:28.420Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=17 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 152 edges has no valid coloring for R(4,6) on K_35; 152 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "ec4f451a-d917-42eb-93a9-41ae1f99df6d",
+      "timestamp": "2026-03-17T00:20:29.720Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=19 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 183 edges has no valid coloring for R(4,6) on K_35; 183 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "14369bb9-32d6-442b-9a1a-94ceb94e3a2f",
+      "timestamp": "2026-03-17T00:20:29.721Z",
+      "type": "observation",
+      "claim": "SA on K_35 R(4,6) converged at E_min=15 (attempt 1)",
+      "evidence": "500,000,000 iters × 8 workers, strategy=island_model, seed=random",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "2b67d383-d7f9-4525-ba12-bc17e14333cd",
+      "timestamp": "2026-03-17T02:09:07.272Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=15 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 130 edges has no valid coloring for R(4,6) on K_35; 130 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "c419e8c5-b69a-4f14-9152-47ed2f3a68d1",
+      "timestamp": "2026-03-17T02:09:07.273Z",
+      "type": "observation",
+      "claim": "SA on K_35 R(4,6) converged at E_min=15 (attempt 2)",
+      "evidence": "2,500,000,000 iters × Infinity workers, strategy=single, seed=random",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "fa6a6bd9-0315-41d8-a384-d48774161e22",
+      "timestamp": "2026-03-17T08:14:34.422Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=11 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 117 edges has no valid coloring for R(4,6) on K_35; 117 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "5dacba7a-b03f-4bb6-bc47-ea5d6b03ab33",
+      "timestamp": "2026-03-17T08:14:35.337Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=14 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 102 edges has no valid coloring for R(4,6) on K_35; 102 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "953259b0-210e-4618-9bff-dd1a38fd697d",
+      "timestamp": "2026-03-17T08:14:35.987Z",
+      "type": "failure_mode",
+      "claim": "LNS could not repair E=15 basin for R(4,6) on K_35",
+      "evidence": "Z3 UNSAT: neighborhood of 130 edges has no valid coloring for R(4,6) on K_35; 130 free edges tried",
+      "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "b76ad351-839e-46ac-bb85-63e01de326d8",
+      "timestamp": "2026-03-17T08:14:35.987Z",
+      "type": "observation",
+      "claim": "SA on K_35 R(4,6) converged at E_min=11 (attempt 3)",
+      "evidence": "5,000,000,000 iters × 8 workers, strategy=island_model, seed=random",
+      "target_goal": "R(4,6) >= 36"
     }
   ]
 }
