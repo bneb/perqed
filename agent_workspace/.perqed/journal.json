@@ -216,6 +216,14 @@
       "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
       "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
       "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "7ab8bfa4-d16e-43de-8d40-0ecc59da32fd",
+      "timestamp": "2026-03-17T08:58:17.741Z",
+      "type": "lemma",
+      "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
+      "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
+      "target_goal": "R(4,6) >= 36"
     }
   ]
 }

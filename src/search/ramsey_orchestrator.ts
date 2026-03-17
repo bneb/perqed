@@ -128,13 +128,18 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
   const basePatience = Math.max(100_000, Math.floor(itersPerWorker * 0.1));
 
   function workerCoolingRate(w: number): number {
-    // Spread cooling rates from baseCoolingRate (fastest) to baseCoolingRate/coolingSpread (slowest)
-    // t ∈ [0,1]: 0 = fastest worker, 1 = slowest worker
+    // Spread diversity as "fraction of budget each worker uses to cool from T_init to T_min".
+    // W0 (t=0): cools over 80% of budget  → slow, deep explorer
+    // W(N-1) (t=1): cools over 20% of budget → fast basin-hopper
+    //
+    // The old formula spread log(coolingRate)≈-1.5e-8 by log(50)≈3.9,
+    // producing rates like exp(-3.9)≈0.02 which kills T in 1 iteration.
     const t = numWorkers > 1 ? w / (numWorkers - 1) : 0;
-    // Higher coolingRate = faster cooling. We want spread across log scale.
-    const logFast = Math.log(Math.abs(baseCoolingRate));
-    const logSlow = logFast - Math.log(coolingSpread); // divide by spread → slower cooling
-    return Math.exp(logFast + t * (logSlow - logFast));
+    const T_MIN = 0.01;
+    // Fraction of budget to spend cooling: 80% down to 20% across workers
+    const coolBudgetFraction = 0.80 - t * 0.60;
+    const coolIters = coolBudgetFraction * itersPerWorker;
+    return Math.exp(Math.log(T_MIN / tInit) / coolIters);
   }
 
   function workerPatience(w: number): number {
