@@ -188,13 +188,46 @@
             }
         }
 
+        // Hero node index to receive the teal haze
+        const HERO_IDX = 20;
+
+        function drawLensFlare(p, starRadius) {
+            const ns = "http://www.w3.org/2000/svg";
+            // Teal haze: 15% smaller radius, offset up-and-right to bloom on top-right side
+            const hazeR = starRadius * 0.85;
+            const offsetX = hazeR * 0.2;   // shift right
+            const offsetY = hazeR * -0.2;  // shift up
+
+            const gradId = "heroHaze";
+            const grad = document.createElementNS(ns, "radialGradient");
+            grad.setAttribute("id", gradId);
+            grad.setAttribute("cx", "50%"); grad.setAttribute("cy", "50%"); grad.setAttribute("r", "50%");
+            [["0%","#2dd4bf","0.65"],["35%","#0d9488","0.08"],["100%","#000","0"]].forEach(([o,c,op]) => {
+                const s = document.createElementNS(ns, "stop");
+                s.setAttribute("offset", o); s.setAttribute("stop-color", c); s.setAttribute("stop-opacity", op);
+                grad.appendChild(s);
+            });
+            document.querySelector("defs").appendChild(grad);
+
+            const haze = document.createElementNS(ns, "circle");
+            haze.setAttribute("cx", p.x + offsetX);
+            haze.setAttribute("cy", p.y + offsetY);
+            haze.setAttribute("r", hazeR.toFixed(1));
+            haze.setAttribute("fill", `url(#${gradId})`);
+            nodesGroup.appendChild(haze);
+        }
+
         points.forEach((p, idx) => {
+
             // Only render node markers for on-screen nodes
             if (p.x > -50 && p.x < 1330 && p.y > -50 && p.y < 690) {
                 // Random star brightness: some dim, some brilliant
-                const brightness = Math.random();
+                const brightness = idx === HERO_IDX ? 0.6 : Math.random();
                 const r = 6 + brightness * 18;          // radius: 6–24px
                 const coreOpacity = 0.5 + brightness * 0.5; // 0.5–1.0
+
+                // Hero node gets teal haze drawn first (behind star)
+                if (idx === HERO_IDX) drawLensFlare(p, r);
 
                 // Unique gradient id per node
                 const gradId = `star${idx}`;
