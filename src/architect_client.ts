@@ -76,6 +76,32 @@ You must respond with ONLY valid JSON (no markdown, no prose) matching this exac
 Do NOT wrap your response in \`\`\`json\`\`\` or any markdown. Return raw JSON only.`;
 
 // ──────────────────────────────────────────────
+// Orthogonal Paradigm Forcing (OPF) — Wiles Mode prompt
+// Exported so the initial formulate() call in perqed.ts can reuse the same
+// canonical text, ensuring both the pivot and the first ARCHITECT call use
+// identical instructions.
+// ──────────────────────────────────────────────
+
+export const WILES_OPF_PROMPT = [
+  "MANDATORY WILES MANEUVER (ORTHOGONAL PARADIGM FORCING):",
+  "You are operating in 'Wiles Mode'. You must completely abandon the standard approaches to this problem.",
+  "",
+  "STEP 1 - HISTORICAL ANTI-PATTERN RECOGNITION:",
+  "Identify the most obvious, standard mathematical techniques historically applied to this specific problem class",
+  "(e.g., combinatorial search for Ramsey theory, infinite descent for Diophantine equations, sieve methods for primes).",
+  "",
+  "STEP 2 - THE STRICT BAN:",
+  "You are STRICTLY FORBIDDEN from using or emitting DAG nodes that rely on these standard, historically exhausted techniques.",
+  "Do NOT emit a naive 'search' node. Do NOT rely on discrete combinatorial enumeration.",
+  "",
+  "STEP 3 - THE FUNCTORIAL LEAP:",
+  "You MUST emit a DAG that translates this problem into a completely orthogonal mathematical category.",
+  "If the problem is discrete, map it to a continuous, topological, or spectral space.",
+  "If it is analytic, map it to algebra. Prioritize SKILLs like 'functorial_domain_translation',",
+  "'razborov_flag_algebras', 'spectral_graph_bounds', or invent a novel bridge.",
+].join("\n");
+
+// ──────────────────────────────────────────────
 // Escalation Ladder — temperature & meta-strategy
 // ──────────────────────────────────────────────
 
@@ -258,21 +284,12 @@ export class ArchitectClient {
 
     // ── Wiles Mode override ──────────────────────────────────────────────
     // --wiles flag (or forceWilesMode=true) bypasses the progressive ladder
-    // entirely and immediately forces Stage 3 (Conceptual Scatter).
+    // entirely and immediately forces Stage 3 (Orthogonal Paradigm Forcing).
     if (forceWilesMode) {
       llmTemperature = 0.95;
-      metaStrategyPrompt = [
-        "MANDATORY WILES MANEUVER OVERRIDE:",
-        "Do NOT emit a naive 'search' node. You are strictly forbidden from using discrete combinatorial Simulated Annealing.",
-        "You MUST emit a DAG that translates this problem into a completely different mathematical domain.",
-        "Prioritize using the 'functorial_domain_translation', 'razborov_flag_algebras', or 'spectral_graph_bounds' SKILL",
-        "to invent a novel continuous, algebraic, or topological bridge.",
-        "If you must search, configure the search to optimize over the translated continuous/algebraic space",
-        "(e.g., matrix eigenvalues or group generators).",
-      ].join(" ");
+      metaStrategyPrompt = WILES_OPF_PROMPT;
     }
     // ───────────────────────────────────────────────────────────────────
-
 
     // Emit escalation tier to console for telemetry
     if (forceWilesMode) {

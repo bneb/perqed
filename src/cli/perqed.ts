@@ -32,6 +32,7 @@ import {
   extractSearchConfig,
   type ArchitectSearchConfig,
 } from "../search/witness_detector";
+import { WILES_OPF_PROMPT } from "../architect_client";
 import { solveWithZ3, isZ3Available } from "../search/z3_ramsey_solver";
 import { adjToMatrix } from "../search/ramsey_worker";
 import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
@@ -198,6 +199,23 @@ const RUN_CONFIG_SCHEMA = {
 // ARCHITECT Preamble
 // ──────────────────────────────────────────────
 
+/**
+ * Returns the ARCHITECT system preamble for the initial formulation call.
+ * When wilesMode=true the Orthogonal Paradigm Forcing prompt is prepended,
+ * forcing the ARCHITECT to bypass standard techniques from Iteration 0.
+ *
+ * Exported so it can be unit-tested independently of the network call.
+ */
+export function buildFormulationPreamble(wilesMode: boolean): string {
+  if (wilesMode) {
+    return (
+      `${WILES_OPF_PROMPT}\n\n---\n\n` +
+      FORMULATION_PREAMBLE_BASE
+    );
+  }
+  return FORMULATION_PREAMBLE_BASE;
+}
+
 const FORMULATION_PREAMBLE_BASE = `You are the Perqed Problem Formulator. A user has described a mathematical problem they want to prove in Lean 4.
 
 Your job is to produce a structured run configuration that the Perqed proof engine can execute autonomously.
@@ -273,8 +291,11 @@ async function buildPreamble(journalPath: string, goal: string): Promise<string>
 // Phase 1: Formulate
 // ──────────────────────────────────────────────
 
-async function formulate(prompt: string, apiKey: string): Promise<RunConfig> {
+async function formulate(prompt: string, apiKey: string, wilesMode: boolean = false): Promise<RunConfig> {
   console.log("🏛️  Asking ARCHITECT to formulate the problem...\n");
+  if (wilesMode) {
+    console.log("   🧮 [Formulator] WILES MODE — Orthogonal Paradigm Forcing from iteration 0\n");
+  }
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
@@ -282,7 +303,7 @@ async function formulate(prompt: string, apiKey: string): Promise<RunConfig> {
     systemInstruction:
       "You are the Perqed Problem Formulator. Output a structured JSON run configuration for the Perqed proof engine.",
     generationConfig: {
-      temperature: 0.3,
+      temperature: wilesMode ? 0.95 : 0.3,
       responseMimeType: "application/json",
       responseSchema: RUN_CONFIG_SCHEMA as any,
     },
@@ -313,7 +334,8 @@ async function formulate(prompt: string, apiKey: string): Promise<RunConfig> {
   }
 
   const doFormulate = async (previousError?: string) => {
-    let p = FORMULATION_PREAMBLE_BASE + "## The User's Problem Description\n\n" + prompt + libraryContext;
+    let p = buildFormulationPreamble(wilesMode) + "## The User's Problem Description\n\n" + prompt + libraryContext;
+
     if (previousError) {
       p += `\n\n## ⚠️ Previous Response Error\nYour last response caused this error:\n\`\`\`\n${previousError}\n\`\`\`\nPlease respond with a valid JSON object only. No markdown.`;
     }
@@ -1281,7 +1303,8 @@ async function main() {
     console.log(`  Prompt: "${args.prompt}"`);
     console.log("═══════════════════════════════════════════════\n");
 
-    config = await formulate(args.prompt!, apiKey);
+    config = await formulate(args.prompt!, apiKey, args.wiles);
+
     configPath = join(workspaceBase, "runs", config.run_name, "run_config.json");
 
     const { mkdir } = await import("node:fs/promises");
@@ -1302,6 +1325,7 @@ async function main() {
   await executeRun(config, apiKey, args.wiles);
 
 }
+
 
 if (import.meta.main) {
   main().catch((err) => {
