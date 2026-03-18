@@ -178,10 +178,12 @@ describe("ArchitectClient.formulateDAG — escalation ladder", () => {
     return lastPayload;
   }
 
-  test("0 consecutive failures → temperature 0.2 (Stage 1: default exploitation)", async () => {
+  test("0 consecutive failures → temperature 0.2 (Stage 1: INITIAL TRIAGE)", async () => {
     const payload = await runWithFailureStreak(0);
     expect(payload.generationConfig.temperature).toBe(0.2);
     const prompt: string = payload.contents[0].parts[0].text;
+    // Stage 1 must enforce heuristic triage, not just naive search
+    expect(prompt).toContain("INITIAL TRIAGE");
     expect(prompt).not.toContain("LOCAL MINIMUM DETECTED");
     expect(prompt).not.toContain("TRIGGER CONCEPTUAL SCATTER");
   });
@@ -228,6 +230,9 @@ describe("ArchitectClient.formulateDAG — escalation ladder", () => {
     const payload_capture = await client.formulateDAG("ctx", "R(4,6) >= 36", [], [], journal)
       .then(() => lastPayload);
     expect(payload_capture.generationConfig.temperature).toBe(0.2);
+    // Even on startup (empty journal), INITIAL TRIAGE must be present
+    const prompt: string = payload_capture.contents[0].parts[0].text;
+    expect(prompt).toContain("INITIAL TRIAGE");
   });
 
   test("Zod validation still runs at temperature 0.95; invalid JSON triggers retry then succeeds", async () => {

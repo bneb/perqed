@@ -106,10 +106,18 @@ Broaden your search. Query the Librarian for analogies in different fields. Cons
     };
   }
 
-  // Stage 1: default high-exploitation
+  // Stage 1: INITIAL TRIAGE — evaluate structural depth before picking a strategy
   return {
     temperature: 0.2,
-    metaStrategyPrompt: "Focus on direct combinatorial construction and local SA configuration.",
+    metaStrategyPrompt: [
+      "INITIAL TRIAGE: Analyze the mathematical depth of the target goal.",
+      "You have access to naive combinatorial search AND advanced structural frameworks",
+      "(Algebraic Construction, Spectral Graph Bounds, Razborov's Flag Algebras).",
+      "Do NOT blindly default to naive search. If the target is a notoriously difficult",
+      "bound (like R(4,6) >= 36), naive search will fail. You are authorized and encouraged",
+      "to start directly with an advanced structural reduction or continuous translation",
+      "if the math warrants it.",
+    ].join(" "),
   };
 }
 

@@ -966,10 +966,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         model: "gemini-2.5-flash",
       });
 
-      // ── Attempt 2+: ask ARCHITECT to emit a ProofDAG instead of a flat pivot ──
-      // Falls back to the existing requestSearchPivot if DAG formulation fails.
+      // ── ALL attempts: ask ARCHITECT to emit a ProofDAG ──
+      // requestSearchPivot is used ONLY as a catch fallback when formulateDAG
+      // throws an unrecoverable JSON/Zod error after 3 retries, NOT based on
+      // attempt number. The ARCHITECT is in control from Attempt 1.
       let dagAttempted = false;
-      if (attempt >= 2) {
+      {
         try {
           // Discover available SKILLs
           let availableSkills: string[] = [];
