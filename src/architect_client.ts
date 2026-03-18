@@ -507,13 +507,27 @@ export class ArchitectClient {
    */
   async replanDAG(
     currentDag: ProofDAG,
-    journalText: string
+    journalText: string,
+    cognitiveMode: "EXPLOITATION" | "EXPLORATION" = "EXPLORATION"
   ): Promise<ProofDAG> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+
+    const explorationConstraints = `SYSTEM STATE: EXPLORATION MODE.
+You are currently exploring barren space or stuck on a plateau. 
+DIRECTIVE: Use your \`query_literature\` skill to research new combinatorial bounds, or formulate a completely novel algebraic paradigm. Do not make small tweaks to failed rules.`;
+
+    const exploitationConstraints = `SYSTEM STATE: EXPLOITATION MODE. 
+You have discovered a deep mathematical basin. Your best attempt is currently in the top 1% of all evaluated spaces. 
+CRITICAL DIRECTIVE: DO NOT change your structural paradigm. DO NOT change the number of vertices. Retrieve the \`edge_rule_js\` of your absolute best attempt from the Empirical Findings. You must perform an ATOMIC MUTATION on this exact rule. Change, add, or remove exactly ONE numeric constant, array element, or arithmetic operator. Keep the exact same mathematical symmetry.`;
+
+    const systemicDirectives = cognitiveMode === "EXPLOITATION" ? exploitationConstraints : explorationConstraints;
 
     const promptText = `OVERRIDE: MID-SPRINT INVESTIGATION
 
 Your previous attempt failed.
+CURRENT GOAL: ${currentDag.goal}
+
+${systemicDirectives}
 CURRENT GOAL: ${currentDag.goal}
 
 CRITICAL: Review the 'Empirical Findings' in your context. DO NOT propose any symmetry or rule that generated an Energy > 0 in past attempts. DO NOT propose symmetries that generated too many degrees of freedom.
@@ -533,7 +547,7 @@ Or you can immediately attempt another \`algebraic_graph_construction\` node.
 CRITICAL JS FORMAT RULES (for algebraic_graph_construction):
 1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v.
 2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration. Output ONLY the raw logic body. VALID: "return (i + j) % 5 === 0;"
-3. The Description Rule: Keep your "description" field to a MAXIMUM of 3 sentences. DO NOT write mathematical proofs. DO NOT write long explanations. State the core symmetry and stop. Your focus must be on the "edge_rule_js".
+3. The Description Rule: CRITICAL: To prevent system timeouts, your "description" field MUST NOT exceed 2 sentences. Explain your atomic mutation or new paradigm instantly and proceed to the code.
 
 Output ONLY a JSON object matching this schema describing the NEW nodes to append:
 {

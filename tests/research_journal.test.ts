@@ -60,9 +60,39 @@ describe("Epistemic Pruning (Memory Manager)", () => {
     expect(summary).not.toContain("E=1000:");
     expect(summary).not.toContain("E=800:");
 
-    // Test investigation recording
     await journal.recordInvestigation("query_literature", "Paley", "Found Paley graph.");
     const summary2 = await journal.getSummary(target);
     expect(summary2).toContain("[query_literature] Input: Paley... -> Result: Found Paley graph.");
+  });
+
+  test("getCognitiveTemperature returns EXPLOITATION when basin is deep", async () => {
+    const journal = new ResearchJournal(TEST_JOURNAL);
+    const target = "Explore vs Exploit";
+
+    // 1. Initially EXPLORATION
+    const temp1 = await journal.getCognitiveTemperature(target);
+    expect(temp1).toBe("EXPLORATION");
+
+    // 2. Add an attempt at E=1000 (Max)
+    await journal.addEntry({
+      type: "failure_mode",
+      claim: "Algebraic Construction test failed (E=1000).",
+      evidence: "TDD",
+      target_goal: target
+    });
+
+    const temp2 = await journal.getCognitiveTemperature(target);
+    expect(temp2).toBe("EXPLORATION"); // min is 1000, max is 1000, depth is 1.0
+
+    // 3. Add an attempt at E=40 (Depth = 40/1000 = 0.04)
+    await journal.addEntry({
+      type: "failure_mode",
+      claim: "Algebraic Construction test failed (E=40).",
+      evidence: "TDD",
+      target_goal: target
+    });
+
+    const temp3 = await journal.getCognitiveTemperature(target);
+    expect(temp3).toBe("EXPLOITATION"); // 0.04 < 0.05
   });
 });

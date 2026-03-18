@@ -555,6 +555,54 @@
       "claim": "AlgebraicBuilder UNSAT: This graph construction for R(4,6) >= 36 employs an orthogonal algebraic rule inspired by the Prouhet-Tarry-Escott problem, which concerns the equality of sums of powers. Instead of directly finding balanced sets, the adjacency rule leverages the *non-equality* of components derived from linear and quadratic transformations across different prime moduli. Specifically, two distinct vertices i and j (from 0 to 34) are defined as adjacent if their residues modulo 5 are different, AND their quadratic residues modulo 7 are also different. This compound condition, mixing a linear congruence with a quadratic congruence across distinct moduli, breaks typical symmetries found in standard modular constructions (e.g., pure circulant or Paley graphs). The goal is to create a graph structure that inhibits the formation of small cliques (K4) and large independent sets (I6) through this non-standard algebraic balancing condition. For a K4 to exist, four vertices must all have distinct residues modulo 5 (possible as there are 5 residues) AND distinct quadratic residues modulo 7 (possible as there are 4 distinct quadratic residues {0,1,2,4} modulo 7). For an I6 to exist, any two vertices must either share the same residue modulo 5 OR the same quadratic residue modulo 7. → E=1625 on N=35",
       "target_goal": "R(4,6) >= 36",
       "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "c85ead4d-d86c-45ea-8d78-a0c7e08de894",
+      "timestamp": "2026-03-18T18:44:35.798Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: This graph defines adjacency based on the sum of squares of vertex indices modulo 36. An edge exists if this modular sum is one of the quadratic residues modulo 36. This construction is inspired by the 'equal sums of powers' aspect of the Prouhet-Tarry-Escott problem. → E=153931 on N=36",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "53784cbe-15d0-4892-a823-c15cec10fde1",
+      "timestamp": "2026-03-18T18:44:59.691Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: A circulant graph on 35 vertices. Edges are defined by differences modulo 35 belonging to a set derived from quadratic residues modulo 5 and 7, and their additive inverses. → E=20020 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "17a769ad-58de-4c35-b922-4a6228ff6fa6",
+      "timestamp": "2026-03-18T18:45:19.136Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Edges are defined by a cubic congruence. Vertices i and j are connected if the sum of their cubes modulo 35 equals 1. This rule aims to create a highly structured graph that avoids small cliques. → E=1117765 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "b49b2723-470d-4c4c-9046-e2a67c60f992",
+      "timestamp": "2026-03-18T18:45:52.840Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: This graph construction utilizes a modular cubic sum rule. Adjacency between vertices i and j is defined by the condition that the sum of their cubes is congruent to a specific constant modulo the total number of vertices. This introduces a non-linear algebraic symmetry based on principles from additive number theory. → E=1623160 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "55df1dfb-45c2-4c04-8d78-2cf68c6202d1",
+      "timestamp": "2026-03-18T18:47:06.348Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Connects vertices i and j if a specific quadratic-linear modular condition holds for (i,j) or (j,i). The conditions involve modulo 5 and modulo 7, using squares and linear terms. This aims to create a complex connectivity pattern on N=36 vertices. → E=734714 on N=36",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "d66e01c5-4fb5-47a5-9f60-6ec3c3ded5bf",
+      "timestamp": "2026-03-18T18:47:34.121Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Constructs a circulant graph on 36 vertices. An edge exists between vertices i and j if their difference modulo 36 is coprime to 36. This rule defines a 12-regular graph. → E=39894 on N=36",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
     }
   ],
   "investigations": [

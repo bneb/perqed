@@ -106,6 +106,29 @@ export class ResearchJournal {
   }
 
   /**
+   * Evaluates the relative depth of the current best mathematical basin.
+   */
+  async getCognitiveTemperature(targetGoal: string): Promise<"EXPLOITATION" | "EXPLORATION"> {
+    const file = await this.readFile();
+    const attempts = file.entries
+      .filter(e => e.target_goal === targetGoal && e.type === "failure_mode")
+      .map(f => {
+        const match = f.claim.match(/E=(\d+)/);
+        return match ? parseInt(match[1]!, 10) : Infinity;
+      })
+      .filter(e => e !== Infinity);
+
+    if (attempts.length === 0) return "EXPLORATION";
+
+    const minEnergySeen = Math.min(...attempts);
+    const maxEnergySeen = Math.max(...attempts);
+
+    if (maxEnergySeen === 0 || minEnergySeen === Infinity) return "EXPLORATION";
+    const depth = minEnergySeen / maxEnergySeen;
+    return depth < 0.05 ? "EXPLOITATION" : "EXPLORATION";
+  }
+
+  /**
    * The Memory Manager (Epistemic Pruning)
    * Prevents Context Window Bloat by strictly enforcing Garbage Collection.
    */

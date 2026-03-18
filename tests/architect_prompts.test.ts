@@ -18,7 +18,7 @@ describe("Architect Prompt Formatting", () => {
     expect(WILES_OPF_PROMPT_DIRECT).toContain("MAXIMUM of 3 sentences");
   });
 
-  test("replanDAG prompt embeds formatting rules", async () => {
+  test("replanDAG injects EXPLOITATION vs EXPLORATION constraints", async () => {
     const ai = new ArchitectClient({ apiKey: "test", model: "test" });
     const mockDag: ProofDAG = {
       id: "mock",
@@ -27,8 +27,31 @@ describe("Architect Prompt Formatting", () => {
       nodes: []
     };
     
-    // We cannot easily unit test the direct internal string without exporting it or refactoring, 
-    // but we can ensure ArchitectClient instantiates correctly for now.
-    expect(ai).toBeDefined();
+    let capturedBody = "";
+    const originalFetch = global.fetch;
+    
+    // Mock fetch to capture the injected prompt
+    global.fetch = (async (url: any, options: any) => {
+      if (options && typeof options.body === "string") {
+        capturedBody = options.body;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: "{\"id\": \"mock\", \"goal\": \"Test Goal\", \"nodes\": [{\"id\":\"n1\",\"kind\":\"calculate_degrees_of_freedom\",\"config\":{\"vertices\":10,\"edge_rule_js\":\"return true\"}}]}" }] } }]
+        })
+      } as any;
+    }) as unknown as typeof fetch;
+
+    try {
+      await ai.replanDAG(mockDag, "journal content", "EXPLOITATION");
+      expect(capturedBody).toContain("ATOMIC MUTATION");
+      expect(capturedBody).toContain("MUST NOT exceed 2 sentences");
+
+      await ai.replanDAG(mockDag, "journal content", "EXPLORATION");
+      expect(capturedBody).toContain("exploring barren space");
+    } finally {
+      global.fetch = originalFetch; // Restore
+    }
   });
 });
