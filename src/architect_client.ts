@@ -11,7 +11,7 @@
 import { z } from "zod";
 import { ArchitectResponseSchema, type ArchitectResponse } from "./schemas";
 import { ProofDAGSchema, type ProofDAG } from "./proof_dag/schemas";
-import { buildTabuHashBlock, type JournalEntry } from "./search/research_journal";
+import { buildTabuHashBlock, type JournalEntry, type ResearchJournal } from "./search/research_journal";
 
 // ──────────────────────────────────────────────
 // Configuration
@@ -60,6 +60,58 @@ You must respond with ONLY valid JSON (no markdown, no prose) matching this exac
 }
 
 Do NOT wrap your response in \`\`\`json\`\`\` or any markdown. Return raw JSON only.`;
+
+// ──────────────────────────────────────────────
+// Escalation Ladder — temperature & meta-strategy
+// ──────────────────────────────────────────────
+
+interface EscalationConfig {
+  temperature: number;
+  metaStrategyPrompt: string;
+}
+
+/**
+ * Determine the LLM temperature and meta-strategy injection based on
+ * the consecutive macro-failure streak from the research journal.
+ *
+ * Stage 1 (0–2 failures): High-exploitation baseline.
+ *   T = 0.2, direct combinatorial focus.
+ *
+ * Stage 2 (3–5 failures): Analogy Reheat.
+ *   T = 0.70 — broaden search, analogies, Tabu Search.
+ *
+ * Stage 3 (≥6 failures): The Wiles Maneuver (Conceptual Scatter).
+ *   T = 0.95 — abandon direct search, structural reductions, domain change.
+ */
+export function computeEscalation(consecutiveFailures: number): EscalationConfig {
+  if (consecutiveFailures >= 6) {
+    return {
+      temperature: 0.95,
+      metaStrategyPrompt: `
+CRITICAL MACRO-STALENESS DETECTED: You have failed ${consecutiveFailures} times using direct combinatorial search.
+Do NOT attempt to solve the target goal directly. You are trapped in a conceptual glass floor.
+TRIGGER CONCEPTUAL SCATTER: You MUST use the 'Polynomial-Time Reductions', 'Duality Arguments', or 'Bijections' SKILL.
+Emit a DAG that translates this problem into a completely different mathematical domain (e.g., topology, complex analysis, or algebraic geometry). Formulate a helper object, and prove that if your object exists, the target goal is structurally satisfied.
+`.trim(),
+    };
+  }
+
+  if (consecutiveFailures >= 3) {
+    return {
+      temperature: 0.70,
+      metaStrategyPrompt: `
+LOCAL MINIMUM DETECTED: Standard search parameters have failed ${consecutiveFailures} times.
+Broaden your search. Query the Librarian for analogies in different fields. Consider changing the graph representation or using advanced heuristics like Tabu Search.
+`.trim(),
+    };
+  }
+
+  // Stage 1: default high-exploitation
+  return {
+    temperature: 0.2,
+    metaStrategyPrompt: "Focus on direct combinatorial construction and local SA configuration.",
+  };
+}
 
 // ──────────────────────────────────────────────
 // ArchitectClient
@@ -148,18 +200,50 @@ export class ArchitectClient {
    * Emits a separate system prompt that instructs Gemini to return raw JSON
    * matching the ProofDAG schema. Validates via ProofDAGSchema.parse().
    *
+   * The LLM temperature and meta-strategy prompt are dynamically scaled by
+   * the consecutive macro-failure streak in the research journal:
+   *   - Stage 1 (0–2 failures): T=0.2, direct combinatorial focus
+   *   - Stage 2 (3–5 failures): T=0.70, "LOCAL MINIMUM DETECTED"
+   *   - Stage 3 (≥6 failures):  T=0.95, "TRIGGER CONCEPTUAL SCATTER" (The Wiles Maneuver)
+   *
+   * Zod validation (ProofDAGSchema.parse) is applied on every attempt regardless
+   * of temperature — high-T responses are more likely to produce malformed JSON,
+   * which is caught by the existing try/catch/retry loop.
+   *
    * @param context         - Journal / digest context (past attempts)
    * @param goal            - Mathematical goal, e.g. "R(4,6) >= 36"
    * @param availableSkills - List of available SKILL names for "skill_apply" nodes
-   * @throws on malformed response or schema validation failure (caller falls back)
+   * @param journalEntries  - Raw entries (for tabu hash extraction)
+   * @param journal         - ResearchJournal for failure streak detection (optional;
+   *                          defaults to 0 failures when not provided)
    */
   async formulateDAG(
     context: string,
     goal: string,
     availableSkills: string[] = [],
     journalEntries: JournalEntry[] = [],
+    journal?: ResearchJournal,
   ): Promise<ProofDAG> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+
+    // ── Failure streak → escalation tier ────────────────────────────────
+    const consecutiveFailures = journal
+      ? await journal.getConsecutiveMacroFailures()
+      : 0;
+    const { temperature: llmTemperature, metaStrategyPrompt } =
+      computeEscalation(consecutiveFailures);
+
+    // Emit escalation tier to console for telemetry
+    if (consecutiveFailures >= 6) {
+      console.log(
+        `   🔀 [Architect] STAGE 3 — Conceptual Scatter (Wiles Maneuver). Failures: ${consecutiveFailures}, T=${llmTemperature}`,
+      );
+    } else if (consecutiveFailures >= 3) {
+      console.log(
+        `   🌡️ [Architect] STAGE 2 — Analogy Reheat. Failures: ${consecutiveFailures}, T=${llmTemperature}`,
+      );
+    }
+    // ────────────────────────────────────────────────────────────────────
 
     const skillList =
       availableSkills.length > 0
@@ -173,6 +257,9 @@ export class ArchitectClient {
       : "";
 
     const dagSystemPrompt =
+      // ── Meta-strategy injection (top of prompt for maximum weight) ──
+      `${metaStrategyPrompt}\n\n` +
+      `---\n\n` +
       `You are a senior proof architect. Decompose the mathematical goal into a minimal directed acyclic graph (DAG) of proof sub-tasks.\n\n` +
       `Goal: ${goal}\n\n` +
       `${skillList}\n\n` +
@@ -214,7 +301,7 @@ export class ArchitectClient {
 
     const payload = {
       contents: [{ parts: [{ text: dagSystemPrompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+      generationConfig: { temperature: llmTemperature, maxOutputTokens: 4096 },
     };
 
     let lastError = "";
@@ -234,6 +321,7 @@ export class ArchitectClient {
 
         const jsonString = extractJSON(rawText);
         const parsed = JSON.parse(jsonString);
+        // Zod validates on every attempt, including temperature=0.95 (The Wiles Maneuver)
         return ProofDAGSchema.parse(parsed);
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);

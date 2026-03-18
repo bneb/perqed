@@ -103,7 +103,32 @@ export class ResearchJournal {
     return entries;
   }
 
+  /**
+   * Count consecutive macro-failures at the tail of the journal.
+   *
+   * Iterates backwards through all entries. Each `failure_mode` entry
+   * adds 1 to the streak. Any `lemma` or `observation` entry (a success
+   * signal or neutral note) immediately breaks the streak and returns
+   * the count accumulated so far.
+   *
+   * Returns 0 for an empty journal (safe startup default).
+   */
+  async getConsecutiveMacroFailures(): Promise<number> {
+    const { entries } = await this.readFile();
+    let streak = 0;
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (entries[i]!.type === "failure_mode") {
+        streak++;
+      } else {
+        // lemma or observation: streak broken
+        break;
+      }
+    }
+    return streak;
+  }
+
   // ── Private ─────────────────────────────────
+
 
   private async readFile(): Promise<JournalFile> {
     try {
