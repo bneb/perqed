@@ -36,24 +36,9 @@ let activePatch: { adj: AdjacencyMatrix | null } = { adj: null };
 self.onmessage = (event: MessageEvent) => {
   const { type, config, workerIndex } = event.data;
 
-  if (type === "RESUME_WITH_PATCH") {
-    // Orchestrator finished MicroSAT — write the patch and wake the SA loop.
-    const { patchedAdjRaw, patchedAdjN } = event.data;
-    if (patchedAdjRaw && patchedAdjN) {
-      const patched = new AdjacencyMatrix(patchedAdjN);
-      const raw = new Int8Array(patchedAdjRaw);
-      for (let i = 0; i < raw.length; i++) patched.raw[i] = raw[i]!;
-      activePatch.adj = patched;
-    } else {
-      activePatch.adj = null;  // no patch → scatter normally
-    }
-    if (activeLockView) {
-      // Write non-zero to wake Atomics.wait in the SA loop.
-      Atomics.store(activeLockView, 0, 1);
-      Atomics.notify(activeLockView, 0, 1);
-    }
-    return;
-  }
+  // The RESUME_WITH_PATCH message is no longer needed.
+  // The Orchestrator writes the patch directly into the microSatLock SharedArrayBuffer
+  // before calling Atomics.notify.
 
   if (type === "start") {
     // Reconstruct AdjacencyMatrix from raw data if present
@@ -76,9 +61,9 @@ self.onmessage = (event: MessageEvent) => {
 
     if (config.microSatThreshold !== undefined) {
       // Allocate a fresh lock for this worker's lifetime.
-      // Reset to 0 so Atomics.wait will block correctly.
-      activeLock = new SharedArrayBuffer(4);
-      activeLockView = new Int32Array(activeLock);
+      // 4 bytes for lock status (0=wait, 1=patch, 2=no-patch) + enough bytes for the AdjacencyMatrix raw array
+      activeLock = new SharedArrayBuffer(4 + config.n * config.n);
+      activeLockView = new Int32Array(activeLock, 0, 1);
       Atomics.store(activeLockView, 0, 0);
       saConfig.microSatLock = activeLock;
 

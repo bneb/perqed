@@ -241,30 +241,33 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
                 // Z3 proved cold zone is toxic — nuke scaffold, send patched adj back
                 console.log(`   ☢️  [MicroSAT] UNSAT in ${ms}ms — nuking cold zone, waking W${w_idx} with patch`);
                 nukeScaffold(basinAdj, zone.frozenVertices);
-                // Send the patched adj to the waiting worker
-                workerRef.postMessage({
-                  type: "RESUME_WITH_PATCH",
-                  patchedAdjRaw: Array.from(basinAdj.raw),
-                  patchedAdjN: basinAdj.n,
-                });
+                
+                if (lock) {
+                  // Write patch into the shared buffer starting at byte 4
+                  const patchRaw = new Int8Array(lock, 4);
+                  for (let i = 0; i < basinAdj.raw.length; i++) {
+                    patchRaw[i] = basinAdj.raw[i]!;
+                  }
+                  
+                  // Wake the worker's Atomics.wait via the shared lock.
+                  // Status 1 = PATCH
+                  const lockView = new Int32Array(lock, 0, 1);
+                  Atomics.store(lockView, 0, 1);
+                  Atomics.notify(lockView, 0, 1);
+                }
               } else {
                 console.log(`   ⏱️  [MicroSAT] ${result.status} in ${ms}ms (hot zone ${result.hotZoneSize}v) — waking W${w_idx} to scatter`);
-                // Timeout or unknown — let worker scatter normally
-                workerRef.postMessage({
-                  type: "RESUME_WITH_PATCH",
-                  patchedAdjRaw: null,
-                  patchedAdjN: 0,
-                });
-              }
-
-              // Wake the worker's Atomics.wait via the shared lock.
-              // If no SharedArrayBuffer was sent (old workers), this is a no-op.
-              if (lock) {
-                const lockView = new Int32Array(lock);
-                Atomics.store(lockView, 0, 1);
-                Atomics.notify(lockView, 0, 1);
+                
+                if (lock) {
+                  // Wake the worker's Atomics.wait via the shared lock.
+                  // Status 2 = NO PATCH (SCATTER)
+                  const lockView = new Int32Array(lock, 0, 1);
+                  Atomics.store(lockView, 0, 2);
+                  Atomics.notify(lockView, 0, 1);
+                }
               }
             })();
+
           }
         }
 

@@ -400,15 +400,20 @@ export function ramseySearch(
             // onSterilBasin (postMessage) is wired in the thread entrypoint.
             // After posting, we park here until orchestrator notifies us.
             config.onSterilBasin?.(snapshot, bestEnergy);  // sends STERILE_BASIN
-            const lockView = new Int32Array(config.microSatLock);
+            const lockView = new Int32Array(config.microSatLock, 0, 1);
             // Park the SA loop until the orchestrator wakes us.
             // Timeout: 130s (slightly over Z3 timeout of 120s + margin).
             Atomics.wait(lockView, 0, 0, 130_000);
-            // Atomics.wait returned — read the patched graph if available.
-            const patch = config.microSatPatch?.adj ?? null;
-            if (patch) {
-              // Orchestrator delivered a surgical fix — apply it, skip scatter.
-              for (let i = 0; i < patch.raw.length; i++) adj.raw[i] = patch.raw[i]!;
+            
+            // Atomics.wait returned. Read status from lockView[0].
+            // 0 = timeout, 1 = patch ready, 2 = no patch (scatter)
+            const status = Atomics.load(lockView, 0);
+            
+            if (status === 1) {
+              // Orchestrator delivered a surgical fix via SharedArrayBuffer — apply it, skip scatter.
+              // Payload starts at byte 4.
+              const patchRaw = new Int8Array(config.microSatLock, 4, adj.raw.length);
+              for (let i = 0; i < patchRaw.length; i++) adj.raw[i] = patchRaw[i]!;
               energy = ramseyEnergy(adj, r, s);
               bestAdj = adj.clone();
               if (energy < bestEnergy) bestEnergy = energy;
@@ -420,7 +425,7 @@ export function ramseySearch(
               console.log(`[MicroSAT] Applied surgical patch — E=${energy}, skipping scatter`);
               continue;  // ← do NOT scatter
             }
-            // patch is null → fall through to scatter below
+            // status !== 1 → fall through to scatter below
           } else {
             // ── SINGLE-WORKER PATH: callback is synchronous no-op ──
             config.onSterilBasin?.(snapshot, bestEnergy);
