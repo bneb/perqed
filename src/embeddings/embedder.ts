@@ -9,6 +9,7 @@
 export class LocalEmbedder {
   private readonly baseUrl: string;
   private readonly model: string;
+  private readonly tagsUrl: string;
 
   constructor(
     baseUrl = "http://localhost:11434/api/embeddings",
@@ -16,15 +17,34 @@ export class LocalEmbedder {
   ) {
     this.baseUrl = baseUrl;
     this.model = model;
+    // Derive the health-check URL from the base URL origin
+    const origin = new URL(baseUrl).origin;
+    this.tagsUrl = `${origin}/api/tags`;
+  }
+
+  /**
+   * Returns true if the local Ollama instance is reachable.
+   * Fast: uses a 2-second timeout, never throws.
+   */
+  async isAvailable(): Promise<boolean> {
+    try {
+      const r = await fetch(this.tagsUrl, {
+        signal: AbortSignal.timeout(2000),
+      });
+      return r.ok;
+    } catch {
+      return false;
+    }
   }
 
   /**
    * Converts a text string into a dense vector embedding.
    *
    * @param text - Lean 4 theorem signature, tactic state, or description
+   * @param silent - If true, suppresses error logging (for batch use)
    * @returns Dense vector array, or [] on failure
    */
-  async embed(text: string): Promise<number[]> {
+  async embed(text: string, silent = false): Promise<number[]> {
     try {
       const response = await fetch(this.baseUrl, {
         method: "POST",
@@ -42,8 +62,32 @@ export class LocalEmbedder {
       const data = (await response.json()) as { embedding: number[] };
       return data.embedding;
     } catch (error: any) {
-      console.error("[Embedder] Failed to reach local Ollama instance:", error.message);
+      if (!silent) {
+        console.error("[Embedder] Failed to reach local Ollama instance:", error.message);
+      }
       return [];
     }
+  }
+
+  /**
+   * Embeds a batch of texts concurrently, with per-item retry on failure.
+   *
+   * @param texts   - Array of texts to embed
+   * @param retries - Number of retries per item on failure (default: 2)
+   * @returns Array parallel to `texts`; null entries = embed failed for that item
+   */
+  async embedBatch(texts: string[], retries = 2): Promise<Array<number[] | null>> {
+    return Promise.all(
+      texts.map(async (t) => {
+        for (let i = 0; i <= retries; i++) {
+          const v = await this.embed(t, /* silent */ true);
+          if (v.length > 0) return v;
+          if (i < retries) {
+            await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+          }
+        }
+        return null;
+      }),
+    );
   }
 }

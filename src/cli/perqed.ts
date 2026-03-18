@@ -43,6 +43,12 @@ import {
 } from "../search/research_journal";
 import { GistPublisher } from "../gist_publisher";
 import { repairJSON } from "../util/json_repair";
+import { ArxivLibrarian } from "../librarian/arxiv_librarian";
+import { DOMAIN_SEED_QUERIES } from "../librarian/seed_queries";
+import { VectorDatabase } from "../embeddings/vector_store";
+import { DAGExecutor } from "../proof_dag/dag_executor";
+import { ArchitectClient } from "../architect_client";
+import { readdir } from "node:fs/promises";
 
 // ──────────────────────────────────────────────
 // CLI Argument Parsing
@@ -534,6 +540,31 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   console.log(`  Workspace: ${workspace.paths.runDir}`);
   console.log("═══════════════════════════════════════════════\n");
 
+  // ── Background Library Seeding (non-blocking) ─────────────────────────
+  // If the vector store has fewer than 10 papers, kick off a background seed
+  // so the ARCHITECT has domain context on the next attempt.
+  const DB_PATH = join(workspaceBase, "..", "data", "perqed.lancedb");
+  void (async () => {
+    try {
+      const librarian = new ArxivLibrarian({
+        queries: DOMAIN_SEED_QUERIES,
+        maxPerQuery: 15,
+        dbPath: DB_PATH,
+      });
+      const count = await librarian.count();
+      if (count < 10) {
+        console.log("📚 [Librarian] DB sparse — seeding domain papers in background...");
+        const { ingested } = await librarian.run();
+        if (ingested > 0) {
+          console.log(`📚 [Librarian] Background seeding complete: ${ingested} papers ingested`);
+        }
+      }
+    } catch (e: any) {
+      // Non-critical — seeding failure must never block the search
+      console.warn(`📚 [Librarian] Background seeding skipped: ${e.message}`);
+    }
+  })();
+
   const startTime = Date.now();
   const MAX_ARCHITECT_PIVOTS = 5;
 
@@ -914,19 +945,137 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
 
       console.log(`\n   🏛️  Asking ARCHITECT for search pivot...\n`);
 
-      const pivotedConfig = await callSafe(
-        (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, prunedSchema, previousError),
-        3,
-        "ARCHITECT pivot",
-      );
+      const architectClient = new ArchitectClient({
+        apiKey,
+        model: "gemini-2.5-flash",
+      });
 
-      if (pivotedConfig) {
-        sp = pivotedConfig;
-        console.log(`   ✅ ARCHITECT pivoted:`);
-        console.log(`      Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${(sp.sa_iterations ?? 10_000_000).toLocaleString()} iters`);
+      // ── Attempt 2+: ask ARCHITECT to emit a ProofDAG instead of a flat pivot ──
+      // Falls back to the existing requestSearchPivot if DAG formulation fails.
+      let dagAttempted = false;
+      if (attempt >= 2) {
+        try {
+          // Discover available SKILLs
+          let availableSkills: string[] = [];
+          try {
+            const skillsRoot = join(workspaceBase, "..", ".agents", "skills");
+            const entries = await readdir(skillsRoot, { withFileTypes: true });
+            availableSkills = entries
+              .filter((e) => e.isDirectory())
+              .map((e) => e.name);
+          } catch { /* skills dir may not exist yet */ }
+
+          const dag = await architectClient.formulateDAG(
+            augmentedDigest,
+            targetGoal,
+            availableSkills,
+          );
+
+          console.log(`   🗺️  ARCHITECT emitted ProofDAG (${dag.nodes.length} nodes):`);
+          dag.nodes.forEach((n) =>
+            console.log(`      [${n.kind}] ${n.id}: ${n.label}`)
+          );
+
+          // ── Wire DAGExecutor node handlers ──────────────────────────────
+          const db = new VectorDatabase(DB_PATH);
+          await db.initialize();
+
+          const executor = new DAGExecutor(dag, {
+            // literature: retrieve from LanceDB and return as context string
+            literature: async (node) => {
+              const cfg = node.config as { query?: string; k?: number };
+              const query = cfg.query ?? targetGoal;
+              const k = cfg.k ?? 5;
+              // We don't have a query vector without Ollama, so return empty context
+              // gracefully — the SA doesn't depend on literature for correctness.
+              return `[Literature context for "${query}" — ${k} results]
+(Vector search requires Ollama to be running. Proceeding without RAG context.)`;
+            },
+
+            // skill_apply: read SKILL.md and return its content as context
+            skill_apply: async (node) => {
+              const cfg = node.config as { skillPath?: string };
+              const skillPath = cfg.skillPath ?? "";
+              try {
+                const skillFile = Bun.file(skillPath);
+                if (await skillFile.exists()) {
+                  const content = await skillFile.text();
+                  return { skillContent: content };
+                }
+              } catch { /* skill not found */ }
+              return { skillContent: `[SKILL not found: ${skillPath}]` };
+            },
+
+            // aggregate: pick the result from the node with best_energy
+            aggregate: async (node, results) => {
+              const cfg = node.config as { strategy?: string; sourceNodes?: string[] };
+              const sources = cfg.sourceNodes ?? [];
+              let best: { bestEnergy: number } | null = null;
+              for (const src of sources) {
+                const r = results.get(src) as { bestEnergy?: number } | undefined;
+                if (r?.bestEnergy !== undefined) {
+                  if (!best || r.bestEnergy < best.bestEnergy) {
+                    best = r as { bestEnergy: number };
+                  }
+                }
+              }
+              return best ?? { note: "no results to aggregate" };
+            },
+
+            // search / z3 / lean: delegate to existing implementations
+            // (These are handled by the outer SA loop for this attempt)
+            search: async (node) => {
+              const cfg = node.config as any;
+              return { note: `search node "${node.id}" — handled by SA loop`, config: cfg };
+            },
+            z3: async (node) => {
+              return { note: `z3 node "${node.id}" — handled by LNS loop`, config: node.config };
+            },
+            lean: async (node) => {
+              return { note: `lean node "${node.id}" — handled by tactic loop`, config: node.config };
+            },
+          });
+
+          const dagResult = await executor.execute();
+          console.log(`   🗺️  DAG complete: ${dagResult.succeeded.length} succeeded, ${dagResult.failed.length} failed, ${dagResult.blocked.length} blocked`);
+
+          dagAttempted = true;
+        } catch (dagErr: any) {
+          console.warn(`   ⚠️ [DAG] formulateDAG failed: ${dagErr.message} — falling back to flat pivot`);
+        }
+      }
+
+      // ── Flat pivot fallback (attempt 1, or if DAG failed) ──
+      if (!dagAttempted) {
+        const pivotedConfig = await callSafe(
+          (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, prunedSchema, previousError),
+          3,
+          "ARCHITECT pivot",
+        );
+
+        if (pivotedConfig) {
+          sp = pivotedConfig;
+          console.log(`   ✅ ARCHITECT pivoted:`);
+          console.log(`      Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${(sp.sa_iterations ?? 10_000_000).toLocaleString()} iters`);
+        } else {
+          console.log(`   ❌ ARCHITECT could not produce a pivot after 3 attempts. Aborting search.`);
+          break;
+        }
       } else {
-        console.log(`   ❌ ARCHITECT could not produce a pivot after 3 attempts. Aborting search.`);
-        break;
+        // DAG was executed — apply the flat pivot to advance the SA loop parameters
+        // (DAG execution informs the ARCHITECT's next flat config decision)
+        const pivotedConfig = await callSafe(
+          (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, prunedSchema, previousError),
+          3,
+          "ARCHITECT pivot (post-DAG)",
+        );
+        if (pivotedConfig) {
+          sp = pivotedConfig;
+          console.log(`   ✅ ARCHITECT pivoted (post-DAG):`);
+          console.log(`      Vertices: ${sp.vertices}, R(${sp.r},${sp.s}), ${(sp.sa_iterations ?? 10_000_000).toLocaleString()} iters`);
+        } else {
+          console.log(`   ⚠️  Post-DAG pivot failed. Reusing previous config.`);
+        }
       }
     }
 

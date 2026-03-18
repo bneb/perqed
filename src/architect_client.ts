@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import { ArchitectResponseSchema, type ArchitectResponse } from "./schemas";
+import { ProofDAGSchema, type ProofDAG } from "./proof_dag/schemas";
 
 // ──────────────────────────────────────────────
 // Configuration
@@ -139,7 +140,95 @@ export class ArchitectClient {
       new_directive: "Try a different approach. Use omega for linear arithmetic or induction for structural proofs.",
     };
   }
+
+  /**
+   * Ask the ARCHITECT to decompose a mathematical goal into a ProofDAG.
+   *
+   * Emits a separate system prompt that instructs Gemini to return raw JSON
+   * matching the ProofDAG schema. Validates via ProofDAGSchema.parse().
+   *
+   * @param context         - Journal / digest context (past attempts)
+   * @param goal            - Mathematical goal, e.g. "R(4,6) >= 36"
+   * @param availableSkills - List of available SKILL names for "skill_apply" nodes
+   * @throws on malformed response or schema validation failure (caller falls back)
+   */
+  async formulateDAG(
+    context: string,
+    goal: string,
+    availableSkills: string[] = [],
+  ): Promise<ProofDAG> {
+    const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+
+    const skillList =
+      availableSkills.length > 0
+        ? `Available SKILLs (use "skill_apply" nodes for these): ${availableSkills.join(", ")}`
+        : "No SKILLs available yet.";
+
+    const dagSystemPrompt =
+      `You are a senior proof architect. Decompose the mathematical goal into a minimal directed acyclic graph (DAG) of proof sub-tasks.\n\n` +
+      `Goal: ${goal}\n\n` +
+      `${skillList}\n\n` +
+      `Research journal (past attempts):\n${context}\n\n` +
+      `Emit ONLY valid JSON (no markdown, no prose) matching this exact schema:\n\n` +
+      `{\n` +
+      `  "id": "<uuid>",\n` +
+      `  "goal": "${goal}",\n` +
+      `  "nodes": [\n` +
+      `    {\n` +
+      `      "id": "unique_snake_case_id",\n` +
+      `      "kind": "search" | "z3" | "lean" | "literature" | "skill_apply" | "aggregate",\n` +
+      `      "label": "human readable description",\n` +
+      `      "dependsOn": ["list", "of", "node", "ids"],\n` +
+      `      "config": { ...kind-specific fields... },\n` +
+      `      "status": "pending"\n` +
+      `    }\n` +
+      `  ],\n` +
+      `  "createdAt": "<ISO 8601 timestamp>"\n` +
+      `}\n\n` +
+      `Ordering rules:\n` +
+      `1. Start with a "literature" node (no deps) to retrieve relevant papers.\n` +
+      `2. Z3 circulant fast-path is a "z3" node with mode "circulant_fast_path" (no deps).\n` +
+      `3. SA search nodes depend on the "literature" node (context injection).\n` +
+      `4. LNS finisher ("z3" with mode "lns_finisher") depends on the SA node.\n` +
+      `5. Lean verification depends on the LNS finisher.\n` +
+      `6. Use "aggregate" nodes to merge multiple parallel SA workers.\n` +
+      `7. Keep the DAG minimal — omit nodes that are not needed.\n` +
+      `8. Every dependsOn reference must point to a real node id in the same DAG.`;
+
+    const payload = {
+      contents: [{ parts: [{ text: dagSystemPrompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+    };
+
+    let lastError = "";
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          throw new Error(`Gemini HTTP ${response.status}: ${await response.text()}`);
+        }
+        const body = (await response.json()) as GeminiApiResponse;
+        const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (!rawText) throw new Error("Empty Gemini response");
+
+        const jsonString = extractJSON(rawText);
+        const parsed = JSON.parse(jsonString);
+        return ProofDAGSchema.parse(parsed);
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        console.warn(`   ⚠️ [Architect.formulateDAG] attempt ${attempt}/3: ${lastError}`);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+
+    throw new Error(`formulateDAG failed after 3 attempts: ${lastError}`);
+  }
 }
+
 
 // ──────────────────────────────────────────────
 // Gemini REST API types (minimal)
