@@ -387,6 +387,38 @@
       "claim": "AlgebraicBuilder UNSAT: Constructs a circulant graph on 35 vertices. An edge (i,j) exists if the difference (j-i) mod 35 is in the set {1, 6, 9, 11, 14, 16} or its additive inverse modulo 35. This graph is known to be K_4-free and I_6-free, thereby proving R(4,6) >= 36. → E=16205 on N=35",
       "target_goal": "R(4,6) >= 36",
       "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "6bf4291c-d42c-4b79-a8e9-9482573f5582",
+      "timestamp": "2026-03-18T17:30:12.659Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Constructs a graph on 35 vertices where an edge (i,j) exists if the sum (i+j) modulo 35 is a non-zero quadratic residue modulo 35. This graph is intended to be K_4-free and I_6-free, thereby witnessing R(4,6) >= 36. This is a non-circulant algebraic graph construction. → E=1442 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "4904245f-2ffc-49b4-88f5-df863672b102",
+      "timestamp": "2026-03-18T17:31:34.033Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Construction of a graph on Z_35 where an edge (i,j) exists if their sum modulo 35 is a non-zero quadratic residue modulo 35. This uses number theory (quadratic residues) over a composite modulus and an additive group structure, providing an orthogonal approach to standard difference set circulant constructions previously attempted. → E=68351 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "70b18272-c486-4bd1-a13e-fbfcead199ce",
+      "timestamp": "2026-03-18T17:32:08.972Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: The graph is constructed by mapping each vertex 'k' (from 0 to 34) to a pair of coordinates (k mod 5, k mod 7) in the product ring Z_5 x Z_7. An edge (i,j) is defined to be red if the 'inner product' of their corresponding coordinate pairs, specifically ((i mod 5)*(j mod 5) + (i mod 7)*(j mod 7)), is congruent to zero modulo 35. This construction stems from the field of algebraic graph theory over finite rings, leveraging properties of ring ideals and bilinear forms to define adjacency. → E=835919 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "322df2ef-ed43-4a06-ad2e-52e236ee580c",
+      "timestamp": "2026-03-18T17:33:16.067Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: This construction defines a graph on 35 vertices, viewed as elements of Z_35 and mapped to coordinate pairs in Z_5 x Z_7 via the Chinese Remainder Theorem. An edge (i,j) is colored red if the expression `((k + 1)*(l + 1) - 1) % p` evaluates to 1 for both p=5 and p=7, where k and l are the coordinates of i and j modulo p, respectively. This method utilizes a multiplicative polynomial form over components of a product ring, offering an orthogonal approach to standard difference set or simple residue constructions. The aim is to generate a K_4-free red graph and a K_6-free blue graph, thereby witnessing R(4,6) >= 36. → E=1162590 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
     }
   ]
 }

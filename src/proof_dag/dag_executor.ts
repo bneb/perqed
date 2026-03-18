@@ -59,9 +59,17 @@ export class DAGExecutor {
 
   async execute(): Promise<DAGExecutionResult> {
     const nodeMap = new Map(this.dag.nodes.map((n) => [n.id, n]));
-    const remaining = new Set(this.dag.nodes.map((n) => n.id));
+    const remaining = new Set<string>();
     const succeeded = new Set<string>();
     const failed = new Set<string>();
+
+    for (const n of this.dag.nodes) {
+      if (n.status === "succeeded") {
+        succeeded.add(n.id);
+      } else {
+        remaining.add(n.id);
+      }
+    }
 
     while (remaining.size > 0) {
       // Find nodes whose every dependency has succeeded

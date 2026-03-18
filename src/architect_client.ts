@@ -498,6 +498,93 @@ export class ArchitectClient {
     throw new Error(`formulateAlgebraicRule failed after 3 attempts: ${lastError}`);
   }
 
+  /**
+   * Used in Wiles Mode Mid-Sprint Replanning.
+   * Prompts the ARCHITECT to either attempt a new algebraic_graph_construction 
+   * OR emit investigation nodes to build intuition.
+   */
+  async replanDAG(
+    currentDag: ProofDAG,
+    journalEntries: JournalEntry[]
+  ): Promise<ProofDAG> {
+    const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+
+    const journalText = journalEntries.length === 0 ? "No previous failures." :
+      "Failed Attempts:\\n" + journalEntries.map((e) => `- ${e.claim}`).join("\n");
+
+    const promptText = `OVERRIDE: MID-SPRINT INVESTIGATION
+
+Your previous attempt failed.
+CURRENT GOAL: ${currentDag.goal}
+
+${journalText}
+
+You can either attempt a new mathematical construction, OR you can use an investigation skill to build intuition before your next attempt.
+
+SUPPORTED INVESTIGATION SKILLS (for 'kind' property):
+1. \`calculate_degrees_of_freedom\`: config requires \`edge_rule_js\` (string) and \`vertices\` (number). Tests the parameter dimension of a rule to see how many independent variables it creates.
+2. \`query_known_graphs\`: config requires \`r\` (number) and \`s\` (number). Returns historical bounds.
+
+Or you can immediately attempt another \`algebraic_graph_construction\` node.
+
+Output ONLY a JSON object matching this schema describing the NEW nodes to append:
+{
+  "id": "replan_xyz",
+  "goal": "${currentDag.goal.replace(/"/g, '\\"')}",
+  "nodes": [
+    {
+      "id": "<string>",
+      "kind": "calculate_degrees_of_freedom" | "query_known_graphs" | "algebraic_graph_construction",
+      "config": { ... }
+    }
+  ]
+}
+
+DO NOT wrap your JSON in markdown.`;
+
+    const payload = {
+      system_instruction: { parts: [{ text: promptText }] },
+      contents: [{ parts: [{ text: "Emit the partial JSON object containing new nodes now." }] }],
+      generationConfig: { temperature: 0.7, response_mime_type: "application/json" },
+    };
+
+    let lastError = "";
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(60000),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Gemini HTTP ${response.status}: ${await response.text()}`);
+        }
+        
+        const body = (await response.json()) as GeminiApiResponse;
+        const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        
+        try {
+          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.config.model, prompt: "replanDAG", response: rawText }) + "\n");
+        } catch (e) {}
+
+        if (!rawText) throw new Error("Empty Gemini response");
+        
+        const jsonString = JsonHandler.extractAndRepair(rawText);
+        const parsed = JSON.parse(jsonString);
+        
+        return ProofDAGSchema.parse(parsed);
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        console.warn(`   ⚠️ [Architect.replanDAG] attempt ${attempt}/3: ${lastError}`);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+    
+    throw new Error(`replanDAG failed after 3 attempts: ${lastError}`);
+  }
+
 }
 
 

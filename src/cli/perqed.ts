@@ -696,10 +696,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         
         let builderConfig: any;
         builderConfig = await callSafe(
-          () => architectClient.formulateAlgebraicRule(
-            targetGoal,
-            allJournalEntries
-          ),
+          () => architectClient.formulateAlgebraicRule(targetGoal, allJournalEntries),
           1,
           "ARCHITECT formulateAlgebraicRule (Wiles)"
         );
@@ -707,12 +704,28 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         if (!builderConfig) throw new Error("formulateAlgebraicRule failed to return a valid config.");
 
         builderConfig = AlgebraicConstructionConfigSchema.parse(builderConfig);
-
         console.log(`   🗺️  ARCHITECT emitted Algebraic Rule for ${builderConfig.vertices} vertices.`);
 
-        console.log(`\n   🏗️  [AlgebraicBuilder] Executing algebraic construction...`);
-        const { AlgebraicBuilder } = await import("../search/algebraic_builder");
+        const currentDag: any = {
+          id: `wiles_run_${wilesAttempts}`,
+          goal: targetGoal,
+          nodes: [{
+            id: "init_alg",
+            kind: "algebraic_graph_construction",
+            dependsOn: [],
+            config: builderConfig
+          }]
+        };
 
+        const { DAGExecutor } = await import("../proof_dag/dag_executor");
+        const { AlgebraicBuilder } = await import("../search/algebraic_builder");
+        const { calculate_degrees_of_freedom, query_known_graphs } = await import("../skills/investigation_skills");
+
+        let replanAttempts = 0;
+        while (replanAttempts < 3 && !witnessFound) {
+          replanAttempts++;
+          console.log(`\n   🏗️  [DAGExecutor] Executing Wiles DAG (Attempt ${replanAttempts})...`);
+          
           const safeJournal = {
             record: (obs: string) => {
               journal.addEntry({
@@ -724,49 +737,87 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
             }
           };
 
-          // Execute the builder workflow (compiles VM code, checks energy, routes SAT to Z3, saves to journal)
-          const builderResult = await AlgebraicBuilder.buildAndVerify(
-            builderConfig,
-            (config.search_config as any)?.r ?? 0,
-            (config.search_config as any)?.s ?? 0,
-            safeJournal,
-            workspace as any
+          const executor = new DAGExecutor(currentDag, {
+            calculate_degrees_of_freedom: async (node) => {
+              const cfg = node.config as any;
+              const result = calculate_degrees_of_freedom(cfg.edge_rule_js, cfg.vertices);
+              await journal.addEntry({
+                type: "observation", claim: `Investigation result: ${result}`, target_goal: targetGoal, evidence: "calculate_degrees_of_freedom"
+              });
+              console.log(`   🔍 [Investigation] calculate_degrees_of_freedom: ${result}`);
+              return { note: result };
+            },
+            query_known_graphs: async (node) => {
+              const cfg = node.config as any;
+              const result = query_known_graphs(cfg.r, cfg.s);
+              await journal.addEntry({
+                type: "observation", claim: `Oracle result: ${result}`, target_goal: targetGoal, evidence: "query_known_graphs"
+              });
+              console.log(`   🔍 [Investigation] query_known_graphs: ${result}`);
+              return { note: result };
+            },
+            algebraic_graph_construction: async (node) => {
+              console.log(`   ⚙️  Compiling Edge Rule for node ${node.id}...`);
+              const algConfig = node.config as any;
+              const algR = algConfig.r ?? (config.search_config as any)?.r ?? 4;
+              const algS = algConfig.s ?? (config.search_config as any)?.s ?? 6;
+              const buildResult = await AlgebraicBuilder.buildAndVerify(algConfig, algR, algS, safeJournal, workspace as any);
+
+              if (buildResult.energy === 0) {
+                console.log(`   ✅ Algebraic Construction SAT! Witness found. Bypassing MCTS Loop.`);
+                witnessFound = true;
+
+                const N = buildResult.adj.n;
+                const matrix: number[][] = [];
+                for (let i = 0; i < N; i++) {
+                  const row: number[] = [];
+                  for (let j = 0; j < N; j++) {
+                    row.push(buildResult.adj.hasEdge(i, j) ? 1 : 0);
+                  }
+                  matrix.push(row);
+                }
+                const witnessPath = join(workspace.paths.scratch, "witness.json");
+                await Bun.write(witnessPath, JSON.stringify({ n: N, r: algR, s: algS, adjacency: matrix }, null, 2));
+
+                const registry = ProofRegistry.withDefaults();
+                const proofClass = config.search_config.problem_class === "ramsey_coloring" ? "ramsey" : config.search_config.problem_class;
+                const generator = registry.getGenerator(proofClass);
+                if (generator) {
+                  const proofInput = { theoremName: config.theorem_name, witness: buildResult.adj, params: { r: algR, s: algS, n: N } };
+                  const leanSource = generator.generateLean(proofInput);
+                  const leanPath = join(workspace.paths.scratch, "Witness.lean");
+                  await Bun.write(leanPath, leanSource);
+                  console.log(`\n📄 Lean proof generated: ${leanPath}`);
+                }
+              } else {
+                console.log(`   ❌ Algebraic Construction ${node.id} failed (E=${buildResult.energy}). Journaling for replan...`);
+              }
+              return buildResult;
+            }
+          });
+
+          await executor.execute();
+
+          if (witnessFound) break;
+
+          console.log(`   📝 DAG cycle finished without witness. Invoking Replanner...`);
+          const currentJournals = await journal.getEntriesForGoal(targetGoal);
+          let appendedDag: any;
+          appendedDag = await callSafe(
+            () => architectClient.replanDAG(currentDag, currentJournals),
+            1,
+            "ARCHITECT replanDAG"
           );
 
-          // If SAT, we found our witness! Prevent the MCTS loop.
-          if (builderResult.energy === 0) {
-            console.log(`   ✅ Algebraic Construction SAT! Witness found. Bypassing MCTS Loop.`);
-            witnessFound = true;
-
-            const N = builderResult.adj.n;
-            const matrix: number[][] = [];
-            for (let i = 0; i < N; i++) {
-              const row: number[] = [];
-              for (let j = 0; j < N; j++) {
-                row.push(builderResult.adj.hasEdge(i, j) ? 1 : 0);
-              }
-              matrix.push(row);
+          if (appendedDag && appendedDag.nodes) {
+            console.log(`   🗺️  ARCHITECT injected ${appendedDag.nodes.length} new node(s).`);
+            for (const n of appendedDag.nodes) {
+              n.status = "pending";
+              if (!n.dependsOn) n.dependsOn = [];
+              currentDag.nodes.push(n);
             }
-            const witnessPath = join(workspace.paths.scratch, "witness.json");
-            const smtR = (config.search_config as any)?.r ?? 4;
-            const smtS = (config.search_config as any)?.s ?? 6;
-            await Bun.write(witnessPath, JSON.stringify({ n: N, r: smtR, s: smtS, adjacency: matrix }, null, 2));
-
-            const registry = ProofRegistry.withDefaults();
-            const proofClass = config.search_config.problem_class === "ramsey_coloring" ? "ramsey" : config.search_config.problem_class;
-            const generator = registry.getGenerator(proofClass);
-            if (generator) {
-              const proofInput = { theoremName: config.theorem_name, witness: builderResult.adj, params: { r: smtR, s: smtS, n: N } };
-              const leanSource = generator.generateLean(proofInput);
-              const leanPath = join(workspace.paths.scratch, "Witness.lean");
-              await Bun.write(leanPath, leanSource);
-              console.log(`\n📄 Lean proof generated: ${leanPath}`);
-            }
-            break; // break the Wiles while loop
-          } else {
-            console.log(`   ❌ Algebraic Construction failed (E=${builderResult.energy}). Feeding back to Architect...`);
-            // Note: AlgebraicBuilder already recorded the E>0 result into the Journal!
           }
+        }
       } catch (e: any) {
         console.error(`   ❌ Failed to execute Algebraic Builder: ${e.message}`);
       }

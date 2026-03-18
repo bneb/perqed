@@ -127,4 +127,3 @@ import { countCliques } from "../src/math/graph/RamseyEnergy";
     expect(fixedGraph).not.toBeNull();
     expect(countCliques(fixedGraph!, r)).toBe(0);
   });
-});
