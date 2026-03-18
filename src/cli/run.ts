@@ -66,7 +66,7 @@ async function main() {
   }
 
   // 3. Initialize workspace
-  const workspaceBase = join(import.meta.dir, "../../agent_workspace");
+  const workspaceBase = join(process.cwd(), "agent_workspace");
   const workspace = new WorkspaceManager(workspaceBase, config.run_name);
   await workspace.init();
 
@@ -114,7 +114,12 @@ async function main() {
   }
 
   // 4. Initialize agents
-  const factory = new AgentFactory({ geminiApiKey: geminiKey });
+  let ollamaModel: string | undefined;
+  try {
+    const gc = await Bun.file(join(workspaceBase, "global_config/config.json")).json();
+    ollamaModel = gc?.models?.tactician?.name;
+  } catch {}
+  const factory = new AgentFactory({ geminiApiKey: geminiKey, ollamaModel });
   const solver = new SolverBridge();
   const lean = new LeanBridge();
 

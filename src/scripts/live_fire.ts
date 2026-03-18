@@ -50,7 +50,7 @@ const THEOREM_SIGNATURE = `(g : Fin 4 → Fin 4 → Bool)
     g v a = true ∧ g v b = true ∧ g v c = true) :
   ∃ a b c d : Fin 4, a ≠ b ∧ b ≠ c ∧ c ≠ d ∧ d ≠ a ∧
     g a b = true ∧ g b c = true ∧ g c d = true ∧ g d a = true`;
-const WORKSPACE_BASE = join(import.meta.dir, "../../agent_workspace");
+const WORKSPACE_BASE = join(process.cwd(), "agent_workspace");
 const RUN_NAME = "erdos_gyarfas_n4_01";
 const MAX_ITERATIONS = 20;
 const BATCH_SIZE = 3;
@@ -102,7 +102,12 @@ async function main() {
     process.exit(1);
   }
   console.log("🔑 Gemini API key loaded from environment.");
-  const factory = new AgentFactory({ geminiApiKey: geminiKey });
+  let ollamaModel: string | undefined;
+  try {
+    const gc = await Bun.file(join(WORKSPACE_BASE, "global_config/config.json")).json();
+    ollamaModel = gc?.models?.tactician?.name;
+  } catch {}
+  const factory = new AgentFactory({ geminiApiKey: geminiKey, ollamaModel });
 
   // 3. Initialize bridges
   console.log("🔌 Initializing Lean 4 + Z3 + RAG bridges...");

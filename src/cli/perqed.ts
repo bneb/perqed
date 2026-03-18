@@ -612,7 +612,7 @@ async function requestSearchPivot(
 // ──────────────────────────────────────────────
 
 async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean = false, maxPivots: number = 5): Promise<void> {
-  const workspaceBase = join(import.meta.dir, "../../agent_workspace");
+  const workspaceBase = join(process.cwd(), "agent_workspace");
   const workspace = new WorkspaceManager(workspaceBase, config.run_name);
   await workspace.init();
 
@@ -1597,7 +1597,7 @@ async function main() {
 
   let config: RunConfig;
   let configPath: string;
-  const workspaceBase = join(import.meta.dir, "../../agent_workspace");
+  const workspaceBase = join(process.cwd(), "agent_workspace");
 
   if (args.configPath) {
     // Resume from existing config
