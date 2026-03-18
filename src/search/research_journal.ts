@@ -63,6 +63,7 @@ export interface JournalEntry {
 interface JournalFile {
   version: 1;
   entries: JournalEntry[];
+  investigations?: Array<{ skill: string; input: string; result: string; timestamp: string }>;
 }
 
 // ──────────────────────────────────────────────
@@ -89,6 +90,76 @@ export class ResearchJournal {
     existing.entries.push(full);
     await this.writeFile(existing);
     return full;
+  }
+
+  /** Permanent tracking of investigation milestones */
+  async recordInvestigation(skill: string, input: string, result: string): Promise<void> {
+    const existing = await this.readFile();
+    if (!existing.investigations) existing.investigations = [];
+    existing.investigations.push({
+      skill,
+      input,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+    await this.writeFile(existing);
+  }
+
+  /**
+   * The Memory Manager (Epistemic Pruning)
+   * Prevents Context Window Bloat by strictly enforcing Garbage Collection.
+   */
+  async getSummary(targetGoal: string): Promise<string> {
+    const file = await this.readFile();
+    const allGoalEntries = file.entries.filter(e => e.target_goal === targetGoal);
+    
+    // Extract failure modes
+    const failures = allGoalEntries.filter(e => e.type === "failure_mode");
+    
+    // Parse energy from claim (e.g., "Algebraic Construction init_alg failed (E=1766).")
+    const attempts = failures.map(f => {
+      const match = f.claim.match(/E=(\d+)/);
+      const eScore = match ? parseInt(match[1]!, 10) : Infinity;
+      return { entry: f, energy: eScore, time: new Date(f.timestamp).getTime() };
+    });
+
+    // 1. Top 3 Best Attempts (lowest E scores)
+    const sortedByEnergy = [...attempts].sort((a, b) => a.energy - b.energy);
+    const top3 = sortedByEnergy.slice(0, 3);
+    const top3Ids = new Set(top3.map(t => t.entry.id));
+
+    // 2. 2 Most Recent Attempts (that are not already in Top 3)
+    const sortedByTime = [...attempts].sort((a, b) => b.time - a.time);
+    const recent2 = [];
+    for (const a of sortedByTime) {
+      if (!top3Ids.has(a.entry.id)) {
+        recent2.push(a);
+        if (recent2.length >= 2) break;
+      }
+    }
+
+    const keeperAttempts = [...top3, ...recent2].sort((a, b) => a.time - b.time);
+
+    let summary = "### Empirical Findings (Memory Manager PRUNED)\n\n";
+
+    if (file.investigations && file.investigations.length > 0) {
+      summary += "#### Investigated Constraints & Analogies:\n";
+      for (const inv of file.investigations) {
+        summary += `- [${inv.skill}] Input: ${inv.input.substring(0, 50)}... -> Result: ${inv.result}\n`;
+      }
+      summary += "\n";
+    }
+
+    if (keeperAttempts.length > 0) {
+      summary += "#### Best/Recent Algebraic Attempts:\n";
+      for (const attempt of keeperAttempts) {
+        summary += `- Failed with E=${attempt.energy}: ${attempt.entry.claim}\n`;
+      }
+    } else {
+      summary += "No previous algebraic failures logged.\n";
+    }
+
+    return summary;
   }
 
   /** All entries relevant to a specific goal string (exact match). */

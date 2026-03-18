@@ -689,14 +689,14 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
           model: "gemini-2.5-flash",
         });
 
-        const allJournalEntries = await journal.getEntriesForGoal(targetGoal);
+        const journalSummaryText = await journal.getSummary(targetGoal);
 
         console.log(`\n   🏛️  Asking ARCHITECT to formulate Algebraic Rule directly...`);
         const { AlgebraicConstructionConfigSchema } = await import("../proof_dag/algebraic_construction_config");
         
         let builderConfig: any;
         builderConfig = await callSafe(
-          () => architectClient.formulateAlgebraicRule(targetGoal, allJournalEntries),
+          () => architectClient.formulateAlgebraicRule(targetGoal, journalSummaryText),
           1,
           "ARCHITECT formulateAlgebraicRule (Wiles)"
         );
@@ -741,19 +741,23 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
             calculate_degrees_of_freedom: async (node) => {
               const cfg = node.config as any;
               const result = calculate_degrees_of_freedom(cfg.edge_rule_js, cfg.vertices);
-              await journal.addEntry({
-                type: "observation", claim: `Investigation result: ${result}`, target_goal: targetGoal, evidence: "calculate_degrees_of_freedom"
-              });
+              await journal.recordInvestigation("calculate_degrees_of_freedom", `Graph(V=${cfg.vertices}) Rule: ${cfg.edge_rule_js}`, result);
               console.log(`   🔍 [Investigation] calculate_degrees_of_freedom: ${result}`);
               return { note: result };
             },
             query_known_graphs: async (node) => {
               const cfg = node.config as any;
               const result = query_known_graphs(cfg.r, cfg.s);
-              await journal.addEntry({
-                type: "observation", claim: `Oracle result: ${result}`, target_goal: targetGoal, evidence: "query_known_graphs"
-              });
+              await journal.recordInvestigation("query_known_graphs", `R(${cfg.r}, ${cfg.s})`, result);
               console.log(`   🔍 [Investigation] query_known_graphs: ${result}`);
+              return { note: result };
+            },
+            query_literature: async (node) => {
+              const cfg = node.config as any;
+              const { query_literature } = await import("../skills/investigation_skills");
+              const result = await query_literature(cfg.search_term);
+              await journal.recordInvestigation("query_literature", cfg.search_term, result);
+              console.log(`   📚 [Investigation] query_literature complete for "${cfg.search_term}"`);
               return { note: result };
             },
             algebraic_graph_construction: async (node) => {
@@ -801,10 +805,10 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
           if (witnessFound) break;
 
           console.log(`   📝 DAG cycle finished without witness. Invoking Replanner...`);
-          const currentJournals = await journal.getEntriesForGoal(targetGoal);
+          const currentJournalsText = await journal.getSummary(targetGoal);
           let appendedDag: any;
           appendedDag = await callSafe(
-            () => architectClient.replanDAG(currentDag, currentJournals),
+            () => architectClient.replanDAG(currentDag, currentJournalsText),
             1,
             "ARCHITECT replanDAG"
           );

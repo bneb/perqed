@@ -62,3 +62,29 @@ export function query_known_graphs(r: number, s: number): string {
   if (r === 4 && s === 6) return "R(4,6) is known to be >= 36. Often constructed using quadratic or cubic residues on Z_35, or a block design.";
   return `No specific canonical graph symmetry is cached for R(${r},${s}). Attempt a Circulant graph, a Paley graph, or a cyclic block design.`;
 }
+
+export async function query_literature(search_term: string): Promise<string> {
+  let libraryContext = `Literature search for "${search_term}":\n`;
+  try {
+    const { LocalEmbedder } = await import("../embeddings/embedder");
+    const { VectorDatabase } = await import("../embeddings/vector_store");
+    const embedder = new LocalEmbedder();
+    const db = new VectorDatabase();
+    await db.initialize();
+
+    const queryVector = await embedder.embed(search_term);
+    if (queryVector.length > 0) {
+      const matches = await db.search(queryVector, 3);
+      if (matches.length > 0) {
+        matches.forEach((m: any, i: number) => {
+          libraryContext += `${i + 1}. **${m.theoremSignature}**\n   ${m.successfulTactic}\n\n`;
+        });
+        return libraryContext;
+      }
+    }
+    return `No empirical records or theorems found specifically matching "${search_term}".`;
+  } catch (e: any) {
+    return `Failed to query literature database: ${e.message}`;
+  }
+}
+

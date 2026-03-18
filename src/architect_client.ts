@@ -431,15 +431,9 @@ export class ArchitectClient {
    */
   async formulateAlgebraicRule(
     goal: string,
-    journalEntries: JournalEntry[]
+    journalText: string
   ): Promise<any> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
-
-    const journalText =
-      journalEntries.length === 0
-        ? "No previous failures. First attempt."
-        : "Previous failures:\\n" +
-          journalEntries.map((e) => `- ${e.claim}`).join("\n");
 
     const directSystemPrompt = [
       WILES_OPF_PROMPT_DIRECT,
@@ -447,7 +441,7 @@ export class ArchitectClient {
       "CURRENT GOAL:",
       goal,
       "---",
-      "PREVIOUS FAILURES (Avoid these):",
+      "CRITICAL: Review the 'Empirical Findings' in your context. DO NOT propose any symmetry or rule that generated an Energy > 0 in past attempts. DO NOT propose symmetries that generated too many degrees of freedom.",
       journalText,
     ].join("\n\n");
 
@@ -505,25 +499,26 @@ export class ArchitectClient {
    */
   async replanDAG(
     currentDag: ProofDAG,
-    journalEntries: JournalEntry[]
+    journalText: string
   ): Promise<ProofDAG> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
-
-    const journalText = journalEntries.length === 0 ? "No previous failures." :
-      "Failed Attempts:\\n" + journalEntries.map((e) => `- ${e.claim}`).join("\n");
 
     const promptText = `OVERRIDE: MID-SPRINT INVESTIGATION
 
 Your previous attempt failed.
 CURRENT GOAL: ${currentDag.goal}
 
+CRITICAL: Review the 'Empirical Findings' in your context. DO NOT propose any symmetry or rule that generated an Energy > 0 in past attempts. DO NOT propose symmetries that generated too many degrees of freedom.
+
 ${journalText}
 
 You can either attempt a new mathematical construction, OR you can use an investigation skill to build intuition before your next attempt.
+If you are shifting to a new mathematical strategy (e.g., from Product Rings to Circulant Graphs), use the \`query_literature\` skill to fetch specific theorems about your new strategy before writing the algebraic rule.
 
 SUPPORTED INVESTIGATION SKILLS (for 'kind' property):
 1. \`calculate_degrees_of_freedom\`: config requires \`edge_rule_js\` (string) and \`vertices\` (number). Tests the parameter dimension of a rule to see how many independent variables it creates.
 2. \`query_known_graphs\`: config requires \`r\` (number) and \`s\` (number). Returns historical bounds.
+3. \`query_literature\`: config requires \`search_term\` (string). RAG fetch of actual structural math papers.
 
 Or you can immediately attempt another \`algebraic_graph_construction\` node.
 

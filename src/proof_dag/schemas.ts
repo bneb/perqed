@@ -22,6 +22,7 @@ export const DAGNodeKindSchema = z.enum([
   "algebraic_graph_construction",  // Wiles Mode: compile edge_rule_js → AdjacencyMatrix → verify
   "calculate_degrees_of_freedom",  // Wiles Mode: investigation skill
   "query_known_graphs",            // Wiles Mode: investigation skill
+  "query_literature",              // Wiles Mode: dynamic JIT retrieval
 ]);
 
 

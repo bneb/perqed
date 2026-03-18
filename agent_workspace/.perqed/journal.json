@@ -427,6 +427,22 @@
       "claim": "AlgebraicBuilder UNSAT: A graph constructed on the vertices Z_35 = {0, ..., 34}. An edge (i,j) is colored red if the product `(i * j) % 35` is a non-zero quadratic residue modulo 35. Otherwise, the edge is colored blue. This leverages the multiplicative structure of the ring Z_35 and properties of quadratic residues over a composite modulus. The set of non-zero quadratic residues modulo 35 is determined by the Chinese Remainder Theorem from the quadratic residues modulo 5 and modulo 7, specifically excluding 0. Edges incident to vertex 0 will always be blue as `0 % 35` is not in the set of non-zero quadratic residues. → E=1766 on N=35",
       "target_goal": "R(4,6) >= 36",
       "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "295a9969-15f4-4efa-ad72-e00d2aebbd45",
+      "timestamp": "2026-03-18T17:59:11.763Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Constructs a graph on 35 vertices by mapping each integer vertex 'k' (from 0 to 34) to its 6-bit binary vector representation in GF(2)^6. An edge (i,j) is colored red if the dot product of their corresponding 6-bit binary vectors, calculated over GF(2), is equal to 1. Otherwise, the edge is blue. This approach leverages linear algebra over the finite field GF(2) and a canonical binary representation, providing a distinct construction method orthogonal to circulant graphs, number theoretic properties of Z_N, and product ring constructions (Z_p x Z_q) previously attempted. The goal is to generate a graph that is K_4-free (red) and I_6-free (blue), thereby witnessing R(4,6) >= 36. → E=751 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "14124fd1-2bcf-4579-b507-fcb485385459",
+      "timestamp": "2026-03-18T17:59:38.444Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Constructs a graph on 35 vertices (0 to 34). An edge (i,j) is colored red if the sum of their cubes modulo 35 is zero, i.e., (i^3 + j^3) % 35 == 0. This leverages a cubic polynomial relationship in the ring Z_35, offering a novel algebraic structure compared to previous attempts using difference sets, quadratic residues, or product ring constructions. The aim is to generate a K_4-free red graph and a K_6-free blue graph, thereby witnessing R(4,6) >= 36. This rule creates a symmetric graph (since i^3+j^3 = j^3+i^3). → E=1623160 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
     }
   ]
 }
