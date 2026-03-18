@@ -44,6 +44,24 @@ graph TD
 
 ## How It Works
 
+Perqed has two operational modes that work in tandem:
+
+### Combinatorial Witness Search
+
+1. **Formulate** — The ARCHITECT (Gemini) reads the prompt (e.g. `R(4,6) >= 36`) and emits a structured search config: vertex count, clique parameters, iteration budget, and strategy.
+
+2. **Fast Path** — Z3 checks whether a circulant graph witnesses the bound. Typically returns UNSAT in under 2 minutes, ruling out the entire circulant subspace.
+
+3. **Simulated Annealing** — An 8-worker island model runs SA on the full unconstrained coloring space. A corrected energy function jointly penalizes excess cycles and in-degree violations, preventing false `E=0` readings on non-Hamiltonian functional graphs. Workers cool on independent schedules; the coolest workers exploit, the hottest explore.
+
+4. **Memetic Vault** — Whenever a new global-best graph is found, it is immediately serialized to `best_seed.json`. This survives kills, reboots, and cross-machine transfers. The next run warm-starts W0 from the vault.
+
+5. **LNS Finisher** — At budget exhaustion, Z3 receives the top-3 candidate graphs and attempts to complete each by solving a neighborhood of free edges via SMT. SAT = witness found; UNSAT = that basin is provably sterile and recorded in `journal.json`.
+
+6. **ARCHITECT Pivot** — The ARCHITECT reads all recorded failure modes and issues a new search config (larger budget, different seed strategy, or structural constraints).
+
+### Formal Proof Search
+
 1. **Read the Literature** — The Librarian fetches papers from arXiv, chunks abstracts at sentence boundaries, embeds them via Ollama `nomic-embed-text`, and stores vectors in LanceDB.
 
 2. **Generate Conjectures** — The Conjecturer (Gemini) synthesizes Lean 4 theorem signatures from embedded literature. A dual-stage filter removes syntax errors and trivially solvable theorems.
@@ -116,8 +134,8 @@ perqed/
 
 Machine-checked Lean 4 proofs of the *m*=4 and *m*=6 cases of the Directed Hamiltonian Torus Decomposition problem (Knuth, March 2026). Together with existing constructions for odd *m* and even *m* ≥ 8, this closes the problem for all *m* ≥ 3.
 
-- **Paper**: [`torus_decomposition.pdf`](projects/torus-decomposition/paper/torus_decomposition.pdf)
-- **Lean proofs**: [`TorusTopologyM4.lean`](projects/torus-decomposition/lean/TorusTopologyM4.lean) (*m*=4) · [`TorusTopologyM6.lean`](projects/torus-decomposition/lean/TorusTopologyM6.lean) (*m*=6)
+- **Paper**: [`torus_decomposition.pdf`](projects/torus-decomposition/paper/arxiv/torus_decomposition.pdf)
+- **Lean proofs**: [`TorusTopologyM4.lean`](projects/torus-decomposition/paper/arxiv/anc/TorusTopologyM4.lean) (*m*=4) · [`TorusTopologyM6.lean`](projects/torus-decomposition/paper/arxiv/anc/TorusTopologyM6.lean) (*m*=6)
 
 ## License
 
