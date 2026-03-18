@@ -443,6 +443,30 @@
       "claim": "AlgebraicBuilder UNSAT: Constructs a graph on 35 vertices (0 to 34). An edge (i,j) is colored red if the sum of their cubes modulo 35 is zero, i.e., (i^3 + j^3) % 35 == 0. This leverages a cubic polynomial relationship in the ring Z_35, offering a novel algebraic structure compared to previous attempts using difference sets, quadratic residues, or product ring constructions. The aim is to generate a K_4-free red graph and a K_6-free blue graph, thereby witnessing R(4,6) >= 36. This rule creates a symmetric graph (since i^3+j^3 = j^3+i^3). → E=1623160 on N=35",
       "target_goal": "R(4,6) >= 36",
       "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "fbd99045-328f-45a3-80aa-1b97353a5f79",
+      "timestamp": "2026-03-18T18:20:21.343Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Graph on points of Z_6 x Z_6, where each vertex i=(x_i, y_i) with x_i = i % 6 and y_i = Math.floor(i / 6). An edge exists between distinct vertices i and j if the sum of their squared coordinate differences modulo 6 is in {1, 2, 3, 4}. This rule aims to create a graph with no K_4 and no independent set of size 6 by carefully selecting 'allowed distances' in a non-Euclidean space over Z_6. → E=8064 on N=36",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "f6593220-9b0a-4c60-bd30-a43ab90224a8",
+      "timestamp": "2026-03-18T18:20:53.734Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: undefined → E=1623160 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
+    }
+  ],
+  "investigations": [
+    {
+      "skill": "query_literature",
+      "input": "Ramsey number R(4,6) construction methods",
+      "result": "Literature search for \"Ramsey number R(4,6) construction methods\":\n1. **[arXiv: math.NT] Combinatorial designs and the Prouhet--Tarry--Escott problem**\n   This is the first paper that provides a systematic treatment of the $r$-dimensional PTE problem in additive number theory, abbreviated by PTE$_r$, through its connection with combinatorial design theory, the branch of combinatorial mathematics that deals with finite set systems or arrangements with the ^^ balancedness' conditions.\n\n2. **[arXiv: math.NT] Combinatorial designs and the Prouhet--Tarry--Escott problem**\n   Furthermore, we explore two dimension-lifting methods for constructing PTE$_r$ solutions: one is a combinatorial composition that produces PTE$_r$ solutions by embedding lower-dimensional solutions into OAs with $r$ columns, and the other is a recursive technique in which a PET$_r$ solution is constructed by taking the Cartesian product of two lower-dimensional solutions.\n\n3. **[arXiv: math.NT] Combinatorial designs and the Prouhet--Tarry--Escott problem**\n   Next, we develop a powerful method for constructing PTE$_r$ solutions via various classes of combinatorial designs such as block designs and OAs.\n\n",
+      "timestamp": "2026-03-18T18:21:00.741Z"
     }
   ]
 }

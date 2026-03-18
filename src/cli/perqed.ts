@@ -69,14 +69,19 @@ interface CliArgs {
   noconfirm: boolean;
   /** Force ARCHITECT into Wiles Mode (Conceptual Scatter) from iteration 0. */
   wiles: boolean;
+  /** Override the maximum number of architect replanning pivots (default 5). */
+  maxPivots: number;
 }
 
 export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
   const args = argv;
   const promptArg = args.find((a) => a.startsWith("--prompt="));
   const configArg = args.find((a) => a.startsWith("--config="));
+  const maxPivotsArg = args.find((a) => a.startsWith("--max-pivots="));
   const noconfirm = args.includes("--noconfirm");
   const wiles = args.includes("--wiles");
+
+  const maxPivots = maxPivotsArg ? parseInt(maxPivotsArg.replace("--max-pivots=", ""), 10) : 5;
 
   if (!promptArg && !configArg) {
     console.error("Usage:");
@@ -84,6 +89,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     console.error("  perqed --config=<path/to/run_config.json>");
     console.error("  perqed --prompt=\"...\" --noconfirm");
     console.error("  perqed --prompt=\"...\" --wiles   # Force Wiles Mode (Conceptual Scatter)");
+    console.error("  perqed --prompt=\"...\" --max-pivots=1000");
     process.exit(1);
   }
 
@@ -92,6 +98,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     configPath: configArg?.replace("--config=", ""),
     noconfirm,
     wiles,
+    maxPivots,
   };
 }
 
@@ -589,7 +596,7 @@ async function requestSearchPivot(
 // Phase 3: Run
 // ──────────────────────────────────────────────
 
-async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean = false): Promise<void> {
+async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean = false, maxPivots: number = 5): Promise<void> {
   const workspaceBase = join(import.meta.dir, "../../agent_workspace");
   const workspace = new WorkspaceManager(workspaceBase, config.run_name);
   await workspace.init();
@@ -652,7 +659,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   })();
 
   const startTime = Date.now();
-  const MAX_ARCHITECT_PIVOTS = 5;
+  const MAX_ARCHITECT_PIVOTS = maxPivots;
 
   // ── Live telemetry (non-blocking — fire-and-forget on all publishes) ──
   const gist = GistPublisher.fromEnv();
@@ -1592,7 +1599,7 @@ async function main() {
   }
 
   // Phase 3: Run
-  await executeRun(config, apiKey, args.wiles);
+  await executeRun(config, apiKey, args.wiles, args.maxPivots);
 
 }
 
