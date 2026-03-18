@@ -780,11 +780,12 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         initialGraph: memeticSeed ?? undefined,
         // Tabu hashes: prevents all workers from re-entering Z3-certified sterile basins
         tabuHashes: saTabuHashes.length > 0 ? saTabuHashes : undefined,
-        // Micro-SAT Patch: Z3 surgery on sterile basins at low energy
-        microSatThreshold: (sp as any).micro_sat?.enabled
-          ? ((sp as any).micro_sat?.threshold ?? 13)
-          : undefined,
-
+        // Micro-SAT Patch: always-on Z3 surgery for sterile basins at E ≤ 13.
+        // Previously gated on micro_sat.enabled in the ARCHITECT's search config,
+        // but since MicroSAT only fires at the glass floor it is always safe.
+        // ARCHITECT can still override via micro_sat.threshold if it wants a
+        // tighter or looser threshold.
+        microSatThreshold: (sp as any).micro_sat?.threshold ?? 13,
 
 
         onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
