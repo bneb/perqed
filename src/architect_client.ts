@@ -91,17 +91,26 @@ export const WILES_OPF_PROMPT = [
   "Your orthogonal translation belongs INSIDE the proof body, not the theorem statement.",
   "",
   "STEP 5 - THE ALGEBRAIC BUILDER (DAG NODE):",
-  "To execute your Functorial Leap, you MUST emit a ProofDAG containing a node of kind `algebraic_graph_construction`.",
-  "This node configures a high-performance VM sandbox that will compile and verify your mathematical pattern.",
-  "Set the config with `vertices`, `r`, `s`, `description`, and a Javascript rule `edge_rule_js`.",
+  "First, determine the TOPOLOGY of the problem:",
+  "  - If constructing a GRAPH (Ramsey, torus, SRG): emit a node of kind `algebraic_graph_construction`.",
+  "    Config: { vertices, r, s, description, edge_rule_js }. The edge_rule_js body takes (i, j) and returns boolean.",
+  "  - If PARTITIONING INTEGERS (Schur numbers, Van der Waerden, sum-free coloring): emit a node of kind `algebraic_partition_construction`.",
+  "    Config: { domain_size, num_partitions, description, partition_rule_js }. The partition_rule_js body takes (i) (1-indexed integer) and returns bucket index 0..num_partitions-1 or -1 (unassigned).",
   "",
-  "CRITICAL JS FORMAT RULES:",
-  "1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v. Do not try to redefine the function signature.",
-  "2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration function is_adjacent(...). Output ONLY the raw logic body. VALID: \"return (i + j) % 5 === 0;\" INVALID: \"const rule = (i, j) => { return (i + j) % 5 === 0; }\"",
-  "3. The Description Rule: Keep your \"description\" field to a MAXIMUM of 3 sentences. DO NOT write mathematical proofs. DO NOT write long explanations. State the core symmetry and stop. Your focus must be on the \"edge_rule_js\".",
-  "4. CRITICAL JSON ESCAPE: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`).",
+  "IMPORTANT: For Schur S(6) and similar integer coloring problems, you MUST use `algebraic_partition_construction`. Do NOT use a graph.",
   "",
-  "CRITICAL: Keep the DAG as simple as possible. Output ONLY ONE node (`algebraic_graph_construction`). Do not include any other nodes."
+  "CRITICAL JS FORMAT RULES (apply to BOTH kinds):",
+  "1. Body-Only Rule: Output ONLY the raw function body. Do NOT write arrow functions or function declarations.",
+  "   GRAPH valid: 'return (i + j) % 5 === 0;'  PARTITION valid: 'return (i - 1) % 6;'",
+  "2. Variable Rule for GRAPHS: use i, j as vertex indices. Variable Rule for PARTITIONS: use i as 1-indexed integer.",
+  "3. Description Rule: MAXIMUM 3 sentences. State the core symmetry and stop.",
+  "4. JSON ESCAPE: Always use double quotes for strings in JSON. NEVER backticks.",
+  "",
+  "PARTITION EXAMPLE (for Schur numbers):",
+  "  kind: 'algebraic_partition_construction'",
+  "  config: { domain_size: 537, num_partitions: 6, description: 'Periodic mod-6 bucketing as warm start.', partition_rule_js: 'return (i - 1) % 6;' }",
+  "",
+  "CRITICAL: Keep the DAG as simple as possible. Output ONLY ONE construction node. Do not include other nodes."
 ].join("\n");
 
 export const WILES_OPF_PROMPT_DIRECT = [
@@ -114,12 +123,17 @@ export const WILES_OPF_PROMPT_DIRECT = [
   "You must determine the correct data structure for this problem BEFORE generating a rule.",
   "",
   "If the problem involves constructing a GRAPH (e.g. Ramsey coloring, Strongly Regular Graph, torus decomposition):",
+  "  → Use kind: 'algebraic_graph_construction'",
   "  → Emit a JSON object with keys: \"vertices\" (number), \"description\" (string), \"edge_rule_js\" (string)",
   "  → The edge_rule_js is a function body taking (i, j) returning boolean (true = edge present).",
   "",
   "If the problem involves PARTITIONING A SET OF INTEGERS (e.g. Schur numbers, Van der Waerden, sum-free sets):",
+  "  → Use kind: 'algebraic_partition_construction'",
   "  → Emit a JSON object with keys: \"domain_size\" (number), \"num_partitions\" (number), \"description\" (string), \"partition_rule_js\" (string)",
   "  → The partition_rule_js is a function body taking (i) where i is 1-indexed integer, returning a bucket index [0, num_partitions-1] or -1 (unassigned).",
+  "",
+  "PARTITION EXAMPLE (for Schur numbers S(6), Van der Waerden, etc.):",
+  "  { \"domain_size\": 537, \"num_partitions\": 6, \"description\": \"Periodic mod-6 warm start.\", \"partition_rule_js\": \"return (i - 1) % 6;\" }",
   "",
   "CRITICAL JS FORMAT RULES (apply to BOTH topology types):",
   "1. The Body-Only Rule: Do NOT write an arrow function or a function declaration. Output ONLY the raw logic body.",
@@ -371,7 +385,7 @@ export class ArchitectClient {
       `  "nodes": [\n` +
       `    {\n` +
       `      "id": "unique_snake_case_id",\n` +
-      `      "kind": "search" | "z3" | "lean" | "literature" | "skill_apply" | "aggregate" | "mathlib_query" | "algebraic_graph_construction",\n` +
+      `      "kind": "search" | "z3" | "lean" | "literature" | "skill_apply" | "aggregate" | "mathlib_query" | "algebraic_graph_construction" | "algebraic_partition_construction",\n` +
       `      "label": "human readable description",\n` +
       `      "dependsOn": ["list", "of", "node", "ids"],\n` +
       `      "config": {\n` +
@@ -553,12 +567,21 @@ SUPPORTED INVESTIGATION SKILLS (for 'kind' property):
 2. \`query_known_graphs\`: config requires \`r\` (number) and \`s\` (number). Returns historical bounds.
 3. \`query_literature\`: config requires \`search_term\` (string). RAG fetch of actual structural math papers.
 
-Or you can immediately attempt another \`algebraic_graph_construction\` node.
+Or you can immediately attempt another construction node.
 
-CRITICAL JS FORMAT RULES (for algebraic_graph_construction):
-1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v.
-2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration. Output ONLY the raw logic body. VALID: "return (i + j) % 5 === 0;"
-3. The Description Rule: CRITICAL: To prevent system timeouts, your "description" field MUST NOT exceed 2 sentences. Explain your atomic mutation or new paradigm instantly and proceed to the code.
+SUPPORTED CONSTRUCTION KINDS:
+- \`algebraic_graph_construction\` — for graph problems (Ramsey, SRG, torus). Config: { vertices, r, s, description, edge_rule_js }
+  edge_rule_js: function body taking (i, j), returns boolean (true = edge present).
+  Example: { "kind": "algebraic_graph_construction", "config": { "vertices": 35, "r": 4, "s": 6, "description": "Cayley graph on Z_35.", "edge_rule_js": "return (i - j + 35) % 35 < 10;" } }
+
+- \`algebraic_partition_construction\` — for INTEGER PARTITION problems (Schur, Van der Waerden, sum-free). Config: { domain_size, num_partitions, description, partition_rule_js }
+  partition_rule_js: function body taking (i) where i is 1-indexed integer, returns bucket [0, num_partitions) or -1.
+  EXAMPLE FOR S(6): { "kind": "algebraic_partition_construction", "config": { "domain_size": 537, "num_partitions": 6, "description": "Periodic mod-6 warm start.", "partition_rule_js": "return (i - 1) % 6;" } }
+
+CRITICAL FORMAT RULES (both construction kinds):
+1. Body-Only Rule: Output ONLY the raw function body. No arrow functions, no function declarations.
+   GRAPH valid: "return (i + j) % 5 === 0;"   PARTITION valid: "return (i - 1) % 6;"
+2. Description: CRITICAL: MUST NOT exceed 2 sentences to prevent timeouts.
 
 Output ONLY a JSON object matching this schema describing the NEW nodes to append:
 {
@@ -567,13 +590,14 @@ Output ONLY a JSON object matching this schema describing the NEW nodes to appen
   "nodes": [
     {
       "id": "<string>",
-      "kind": "calculate_degrees_of_freedom" | "query_known_graphs" | "algebraic_graph_construction",
+      "kind": "calculate_degrees_of_freedom" | "query_known_graphs" | "query_literature" | "algebraic_graph_construction" | "algebraic_partition_construction",
       "config": { ... }
     }
   ]
 }
 
 DO NOT wrap your JSON in markdown.`;
+
 
     const payload = {
       system_instruction: { parts: [{ text: promptText }] },
