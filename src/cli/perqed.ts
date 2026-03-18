@@ -574,6 +574,9 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
   const gist = GistPublisher.fromEnv();
   let lastPublishMs = 0; // throttle: max 1 publish per 30s during SA
   const publish = (state: Parameters<GistPublisher['publishState']>[0]) => {
+    const now = Date.now();
+    if (now - lastPublishMs < 30_000) return; // 30s cooldown
+    lastPublishMs = now;
     gist?.publishState(state); // intentionally un-awaited
   };
   const addEvent = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
