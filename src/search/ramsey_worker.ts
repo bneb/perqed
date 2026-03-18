@@ -57,7 +57,7 @@ export interface RamseySearchConfig {
   tabuHashes?: string[];
   /**
    * Temperature to reheat to when a tabu basin is entered.
-   * Default: 3.0 (aggressive reheat to force basin escape).
+   * Default: 3.0 (aggressive reheat to force basin escape)
    */
   tabuPenaltyTemperature?: number;
   /**
@@ -84,6 +84,21 @@ export interface RamseySearchResult {
 
 /**
  * Run a single SA worker searching for a Ramsey witness.
+ *
+ * Reheat strategy — Progressive Thermal Escalation Ladder:
+ *   Each time patience is exhausted without escaping the basin,
+ *   `localReheatCount` increments. This drives a two-stage response:
+ *
+ *   Stage 1 (reheats 1–3): SUPERCRITICAL REHEAT
+ *     T = initialTemp * (1 + localReheatCount * 0.4)
+ *     Intentionally spikes T above initialTemp to explore the basin wall.
+ *
+ *   Stage 2 (4th consecutive reheat): SCATTER (EJECTION SEAT)
+ *     50% of edges are randomly flipped, teleporting to a new region of
+ *     the 2^C(n,2) search space. T resets to initialTemp.
+ *
+ *   `localReheatCount` resets to 0 whenever a new bestEnergy is found,
+ *   confirming basin escape.
  */
 export function ramseySearch(
   config: RamseySearchConfig,
@@ -121,12 +136,14 @@ export function ramseySearch(
   }
 
   let energy = ramseyEnergy(adj, r, s);
-  const initialEnergy = energy;     // capture for energy-urgency normalization in reheat
   let bestEnergy = energy;
   let bestAdj = adj.clone();
   let temp = initialTemp;
   let staleCount = 0;
   let reheatCount = 0;
+  // localReheatCount: consecutive failed escape attempts since last bestEnergy improvement.
+  // Drives the Progressive Thermal Escalation Ladder (supercritical → scatter).
+  let localReheatCount = 0;
   let tabuReheatCount = 0;
   // Cooldown: prevents dead-temp trigger from firing again immediately after a reheat.
   // After each reheat, dead-temp is suppressed for minPatience iterations.
@@ -199,6 +216,7 @@ export function ramseySearch(
           bestEnergy = energy;
           bestAdj = adj.clone();
           staleCount = 0;
+          localReheatCount = 0; // ← basin escaped; reset escalation ladder
 
           if (energy === 0) {
             const elapsed = (Date.now() - startTime) / 1000;
@@ -259,6 +277,7 @@ export function ramseySearch(
           bestEnergy = energy;
           bestAdj = adj.clone();
           staleCount = 0;
+          localReheatCount = 0; // ← basin escaped; reset escalation ladder
 
           if (energy === 0) {
             const elapsed = (Date.now() - startTime) / 1000;
@@ -284,7 +303,7 @@ export function ramseySearch(
     staleCount++;
     if (reheatCooldown > 0) reheatCooldown--;
 
-    // ── Adaptive reheat: dual-trigger ──
+    // ── Progressive Thermal Escalation Ladder ──────────────────────────────
     // Trigger 1 (patience): stuck long enough without improvement
     // Trigger 2 (dead temp): T is near-zero but energy is still high
     //   Dead-temp is suppressed for minPatience iters after each reheat
@@ -295,41 +314,54 @@ export function ramseySearch(
     const isStale = staleCount >= minPatience;
 
     if (isStale || tempIsDead) {
-      // ─ Staleness component ─
-      // Normalized by THIS worker's minPatience, not total iterations.
-      // staleness=1.0 at patience threshold, grows linearly beyond.
-      const staleness = Math.min(2.0, staleCount / minPatience);
-
-      // ─ Energy urgency component ─
-      // Normalized by THIS run's initial energy so it's dimensionless.
-      // 0 = solved (E=0), 1 = at starting energy (no progress).
-      const energyUrgency = Math.min(1.0, bestEnergy / Math.max(1, initialEnergy));
-
-      // Reheat strength formula:
-      //   base:        always reheat to at least 15% of T₀
-      //   staleness:   +30% scaled by how long stuck (vs own patience)
-      //   energy:      +35% scaled by how far from E=0 (vs initial E)
-      //   interaction: +12% when BOTH stuck AND high-energy compound
-      //   dead-temp:   +10% extra kick when T-dead trigger (not patience) fired
-      const deadTempBonus = tempIsDead && !isStale ? 0.10 : 0;
-      const reheatStrength = Math.min(0.92,
-        0.15
-        + staleness    * 0.30
-        + energyUrgency * 0.35
-        + staleness * energyUrgency * 0.12
-        + deadTempBonus
-      );
-
-      temp = initialTemp * reheatStrength;
-      staleCount = 0;
       reheatCount++;
-      // Suppress dead-temp trigger after reheat, but cap cooldown at 1% of budget.
-      // Without the cap, patient workers (minPatience≈97M) would freeze at T≈0
-      // for nearly 20% of the run before the dead-temp trigger could fire again.
-      const maxCooldown = Math.max(1_000_000, Math.floor(maxIterations / 100));
-      reheatCooldown = Math.min(minPatience, maxCooldown);
+      localReheatCount++;
 
+      const MAX_LOCAL_REHEATS = 4;
+      const SCATTER_RATE = 0.50;
+      const maxCooldown = Math.max(1_000_000, Math.floor(maxIterations / 100));
+
+      if (localReheatCount >= MAX_LOCAL_REHEATS) {
+        // ── STAGE 2: SCATTER (Ejection Seat) ────────────────────────────
+        // Basin is a proven glass floor after MAX_LOCAL_REHEATS consecutive
+        // failed escape attempts. Teleport to a new sector of the search
+        // space by randomly flipping 50% of edges.
+        adj.scatter(SCATTER_RATE);
+        energy = ramseyEnergy(adj, r, s);
+
+        // Re-anchor tracking to the new location so patience isn't immediately
+        // exhausted again after landing.
+        bestAdj = adj.clone();
+        // Note: we do NOT update bestEnergy — we preserve the global best.
+        staleCount = 0;
+        localReheatCount = 0;
+
+        // Recompute Zobrist hash for the teleported graph position
+        if (hasher) graphHash = hasher.computeInitial(adj);
+
+        // Full temperature reset to initial heat
+        temp = initialTemp;
+        reheatCooldown = Math.min(minPatience, maxCooldown);
+
+        console.log(`[SA] Basin sterile after ${MAX_LOCAL_REHEATS} reheats. SCATTERING to new coordinates. E=${energy}`);
+
+      } else {
+        // ── STAGE 1: SUPERCRITICAL REHEAT ───────────────────────────────
+        // Spike T intentionally above initialTemp. Each consecutive failed
+        // escape attempt gets hotter:
+        //   reheat 1: T = initialTemp * 1.4
+        //   reheat 2: T = initialTemp * 1.8
+        //   reheat 3: T = initialTemp * 2.2
+        const escalationFactor = 1.0 + localReheatCount * 0.4;
+        temp = initialTemp * escalationFactor;
+
+        staleCount = 0;
+        reheatCooldown = Math.min(minPatience, maxCooldown);
+
+        console.log(`[SA] Reheat escalation ${localReheatCount}/${MAX_LOCAL_REHEATS}. T spiked to ${temp.toFixed(3)}`);
+      }
     }
+    // ── End Progressive Thermal Escalation Ladder ───────────────────────────
 
     // Trajectory checkpoint
     if ((iter + 1) % checkpointInterval === 0 && energyTrajectory.length < 10) {

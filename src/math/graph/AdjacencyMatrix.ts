@@ -73,6 +73,30 @@ export class AdjacencyMatrix {
   }
 
   /**
+   * Scatter: randomly flip each edge in the upper triangle with probability
+   * `mutationRate`. Used by the Progressive Thermal Reheating system to
+   * teleport the graph to a new region of the search space when a basin
+   * proves inescapable after `MAX_LOCAL_REHEATS` consecutive failed escape
+   * attempts.
+   *
+   * @param mutationRate  Fraction of edges to flip in [0, 1].
+   *                      0 = no-op; 1 = flip every edge (full complement).
+   */
+  scatter(mutationRate: number): void {
+    for (let i = 0; i < this.n; i++) {
+      for (let j = i + 1; j < this.n; j++) {
+        if (Math.random() < mutationRate) {
+          if (this.hasEdge(i, j)) {
+            this.removeEdge(i, j);
+          } else {
+            this.addEdge(i, j);
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Generate a random k-regular graph on n vertices.
    *
    * Uses a two-phase approach:
