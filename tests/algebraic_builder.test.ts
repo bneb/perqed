@@ -27,4 +27,28 @@ describe("Dynamic Compilation Fallback", () => {
     expect(result).toContain("independent variables");
     expect(result).not.toContain("SandboxError");
   });
+
+  test("compileEdgeRule auto-sanitizes standard function closures", () => {
+    const rawFunction = "function (u, v, N) { return (u+v)%2===0; }";
+    const adj = AlgebraicBuilder.compile({
+      vertices: 10,
+      description: "testing closures",
+      edge_rule_js: rawFunction
+    });
+    // u/v mapped to i/j. i=1, j=3 => 4%2=0 (true). i=1, j=4 => 5%2!=0 (false).
+    expect(adj.hasEdge(1, 3)).toBe(true);
+    expect(adj.hasEdge(1, 4)).toBe(false);
+  });
+
+  test("compileEdgeRule auto-sanitizes arrow functions closures", () => {
+    const rawArrow = "(i, j) => { return (i*j)%3===0; }";
+    const adj = AlgebraicBuilder.compile({
+      vertices: 10,
+      description: "testing arrows",
+      edge_rule_js: rawArrow
+    });
+    // 1*3=3%3=0 (true). 2*4=8%3!=0 (false).
+    expect(adj.hasEdge(1, 3)).toBe(true);
+    expect(adj.hasEdge(2, 4)).toBe(false);
+  });
 });

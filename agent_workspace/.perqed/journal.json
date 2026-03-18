@@ -491,6 +491,14 @@
       "claim": "AlgebraicBuilder UNSAT: Graph constructed on Z_35 where vertices i and j are connected if (i-j) mod 5 is a quadratic residue and (i-j) mod 7 is non-zero. This construction uses modular arithmetic properties and is a specific instance of a Cayley graph on Z_35, mapping to Z_5 x Z_7 via the Chinese Remainder Theorem. This approach is inspired by product constructions mentioned in combinatorial design theory for generating higher-dimensional solutions. → E=16205 on N=35",
       "target_goal": "R(4,6) >= 36",
       "evidence": "Algebraic Builder run"
+    },
+    {
+      "id": "617a36c8-6a51-43e9-8d5c-4ad42193fa65",
+      "timestamp": "2026-03-18T18:28:22.980Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Graph construction on 36 vertices where adjacency is determined by differences related to a specific solution of the Prouhet--Tarry--Escott (PTE) problem. For a PTE solution of degree r=1 and size k=3, the sets A={0,4,5} and B={1,2,6} have equal sums of elements. The set of all absolute differences between distinct elements within A (which is {1,4,5}) is used as the generating set for a circulant graph on Z_36. Edges (i,j) exist if the shortest distance between i and j modulo 36 is within this derived set. → E=52554 on N=36",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
     }
   ],
   "investigations": [

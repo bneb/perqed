@@ -59,6 +59,41 @@ export interface AlgebraicBuildResult {
  */
 const SANDBOX_TIMEOUT_MS = 500;
 
+// ── Compiler Helper ─────────────────────────────────────────────────────────────
+
+export function compileEdgeRule(ruleStr: string): (i: number, j: number) => boolean {
+  let cleanRule = ruleStr.trim();
+
+  // 1. Strip Arrow Functions: `(i, j) => { ... }` or `i => { ... }`
+  cleanRule = cleanRule.replace(/^(\([^)]*\)|[a-zA-Z0-9_]+)\s*=>\s*\{?/, '');
+  
+  // 2. Strip Standard Functions: `function(u, v, N) { ... }` or `function name() { ... }`
+  cleanRule = cleanRule.replace(/^function\s*[^(]*\([^)]*\)\s*\{/, '');
+  
+  // 3. Remove the trailing closing brace if we stripped an opening wrapper
+  if (/^function|=>/.test(ruleStr.trim()) && cleanRule.endsWith('}')) {
+      cleanRule = cleanRule.substring(0, cleanRule.lastIndexOf('}'));
+  }
+
+  // 4. Variable Translation: Force u/v to i/j just in case
+  cleanRule = cleanRule.replace(/\bu\b/g, 'i').replace(/\bv\b/g, 'j');
+
+  const body = cleanRule.includes('return') ? cleanRule : `return (${cleanRule});`;
+  
+  try {
+      const evaluate = new Function('i', 'j', body);
+      return (i: number, j: number) => {
+        try {
+          return Boolean(evaluate(i, j));
+        } catch (e: any) {
+          throw new SandboxError(`Runtime execution threw at (i=${i}, j=${j}): ${e.message}`);
+        }
+      };
+  } catch (e: any) {
+      throw new SandboxError(`Failed to compile edge rule: ${e.message}. Cleaned string: ${body}`);
+  }
+}
+
 // ── AlgebraicBuilder ──────────────────────────────────────────────────────────
 
 export class AlgebraicBuilder {
@@ -76,29 +111,7 @@ export class AlgebraicBuilder {
   static compile(config: AlgebraicConstructionConfig): AdjacencyMatrix {
     const N = config.vertices;
 
-    const cleanRule = config.edge_rule_js.trim().replace(/;+$/, '');
-    const body = cleanRule.includes('return') ? cleanRule : `return (${cleanRule});`;
-
-    let userFn: any;
-    try {
-      userFn = new Function('i', 'j', body);
-    } catch (err) {
-      throw new SandboxError(
-        `AlgebraicBuilder: failed to compile edge_rule_js — ${err instanceof Error ? err.message : String(err)}`,
-        err,
-      );
-    }
-
-    const ruleFn = (i: number, j: number): boolean => {
-      try {
-        return Boolean(userFn(i, j));
-      } catch (err) {
-        throw new SandboxError(
-          `AlgebraicBuilder: edge_rule_js threw at (i=${i}, j=${j}) — ${err instanceof Error ? err.message : String(err)}`,
-          err,
-        );
-      }
-    };
+    const ruleFn = compileEdgeRule(config.edge_rule_js);
 
     // Populate the adjacency matrix
     const adj = new AdjacencyMatrix(N);

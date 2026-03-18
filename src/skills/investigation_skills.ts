@@ -13,13 +13,12 @@
  * 
  * Returns a statement indicating the exact dimension of the search space $2^N$.
  */
-export function calculate_degrees_of_freedom(edge_rule_js: string, vertices: number): string {
-  const cleanRule = edge_rule_js.trim().replace(/;+$/, '');
-  const body = cleanRule.includes('return') ? cleanRule : `return (${cleanRule});`;
+import { compileEdgeRule } from "../search/algebraic_builder";
 
+export function calculate_degrees_of_freedom(edge_rule_js: string, vertices: number): string {
   let ruleFn: (i: number, j: number) => any;
   try {
-    ruleFn = new Function('i', 'j', body) as (i: number, j: number) => any;
+    ruleFn = compileEdgeRule(edge_rule_js);
   } catch (err: any) {
     return `SandboxError: failed to compile edge_rule_js — ${err.message}`;
   }
