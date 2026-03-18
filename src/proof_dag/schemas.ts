@@ -18,7 +18,9 @@ export const DAGNodeKindSchema = z.enum([
   "skill_apply",
   "aggregate",
   "mathlib_query",
+  "algebraic_graph_construction",  // Wiles Mode: compile edge_rule_js → AdjacencyMatrix → verify
 ]);
+
 
 export const DAGNodeStatusSchema = z.enum([
   "pending",

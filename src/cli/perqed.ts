@@ -52,6 +52,9 @@ import { DAGExecutor } from "../proof_dag/dag_executor";
 import { ArchitectClient } from "../architect_client";
 import { readdir } from "node:fs/promises";
 import { ZobristHasher } from "../search/zobrist_hash";
+import { AlgebraicBuilder } from "../search/algebraic_builder";
+import { AlgebraicConstructionConfigSchema } from "../proof_dag/algebraic_construction_config";
+
 
 // ──────────────────────────────────────────────
 // CLI Argument Parsing
@@ -1175,7 +1178,46 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
               return best ?? { note: "no results to aggregate" };
             },
 
-            // ── search / z3 / lean: context-aware stubs ───────────────────
+            // ── algebraic_graph_construction: VM-sandbox J edge rule → AdjacencyMatrix ──
+            // The ARCHITECT (in Wiles Mode) emits this node kind to test an
+            // algebraic symmetry (Cayley/Paley graph) without SA. The builder:
+            //   1. Compiles edge_rule_js in a vm.Script sandbox (only Math exposed)
+            //   2. Verifies via ramseyEnergy
+            //   3. Journals SAT/UNSAT and persists the candidate for memetic seeding
+            algebraic_graph_construction: async (node) => {
+              const parseResult = AlgebraicConstructionConfigSchema.safeParse(node.config);
+              if (!parseResult.success) {
+                throw new Error(
+                  `[AlgebraicBuilder] Invalid config for node "${node.id}": ${parseResult.error.message}`,
+                );
+              }
+              const algConfig = parseResult.data;
+              // Fall back to run-level r/s if not specified in the node config
+              const rawSc = config.search_config as any;
+              const algR = algConfig.r ?? rawSc?.r ?? 4;
+              const algS = algConfig.s ?? rawSc?.s ?? 6;
+              const buildResult = await AlgebraicBuilder.buildAndVerify(
+                algConfig,
+                algR,
+                algS,
+                null,      // journal handled inline below via addEntry
+                workspace,
+              );
+              // Journal the outcome
+              await journal.addEntry({
+                type: "observation",
+                claim: buildResult.status === "witness"
+                  ? `AlgebraicBuilder E=0 witness: ${algConfig.description}`
+                  : `AlgebraicBuilder no witness: E=${buildResult.energy} for ${algConfig.description}`,
+                evidence: `AlgebraicBuilder vm.compile + ramseyEnergy(${algR},${algS}) on N=${algConfig.vertices} in ${buildResult.compiledInMs}ms`,
+                target_goal: config.theorem_name,
+              });
+
+
+              return buildResult;
+            },
+
+            // ── search / z3 / lean: context-aware stubs ─────────────────
             // These delegate to the outer SA loop but accept injected context
             // from upstream literature / mathlib_query nodes.
             search: async (node, results) => {
