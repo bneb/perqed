@@ -18,6 +18,7 @@
 import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
 import { ramseyEnergy } from "../math/graph/RamseyEnergy";
 import type { AlgebraicConstructionConfig } from "../proof_dag/algebraic_construction_config";
+import { InvariantValidator } from "./invariant_validator";
 
 // ── Error type ────────────────────────────────────────────────────────────────
 
@@ -160,6 +161,7 @@ export class AlgebraicBuilder {
     s: number,
     journal: { record(obs: string): void } | null,
     workspace: { paths: { scratch: string } } | null,
+    constraints?: { exact_vertices?: number; undirected?: boolean; no_self_loops?: boolean }
   ): Promise<AlgebraicBuildResult> {
     const t0 = Date.now();
 
@@ -167,6 +169,8 @@ export class AlgebraicBuilder {
     console.log(`   Rule: ${config.edge_rule_js.slice(0, 80)}${config.edge_rule_js.length > 80 ? "..." : ""}`);
 
     const adj = AlgebraicBuilder.compile(config);
+    InvariantValidator.validate(adj, constraints);
+    
     const { energy, status } = AlgebraicBuilder.verify(adj, r, s);
     const compiledInMs = Date.now() - t0;
 

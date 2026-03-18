@@ -136,6 +136,12 @@ export interface RunConfig {
   domain_skills_md: string;
   /** Structured search config emitted by the ARCHITECT — no regex needed */
   search_config: ArchitectSearchConfig;
+  /** High-level boundary constraints to rigidly evaluate generative solutions against */
+  constraints?: {
+    exact_vertices?: number;
+    undirected?: boolean;
+    no_self_loops?: boolean;
+  };
 }
 
 const RUN_CONFIG_SCHEMA = {
@@ -199,6 +205,15 @@ const RUN_CONFIG_SCHEMA = {
         },
       },
       required: ["problem_class"],
+    },
+    constraints: {
+      type: SchemaType.OBJECT as const,
+      description: "Rigid boundary constraints that any generative solution must perfectly satisfy before evaluation.",
+      properties: {
+        exact_vertices: { type: SchemaType.NUMBER as const, description: "The exact number of vertices the graph must have (e.g., 35 for R(4,6) >= 36)" },
+        undirected: { type: SchemaType.BOOLEAN as const, description: "True if the graph must be strictly undirected/symmetric" },
+        no_self_loops: { type: SchemaType.BOOLEAN as const, description: "True if all self-loops must be false" },
+      },
     },
   },
   required: [
@@ -772,7 +787,22 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
               const algConfig = node.config as any;
               const algR = algConfig.r ?? (config.search_config as any)?.r ?? 4;
               const algS = algConfig.s ?? (config.search_config as any)?.s ?? 6;
-              const buildResult = await AlgebraicBuilder.buildAndVerify(algConfig, algR, algS, safeJournal, workspace as any);
+              let buildResult;
+              try {
+                buildResult = await AlgebraicBuilder.buildAndVerify(algConfig, algR, algS, safeJournal, workspace as any, config.constraints);
+              } catch (e: any) {
+                if (e.name === "InvariantViolationError") {
+                  console.log(`\n   🛑 [Boundary Violation] LLM attempted to violate constraints: ${e.message}`);
+                  await journal.addEntry({
+                    type: "failure_mode",
+                    claim: `Boundary Violation: rule generated graph with ${e.message}`,
+                    target_goal: targetGoal,
+                    evidence: "InvariantValidator",
+                  });
+                  return { energy: NaN, status: "violations", note: e.message };
+                }
+                throw e;
+              }
 
               if (buildResult.energy === 0) {
                 console.log(`   ✅ Algebraic Construction SAT! Witness found. Bypassing MCTS Loop.`);
@@ -813,9 +843,10 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
           console.log(`   📝 DAG cycle finished without witness. Invoking Replanner...`);
           const currentJournalsText = await journal.getSummary(targetGoal);
+          const cognitiveMode = await journal.getCognitiveTemperature(targetGoal);
           let appendedDag: any;
           appendedDag = await callSafe(
-            () => architectClient.replanDAG(currentDag, currentJournalsText),
+            () => architectClient.replanDAG(currentDag, currentJournalsText, cognitiveMode),
             1,
             "ARCHITECT replanDAG"
           );
@@ -1511,7 +1542,12 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   }
 
   // ── Tactic Phase: LLM-driven proof search (for non-constructive proofs) ──
-  const factory = new AgentFactory({ geminiApiKey: apiKey });
+  let ollamaModel: string | undefined;
+  try {
+    const gc = await Bun.file(join(workspaceBase, "global_config/config.json")).json();
+    ollamaModel = gc?.models?.tactician?.name;
+  } catch {}
+  const factory = new AgentFactory({ geminiApiKey: apiKey, ollamaModel });
   const solver = new SolverBridge();
   const lean = new LeanBridge();
 
