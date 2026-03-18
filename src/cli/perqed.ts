@@ -755,8 +755,9 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         tabuHashes: saTabuHashes.length > 0 ? saTabuHashes : undefined,
         // Micro-SAT Patch: Z3 surgery on sterile basins at low energy
         microSatThreshold: (sp as any).micro_sat?.enabled
-          ? ((sp as any).micro_sat?.threshold ?? 12)
+          ? ((sp as any).micro_sat?.threshold ?? 13)
           : undefined,
+
 
 
         onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
