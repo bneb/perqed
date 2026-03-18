@@ -50,10 +50,11 @@ export interface RamseySearchConfig {
   symmetry?: 'none' | 'circulant';
   /**
    * Tabu: set of 64-bit Zobrist hashes representing known-sterile energy
-   * basins (glass floors). If the proposed mutation hashes to one of these
-   * values, it is hard-rejected and a thermal reheat is triggered.
+   * basins (glass floors). Stored as decimal strings for safe JSON transport
+   * through worker thread boundaries (BigInt cannot be JSON-serialized).
+   * The SA worker coerces these back to BigInt via BigInt(h) at startup.
    */
-  tabuHashes?: bigint[];
+  tabuHashes?: string[];
   /**
    * Temperature to reheat to when a tabu basin is entered.
    * Default: 3.0 (aggressive reheat to force basin escape).
@@ -132,10 +133,11 @@ export function ramseySearch(
   let reheatCooldown = 0;
 
   // ── Tabu Search setup ──────────────────────────────────────────────────
-  // If tabuHashes are provided, we track the current graph hash at O(1) cost
-  // using Zobrist hashing. When a proposed mutation would land on a known-sterile
-  // basin, the mutation is hard-rejected and temperature is aggressively reheated.
-  const tabuSet = config.tabuHashes ? new Set<bigint>(config.tabuHashes) : null;
+  // tabuHashes arrives as string[] (JSON-safe). Coerce to BigInt here, at
+  // the worker boundary, so the hot inner loop only touches native BigInt.
+  const tabuSet = config.tabuHashes && config.tabuHashes.length > 0
+    ? new Set<bigint>(config.tabuHashes.map((h) => BigInt(h)))
+    : null;
   const tabuPenaltyTemp = config.tabuPenaltyTemperature ?? 3.0;
   const hasher = tabuSet ? new ZobristHasher(n) : null;
   let graphHash: bigint = hasher ? hasher.computeInitial(adj) : 0n;

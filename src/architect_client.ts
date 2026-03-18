@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { ArchitectResponseSchema, type ArchitectResponse } from "./schemas";
 import { ProofDAGSchema, type ProofDAG } from "./proof_dag/schemas";
+import { buildTabuHashBlock, type JournalEntry } from "./search/research_journal";
 
 // ──────────────────────────────────────────────
 // Configuration
@@ -156,6 +157,7 @@ export class ArchitectClient {
     context: string,
     goal: string,
     availableSkills: string[] = [],
+    journalEntries: JournalEntry[] = [],
   ): Promise<ProofDAG> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
@@ -164,22 +166,35 @@ export class ArchitectClient {
         ? `Available SKILLs (use "skill_apply" nodes for these): ${availableSkills.join(", ")}`
         : "No SKILLs available yet.";
 
+    // Build the tabu hash block — only non-empty when failure_mode entries carry hashes
+    const tabuBlock = buildTabuHashBlock(journalEntries);
+    const tabuSection = tabuBlock
+      ? `\n\n${tabuBlock}\n`
+      : "";
+
     const dagSystemPrompt =
       `You are a senior proof architect. Decompose the mathematical goal into a minimal directed acyclic graph (DAG) of proof sub-tasks.\n\n` +
       `Goal: ${goal}\n\n` +
       `${skillList}\n\n` +
-      `Research journal (past attempts):\n${context}\n\n` +
-      `Emit ONLY valid JSON (no markdown, no prose) matching this exact schema:\n\n` +
+      `Research journal (past attempts):\n${context}\n` +
+      tabuSection +
+      `\nEmit ONLY valid JSON (no markdown, no prose) matching this exact schema:\n\n` +
       `{\n` +
       `  "id": "<uuid>",\n` +
       `  "goal": "${goal}",\n` +
       `  "nodes": [\n` +
       `    {\n` +
       `      "id": "unique_snake_case_id",\n` +
-      `      "kind": "search" | "z3" | "lean" | "literature" | "skill_apply" | "aggregate",\n` +
+      `      "kind": "search" | "z3" | "lean" | "literature" | "skill_apply" | "aggregate" | "mathlib_query",\n` +
       `      "label": "human readable description",\n` +
       `      "dependsOn": ["list", "of", "node", "ids"],\n` +
-      `      "config": { ...kind-specific fields... },\n` +
+      `      "config": {\n` +
+      `        // For search nodes: { vertices, r, s, iterations, workers,\n` +
+      `        //   tabuHashes?: string[]  <-- MUST be decimal strings, e.g. ["14819238491823"],\n` +
+      `        //   tabuPenaltyTemperature?: number }\n` +
+      `        // For literature/mathlib_query nodes: { query: string, k?: number }\n` +
+      `        // For skill_apply nodes: { skillPath: string }\n` +
+      `      },\n` +
       `      "status": "pending"\n` +
       `    }\n` +
       `  ],\n` +
@@ -193,7 +208,9 @@ export class ArchitectClient {
       `5. Lean verification depends on the LNS finisher.\n` +
       `6. Use "aggregate" nodes to merge multiple parallel SA workers.\n` +
       `7. Keep the DAG minimal — omit nodes that are not needed.\n` +
-      `8. Every dependsOn reference must point to a real node id in the same DAG.`;
+      `8. Every dependsOn reference must point to a real node id in the same DAG.\n` +
+      `9. If KNOWN STERILE BASINS are listed above, you MUST include those exact hash strings\n` +
+      `   in the tabuHashes array of your search node config. Use the 'distributed_tabu_search' skill.`;
 
     const payload = {
       contents: [{ parts: [{ text: dagSystemPrompt }] }],

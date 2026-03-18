@@ -51,6 +51,13 @@ export interface JournalEntry {
    * Format: "R(4,6) >= 36"
    */
   target_goal: string;
+  /**
+   * Optional: Zobrist hash of the failed adjacency matrix, stored as a
+   * decimal string (BigInt-safe JSON transport).
+   * Only present on failure_mode entries where the graph was hashed at
+   * the moment Z3 returned UNSAT.
+   */
+  zobristHash?: string;
 }
 
 interface JournalFile {
@@ -176,7 +183,44 @@ export function distillJournalForPrompt(
 
   if (lines.length === 0) return "";
 
-  return header + lines.join("\n") + "\n";
+  let result = header + lines.join("\n") + "\n";
+
+  // Append the tabu hash block if any failure_mode entries carry hashes.
+  const tabuBlock = buildTabuHashBlock(sorted);
+  if (tabuBlock) result += "\n" + tabuBlock;
+
+  return result;
+}
+
+/**
+ * Build the KNOWN STERILE BASINS block for the ARCHITECT's system prompt.
+ *
+ * Extracts Zobrist hashes from failure_mode journal entries and formats
+ * them into an explicit instruction block that tells Gemini exactly which
+ * hash strings to copy into the `tabuHashes` array of a search node.
+ *
+ * Returns "" when there are no hashed failure_mode entries (no noise).
+ */
+export function buildTabuHashBlock(entries: JournalEntry[]): string {
+  // Collect unique hashes from failure_mode entries only
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    if (entry.type === "failure_mode" && entry.zobristHash) {
+      seen.add(entry.zobristHash);
+    }
+  }
+
+  if (seen.size === 0) return "";
+
+  const hashList = [...seen].map((h) => `  "${h}"`).join(",\n");
+
+  return (
+    `KNOWN STERILE BASINS (TABU HASHES):\n` +
+    `The following Zobrist hashes represent completely explored, sterile energy basins.\n` +
+    `If you use the 'distributed_tabu_search' skill, you MUST copy these exact strings\n` +
+    `into the 'tabuHashes' array of your search node config:\n` +
+    `[\n${hashList}\n]\n`
+  );
 }
 
 // ──────────────────────────────────────────────

@@ -50,6 +50,7 @@ import { LocalEmbedder } from "../embeddings/embedder";
 import { DAGExecutor } from "../proof_dag/dag_executor";
 import { ArchitectClient } from "../architect_client";
 import { readdir } from "node:fs/promises";
+import { ZobristHasher } from "../search/zobrist_hash";
 
 // ──────────────────────────────────────────────
 // CLI Argument Parsing
@@ -888,11 +889,22 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
               } else if (lnsResult.status === 'unsat') {
                 console.log(`   ❌ LNS UNSAT (#${ci + 1}): ${lnsResult.clue}`);
                 addEvent(`LNS UNSAT (#${ci + 1}): E=${candidate.bestEnergy} basin irrecoverable`, 'error');
+                // ── Capture Zobrist hash of this glass floor ─────────────────
+                // Compute at the moment of failure so the ARCHITECT can inject
+                // this exact hash into tabuHashes on the next SA run.
+                let failedHash: string | undefined;
+                try {
+                  const glassHasher = new ZobristHasher(sp.vertices);
+                  failedHash = glassHasher.computeInitial(candidate.bestAdj).toString();
+                  console.log(`   🔑 Glass floor hash: ${failedHash}`);
+                } catch { /* non-fatal — journal entry still written without hash */ }
+                // ─────────────────────────────────────────────────────────────
                 await journal.addEntry({
                   type: 'failure_mode',
                   claim: `LNS could not repair E=${candidate.bestEnergy} basin for R(${sp.r},${sp.s}) on K_${sp.vertices}`,
                   evidence: `${lnsResult.clue}; ${lnsResult.freeEdgeCount} free edges tried`,
                   target_goal: targetGoal,
+                  ...(failedHash !== undefined ? { zobristHash: failedHash } : {}),
                 });
               } else {
                 console.log(`   ⚠️  LNS ${lnsResult.status} (#${ci + 1}) — skipping to next candidate`);
@@ -966,10 +978,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
               .map((e) => e.name);
           } catch { /* skills dir may not exist yet */ }
 
+          const allJournalEntries = await journal.getEntriesForGoal(targetGoal);
           const dag = await architectClient.formulateDAG(
             augmentedDigest,
             targetGoal,
             availableSkills,
+            allJournalEntries,
           );
 
           console.log(`   🗺️  ARCHITECT emitted ProofDAG (${dag.nodes.length} nodes):`);
