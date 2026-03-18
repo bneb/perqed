@@ -98,7 +98,7 @@ export const WILES_OPF_PROMPT = [
   "CRITICAL JS FORMAT RULES:",
   "1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v. Do not try to redefine the function signature.",
   "2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration function is_adjacent(...). Output ONLY the raw logic body. VALID: \"return (i + j) % 5 === 0;\" INVALID: \"const rule = (i, j) => { return (i + j) % 5 === 0; }\"",
-  "3. The Description Rule: You MUST include a detailed \"description\" string explaining your mathematical reasoning before the \"edge_rule_js\" field.",
+  "3. The Description Rule: Keep your \"description\" field to a MAXIMUM of 3 sentences. DO NOT write mathematical proofs. DO NOT write long explanations. State the core symmetry and stop. Your focus must be on the \"edge_rule_js\".",
   "4. CRITICAL JSON ESCAPE: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`).",
   "",
   "CRITICAL: Keep the DAG as simple as possible. Output ONLY ONE node (`algebraic_graph_construction`). Do not include any other nodes."
@@ -121,7 +121,7 @@ export const WILES_OPF_PROMPT_DIRECT = [
   "CRITICAL JS FORMAT RULES:",
   "1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v. Do not try to redefine the function signature.",
   "2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration function is_adjacent(...). Output ONLY the raw logic body. VALID: \"return (i + j) % 5 === 0;\" INVALID: \"const rule = (i, j) => { return (i + j) % 5 === 0; }\"",
-  "3. The Description Rule: You MUST include a detailed \"description\" string explaining your mathematical reasoning before the \"edge_rule_js\" field.",
+  "3. The Description Rule: Keep your \"description\" field to a MAXIMUM of 3 sentences. DO NOT write mathematical proofs. DO NOT write long explanations. State the core symmetry and stop. Your focus must be on the \"edge_rule_js\".",
   "4. CRITICAL JSON ESCAPE: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`)."
 ].join("\n");
 
@@ -232,7 +232,7 @@ export class ArchitectClient {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(60000),
+          signal: AbortSignal.timeout(120000),
         });
 
         if (!response.ok) {
@@ -405,7 +405,7 @@ export class ArchitectClient {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(60000),
+          signal: AbortSignal.timeout(120000),
         });
         if (!response.ok) {
           throw new Error(`Gemini HTTP ${response.status}: ${await response.text()}`);
@@ -472,7 +472,7 @@ export class ArchitectClient {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(60000),
+          signal: AbortSignal.timeout(120000),
         });
         if (!response.ok) {
           throw new Error(`Gemini HTTP ${response.status}: ${await response.text()}`);
@@ -533,7 +533,7 @@ Or you can immediately attempt another \`algebraic_graph_construction\` node.
 CRITICAL JS FORMAT RULES (for algebraic_graph_construction):
 1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v.
 2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration. Output ONLY the raw logic body. VALID: "return (i + j) % 5 === 0;"
-3. The Description Rule: You MUST include a detailed "description" string explaining your reasoning.
+3. The Description Rule: Keep your "description" field to a MAXIMUM of 3 sentences. DO NOT write mathematical proofs. DO NOT write long explanations. State the core symmetry and stop. Your focus must be on the "edge_rule_js".
 
 Output ONLY a JSON object matching this schema describing the NEW nodes to append:
 {
@@ -563,7 +563,7 @@ DO NOT wrap your JSON in markdown.`;
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(60000),
+          signal: AbortSignal.timeout(120000),
         });
         
         if (!response.ok) {

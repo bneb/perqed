@@ -8,12 +8,14 @@ describe("Architect Prompt Formatting", () => {
     expect(WILES_OPF_PROMPT).toContain("function(i, j)");
     expect(WILES_OPF_PROMPT).toContain("Output ONLY the raw logic body");
     expect(WILES_OPF_PROMPT).toContain("raw logic body");
+    expect(WILES_OPF_PROMPT).toContain("MAXIMUM of 3 sentences");
   });
 
   test("WILES_OPF_PROMPT_DIRECT contains the formatting rules", () => {
     expect(WILES_OPF_PROMPT_DIRECT).toContain("CRITICAL JS FORMAT RULES:");
     expect(WILES_OPF_PROMPT_DIRECT).toContain("function(i, j)");
     expect(WILES_OPF_PROMPT_DIRECT).toContain("raw logic body");
+    expect(WILES_OPF_PROMPT_DIRECT).toContain("MAXIMUM of 3 sentences");
   });
 
   test("replanDAG prompt embeds formatting rules", async () => {
