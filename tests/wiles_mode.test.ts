@@ -150,8 +150,8 @@ describe("shouldRunSearchPhase (SA bypass gate)", () => {
   const ramseyConfig = { problem_class: "ramsey_coloring", domain_size: 35, r: 4, s: 6 };
   const unknownConfig = { problem_class: "unknown" };
 
-  test("wilesMode=true suppresses SA even for ramsey_coloring (the bypass)", () => {
-    expect(shouldRunSearchPhase(ramseyConfig, true)).toBe(false);
+  test("wilesMode=true no longer suppresses DAG formulation (bypass is handled internally)", () => {
+    expect(shouldRunSearchPhase(ramseyConfig, true)).toBe(true);
   });
 
   test("wilesMode=false runs SA for ramsey_coloring (normal path)", () => {

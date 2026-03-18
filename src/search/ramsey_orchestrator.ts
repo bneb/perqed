@@ -9,8 +9,9 @@
 import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
 import { paleyGraph, circulantGraph, perturbGraph } from "../math/graph/GraphSeeds";
 import { ramseySearch, type RamseySearchConfig, type RamseySearchResult } from "./ramsey_worker";
-import { extractTopHotZone } from "./hot_zone_extractor";
-import { runMicroSATPatch, nukeScaffold } from "./micro_sat_patcher";
+import { extractCliques } from "./lns_window";
+import { adaptiveZ3Solve } from "./z3_lns_optimizer";
+import { SolverBridge } from "../solver";
 
 export type SearchStrategy = "single" | "island_model";
 export type SeedType = "random" | "paley" | "circulant";
@@ -211,21 +212,22 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
             const rawData = new Int8Array(msg.bestAdjRaw as number[]);
             for (let i = 0; i < rawData.length; i++) basinAdj.raw[i] = rawData[i]!;
 
-            const zone = extractTopHotZone(basinAdj, config.r, config.s);
+            const cliques = extractCliques(basinAdj, config.r, config.s);
 
             (async () => {
               const patchStart = Date.now();
-              const result = await runMicroSATPatch(basinAdj, config.r, config.s, zone, { timeoutMs: 120_000 });
+              const solver = new SolverBridge();
+              const patchedGraph = await adaptiveZ3Solve(basinAdj, cliques, solver, config.r, config.s);
               const ms = Date.now() - patchStart;
 
-              if (result.status === "sat" && result.adj && !resolved) {
+              if (patchedGraph && !resolved) {
                 // E=0 witness found — terminate all workers
                 resolved = true;
-                console.log(`   🎯 [MicroSAT] SAT witness found in ${ms}ms (hot zone ${result.hotZoneSize}v) — terminating all workers`);
+                console.log(`   🎯 [Adaptive Z3-LNS] SAT witness found in ${ms}ms — terminating all workers`);
                 const satResult: RamseySearchResult = {
                   bestEnergy: 0,
-                  witness: result.adj,
-                  bestAdj: result.adj,
+                  witness: patchedGraph,
+                  bestAdj: patchedGraph,
                   iterations: 0,
                   ips: 0,
                   telemetry: {} as any,
@@ -237,30 +239,13 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
                   try { workers[i]!.terminate(); } catch {}
                   resolvers[i]!();
                 }
-              } else if (result.status === "unsat") {
-                // Z3 proved cold zone is toxic — nuke scaffold, send patched adj back
-                console.log(`   ☢️  [MicroSAT] UNSAT in ${ms}ms — nuking cold zone, waking W${w_idx} with patch`);
-                nukeScaffold(basinAdj, zone.frozenVertices);
-                
-                if (lock) {
-                  // Write patch into the shared buffer starting at byte 4
-                  const patchRaw = new Int8Array(lock, 4);
-                  for (let i = 0; i < basinAdj.raw.length; i++) {
-                    patchRaw[i] = basinAdj.raw[i]!;
-                  }
-                  
-                  // Wake the worker's Atomics.wait via the shared lock.
-                  // Status 1 = PATCH
-                  const lockView = new Int32Array(lock, 0, 1);
-                  Atomics.store(lockView, 0, 1);
-                  Atomics.notify(lockView, 0, 1);
-                }
               } else {
-                console.log(`   ⏱️  [MicroSAT] ${result.status} in ${ms}ms (hot zone ${result.hotZoneSize}v) — waking W${w_idx} to scatter`);
+                // Z3 proved hot zone + 100-halo is toxic — nuke scaffold and scatter
+                console.log(`   ☢️  [Adaptive Z3-LNS] Terminally UNSAT in ${ms}ms — triggering full scatter, waking W${w_idx}`);
                 
                 if (lock) {
                   // Wake the worker's Atomics.wait via the shared lock.
-                  // Status 2 = NO PATCH (SCATTER)
+                  // Status 2 = NO PATCH (FULL SCATTER)
                   const lockView = new Int32Array(lock, 0, 1);
                   Atomics.store(lockView, 0, 2);
                   Atomics.notify(lockView, 0, 1);

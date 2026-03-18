@@ -21,6 +21,9 @@ export type DAGNodeKind =
   | "lean"          // Lean 4 tactic proof (SolverBridge)
   | "literature"    // Retrieve + format relevant papers from LanceDB
   | "skill_apply"   // Read SKILL.md and inject technique into a downstream prompt
+  | "algebraic_graph_construction" // VM execution of topological rules
+  | "smt_constraint"// Z3 synthesis of structural rules
+  | "mathlib_query" // LanceDB lookups of Lean4 Mathlib
   | "aggregate";    // Merge results from multiple preceding nodes
 
 export interface DAGNode {

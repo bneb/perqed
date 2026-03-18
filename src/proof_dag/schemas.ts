@@ -18,6 +18,7 @@ export const DAGNodeKindSchema = z.enum([
   "skill_apply",
   "aggregate",
   "mathlib_query",
+  "smt_constraint",                // Wiles Mode: Z3 synthesis
   "algebraic_graph_construction",  // Wiles Mode: compile edge_rule_js → AdjacencyMatrix → verify
 ]);
 

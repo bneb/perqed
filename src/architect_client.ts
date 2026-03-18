@@ -9,6 +9,8 @@
  */
 
 import { z } from "zod";
+import * as fs from "fs";
+import { JsonHandler } from "./utils/json_handler";
 import { ArchitectResponseSchema, type ArchitectResponse } from "./schemas";
 import { ProofDAGSchema, type ProofDAG } from "./proof_dag/schemas";
 import { buildTabuHashBlock, type JournalEntry, type ResearchJournal } from "./search/research_journal";
@@ -30,29 +32,7 @@ export interface ArchitectClientConfig {
 // JSON Extraction (shared with llm_client.ts pattern)
 // ──────────────────────────────────────────────
 
-function extractJSON(raw: string): string {
-  const trimmed = raw.trim();
 
-  // Pass 1: strip any ```json ... ``` or ``` ... ``` fence found ANYWHERE in the string.
-  // The old regex required ^ and $ anchors — this broke when Gemini 2.5 Flash prefaced
-  // the JSON with a prose sentence or trailing commentary.
-  const fenceMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  if (fenceMatch?.[1]) {
-    return fenceMatch[1].trim();
-  }
-
-  // Pass 2: brace-balanced extraction — find the first '{' and walk forward to its
-  // matching '}', tolerating any surrounding prose. This handles responses like:
-  //   "Here is the DAG:\n{...}\n\nLet me know if you need changes."
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start !== -1 && end !== -1 && end > start) {
-    return trimmed.slice(start, end + 1);
-  }
-
-  // Pass 3: return as-is and let JSON.parse throw with a useful message.
-  return trimmed;
-}
 
 // ──────────────────────────────────────────────
 // System Prompt
@@ -109,6 +89,13 @@ export const WILES_OPF_PROMPT = [
   "  (n : Nat) (hn : n = 35) : ∃ (g : Fin n → Fin n → Bool),",
   "    (∀ i j, g i j = g j i) ∧ (∀ i, g i i = false)",
   "Your orthogonal translation belongs INSIDE the proof body, not the theorem statement.",
+  "",
+  "STEP 5 - THE ALGEBRAIC BUILDER (DAG NODE):",
+  "To execute your Functorial Leap, you MUST emit a ProofDAG containing a node of kind `algebraic_graph_construction`.",
+  "This node configures a high-performance VM sandbox that will compile and verify your mathematical pattern.",
+  "Set the config with `vertices`, `r`, `s`, `description`, and a Javascript rule `edge_rule_js`.",
+  "The JS rule is a function body evaluated for each (i, j) pair. Example: \"return Math.abs(i - j) % 2 === 1;\".",
+  "CRITICAL: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`)."
 ].join("\n");
 
 
@@ -218,6 +205,7 @@ export class ArchitectClient {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(60000),
         });
 
         if (!response.ok) {
@@ -229,12 +217,17 @@ export class ArchitectClient {
         const body = (await response.json()) as GeminiApiResponse;
 
         const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        
+        try {
+          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.config.model, prompt: payload.contents[0]?.parts[0]?.text, response: rawText }) + "\n");
+        } catch (e) {}
+        
         if (!rawText) {
           throw new Error("Gemini returned an empty response.");
         }
 
         // Strip markdown fences and parse
-        const jsonString = extractJSON(rawText);
+        const jsonString = JsonHandler.extractAndRepair(rawText);
         const parsed = JSON.parse(jsonString);
 
         return ArchitectResponseSchema.parse(parsed);
@@ -345,13 +338,14 @@ export class ArchitectClient {
       `  "nodes": [\n` +
       `    {\n` +
       `      "id": "unique_snake_case_id",\n` +
-      `      "kind": "search" | "z3" | "lean" | "literature" | "skill_apply" | "aggregate" | "mathlib_query",\n` +
+      `      "kind": "search" | "z3" | "lean" | "literature" | "skill_apply" | "aggregate" | "mathlib_query" | "algebraic_graph_construction",\n` +
       `      "label": "human readable description",\n` +
       `      "dependsOn": ["list", "of", "node", "ids"],\n` +
       `      "config": {\n` +
-      `        // For search nodes: { vertices, r, s, iterations, workers,\n` +
-      `        //   tabuHashes?: string[]  <-- MUST be decimal strings, e.g. ["14819238491823"],\n` +
-      `        //   tabuPenaltyTemperature?: number }\n` +
+      `        // For search nodes: { vertices, r, s, iterations, workers, tabuHashes?: string[] }\n` +
+      `        // For algebraic_graph_construction nodes: { vertices, r, s, description,\n` +
+      `        //   "edge_rule_js": "return (i - j) % 2 === 0;" <-- VM-sandboxed (i,j) => boolean. Use double quotes, NEVER backticks.\n` +
+      `        // }\n` +
       `        // For literature/mathlib_query nodes: { query: string, k?: number }\n` +
       `        // For skill_apply nodes: { skillPath: string }\n` +
       `      },\n` +
@@ -384,15 +378,21 @@ export class ArchitectClient {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(60000),
         });
         if (!response.ok) {
           throw new Error(`Gemini HTTP ${response.status}: ${await response.text()}`);
         }
         const body = (await response.json()) as GeminiApiResponse;
         const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        
+        try {
+          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.config.model, prompt: dagSystemPrompt, response: rawText }) + "\n");
+        } catch (e) {}
+
         if (!rawText) throw new Error("Empty Gemini response");
 
-        const jsonString = extractJSON(rawText);
+        const jsonString = JsonHandler.extractAndRepair(rawText);
         const parsed = JSON.parse(jsonString);
         // Zod validates on every attempt, including temperature=0.95 (The Wiles Maneuver)
         return ProofDAGSchema.parse(parsed);

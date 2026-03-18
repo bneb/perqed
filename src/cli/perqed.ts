@@ -15,6 +15,7 @@
 
 import { join } from "node:path";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { JsonHandler } from "../utils/json_handler";
 import { WorkspaceManager } from "../workspace";
 import { SolverBridge } from "../solver";
 import { LeanBridge } from "../lean_bridge";
@@ -53,6 +54,8 @@ import { ArchitectClient } from "../architect_client";
 import { readdir } from "node:fs/promises";
 import { ZobristHasher } from "../search/zobrist_hash";
 import { AlgebraicBuilder } from "../search/algebraic_builder";
+import { SmtWilesBuilder } from "../search/smt_wiles_builder";
+import { SmtWilesConfigSchema } from "../proof_dag/smt_wiles_config";
 import { AlgebraicConstructionConfigSchema } from "../proof_dag/algebraic_construction_config";
 
 
@@ -222,7 +225,6 @@ export function shouldRunSearchPhase(
   searchConfig: { problem_class?: string } | null | undefined,
   wilesMode: boolean,
 ): boolean {
-  if (wilesMode) return false;
   const pc = searchConfig?.problem_class;
   return pc !== undefined && pc !== "unknown";
 }
@@ -363,10 +365,14 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
     }
     const result = await model.generateContent(p);
     let text = result.response.text().trim();
-    if (text.startsWith("```json")) text = text.replace(/^```json/i, "");
-    else if (text.startsWith("```")) text = text.replace(/^```/, "");
-    if (text.endsWith("```")) text = text.replace(/```$/, "");
-    return JSON.parse(text.trim()) as RunConfig;
+
+    try {
+      const fs = await import("fs");
+      fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: "gemini-2.5-flash", step: "doFormulate", rawText: text }) + "\n");
+    } catch (e) { }
+
+    const jsonString = JsonHandler.extractAndRepair(text);
+    return JSON.parse(jsonString) as RunConfig;
   };
 
   const config = await callSafe(doFormulate, 3, "ARCHITECT formulate");
@@ -489,16 +495,30 @@ async function callSafe<T>(
   maxRetries: number,
   label = "call",
 ): Promise<T | null> {
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let lastError: string | undefined;
   const BASE_DELAY_MS = 1000;
   const MAX_DELAY_MS = 30_000;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    let spinnerTimer: ReturnType<typeof setInterval> | null = null;
+    let i = 0;
+    process.stdout.write(`   ${frames[0]} [LLM] Awaiting ${label}...\r`);
+    spinnerTimer = setInterval(() => {
+      i = (i + 1) % frames.length;
+      process.stdout.write(`   ${frames[i]} [LLM] Awaiting ${label}...\r`);
+    }, 80);
+
     try {
-      return await fn(lastError);
+      const result = await fn(lastError);
+      clearInterval(spinnerTimer);
+      process.stdout.write(`   ✅ [LLM] ${label} completed.                 \n`);
+      return result;
     } catch (err) {
+      clearInterval(spinnerTimer);
+      process.stdout.write(`   ❌ [LLM] ${label} failed.                    \n`);
       lastError = String(err);
-      console.log(`   ⚠️  ${label} attempt ${attempt}/${maxRetries} failed: ${lastError.slice(0, 100)}`);
+      console.log(`   ⚠️  ${label} error details: ${lastError.slice(0, 100)}`);
       if (attempt < maxRetries) {
         // Exponential backoff with ±25% jitter
         const base = Math.min(BASE_DELAY_MS * Math.pow(2, attempt - 1), MAX_DELAY_MS);
@@ -650,19 +670,123 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   // ── Research Journal: persistent cross-run memory ──
   const journalPath = defaultJournalPath(join(workspace.paths.runDir, "..", ".."));
   const journal = new ResearchJournal(journalPath);
-  const targetGoal = `R(${config.search_config?.r ?? "?"},${config.search_config?.s ?? "?"}) >= ${(config.search_config?.domain_size ?? 0) + 1}`;
+  const targetGoal = `R(${(config.search_config as any)?.r ?? "?"},${(config.search_config as any)?.s ?? "?"}) >= ${((config.search_config as any)?.domain_size ?? 0) + 1}`;
 
-  // ── Search Phase: triggered by ARCHITECT-emitted search_config ──
-  // shouldRunSearchPhase encodes two bypass conditions:
-  //   1. wilesMode active: skip SA, route directly to Lean proof loop using
-  //      the ARCHITECT's algebraic/spectral DAG strategy instead.
-  //   2. problem_class is unknown/absent: no structured search available.
-  const needsSearch = shouldRunSearchPhase(config.search_config, wilesMode);
-  if (wilesMode) {
-    console.log(`\n🧮 [Wiles] SA bypass active — skipping search phase, routing to Lean proof loop`);
-    console.log(`   The ARCHITECT's algebraic strategy will drive iteration 1.`);
-  }
   let searchPhase: SearchPhase | null = null;
+  let witnessFound = false;
+
+  // ── Wiles Mode Intercept: Evaluate DAG upfront ──
+  if (wilesMode) {
+    console.log(`\n🧮 [Wiles] SA bypass active — intercepting for Algebraic Builder DAG`);
+
+    let wilesAttempts = 0;
+    while (wilesAttempts < MAX_ARCHITECT_PIVOTS && !witnessFound) {
+      wilesAttempts++;
+      let dagAttempted = false;
+      try {
+        const architectClient = new ArchitectClient({
+          apiKey,
+          model: "gemini-2.5-flash",
+        });
+
+        const allJournalEntries = await journal.getEntriesForGoal(targetGoal);
+
+        console.log(`\n   🏛️  Asking ARCHITECT to formulate ProofDAG...`);
+        const dag = await callSafe(
+          () => architectClient.formulateDAG(
+            "Initial Wiles mode formulation.",
+            targetGoal,
+            [], // no skills needed to be passed dynamically here, they are hardcoded
+            allJournalEntries,
+            journal,
+            true, // forceWilesMode
+          ),
+          1,
+          "ARCHITECT formulateDAG (Wiles)"
+        );
+
+        if (!dag) throw new Error("formulateDAG failed to return a DAG.");
+
+        console.log(`   🗺️  ARCHITECT emitted ProofDAG (${dag.nodes.length} nodes):`);
+        dag.nodes.forEach((n: any) =>
+          console.log(`      [${n.kind}] ${n.id}: ${n.label}`)
+        );
+
+        const algebraicNode = dag.nodes.find(n => n.kind === "algebraic_graph_construction");
+
+        if (algebraicNode) {
+          console.log(`\n   🏗️  [AlgebraicBuilder] Executing algebraic construction from DAG...`);
+          const { AlgebraicConstructionConfigSchema } = await import("../proof_dag/algebraic_construction_config");
+          const { AlgebraicBuilder } = await import("../search/algebraic_builder");
+
+          const builderConfig = AlgebraicConstructionConfigSchema.parse(algebraicNode.config);
+
+          const safeJournal = {
+            record: (obs: string) => {
+              journal.addEntry({
+                type: "observation",
+                claim: obs,
+                target_goal: targetGoal,
+                evidence: "Algebraic Builder run",
+              }).catch(console.error);
+            }
+          };
+
+          // Execute the builder workflow (compiles VM code, checks energy, routes SAT to Z3, saves to journal)
+          const builderResult = await AlgebraicBuilder.buildAndVerify(
+            builderConfig,
+            (config.search_config as any)?.r ?? 0,
+            (config.search_config as any)?.s ?? 0,
+            safeJournal,
+            workspace as any
+          );
+
+          // If SAT, we found our witness! Prevent the MCTS loop.
+          if (builderResult.energy === 0) {
+            console.log(`   ✅ Algebraic Construction SAT! Witness found. Bypassing MCTS Loop.`);
+            witnessFound = true;
+
+            const N = builderResult.adj.n;
+            const matrix: number[][] = [];
+            for (let i = 0; i < N; i++) {
+              const row: number[] = [];
+              for (let j = 0; j < N; j++) {
+                row.push(builderResult.adj.hasEdge(i, j) ? 1 : 0);
+              }
+              matrix.push(row);
+            }
+            const witnessPath = join(workspace.paths.scratch, "witness.json");
+            const smtR = (config.search_config as any)?.r ?? 4;
+            const smtS = (config.search_config as any)?.s ?? 6;
+            await Bun.write(witnessPath, JSON.stringify({ n: N, r: smtR, s: smtS, adjacency: matrix }, null, 2));
+
+            const registry = ProofRegistry.withDefaults();
+            const proofClass = config.search_config.problem_class === "ramsey_coloring" ? "ramsey" : config.search_config.problem_class;
+            const generator = registry.getGenerator(proofClass);
+            if (generator) {
+              const proofInput = { theoremName: config.theorem_name, witness: builderResult.adj, params: { r: smtR, s: smtS, n: N } };
+              const leanSource = generator.generateLean(proofInput);
+              const leanPath = join(workspace.paths.scratch, "Witness.lean");
+              await Bun.write(leanPath, leanSource);
+              console.log(`\n📄 Lean proof generated: ${leanPath}`);
+            }
+            break; // break the Wiles while loop
+          } else {
+            console.log(`   ❌ Algebraic Construction failed (E=${builderResult.energy}). Feeding back to Architect...`);
+            // Note: AlgebraicBuilder already recorded the E>0 result into the Journal!
+          }
+        } else {
+          console.log(`   ⚠️  No 'algebraic_graph_construction' node found in DAG.`);
+        }
+
+        dagAttempted = true;
+      } catch (e: any) {
+        console.error(`   ❌ Failed to execute Algebraic Builder: ${e.message}`);
+      }
+    } // end while(wilesAttempts < MAX)
+  }
+
+  const needsSearch = !wilesMode && !witnessFound && shouldRunSearchPhase(config.search_config, false);
 
   if (needsSearch) {
     const searchConfig = extractSearchConfig(config.search_config);
@@ -1215,6 +1339,44 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
 
               return buildResult;
+            },
+
+            // ── smt_constraint: Python script generating Z3 assertions ──
+            smt_constraint: async (node: any) => {
+              const parseResult = SmtWilesConfigSchema.safeParse(node.config);
+              if (!parseResult.success) {
+                throw new Error(
+                  `[SmtWilesBuilder] Invalid config for node "${node.id}": ${parseResult.error.message}`,
+                );
+              }
+              const smtConfig = parseResult.data;
+              const rawSc = config.search_config as any;
+              const smtR = smtConfig.r ?? rawSc?.r ?? 4;
+              const smtS = smtConfig.s ?? rawSc?.s ?? 6;
+              const buildResult = await SmtWilesBuilder.buildAndVerify(smtConfig, smtR, smtS);
+
+              let notes = "";
+              if (buildResult.status === "witness" && buildResult.adj) {
+                await journal.addEntry({
+                  type: "observation",
+                  claim: `SMT Wiles Builder witness: E=0`,
+                  evidence: `SMT Logic found SAT witness in ${buildResult.compiledInMs}ms`,
+                  target_goal: config.theorem_name,
+                });
+                notes = `Witness found! E=0`;
+              } else if (buildResult.status === "unsat") {
+                notes = `UNSAT (No satisfying graph for these constraints)`;
+              } else if (buildResult.status === "timeout") {
+                notes = `TIMEOUT (Z3 constraint explosion)`;
+              } else {
+                notes = `ERROR (Z3 Syntax/Runtime error in assertions)`;
+              }
+
+              console.log(
+                `   ✅ Node \x1b[36m${node.id}\x1b[0m \x1b[90m(${node.kind})\x1b[0m \x1b[33m${buildResult.compiledInMs}ms\x1b[0m → ${notes}`,
+              );
+
+              return { status: buildResult.status, notes, witness: buildResult.adj };
             },
 
             // ── search / z3 / lean: context-aware stubs ─────────────────
