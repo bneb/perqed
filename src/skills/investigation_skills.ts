@@ -1,4 +1,4 @@
-import * as vm from "node:vm";
+// Removed `node:vm` for Bun 1.3 stability
 
 /**
  * calculate_degrees_of_freedom
@@ -14,18 +14,12 @@ import * as vm from "node:vm";
  * Returns a statement indicating the exact dimension of the search space $2^N$.
  */
 export function calculate_degrees_of_freedom(edge_rule_js: string, vertices: number): string {
-  const sandbox = Object.create(null) as Record<string, unknown>;
-  sandbox["Math"] = Math;
-  sandbox["Set"] = Set;
-  sandbox["Map"] = Map;
-  sandbox["Array"] = Array;
-  sandbox["console"] = { log: (...args: any[]) => {} };
-  const context = vm.createContext(sandbox);
+  const cleanRule = edge_rule_js.trim().replace(/;+$/, '');
+  const body = cleanRule.includes('return') ? cleanRule : `return (${cleanRule});`;
 
   let ruleFn: (i: number, j: number) => any;
   try {
-    const script = new vm.Script(`(function(i, j) { ${edge_rule_js} })`);
-    ruleFn = script.runInContext(context, { timeout: 1000 }) as (i: number, j: number) => any;
+    ruleFn = new Function('i', 'j', body) as (i: number, j: number) => any;
   } catch (err: any) {
     return `SandboxError: failed to compile edge_rule_js — ${err.message}`;
   }

@@ -14,7 +14,7 @@
  *   - All exceptions from the sandbox are re-thrown as SandboxError
  */
 
-import * as vm from "node:vm";
+// Removed `node:vm` usage for stability inside Bun 1.3
 import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
 import { ramseyEnergy } from "../math/graph/RamseyEnergy";
 import type { AlgebraicConstructionConfig } from "../proof_dag/algebraic_construction_config";
@@ -76,26 +76,12 @@ export class AlgebraicBuilder {
   static compile(config: AlgebraicConstructionConfig): AdjacencyMatrix {
     const N = config.vertices;
 
-    // Build isolated context — only Math is whitelisted.
-    // Object.create(null) gives a null-prototype object so there's no
-    // inherited globalThis / __proto__ leakage.
-    const sandbox = Object.create(null) as Record<string, unknown>;
-    sandbox["Math"] = Math;
-    sandbox["Set"] = Set;
-    sandbox["Map"] = Map;
-    sandbox["Array"] = Array;
-    sandbox["console"] = { log: (...args: any[]) => {} };
-    const context = vm.createContext(sandbox);
+    const cleanRule = config.edge_rule_js.trim().replace(/;+$/, '');
+    const body = cleanRule.includes('return') ? cleanRule : `return (${cleanRule});`;
 
-    // Compile the function once (not per-edge) for performance.
-    // The wrapping function signature matches the documented API: (i, j) => boolean.
-    let ruleFn: (i: number, j: number) => boolean;
+    let userFn: any;
     try {
-      const script = new vm.Script(
-        `(function(i, j) { ${config.edge_rule_js} })`,
-        { filename: "<algebraic_rule>", lineOffset: 0 },
-      );
-      ruleFn = script.runInContext(context, { timeout: SANDBOX_TIMEOUT_MS }) as typeof ruleFn;
+      userFn = new Function('i', 'j', body);
     } catch (err) {
       throw new SandboxError(
         `AlgebraicBuilder: failed to compile edge_rule_js — ${err instanceof Error ? err.message : String(err)}`,
@@ -103,26 +89,23 @@ export class AlgebraicBuilder {
       );
     }
 
-    if (typeof ruleFn !== "function") {
-      throw new SandboxError(
-        `AlgebraicBuilder: edge_rule_js did not evaluate to a function (got ${typeof ruleFn})`,
-      );
-    }
+    const ruleFn = (i: number, j: number): boolean => {
+      try {
+        return Boolean(userFn(i, j));
+      } catch (err) {
+        throw new SandboxError(
+          `AlgebraicBuilder: edge_rule_js threw at (i=${i}, j=${j}) — ${err instanceof Error ? err.message : String(err)}`,
+          err,
+        );
+      }
+    };
 
     // Populate the adjacency matrix
     const adj = new AdjacencyMatrix(N);
 
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
-        let result: boolean;
-        try {
-          result = ruleFn(i, j);
-        } catch (err) {
-          throw new SandboxError(
-            `AlgebraicBuilder: edge_rule_js threw at (i=${i}, j=${j}) — ${err instanceof Error ? err.message : String(err)}`,
-            err,
-          );
-        }
+        const result = ruleFn(i, j);
         if (result) {
           adj.addEdge(i, j); // also sets (j, i) — symmetry enforced by AdjacencyMatrix
         }
