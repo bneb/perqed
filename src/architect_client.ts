@@ -94,8 +94,12 @@ export const WILES_OPF_PROMPT = [
   "To execute your Functorial Leap, you MUST emit a ProofDAG containing a node of kind `algebraic_graph_construction`.",
   "This node configures a high-performance VM sandbox that will compile and verify your mathematical pattern.",
   "Set the config with `vertices`, `r`, `s`, `description`, and a Javascript rule `edge_rule_js`.",
-  "The JS rule is a function body evaluated for each (i, j) pair. Example: \"return Math.abs(i - j) % 2 === 1;\".",
-  "CRITICAL: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`).",
+  "",
+  "CRITICAL JS FORMAT RULES:",
+  "1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v. Do not try to redefine the function signature.",
+  "2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration function is_adjacent(...). Output ONLY the raw logic body. VALID: \"return (i + j) % 5 === 0;\" INVALID: \"const rule = (i, j) => { return (i + j) % 5 === 0; }\"",
+  "3. The Description Rule: You MUST include a detailed \"description\" string explaining your mathematical reasoning before the \"edge_rule_js\" field.",
+  "4. CRITICAL JSON ESCAPE: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`).",
   "",
   "CRITICAL: Keep the DAG as simple as possible. Output ONLY ONE node (`algebraic_graph_construction`). Do not include any other nodes."
 ].join("\n");
@@ -113,8 +117,12 @@ export const WILES_OPF_PROMPT_DIRECT = [
   "  \"edge_rule_js\": string",
   "}",
   "Do not include a 'nodes' array. Do not include 'createdAt', 'kind', 'id', 'dependsOn' or 'status'.",
-  "The JS rule is a function body evaluated for each (i, j) pair. Example: \"return Math.abs(i - j) % 2 === 1;\".",
-  "CRITICAL: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`)."
+  "",
+  "CRITICAL JS FORMAT RULES:",
+  "1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v. Do not try to redefine the function signature.",
+  "2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration function is_adjacent(...). Output ONLY the raw logic body. VALID: \"return (i + j) % 5 === 0;\" INVALID: \"const rule = (i, j) => { return (i + j) % 5 === 0; }\"",
+  "3. The Description Rule: You MUST include a detailed \"description\" string explaining your mathematical reasoning before the \"edge_rule_js\" field.",
+  "4. CRITICAL JSON ESCAPE: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`)."
 ].join("\n");
 
 
@@ -521,6 +529,11 @@ SUPPORTED INVESTIGATION SKILLS (for 'kind' property):
 3. \`query_literature\`: config requires \`search_term\` (string). RAG fetch of actual structural math papers.
 
 Or you can immediately attempt another \`algebraic_graph_construction\` node.
+
+CRITICAL JS FORMAT RULES (for algebraic_graph_construction):
+1. The Variables Rule: Your edge_rule_js will be compiled into a function with the signature function(i, j). You MUST use i and j as your vertex indices. Do not use x, y, u, or v.
+2. The Body-Only Rule: Do NOT write an arrow function (i, j) => {...} or a function declaration. Output ONLY the raw logic body. VALID: "return (i + j) % 5 === 0;"
+3. The Description Rule: You MUST include a detailed "description" string explaining your reasoning.
 
 Output ONLY a JSON object matching this schema describing the NEW nodes to append:
 {
