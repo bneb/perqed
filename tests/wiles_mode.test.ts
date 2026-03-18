@@ -82,10 +82,11 @@ describe("formulateDAG forceWilesMode", () => {
     expect(lastPayload).not.toBeNull();
     expect(lastPayload.generationConfig.temperature).toBe(0.95);
     const prompt = lastPayload.contents[0].parts[0].text as string;
-    // All three OPF steps must be present
+    // All four OPF steps must be present
     expect(prompt).toContain("STEP 1 - HISTORICAL ANTI-PATTERN RECOGNITION");
     expect(prompt).toContain("STEP 2 - THE STRICT BAN");
     expect(prompt).toContain("STEP 3 - THE FUNCTORIAL LEAP");
+    expect(prompt).toContain("STEP 4 - THE SIGNATURE ANCHOR (ANTI-HALLUCINATION)");
   });
 
   test("forceWilesMode=false → T=0.2, no OPF steps injected", async () => {
@@ -102,12 +103,13 @@ describe("formulateDAG forceWilesMode", () => {
 // ── 4–5: buildFormulationPreamble — OPF injected into initial call ─────────
 
 describe("buildFormulationPreamble (formulate() wilesMode injection)", () => {
-  test("wilesMode=true → preamble contains OPF header and all 3 steps", () => {
+  test("wilesMode=true → preamble contains OPF header and all 4 steps", () => {
     const preamble = buildFormulationPreamble(true);
     expect(preamble).toContain("MANDATORY WILES MANEUVER");
     expect(preamble).toContain("STEP 1 - HISTORICAL ANTI-PATTERN RECOGNITION");
     expect(preamble).toContain("STEP 2 - THE STRICT BAN");
     expect(preamble).toContain("STEP 3 - THE FUNCTORIAL LEAP");
+    expect(preamble).toContain("STEP 4 - THE SIGNATURE ANCHOR (ANTI-HALLUCINATION)");
   });
 
   test("wilesMode=false → preamble uses normal INITIAL TRIAGE text, no OPF", () => {

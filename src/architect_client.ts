@@ -99,7 +99,18 @@ export const WILES_OPF_PROMPT = [
   "If the problem is discrete, map it to a continuous, topological, or spectral space.",
   "If it is analytic, map it to algebra. Prioritize SKILLs like 'functorial_domain_translation',",
   "'razborov_flag_algebras', 'spectral_graph_bounds', or invent a novel bridge.",
+  "",
+  "STEP 4 - THE SIGNATURE ANCHOR (ANTI-HALLUCINATION):",
+  "Even though you are translating the proof into an orthogonal domain, the top-level `signature` of the theorem",
+  "MUST remain grounded in standard, constructive Lean 4 types.",
+  "- You are STRICTLY FORBIDDEN from inventing nonexistent Mathlib definitions",
+  "  (e.g., do NOT use made-up predicates like `Ramsey.colorable`).",
+  "- You MUST use the constructive witness form for the signature. Example format:",
+  "  (n : ℕ) (hn : n = 36) : ∃ (g : Fin n → Fin n → Bool),",
+  "    (no_mono_clique_of_size g 4) ∧ (no_mono_clique_of_size (complement g) 6)",
+  "Your orthogonal translation belongs INSIDE the proof body, not the theorem statement.",
 ].join("\n");
+
 
 // ──────────────────────────────────────────────
 // Escalation Ladder — temperature & meta-strategy
