@@ -79,10 +79,45 @@ async function main() {
 
   console.log(`📁 Workspace: ${workspace.paths.runDir}`);
 
+  // 3.5. Ollama readiness check
+  // The ARCHITECT's DAG always starts with a literature node (RAG lookup via
+  // nomic-embed-text). Without Ollama, that node silently returns a stub and
+  // the ARCHITECT gets degraded context for its very first strategy decision.
+  // Poll for up to 30s so that `ollama serve` started just before the run has
+  // time to finish loading rather than being skipped on the first attempt.
+  {
+    const { LocalEmbedder } = await import("../embeddings/embedder");
+    const embedder = new LocalEmbedder();
+    const POLL_INTERVAL_MS = 2_000;
+    const TIMEOUT_MS = 30_000;
+    const deadline = Date.now() + TIMEOUT_MS;
+    let ollamaReady = await embedder.isAvailable();
+
+    if (!ollamaReady) {
+      process.stdout.write("⏳ Waiting for Ollama (literature RAG)");
+      while (!ollamaReady && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        const remaining = Math.ceil((deadline - Date.now()) / 1000);
+        process.stdout.write(` ${remaining}s`);
+        ollamaReady = await embedder.isAvailable();
+      }
+      process.stdout.write("\n");
+    }
+
+    if (ollamaReady) {
+      console.log("✅ Ollama ready — literature nodes will use live RAG context");
+    } else {
+      console.log("⚠️  Ollama unavailable after 30s — literature nodes will use stubs");
+      console.log("   The SA search and ARCHITECT will still run normally.");
+      console.log("   To enable RAG: `ollama serve` and `ollama pull nomic-embed-text`");
+    }
+  }
+
   // 4. Initialize agents
   const factory = new AgentFactory({ geminiApiKey: geminiKey });
   const solver = new SolverBridge();
   const lean = new LeanBridge();
+
 
   // 5. Run
   console.log("🔬 Starting proof search...\n");
