@@ -89,6 +89,8 @@ class GeminiSpecialist implements SpecialistAgent {
 export interface FactoryConfig {
   /** Ollama endpoint (default: http://localhost:11434) */
   ollamaEndpoint?: string;
+  /** Ollama model (default: deepseek-prover-v2:7b-q8) */
+  ollamaModel?: string;
   /** Gemini API key (required for REASONER & ARCHITECT). Falls back to process.env.GEMINI_API_KEY. */
   geminiApiKey?: string;
   /** Tactician system prompt (short, tactic-focused) */
@@ -101,6 +103,7 @@ export interface FactoryConfig {
 
 const DEFAULT_FACTORY_CONFIG = {
   ollamaEndpoint: "http://localhost:11434",
+  ollamaModel: "deepseek-prover-v2:7b-q8",
   geminiApiKey: "",
   tacticianSystemPrompt: "You are a Lean 4 theorem prover. When given a theorem, output ONLY the tactic(s) to complete the proof. No explanations. No markdown. Just the tactic code.",
   thresholdM: 4,
@@ -143,7 +146,7 @@ export class AgentFactory {
       case "TACTICIAN":
         return new FormalistSpecialist("TACTICIAN", {
           endpoint: this.config.ollamaEndpoint,
-          model: "deepseek-prover-v2:7b-q8",
+          model: this.config.ollamaModel,
           temperature: 0.3,
           numPredict: 256,
           mode: "completion",
