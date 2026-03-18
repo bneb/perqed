@@ -205,7 +205,26 @@ const RUN_CONFIG_SCHEMA = {
  * forcing the ARCHITECT to bypass standard techniques from Iteration 0.
  *
  * Exported so it can be unit-tested independently of the network call.
+ *
+ * Pure gate function: should the SA witness-search phase run?
+ *
+ * Returns false when:
+ *   - wilesMode is active (Orthogonal Paradigm Forcing — SA is bypassed, the
+ *     ARCHITECT's algebraic DAG strategy drives the proof loop instead)
+ *   - problem_class is "unknown" or undefined (no structured search available)
+ *
+ * Exported for unit testing.
  */
+export function shouldRunSearchPhase(
+  searchConfig: { problem_class?: string } | null | undefined,
+  wilesMode: boolean,
+): boolean {
+  if (wilesMode) return false;
+  const pc = searchConfig?.problem_class;
+  return pc !== undefined && pc !== "unknown";
+}
+
+
 export function buildFormulationPreamble(wilesMode: boolean): string {
   if (wilesMode) {
     return (
@@ -631,11 +650,15 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   const targetGoal = `R(${config.search_config?.r ?? "?"},${config.search_config?.s ?? "?"}) >= ${(config.search_config?.domain_size ?? 0) + 1}`;
 
   // ── Search Phase: triggered by ARCHITECT-emitted search_config ──
-  // search_config.problem_class is the authoritative signal — the ARCHITECT
-  // emits it as structured JSON so it's reliable regardless of theorem_signature format.
-  // isConstructiveExistence is a secondary sanity check only.
-  const needsSearch = config.search_config?.problem_class !== "unknown"
-    && config.search_config?.problem_class !== undefined;
+  // shouldRunSearchPhase encodes two bypass conditions:
+  //   1. wilesMode active: skip SA, route directly to Lean proof loop using
+  //      the ARCHITECT's algebraic/spectral DAG strategy instead.
+  //   2. problem_class is unknown/absent: no structured search available.
+  const needsSearch = shouldRunSearchPhase(config.search_config, wilesMode);
+  if (wilesMode) {
+    console.log(`\n🧮 [Wiles] SA bypass active — skipping search phase, routing to Lean proof loop`);
+    console.log(`   The ARCHITECT's algebraic strategy will drive iteration 1.`);
+  }
   let searchPhase: SearchPhase | null = null;
 
   if (needsSearch) {
@@ -707,7 +730,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
               await journal.addEntry({
                 type: 'lemma',
                 claim,
-                evidence: `Z3 UNSAT: 17-var SAT encoding, circulant 2^${Math.floor(sp.vertices/2)} search space exhausted`,
+                evidence: `Z3 UNSAT: 17-var SAT encoding, circulant 2^${Math.floor(sp.vertices / 2)} search space exhausted`,
                 target_goal: targetGoal,
               });
               console.log(`   📓 Lemma recorded: "${claim}"`);

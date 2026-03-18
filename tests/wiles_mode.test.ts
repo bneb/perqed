@@ -1,21 +1,24 @@
 /**
- * TDD: --wiles flag, Orthogonal Paradigm Forcing (OPF) prompt, and
- * formulate() injection so SA is bypassed from the very first ARCHITECT call.
+ * TDD: --wiles flag, Orthogonal Paradigm Forcing (OPF) prompt,
+ * formulate() initial injection, and SA bypass gate.
  *
  * Tests cover:
  *   1. computeEscalation escalation ladder remains intact (GREEN guard)
- *   2. formulateDAG(forceWilesMode=true) → T=0.95 + OPF 3-step prompt
+ *   2. formulateDAG(forceWilesMode=true) → T=0.95 + OPF 4-step prompt
  *   3. formulateDAG(forceWilesMode=false) → T=0.2, no OPF
  *   4. buildFormulationPreamble(true)  → contains OPF header in initial prompt
  *   5. buildFormulationPreamble(false) → no OPF header in initial prompt
  *   6. parseArgs --wiles  → wiles=true
  *   7. parseArgs (absent) → wiles=false
+ *   8. shouldRunSearchPhase(ramsey_config, wilesMode=true)  → false (SA bypassed)
+ *   9. shouldRunSearchPhase(ramsey_config, wilesMode=false) → true  (SA runs)
+ *  10. shouldRunSearchPhase(unknown config, wilesMode=false) → false (no search)
  */
 
 import { describe, test, expect, beforeEach } from "bun:test";
 
 import { computeEscalation, ArchitectClient } from "../src/architect_client";
-import { parseArgs, buildFormulationPreamble } from "../src/cli/perqed";
+import { parseArgs, buildFormulationPreamble, shouldRunSearchPhase } from "../src/cli/perqed";
 
 // ── 1: computeEscalation escalation ladder (existing, must stay GREEN) ────────
 
@@ -131,3 +134,24 @@ describe("parseArgs --wiles flag", () => {
     expect(args.wiles).toBe(false);
   });
 });
+
+// ── 8–10: shouldRunSearchPhase — SA bypass gate ──────────────────────────────
+
+describe("shouldRunSearchPhase (SA bypass gate)", () => {
+  const ramseyConfig = { problem_class: "ramsey_coloring", domain_size: 35, r: 4, s: 6 };
+  const unknownConfig = { problem_class: "unknown" };
+
+  test("wilesMode=true suppresses SA even for ramsey_coloring (the bypass)", () => {
+    expect(shouldRunSearchPhase(ramseyConfig, true)).toBe(false);
+  });
+
+  test("wilesMode=false runs SA for ramsey_coloring (normal path)", () => {
+    expect(shouldRunSearchPhase(ramseyConfig, false)).toBe(true);
+  });
+
+  test("unknown problem_class skips SA regardless of wilesMode", () => {
+    expect(shouldRunSearchPhase(unknownConfig, false)).toBe(false);
+    expect(shouldRunSearchPhase(unknownConfig, true)).toBe(false);
+  });
+});
+
