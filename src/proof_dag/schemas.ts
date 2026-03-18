@@ -17,6 +17,7 @@ export const DAGNodeKindSchema = z.enum([
   "literature",
   "skill_apply",
   "aggregate",
+  "mathlib_query",
 ]);
 
 export const DAGNodeStatusSchema = z.enum([
@@ -33,7 +34,7 @@ export const DAGNodeSchema = z.object({
   kind: DAGNodeKindSchema,
   label: z.string().min(1),
   dependsOn: z.array(z.string()),
-  config: z.record(z.unknown()),
+  config: z.record(z.string(), z.unknown()),
   status: DAGNodeStatusSchema.default("pending"),
   result: z.unknown().optional(),
 });
@@ -45,7 +46,7 @@ export const ProofDAGSchema = z.object({
   goal: z.string().min(1),
   nodes: z
     .array(DAGNodeSchema)
-    .min(1, "A ProofDAG must have at least one node")
+    .refine((arr) => arr.length >= 1, { message: "A ProofDAG must have at least one node" })
     .refine(
       (nodes) => {
         // Every dependsOn reference must point to a real node id
@@ -78,7 +79,8 @@ export const ProofDAGSchema = z.object({
       },
       { message: "DAG contains a cycle" },
     ),
-  createdAt: z.string().datetime({ offset: true }).or(z.string().min(1)),
+  // Accept any non-empty string for createdAt (ISO 8601 or otherwise)
+  createdAt: z.string().min(1),
 });
 
 export type ProofDAG = z.infer<typeof ProofDAGSchema>;

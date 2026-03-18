@@ -45,7 +45,8 @@ import { GistPublisher } from "../gist_publisher";
 import { repairJSON } from "../util/json_repair";
 import { ArxivLibrarian } from "../librarian/arxiv_librarian";
 import { DOMAIN_SEED_QUERIES } from "../librarian/seed_queries";
-import { VectorDatabase } from "../embeddings/vector_store";
+import { VectorDatabase, TABLE_ARXIV, TABLE_MATHLIB } from "../embeddings/vector_store";
+import { LocalEmbedder } from "../embeddings/embedder";
 import { DAGExecutor } from "../proof_dag/dag_executor";
 import { ArchitectClient } from "../architect_client";
 import { readdir } from "node:fs/promises";
@@ -977,22 +978,55 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
           );
 
           // ── Wire DAGExecutor node handlers ──────────────────────────────
-          const db = new VectorDatabase(DB_PATH);
-          await db.initialize();
+          const arxivDb = new VectorDatabase(DB_PATH, TABLE_ARXIV);
+          await arxivDb.initialize();
+          const mathlibDb = new VectorDatabase(DB_PATH, TABLE_MATHLIB);
+          await mathlibDb.initialize();
+          const embedder = new LocalEmbedder();
+          const ollamaLive = await embedder.isAvailable();
 
           const executor = new DAGExecutor(dag, {
-            // literature: retrieve from LanceDB and return as context string
+            // ── literature: vector-search arxiv_papers ────────────────────
             literature: async (node) => {
               const cfg = node.config as { query?: string; k?: number };
               const query = cfg.query ?? targetGoal;
               const k = cfg.k ?? 5;
-              // We don't have a query vector without Ollama, so return empty context
-              // gracefully — the SA doesn't depend on literature for correctness.
-              return `[Literature context for "${query}" — ${k} results]
-(Vector search requires Ollama to be running. Proceeding without RAG context.)`;
+              if (!ollamaLive) {
+                return `[Literature context for "${query}" — Ollama unavailable, skipping vector search]`;
+              }
+              const queryVec = await embedder.embed(query);
+              if (queryVec.length === 0) {
+                return `[Literature context for "${query}" — embedding failed]`;
+              }
+              const hits = await arxivDb.search(queryVec, k);
+              if (hits.length === 0) return `[No literature found for "${query}"]`;
+              return (
+                `Found literature for "${query}":\n` +
+                hits.map((h) => `  - ${h.theoremSignature}\n    ${h.successfulTactic}`).join("\n")
+              );
             },
 
-            // skill_apply: read SKILL.md and return its content as context
+            // ── mathlib_query: vector-search mathlib_premises ─────────────
+            mathlib_query: async (node) => {
+              const cfg = node.config as { query?: string; k?: number };
+              const query = cfg.query ?? targetGoal;
+              const k = cfg.k ?? 5;
+              if (!ollamaLive) {
+                return `[Mathlib context for "${query}" — Ollama unavailable, skipping vector search]`;
+              }
+              const queryVec = await embedder.embed(query);
+              if (queryVec.length === 0) {
+                return `[Mathlib context for "${query}" — embedding failed]`;
+              }
+              const hits = await mathlibDb.searchMathlib(queryVec, k);
+              if (hits.length === 0) return `[No mathlib premises found for "${query}"]`;
+              return (
+                `Relevant Lean 4 lemmas for "${query}":\n` +
+                hits.map((h) => `  - ${h.theoremSignature}`).join("\n")
+              );
+            },
+
+            // ── skill_apply: read SKILL.md and inject its content ─────────
             skill_apply: async (node) => {
               const cfg = node.config as { skillPath?: string };
               const skillPath = cfg.skillPath ?? "";
@@ -1006,7 +1040,7 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
               return { skillContent: `[SKILL not found: ${skillPath}]` };
             },
 
-            // aggregate: pick the result from the node with best_energy
+            // ── aggregate: pick the result with lowest energy ─────────────
             aggregate: async (node, results) => {
               const cfg = node.config as { strategy?: string; sourceNodes?: string[] };
               const sources = cfg.sourceNodes ?? [];
@@ -1022,17 +1056,31 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
               return best ?? { note: "no results to aggregate" };
             },
 
-            // search / z3 / lean: delegate to existing implementations
-            // (These are handled by the outer SA loop for this attempt)
-            search: async (node) => {
-              const cfg = node.config as any;
-              return { note: `search node "${node.id}" — handled by SA loop`, config: cfg };
+            // ── search / z3 / lean: context-aware stubs ───────────────────
+            // These delegate to the outer SA loop but accept injected context
+            // from upstream literature / mathlib_query nodes.
+            search: async (node, results) => {
+              const cfg = node.config as { contextFromNode?: string[] };
+              const ctx = (cfg.contextFromNode ?? []).map((id) => results.get(id)).filter(Boolean);
+              return { note: `search node "${node.id}" — handled by SA loop`, injectedContext: ctx };
             },
-            z3: async (node) => {
-              return { note: `z3 node "${node.id}" — handled by LNS loop`, config: node.config };
+            z3: async (node, results) => {
+              const cfg = node.config as { contextFromNode?: string[] };
+              const ctx = (cfg.contextFromNode ?? []).map((id) => results.get(id)).filter(Boolean);
+              return { note: `z3 node "${node.id}" — handled by LNS loop`, injectedContext: ctx };
             },
-            lean: async (node) => {
-              return { note: `lean node "${node.id}" — handled by tactic loop`, config: node.config };
+            lean: async (node, results) => {
+              const cfg = node.config as { contextFromNode?: string[]; theoremSignature?: string };
+              const contextParts: string[] = [];
+              for (const srcId of cfg.contextFromNode ?? []) {
+                const ctx = results.get(srcId);
+                if (typeof ctx === "string") contextParts.push(ctx);
+              }
+              return {
+                note: `lean node "${node.id}" — handled by tactic loop`,
+                injectedContext: contextParts.join("\n\n"),
+                theoremSignature: cfg.theoremSignature ?? "",
+              };
             },
           });
 

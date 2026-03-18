@@ -1,108 +1,88 @@
+#!/usr/bin/env bun
 /**
- * Sprint 13b: Seed LanceDB with Foundational Mathlib Premises
+ * seed_mathlib.ts — Bootstrap the mathlib_premises LanceDB table.
  *
- * Embeds 5 foundational Lean 4 theorems using Ollama's nomic-embed-text
- * and writes them to the local LanceDB vector store.
+ * Seeds fundamental combinatorics, graph theory, and number theory
+ * Lean 4 theorem signatures so the DAG `mathlib_query` node has real
+ * formal content to retrieve from day one.
  *
  * Prerequisites:
- *   - Ollama running: `ollama serve`
- *   - Model pulled: `ollama pull nomic-embed-text`
+ *   - Ollama running with nomic-embed-text pulled:
+ *       ollama serve && ollama pull nomic-embed-text
  *
  * Usage:
  *   bun run src/scripts/seed_mathlib.ts
  */
 
-import { LocalEmbedder } from "../embeddings/embedder";
-import { VectorDatabase, type Premise } from "../embeddings/vector_store";
+import { MathlibLibrarian, type LeanTheorem } from "../librarian/mathlib_librarian";
 
-const seedData = [
+const DB_PATH = "./data/perqed.lancedb";
+
+// ── Fundamental theorem catalogue ──────────────────────────────────────────
+// Each entry provides a docstring written to be semantically meaningful for
+// vector search, so queries like "Ramsey number graph coloring" surface the
+// most relevant formal lemmas.
+
+const SEED_THEOREMS: LeanTheorem[] = [
+  // ── Combinatorics: Pigeonhole ────────────────────────────────────────────
   {
-    id: "nat_add_zero",
-    theoremSignature: "theorem nat_add_zero (n : Nat) : n + 0 = n",
-    successfulTactic: "rfl",
-    type: "MATHLIB" as const,
+    theorem: "Finset.exists_ne_map_eq_of_card_lt_of_maps_to",
+    signature: "theorem Finset.exists_ne_map_eq_of_card_lt_of_maps_to {α β : Type*} [DecidableEq β] {s : Finset α} {t : Finset β} {f : α → β} (hc : t.card < s.card) (hf : ∀ a ∈ s, f a ∈ t) : ∃ x ∈ s, ∃ y ∈ s, x ≠ y ∧ f x = f y",
+    docstring: "Pigeonhole principle: if more elements are mapped into fewer buckets, two must collide. Core tool for Ramsey-type existence arguments.",
+    module: "Mathlib.Data.Finset.Card",
   },
   {
-    id: "nat_add_succ",
-    theoremSignature:
-      "theorem nat_add_succ (n m : Nat) : n + Nat.succ m = Nat.succ (n + m)",
-    successfulTactic: "rfl",
-    type: "MATHLIB" as const,
+    theorem: "SimpleGraph.IsClique.mono",
+    signature: "theorem SimpleGraph.IsClique.mono {V : Type*} {G H : SimpleGraph V} {s : Set V} (h : G.IsClique s) (hGH : G ≤ H) : H.IsClique s",
+    docstring: "If s is a clique in G and G is a subgraph of H, then s is also a clique in H. Used for monotonicity arguments in Ramsey lower bounds.",
+    module: "Mathlib.Combinatorics.SimpleGraph.Clique",
   },
   {
-    id: "nat_add_comm",
-    theoremSignature:
-      "theorem nat_add_comm (n m : Nat) : n + m = m + n",
-    successfulTactic:
-      "induction n with | zero => simp [nat_add_zero] | succ n' ih => simp [nat_add_succ, ih]",
-    type: "MATHLIB" as const,
+    theorem: "SimpleGraph.IsIndependentSet.mono",
+    signature: "theorem SimpleGraph.IsIndependentSet.mono {V : Type*} {G H : SimpleGraph V} {s : Set V} (h : H.IsIndependentSet s) (hGH : G ≤ H) : G.IsIndependentSet s",
+    docstring: "If s is an independent set in H and G is a subgraph of H, then s is independent in G. Dual of IsClique.mono; used in 2-coloring lower bound witnesses.",
+    module: "Mathlib.Combinatorics.SimpleGraph.Clique",
   },
   {
-    id: "nat_mul_zero",
-    theoremSignature: "theorem nat_mul_zero (n : Nat) : n * 0 = 0",
-    successfulTactic:
-      "induction n with | zero => rfl | succ n' ih => simp [Nat.mul, ih]",
-    type: "MATHLIB" as const,
+    theorem: "SimpleGraph.chromaticNumber_le_card",
+    signature: "theorem SimpleGraph.chromaticNumber_le_card {V : Type*} [Fintype V] (G : SimpleGraph V) : G.chromaticNumber ≤ Fintype.card V",
+    docstring: "The chromatic number of a finite graph is at most the number of vertices. Trivial upper bound used as termination argument in SA graph coloring proofs.",
+    module: "Mathlib.Combinatorics.SimpleGraph.Coloring",
   },
   {
-    id: "nat_mul_comm",
-    theoremSignature:
-      "theorem nat_mul_comm (n m : Nat) : n * m = m * n",
-    successfulTactic:
-      "induction n with | zero => simp [nat_mul_zero] | succ n' ih => simp [Nat.mul, ih, nat_add_comm]",
-    type: "MATHLIB" as const,
+    theorem: "Nat.add_comm",
+    signature: "theorem Nat.add_comm (n m : ℕ) : n + m = m + n",
+    docstring: "Natural number addition is commutative. Foundational lemma relied on by virtually all arithmetic proofs.",
+    module: "Mathlib.Data.Nat.Basic",
+  },
+  {
+    theorem: "Nat.choose_symm",
+    signature: "theorem Nat.choose_symm {n k : ℕ} (hk : k ≤ n) : n.choose (n - k) = n.choose k",
+    docstring: "Binomial coefficients are symmetric: C(n,k) = C(n,n-k). Used in probabilistic method calculations for Ramsey upper bounds.",
+    module: "Mathlib.Data.Nat.Choose.Basic",
+  },
+  {
+    theorem: "Finset.sum_le_sum",
+    signature: "theorem Finset.sum_le_sum {α : Type*} {s : Finset α} {f g : α → ℕ} (h : ∀ i ∈ s, f i ≤ g i) : ∑ i in s, f i ≤ ∑ i in s, g i",
+    docstring: "Pointwise domination implies sum domination over a Finset. Used in density-based flag algebra upper bound arguments for Ramsey numbers.",
+    module: "Mathlib.Algebra.BigOperators.Order",
   },
 ];
 
-async function main() {
-  console.log("🌱 Seeding LanceDB with foundational Mathlib premises...\n");
+// ── Main ───────────────────────────────────────────────────────────────────
 
-  const embedder = new LocalEmbedder();
-  const db = new VectorDatabase();
-  await db.initialize();
+console.log("═══════════════════════════════════════════════");
+console.log("  📐 PERQED — Mathlib Premise Seeding");
+console.log("═══════════════════════════════════════════════");
+console.log(`  Theorems: ${SEED_THEOREMS.length}`);
+console.log(`  DB Path:  ${DB_PATH}`);
+console.log("═══════════════════════════════════════════════\n");
 
-  const premises: Premise[] = [];
+const librarian = new MathlibLibrarian({ dbPath: DB_PATH });
+const { ingested, skipped } = await librarian.ingest(SEED_THEOREMS);
 
-  for (const item of seedData) {
-    process.stdout.write(`  Embedding [${item.id}]... `);
-    const vector = await embedder.embed(item.theoremSignature);
-
-    if (vector.length === 0) {
-      console.log("❌ Failed to embed. Is Ollama running with nomic-embed-text?");
-      console.log("  Try: ollama pull nomic-embed-text && ollama serve");
-      process.exit(1);
-    }
-
-    premises.push({
-      id: item.id,
-      theoremSignature: item.theoremSignature,
-      successfulTactic: item.successfulTactic,
-      vector,
-    });
-    console.log(`✅ (${vector.length}-dim)`);
-  }
-
-  console.log(`\n💾 Writing ${premises.length} premises to LanceDB...`);
-  await db.addPremises(premises);
-  console.log("🎉 Seeding complete! The Librarian is ready.\n");
-
-  // Verification: search for a test query
-  console.log("🔍 Verification — searching for 'nat addition commutativity'...");
-  const testVector = await embedder.embed("nat addition commutativity");
-  const matches = await db.search(testVector, 3);
-
-  if (matches.length > 0) {
-    console.log(`  Found ${matches.length} match(es):`);
-    matches.forEach((m, i) => {
-      console.log(`  [${i + 1}] ${m.theoremSignature}`);
-      console.log(`      Tactic: \`${m.successfulTactic}\``);
-    });
-  } else {
-    console.log("  ⚠️ No matches found. Vector search may need debugging.");
-  }
-}
-
-main().catch((err) => {
-  console.error("💥 Seed script failed:", err);
-  process.exit(1);
-});
+console.log("\n═══════════════════════════════════════════════");
+console.log(`  ✅ Seeding complete`);
+console.log(`     Premises ingested: ${ingested}`);
+console.log(`     Embed failures:    ${skipped}`);
+console.log("═══════════════════════════════════════════════\n");
