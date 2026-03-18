@@ -29,6 +29,10 @@ const skills = [
   "homological_cohomological_arguments",
   "geometric_flow_homotopy",
   "forcing_set_theory_independence",
+  // Bridge skills (Wiles Maneuver)
+  "algebraic_graph_construction",
+  "spectral_graph_bounds",
+  "razborov_flag_algebras",
 ];
 
 let pass = 0;
