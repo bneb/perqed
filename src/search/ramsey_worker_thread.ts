@@ -29,7 +29,23 @@ self.onmessage = (event: MessageEvent) => {
       coolingRate: config.coolingRate,
       symmetry: config.symmetry,
       minPatience: config.minPatience, // per-worker patience from orchestrator
+      // ── Tabu hash injection ──────────────────────────────────────────────
+      // Forward glass-floor Zobrist hashes so workers hard-reject re-entry
+      // into Z3-certified sterile basins.
+      tabuHashes: config.tabuHashes,
+      tabuPenaltyTemperature: config.tabuPenaltyTemperature,
     };
+    // Boot telemetry — visible in the main thread log via progress messages
+    const tabuCount = saConfig.tabuHashes?.length ?? 0;
+    self.postMessage({
+      type: "progress",
+      worker: workerIndex,
+      iter: 0,
+      energy: -1,
+      best: -1,
+      temp: saConfig.initialTemp,
+      tabuCount, // extra field — ignored by older handlers, shown by new ones
+    });
 
     if (config.initialGraphRaw && config.initialGraphN) {
       const g = new AdjacencyMatrix(config.initialGraphN);

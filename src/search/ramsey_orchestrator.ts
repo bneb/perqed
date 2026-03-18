@@ -34,6 +34,14 @@ export interface OrchestratedSearchConfig {
   symmetry?: 'none' | 'circulant';
   /** Optional warm-start graph (memetic handoff from previous SA run) */
   initialGraph?: AdjacencyMatrix;
+  /**
+   * Tabu hashes: Zobrist hashes of Z3-certified sterile energy basins.
+   * Forwarded to every SA worker so they hard-reject re-entry into known
+   * glass floors. Decimal strings (JSON-safe BigInt transport).
+   */
+  tabuHashes?: string[];
+  /** Temperature reheat when a tabu basin is entered (default: 3.0) */
+  tabuPenaltyTemperature?: number;
   /** Progress callback */
   onProgress?: (worker: number, iter: number, energy: number, bestEnergy: number, temp: number) => void;
 }
@@ -83,6 +91,9 @@ function singleSearch(config: OrchestratedSearchConfig): OrchestratedSearchResul
     // Memetic warm-start: prefer explicit initialGraph over random seed
     initialGraph: config.initialGraph ?? seeds[0],
     symmetry: config.symmetry,
+    // Tabu hashes: prevents re-entry into Z3-certified sterile basins
+    tabuHashes: config.tabuHashes,
+    tabuPenaltyTemperature: config.tabuPenaltyTemperature,
   };
 
   let result: RamseySearchResult;
@@ -245,6 +256,11 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
       coolingRate: wCoolingRate,
       minPatience: wPatience,
       symmetry: config.symmetry,
+      // ── Tabu hash injection ──────────────────────────────────────────────
+      // Every worker gets the full set of known-sterile basin hashes so they
+      // all hard-reject re-entry regardless of which basin they scatter into.
+      tabuHashes: config.tabuHashes,
+      tabuPenaltyTemperature: config.tabuPenaltyTemperature,
     };
 
     // Serialize the seed graph as raw Int8Array if present

@@ -469,6 +469,7 @@ async function requestSearchPivot(
   currentConfig: SearchPhase,
   prunedSchema: typeof SEARCH_PIVOT_SCHEMA,
   previousError?: string,
+  tabuHashes?: string[],
 ): Promise<SearchPhase> {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
@@ -498,7 +499,21 @@ async function requestSearchPivot(
   const text = result.response.text().trim();
   const parsed = repairJSON(text);
   if (!parsed) throw new Error(`Search pivot JSON unparseable: ${text.slice(0, 100)}`);
-  return parsed as SearchPhase;
+
+  const phase = parsed as SearchPhase;
+
+  // ── Tabu hash injection ────────────────────────────────────────────────────
+  // Merge journal-extracted glass-floor hashes into the returned SearchPhase.
+  // This ensures SA workers spawned from a flat pivot always carry the full
+  // cumulative set of Z3-certified sterile basin hashes, preventing re-entry.
+  if (tabuHashes && tabuHashes.length > 0) {
+    const existing = (phase as any).tabuHashes ?? [];
+    const merged = [...new Set([...existing, ...tabuHashes])];
+    (phase as any).tabuHashes = merged;
+    console.log(`   🚫 Injecting ${merged.length} tabu hash(es) into pivot config`);
+  }
+
+  return phase;
 }
 
 // ──────────────────────────────────────────────
@@ -1113,9 +1128,17 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       }
 
       // ── Flat pivot fallback (attempt 1, or if DAG failed) ──
+      // Extract cumulative tabu hashes from journal so workers never re-enter
+      // Z3-certified sterile basins regardless of which pivot path fired.
+      const journalTabuHashes = await journal.getAllEntries().then(entries =>
+        [...new Set(entries
+          .filter(e => e.type === "failure_mode" && e.zobristHash)
+          .map(e => e.zobristHash!))]
+      );
+
       if (!dagAttempted) {
         const pivotedConfig = await callSafe(
-          (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, prunedSchema, previousError),
+          (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, prunedSchema, previousError, journalTabuHashes),
           3,
           "ARCHITECT pivot",
         );
@@ -1132,7 +1155,7 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         // DAG was executed — apply the flat pivot to advance the SA loop parameters
         // (DAG execution informs the ARCHITECT's next flat config decision)
         const pivotedConfig = await callSafe(
-          (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, prunedSchema, previousError),
+          (previousError) => requestSearchPivot(apiKey, augmentedDigest, sp, prunedSchema, previousError, journalTabuHashes),
           3,
           "ARCHITECT pivot (post-DAG)",
         );
