@@ -753,6 +753,12 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         initialGraph: memeticSeed ?? undefined,
         // Tabu hashes: prevents all workers from re-entering Z3-certified sterile basins
         tabuHashes: saTabuHashes.length > 0 ? saTabuHashes : undefined,
+        // Micro-SAT Patch: Z3 surgery on sterile basins at low energy
+        microSatThreshold: (sp as any).micro_sat?.enabled
+          ? ((sp as any).micro_sat?.threshold ?? 12)
+          : undefined,
+
+
         onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
           // Scale report interval: single-worker runs at 10M intervals same as multi-worker
           const reportEvery = Math.max(10_000_000, Math.floor(iters / 50));
