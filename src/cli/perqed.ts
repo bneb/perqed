@@ -718,6 +718,28 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
       const strategy = sp.strategy ?? "island_model";
 
 
+      // ── Tabu hash injection (ALL attempts, including Attempt 1) ───────────
+      // Extract cumulative glass-floor hashes from the journal and inject
+      // into the OrchestratedSearchConfig so workers hard-reject re-entry
+      // into Z3-certified sterile basins from the very first iteration.
+      // (Pivot hashes are also injected in requestSearchPivot — this is the
+      // belt that covers Attempt 1 which bypasses the pivot path.)
+      const bootTabuHashes = await journal.getAllEntries().then(entries =>
+        [...new Set(entries
+          .filter(e => e.type === "failure_mode" && e.zobristHash)
+          .map(e => e.zobristHash!))]
+      );
+      if (bootTabuHashes.length > 0) {
+        console.log(`   🚫 [W*] Booting with ${bootTabuHashes.length} tabu hash(es) from journal`);
+      }
+
+      const saTabuHashes: string[] = [
+        ...new Set([
+          ...bootTabuHashes,
+          ...((sp as any).tabuHashes ?? []),
+        ])
+      ];
+
       const orchResult = await orchestratedSearch({
         n: sp.vertices,
         r: sp.r,
@@ -729,6 +751,8 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
         symmetry: sp.symmetry,
         // Memetic warm-start: seed first worker with best graph from prior attempt
         initialGraph: memeticSeed ?? undefined,
+        // Tabu hashes: prevents all workers from re-entering Z3-certified sterile basins
+        tabuHashes: saTabuHashes.length > 0 ? saTabuHashes : undefined,
         onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
           // Scale report interval: single-worker runs at 10M intervals same as multi-worker
           const reportEvery = Math.max(10_000_000, Math.floor(iters / 50));
