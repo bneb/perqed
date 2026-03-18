@@ -198,11 +198,13 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
         }
 
         if (msg.type === "STERILE_BASIN") {
-          // Fire-and-forget: run MicroSAT asynchronously while the worker scatters.
-          // If Z3 wins, we terminate all workers with the found witness.
+          // Synchronized MicroSAT: worker is Atomics.wait-parked on msg.lock.
+          // We run Z3 async, then wake the worker with the patched adj.
           const w_idx = msg.worker as number;
           const basinEnergy = msg.energy as number;
-          console.log(`   🔬 [W${w_idx}] Sterile basin at E=${basinEnergy} — routing to MicroSAT`);
+          const workerRef = workers[w_idx]!;
+          const lock = msg.lock as SharedArrayBuffer | undefined;
+          console.log(`   🔬 [W${w_idx}] Sterile basin at E=${basinEnergy} — routing to MicroSAT (worker paused)`);
 
           if (msg.bestAdjRaw && msg.bestAdjN) {
             const basinAdj = new AdjacencyMatrix(msg.bestAdjN as number);
@@ -236,11 +238,31 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
                   resolvers[i]!();
                 }
               } else if (result.status === "unsat") {
-                // Z3 proved cold zone is toxic — nukeScaffold to destroy the geometry
-                console.log(`   ☢️  [MicroSAT] UNSAT in ${ms}ms — nuking cold zone scaffold`);
+                // Z3 proved cold zone is toxic — nuke scaffold, send patched adj back
+                console.log(`   ☢️  [MicroSAT] UNSAT in ${ms}ms — nuking cold zone, waking W${w_idx} with patch`);
                 nukeScaffold(basinAdj, zone.frozenVertices);
+                // Send the patched adj to the waiting worker
+                workerRef.postMessage({
+                  type: "RESUME_WITH_PATCH",
+                  patchedAdjRaw: Array.from(basinAdj.raw),
+                  patchedAdjN: basinAdj.n,
+                });
               } else {
-                console.log(`   ⏱️  [MicroSAT] ${result.status} in ${ms}ms (hot zone ${result.hotZoneSize}v)`);
+                console.log(`   ⏱️  [MicroSAT] ${result.status} in ${ms}ms (hot zone ${result.hotZoneSize}v) — waking W${w_idx} to scatter`);
+                // Timeout or unknown — let worker scatter normally
+                workerRef.postMessage({
+                  type: "RESUME_WITH_PATCH",
+                  patchedAdjRaw: null,
+                  patchedAdjN: 0,
+                });
+              }
+
+              // Wake the worker's Atomics.wait via the shared lock.
+              // If no SharedArrayBuffer was sent (old workers), this is a no-op.
+              if (lock) {
+                const lockView = new Int32Array(lock);
+                Atomics.store(lockView, 0, 1);
+                Atomics.notify(lockView, 0, 1);
               }
             })();
           }

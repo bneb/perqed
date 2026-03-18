@@ -23,6 +23,19 @@ import { ZobristHasher } from "./zobrist_hash";
 
 import type { SearchTelemetry } from "./search_failure_digest";
 
+/**
+ * Messages sent to the worker thread by the orchestrator.
+ *
+ * RESUME_WITH_PATCH: sent after MicroSAT completes. Contains either a
+ *   patched adjacency matrix (UNSAT case — nuked scaffold) or null
+ *   (SAT case — all workers terminate so this is moot).
+ */
+export interface ResumeWithPatchMessage {
+  type: "RESUME_WITH_PATCH";
+  patchedAdjRaw: number[] | null;  // null → no patch, proceed to scatter
+  patchedAdjN: number;
+}
+
 export interface RamseySearchConfig {
   /** Number of vertices in the graph */
   n: number;
@@ -73,11 +86,36 @@ export interface RamseySearchConfig {
   microSatThreshold?: number;
   /**
    * Called just before each scatter event when bestEnergy ≤ microSatThreshold.
-   * Fire-and-forget: scatter proceeds immediately without waiting for the callback.
-   * The callback receives a CLONE of bestAdj (safe to read after scatter).
+   *
+   * The callback MUST be synchronous-safe (no await) because the SA hot loop
+   * is synchronous. It receives a CLONE of bestAdj.
+   *
+   * The MicroSAT synchronization protocol (Atomics.wait) is handled entirely
+   * by the worker thread — the callback here is used only on the single-worker
+   * path where the SA runs in the main thread without a Bun.Worker.
    */
   onSterilBasin?: (bestAdj: AdjacencyMatrix, bestEnergy: number) => void;
+  /**
+   * SharedArrayBuffer used to synchronize MicroSAT pause/resume.
+   *
+   * Layout (Int32Array view):
+   *   [0] = lock flag: 0 = waiting, 1 = woken (resume/scatter), 2 = woken (patch ready)
+   *
+   * Set by the worker thread entrypoint before calling ramseySearch.
+   * When set, ramseySearch will Atomics.wait on this buffer at each sterile
+   * basin instead of scattering immediately.
+   */
+  microSatLock?: SharedArrayBuffer;
+  /**
+   * Receives the patched adjacency matrix after MicroSAT completes.
+   * Written by the orchestrator before Atomics.notify; read by the worker
+   * after Atomics.wait returns to overwrite adj and bestAdj.
+   *
+   * null = no patch (scatter normally)
+   */
+  microSatPatch?: { adj: AdjacencyMatrix | null };
 }
+
 
 export interface RamseySearchResult {
   /** Best energy found */
@@ -340,17 +378,55 @@ export function ramseySearch(
         // space by randomly flipping 50% of edges.
         console.log(`[SA] Basin sterile after ${MAX_LOCAL_REHEATS} reheats. SCATTERING to new coordinates. E=${energy}`);
 
-        // ── MicroSAT hook: fire before scatter if energy is critically low ──
-        // The callback receives a snapshot of bestAdj (not the current adj,
-        // which is about to be scattered). It runs asynchronously — scatter
-        // proceeds immediately so the SA loop stays hot.
+        // ── MicroSAT hook: pause worker until Z3 resolves ──────────────────
+        //
+        // SYNCHRONIZATION PROTOCOL:
+        //   1. Worker fires onSterilBasin (single-worker path) OR sends
+        //      STERILE_BASIN postMessage and Atomics.wait (multi-worker path).
+        //   2. Orchestrator runs MicroSAT async without the worker churning.
+        //   3. Orchestrator writes the patch into config.microSatPatch and
+        //      Atomics.notify to wake the worker.
+        //   4. Worker checks config.microSatPatch:
+        //        • non-null adj  → apply patch, skip scatter
+        //        • null          → scatter normally
         if (
           config.microSatThreshold !== undefined &&
-          bestEnergy <= config.microSatThreshold &&
-          config.onSterilBasin
+          bestEnergy <= config.microSatThreshold
         ) {
-          config.onSterilBasin(bestAdj.clone(), bestEnergy);
+          const snapshot = bestAdj.clone();
+
+          if (config.microSatLock) {
+            // ── MULTI-WORKER PATH: Atomics.wait synchronization ──
+            // onSterilBasin (postMessage) is wired in the thread entrypoint.
+            // After posting, we park here until orchestrator notifies us.
+            config.onSterilBasin?.(snapshot, bestEnergy);  // sends STERILE_BASIN
+            const lockView = new Int32Array(config.microSatLock);
+            // Park the SA loop until the orchestrator wakes us.
+            // Timeout: 130s (slightly over Z3 timeout of 120s + margin).
+            Atomics.wait(lockView, 0, 0, 130_000);
+            // Atomics.wait returned — read the patched graph if available.
+            const patch = config.microSatPatch?.adj ?? null;
+            if (patch) {
+              // Orchestrator delivered a surgical fix — apply it, skip scatter.
+              for (let i = 0; i < patch.raw.length; i++) adj.raw[i] = patch.raw[i]!;
+              energy = ramseyEnergy(adj, r, s);
+              bestAdj = adj.clone();
+              if (energy < bestEnergy) bestEnergy = energy;
+              staleCount = 0;
+              localReheatCount = 0;
+              if (hasher) graphHash = hasher.computeInitial(adj);
+              temp = initialTemp;
+              reheatCooldown = Math.min(minPatience, maxCooldown);
+              console.log(`[MicroSAT] Applied surgical patch — E=${energy}, skipping scatter`);
+              continue;  // ← do NOT scatter
+            }
+            // patch is null → fall through to scatter below
+          } else {
+            // ── SINGLE-WORKER PATH: callback is synchronous no-op ──
+            config.onSterilBasin?.(snapshot, bestEnergy);
+          }
         }
+
         adj.scatter(SCATTER_RATE);
         energy = ramseyEnergy(adj, r, s);
 
