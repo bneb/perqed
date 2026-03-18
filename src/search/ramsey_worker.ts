@@ -19,6 +19,7 @@ import {
   buildCirculantGraph,
   extractDistanceColors,
 } from "./symmetry";
+import { ZobristHasher } from "./zobrist_hash";
 
 import type { SearchTelemetry } from "./search_failure_digest";
 
@@ -48,8 +49,19 @@ export interface RamseySearchConfig {
   /** Symmetry constraint */
   symmetry?: 'none' | 'circulant';
   /**
+   * Tabu: set of 64-bit Zobrist hashes representing known-sterile energy
+   * basins (glass floors). If the proposed mutation hashes to one of these
+   * values, it is hard-rejected and a thermal reheat is triggered.
+   */
+  tabuHashes?: bigint[];
+  /**
+   * Temperature to reheat to when a tabu basin is entered.
+   * Default: 3.0 (aggressive reheat to force basin escape).
+   */
+  tabuPenaltyTemperature?: number;
+  /**
    * Reheat patience: iterations without improvement before adaptive reheat fires.
-   * Defaults to 10% of maxIterations. Lower = faster basin escape, higher = deeper search.
+   * Defaults to 10% of maxIterations.
    */
   minPatience?: number;
 }
@@ -114,9 +126,20 @@ export function ramseySearch(
   let temp = initialTemp;
   let staleCount = 0;
   let reheatCount = 0;
+  let tabuReheatCount = 0;
   // Cooldown: prevents dead-temp trigger from firing again immediately after a reheat.
   // After each reheat, dead-temp is suppressed for minPatience iterations.
   let reheatCooldown = 0;
+
+  // ── Tabu Search setup ──────────────────────────────────────────────────
+  // If tabuHashes are provided, we track the current graph hash at O(1) cost
+  // using Zobrist hashing. When a proposed mutation would land on a known-sterile
+  // basin, the mutation is hard-rejected and temperature is aggressively reheated.
+  const tabuSet = config.tabuHashes ? new Set<bigint>(config.tabuHashes) : null;
+  const tabuPenaltyTemp = config.tabuPenaltyTemperature ?? 3.0;
+  const hasher = tabuSet ? new ZobristHasher(n) : null;
+  let graphHash: bigint = hasher ? hasher.computeInitial(adj) : 0n;
+  // ─────────────────────────────────────────────────────────────────────
 
   // Trajectory tracking: 10 checkpoints at 10%, 20%, ..., 100%
   const checkpointInterval = Math.max(1, Math.floor(maxIterations / 10));
@@ -138,12 +161,37 @@ export function ramseySearch(
 
       // Metropolis acceptance
       if (delta <= 0 || Math.random() < Math.exp(-delta / temp)) {
+        // ── Tabu check for circulant mutations ────────────────────────
+        // For batch flips, compute the proposed hash by toggling all affected edges.
+        let proposedHashCirculant = graphHash;
+        if (hasher) {
+          for (const [eu, ev] of affectedEdges) {
+            proposedHashCirculant = hasher.toggleEdge(proposedHashCirculant, eu, ev);
+          }
+          if (tabuSet!.has(proposedHashCirculant)) {
+            // Tabu basin — hard reject and reheat
+            temp = tabuPenaltyTemp;
+            tabuReheatCount++;
+            reheatCooldown = Math.min(minPatience, Math.max(1_000_000, Math.floor(maxIterations / 100)));
+            temp *= coolingRate;
+            staleCount++;
+            if (reheatCooldown > 0) reheatCooldown--;
+            if ((iter + 1) % checkpointInterval === 0 && energyTrajectory.length < 10) {
+              energyTrajectory.push(bestEnergy);
+              temperatureTrajectory.push(temp);
+            }
+            if (onProgress && iter % 10000 === 0) onProgress(iter, energy, bestEnergy, temp);
+            continue;
+          }
+        }
+        // ─────────────────────────────────────────────────────────────
         // Accept: apply all flips permanently
         const oldColor = distanceColors.get(mutatedDist)!;
         const newColor = 1 - oldColor;
         distanceColors.set(mutatedDist, newColor);
         for (const [u, v] of affectedEdges) flipEdge(adj, u, v);
         energy += delta;
+        if (hasher) graphHash = proposedHashCirculant;
 
         if (energy < bestEnergy) {
           bestEnergy = energy;
@@ -176,10 +224,34 @@ export function ramseySearch(
 
       delta = ramseyEnergyDelta(adj, u, v, r, s);
 
+      // ── Tabu check (O(1)) ────────────────────────────────────────────
+      // If this mutation would land on a known glass floor, hard-reject it
+      // and trigger an aggressive thermal reheat to force basin escape.
+      if (hasher) {
+        const proposedHash = hasher.toggleEdge(graphHash, u, v);
+        if (tabuSet!.has(proposedHash)) {
+          temp = tabuPenaltyTemp;
+          tabuReheatCount++;
+          reheatCooldown = Math.min(minPatience, Math.max(1_000_000, Math.floor(maxIterations / 100)));
+          // Skip to next iteration (no cooling, no stale increment for tabu hit)
+          temp *= coolingRate;
+          staleCount++;
+          if (reheatCooldown > 0) reheatCooldown--;
+          if ((iter + 1) % checkpointInterval === 0 && energyTrajectory.length < 10) {
+            energyTrajectory.push(bestEnergy);
+            temperatureTrajectory.push(temp);
+          }
+          if (onProgress && iter % 10000 === 0) onProgress(iter, energy, bestEnergy, temp);
+          continue;
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────
+
       // Metropolis acceptance
       if (delta <= 0 || Math.random() < Math.exp(-delta / temp)) {
         flipEdge(adj, u, v);
         energy += delta;
+        if (hasher) graphHash = hasher.toggleEdge(graphHash, u, v);
 
         if (energy < bestEnergy) {
           bestEnergy = energy;

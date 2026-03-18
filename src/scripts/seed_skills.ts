@@ -133,3 +133,91 @@ await writeFile(skillPath, MATHLIB_PREMISE_DISCOVERY_SKILL, "utf-8");
 
 console.log(`✅ Written to ${skillPath}`);
 console.log("\n═══════════════════════════════════════════════\n");
+
+// ── Skill 2: Distributed Tabu Search ──────────────────────────────────────
+
+const DISTRIBUTED_TABU_SEARCH_SKILL = `---
+name: distributed_tabu_search
+description: Uses Zobrist hashing to prevent Simulated Annealing workers from re-entering known sterile energy basins (glass floors) by triggering an aggressive thermal reheat.
+---
+
+# Distributed Tabu Search
+
+## Technique
+
+When heuristic search engines (like SA) repeatedly converge on the same local minima (glass floors),
+we can map the adjacency matrix of those failures to a 64-bit Zobrist hash. By passing an array of
+\`tabuHashes\` to the workers, they can incrementally compute their state hash in O(1) time and
+execute an immediate thermal reheat (T = tabuPenaltyTemperature, default 3.0) if they step into a
+forbidden basin.
+
+The key insight: XOR is its own inverse. Toggling edge {u,v} costs exactly one XOR operation
+regardless of graph size, so the tabu check adds zero asymptotic overhead to the inner SA loop.
+
+Implementation lives in \`src/search/zobrist_hash.ts\` (\`ZobristHasher\`) and is wired into both
+the unconstrained and circulant mutation branches of \`src/search/ramsey_worker.ts\`.
+
+## When to Apply
+
+Apply this skill when the \`journal.json\` shows multiple LNS/Z3 failures at the exact same minimal
+energy level (e.g., multiple \`E=8\` UNSAT results on the same graph size \`n\`). Those repeated
+failures indicate the SA workers keep gravitating to the same glass floor basin.
+
+Extract the Zobrist hashes of those specific failed adjacency matrices and inject them into the
+next SA run's \`tabuHashes\` array.
+
+## Worked Example
+
+If the journal shows \`LNS UNSAT\` at \`E=8\` for \`K_35\`, calculate the hash of that specific
+failed adjacency matrix using \`ZobristHasher.computeInitial()\`, and inject it into the next run:
+
+\`\`\`typescript
+import { ZobristHasher } from "../search/zobrist_hash";
+import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
+
+// Load the failed glass floor graph from the journal
+const glassFloor: AdjacencyMatrix = loadFromJournal("lns_fail_n35_e8");
+const hasher = new ZobristHasher(35);
+const glassHash = hasher.computeInitial(glassFloor); // e.g., 14819238491823n
+\`\`\`
+
+## TypeScript Template
+
+\`\`\`typescript
+// Inside the DAG generation logic:
+const tabuNode = {
+  id: "sa_with_tabu",
+  kind: "search",
+  label: "SA search with glass floor avoidance",
+  dependsOn: ["literature_review"],
+  config: {
+    vertices: 35,
+    iterations: 500_000_000,
+    workers: 8,
+    // Hashes of known-sterile energy basins extracted from journal.json:
+    tabuHashes: [14819238491823n, 8471923847192n],
+    tabuPenaltyTemperature: 3.0,
+  },
+};
+\`\`\`
+
+## Key References
+
+- Optimization by Simulated Annealing (Kirkpatrick et al., Science 1983)
+- Tabu Search (Glover, ORSA Journal on Computing 1989)
+- Zobrist, A. L. "A New Hashing Method with Application for Game Playing." ICCA Journal, 1990.
+- \`src/search/zobrist_hash.ts\` — ZobristHasher implementation (Splitmix64 PRNG, O(1) toggleEdge)
+- \`src/search/ramsey_worker.ts\` — SA loop with tabu detection in both mutation branches
+`;
+
+const TABU_SKILL_DIR = join(SKILLS_ROOT, "distributed_tabu_search");
+console.log("  Writing: distributed_tabu_search/SKILL.md");
+
+assertValidSkillFile(DISTRIBUTED_TABU_SEARCH_SKILL, "distributed_tabu_search/SKILL.md");
+
+await mkdir(TABU_SKILL_DIR, { recursive: true });
+const tabuSkillPath = join(TABU_SKILL_DIR, "SKILL.md");
+await writeFile(tabuSkillPath, DISTRIBUTED_TABU_SEARCH_SKILL, "utf-8");
+
+console.log(`✅ Written to ${tabuSkillPath}`);
+console.log("\n═══════════════════════════════════════════════\n");
