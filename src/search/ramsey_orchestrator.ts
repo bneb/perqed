@@ -9,6 +9,8 @@
 import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
 import { paleyGraph, circulantGraph, perturbGraph } from "../math/graph/GraphSeeds";
 import { ramseySearch, type RamseySearchConfig, type RamseySearchResult } from "./ramsey_worker";
+import { extractTopHotZone } from "./hot_zone_extractor";
+import { runMicroSATPatch, nukeScaffold } from "./micro_sat_patcher";
 
 export type SearchStrategy = "single" | "island_model";
 export type SeedType = "random" | "paley" | "circulant";
@@ -42,6 +44,12 @@ export interface OrchestratedSearchConfig {
   tabuHashes?: string[];
   /** Temperature reheat when a tabu basin is entered (default: 3.0) */
   tabuPenaltyTemperature?: number;
+  /**
+   * Energy threshold below which STERILE_BASIN triggers MicroSAT repair.
+   * E.g. 15 = route any sterile basin at bestEnergy ≤ 15 to Z3 surgery.
+   * Default: disabled (undefined).
+   */
+  microSatThreshold?: number;
   /** Progress callback */
   onProgress?: (worker: number, iter: number, energy: number, bestEnergy: number, temp: number) => void;
 }
@@ -94,7 +102,10 @@ function singleSearch(config: OrchestratedSearchConfig): OrchestratedSearchResul
     // Tabu hashes: prevents re-entry into Z3-certified sterile basins
     tabuHashes: config.tabuHashes,
     tabuPenaltyTemperature: config.tabuPenaltyTemperature,
+    // MicroSAT: single-worker path (no worker thread, callback is a no-op placeholder)
+    microSatThreshold: config.microSatThreshold,
   };
+
 
   let result: RamseySearchResult;
   if (config.onProgress) {
@@ -186,6 +197,55 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
           config.onProgress(msg.worker, msg.iter, msg.energy, msg.best, msg.temp);
         }
 
+        if (msg.type === "STERILE_BASIN") {
+          // Fire-and-forget: run MicroSAT asynchronously while the worker scatters.
+          // If Z3 wins, we terminate all workers with the found witness.
+          const w_idx = msg.worker as number;
+          const basinEnergy = msg.energy as number;
+          console.log(`   🔬 [W${w_idx}] Sterile basin at E=${basinEnergy} — routing to MicroSAT`);
+
+          if (msg.bestAdjRaw && msg.bestAdjN) {
+            const basinAdj = new AdjacencyMatrix(msg.bestAdjN as number);
+            const rawData = new Int8Array(msg.bestAdjRaw as number[]);
+            for (let i = 0; i < rawData.length; i++) basinAdj.raw[i] = rawData[i]!;
+
+            const zone = extractTopHotZone(basinAdj, config.r, config.s);
+
+            (async () => {
+              const patchStart = Date.now();
+              const result = await runMicroSATPatch(basinAdj, config.r, config.s, zone, { timeoutMs: 120_000 });
+              const ms = Date.now() - patchStart;
+
+              if (result.status === "sat" && result.adj && !resolved) {
+                // E=0 witness found — terminate all workers
+                resolved = true;
+                console.log(`   🎯 [MicroSAT] SAT witness found in ${ms}ms (hot zone ${result.hotZoneSize}v) — terminating all workers`);
+                const satResult: RamseySearchResult = {
+                  bestEnergy: 0,
+                  witness: result.adj,
+                  bestAdj: result.adj,
+                  iterations: 0,
+                  ips: 0,
+                  telemetry: {} as any,
+                };
+                if (!bestResult || satResult.bestEnergy < bestResult.bestEnergy) {
+                  bestResult = satResult;
+                }
+                for (let i = 0; i < workers.length; i++) {
+                  try { workers[i]!.terminate(); } catch {}
+                  resolvers[i]!();
+                }
+              } else if (result.status === "unsat") {
+                // Z3 proved cold zone is toxic — nukeScaffold to destroy the geometry
+                console.log(`   ☢️  [MicroSAT] UNSAT in ${ms}ms — nuking cold zone scaffold`);
+                nukeScaffold(basinAdj, zone.frozenVertices);
+              } else {
+                console.log(`   ⏱️  [MicroSAT] ${result.status} in ${ms}ms (hot zone ${result.hotZoneSize}v)`);
+              }
+            })();
+          }
+        }
+
         if (msg.type === "done") {
           // Reconstruct AdjacencyMatrix from serialized worker data
           const raw = msg.result;
@@ -261,7 +321,10 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
       // all hard-reject re-entry regardless of which basin they scatter into.
       tabuHashes: config.tabuHashes,
       tabuPenaltyTemperature: config.tabuPenaltyTemperature,
+      // MicroSAT: pass threshold so workers know when to emit STERILE_BASIN
+      microSatThreshold: config.microSatThreshold,
     };
+
 
     // Serialize the seed graph as raw Int8Array if present
     // Note: for circulant mode, the worker ignores the seed and builds its own random circulant

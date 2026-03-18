@@ -28,13 +28,27 @@ self.onmessage = (event: MessageEvent) => {
       initialTemp: config.initialTemp,
       coolingRate: config.coolingRate,
       symmetry: config.symmetry,
-      minPatience: config.minPatience, // per-worker patience from orchestrator
+      minPatience: config.minPatience,
       // ── Tabu hash injection ──────────────────────────────────────────────
-      // Forward glass-floor Zobrist hashes so workers hard-reject re-entry
-      // into Z3-certified sterile basins.
       tabuHashes: config.tabuHashes,
       tabuPenaltyTemperature: config.tabuPenaltyTemperature,
+      // ── MicroSAT hook ────────────────────────────────────────────────────
+      // When a scatter fires at bestEnergy ≤ microSatThreshold, emit a
+      // STERILE_BASIN message to the orchestrator (fire-and-forget).
+      microSatThreshold: config.microSatThreshold,
+      onSterilBasin: config.microSatThreshold !== undefined
+        ? (bestAdj, bestEnergy) => {
+            self.postMessage({
+              type: "STERILE_BASIN",
+              worker: workerIndex,
+              energy: bestEnergy,
+              bestAdjRaw: Array.from(bestAdj.raw),
+              bestAdjN: bestAdj.n,
+            });
+          }
+        : undefined,
     };
+
     // Boot telemetry — visible in the main thread log via progress messages
     const tabuCount = saConfig.tabuHashes?.length ?? 0;
     self.postMessage({

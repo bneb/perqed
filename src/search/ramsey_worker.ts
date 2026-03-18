@@ -65,6 +65,18 @@ export interface RamseySearchConfig {
    * Defaults to 10% of maxIterations.
    */
   minPatience?: number;
+  /**
+   * Energy threshold below which a sterile basin triggers the MicroSAT callback.
+   * E.g. 15 means: if bestEnergy ≤ 15 when scatter fires, call onSterilBasin.
+   * Default: disabled (undefined = never fires).
+   */
+  microSatThreshold?: number;
+  /**
+   * Called just before each scatter event when bestEnergy ≤ microSatThreshold.
+   * Fire-and-forget: scatter proceeds immediately without waiting for the callback.
+   * The callback receives a CLONE of bestAdj (safe to read after scatter).
+   */
+  onSterilBasin?: (bestAdj: AdjacencyMatrix, bestEnergy: number) => void;
 }
 
 export interface RamseySearchResult {
@@ -326,6 +338,19 @@ export function ramseySearch(
         // Basin is a proven glass floor after MAX_LOCAL_REHEATS consecutive
         // failed escape attempts. Teleport to a new sector of the search
         // space by randomly flipping 50% of edges.
+        console.log(`[SA] Basin sterile after ${MAX_LOCAL_REHEATS} reheats. SCATTERING to new coordinates. E=${energy}`);
+
+        // ── MicroSAT hook: fire before scatter if energy is critically low ──
+        // The callback receives a snapshot of bestAdj (not the current adj,
+        // which is about to be scattered). It runs asynchronously — scatter
+        // proceeds immediately so the SA loop stays hot.
+        if (
+          config.microSatThreshold !== undefined &&
+          bestEnergy <= config.microSatThreshold &&
+          config.onSterilBasin
+        ) {
+          config.onSterilBasin(bestAdj.clone(), bestEnergy);
+        }
         adj.scatter(SCATTER_RATE);
         energy = ramseyEnergy(adj, r, s);
 
