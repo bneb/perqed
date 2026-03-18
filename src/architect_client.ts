@@ -245,6 +245,7 @@ export class ArchitectClient {
     availableSkills: string[] = [],
     journalEntries: JournalEntry[] = [],
     journal?: ResearchJournal,
+    forceWilesMode: boolean = false,
   ): Promise<ProofDAG> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
@@ -252,11 +253,33 @@ export class ArchitectClient {
     const consecutiveFailures = journal
       ? await journal.getConsecutiveMacroFailures()
       : 0;
-    const { temperature: llmTemperature, metaStrategyPrompt } =
+    let { temperature: llmTemperature, metaStrategyPrompt } =
       computeEscalation(consecutiveFailures);
 
+    // ── Wiles Mode override ──────────────────────────────────────────────
+    // --wiles flag (or forceWilesMode=true) bypasses the progressive ladder
+    // entirely and immediately forces Stage 3 (Conceptual Scatter).
+    if (forceWilesMode) {
+      llmTemperature = 0.95;
+      metaStrategyPrompt = [
+        "MANDATORY WILES MANEUVER OVERRIDE:",
+        "Do NOT emit a naive 'search' node. You are strictly forbidden from using discrete combinatorial Simulated Annealing.",
+        "You MUST emit a DAG that translates this problem into a completely different mathematical domain.",
+        "Prioritize using the 'functorial_domain_translation', 'razborov_flag_algebras', or 'spectral_graph_bounds' SKILL",
+        "to invent a novel continuous, algebraic, or topological bridge.",
+        "If you must search, configure the search to optimize over the translated continuous/algebraic space",
+        "(e.g., matrix eigenvalues or group generators).",
+      ].join(" ");
+    }
+    // ───────────────────────────────────────────────────────────────────
+
+
     // Emit escalation tier to console for telemetry
-    if (consecutiveFailures >= 6) {
+    if (forceWilesMode) {
+      console.log(
+        `   🧮 [Architect] WILES MODE OVERRIDE — T=0.95, domain translation enforced`,
+      );
+    } else if (consecutiveFailures >= 6) {
       console.log(
         `   🔀 [Architect] STAGE 3 — Conceptual Scatter (Wiles Maneuver). Failures: ${consecutiveFailures}, T=${llmTemperature}`,
       );

@@ -60,19 +60,23 @@ interface CliArgs {
   prompt?: string;
   configPath?: string;
   noconfirm: boolean;
+  /** Force ARCHITECT into Wiles Mode (Conceptual Scatter) from iteration 0. */
+  wiles: boolean;
 }
 
-function parseArgs(): CliArgs {
-  const args = process.argv.slice(2);
+export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
+  const args = argv;
   const promptArg = args.find((a) => a.startsWith("--prompt="));
   const configArg = args.find((a) => a.startsWith("--config="));
   const noconfirm = args.includes("--noconfirm");
+  const wiles = args.includes("--wiles");
 
   if (!promptArg && !configArg) {
     console.error("Usage:");
     console.error("  perqed --prompt=\"<problem description>\"");
     console.error("  perqed --config=<path/to/run_config.json>");
     console.error("  perqed --prompt=\"...\" --noconfirm");
+    console.error("  perqed --prompt=\"...\" --wiles   # Force Wiles Mode (Conceptual Scatter)");
     process.exit(1);
   }
 
@@ -80,6 +84,7 @@ function parseArgs(): CliArgs {
     prompt: promptArg?.replace("--prompt=", ""),
     configPath: configArg?.replace("--config=", ""),
     noconfirm,
+    wiles,
   };
 }
 
@@ -520,7 +525,7 @@ async function requestSearchPivot(
 // Phase 3: Run
 // ──────────────────────────────────────────────
 
-async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
+async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean = false): Promise<void> {
   const workspaceBase = join(import.meta.dir, "../../agent_workspace");
   const workspace = new WorkspaceManager(workspaceBase, config.run_name);
   await workspace.init();
@@ -1035,7 +1040,10 @@ async function executeRun(config: RunConfig, apiKey: string): Promise<void> {
             targetGoal,
             availableSkills,
             allJournalEntries,
+            journal,
+            wilesMode,    // --wiles: force Wiles Mode (Conceptual Scatter) from iteration 0
           );
+
 
           console.log(`   🗺️  ARCHITECT emitted ProofDAG (${dag.nodes.length} nodes):`);
           dag.nodes.forEach((n) =>
@@ -1291,10 +1299,14 @@ async function main() {
   }
 
   // Phase 3: Run
-  await executeRun(config, apiKey);
+  await executeRun(config, apiKey, args.wiles);
+
 }
 
-main().catch((err) => {
-  console.error("💥 Perqed failed:", err);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error("💥 Perqed failed:", err);
+    process.exit(1);
+  });
+}
+
