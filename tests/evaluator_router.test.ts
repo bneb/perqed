@@ -141,3 +141,49 @@ describe("AlgebraicBuilder — routes through EvaluatorRouter", () => {
     expect(result.energy).toBe(0);
   });
 });
+
+// ── SUM_FREE_PARTITION backend ────────────────────────────────────────────────
+
+function makePartition(domainSize: number, colorMap: Map<number, number[]>): Int8Array {
+  const p = new Int8Array(domainSize + 1).fill(-1);
+  for (const [color, nums] of colorMap) {
+    for (const n of nums) p[n] = color;
+  }
+  return p;
+}
+
+describe("EvaluatorRouter — SUM_FREE_PARTITION backend", () => {
+  test("valid sum-free S(2) partition {1,4},{2,3} routes to E=0", async () => {
+    const p = makePartition(4, new Map([[0, [1, 4]], [1, [2, 3]]]));
+    const energy = await EvaluatorRouter.evaluate(p, {
+      evaluator_type: "SUM_FREE_PARTITION",
+      domain_size: 4,
+      num_partitions: 2,
+    });
+    expect(energy).toBe(0);
+  });
+
+  test("monochromatic {1,2,3} gives E > 0 via router", async () => {
+    const p = makePartition(3, new Map([[0, [1, 2, 3]]]));
+    const energy = await EvaluatorRouter.evaluate(p, {
+      evaluator_type: "SUM_FREE_PARTITION",
+      domain_size: 3,
+      num_partitions: 1,
+    });
+    expect(energy).toBeGreaterThan(0);
+  });
+
+  test("passing AdjacencyMatrix for SUM_FREE_PARTITION throws", async () => {
+    const adj = emptyGraph(4);
+    await expect(
+      EvaluatorRouter.evaluate(adj, { evaluator_type: "SUM_FREE_PARTITION", domain_size: 4, num_partitions: 2 })
+    ).rejects.toThrow();
+  });
+
+  test("passing Int8Array for RAMSEY_CLIQUES throws", async () => {
+    const p = makePartition(4, new Map([[0, [1, 4]], [1, [2, 3]]]));
+    await expect(
+      EvaluatorRouter.evaluate(p, { evaluator_type: "RAMSEY_CLIQUES", r: 4, s: 4 })
+    ).rejects.toThrow();
+  });
+});

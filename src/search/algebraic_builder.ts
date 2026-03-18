@@ -18,9 +18,11 @@
 import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
 import { ramseyEnergy } from "../math/graph/RamseyEnergy";
 import type { AlgebraicConstructionConfig } from "../proof_dag/algebraic_construction_config";
+import type { AlgebraicPartitionConfig } from "../proof_dag/algebraic_partition_config";
 import { InvariantValidator } from "./invariant_validator";
 import { EvaluatorRouter } from "./evaluator_router";
 import type { EvaluatorType } from "./evaluator_router";
+import { computeSumFreeEnergy } from "../math/optim/SumFreeEnergy";
 
 // ── Error type ────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,20 @@ export interface AlgebraicBuildResult {
   /** The compiled adjacency matrix */
   adj: AdjacencyMatrix;
   /** ramseyEnergy(adj, r, s) — 0 means a valid witness was found */
+  energy: number;
+  /** The description string from the config */
+  description: string;
+  /** Wall-clock milliseconds for compile + energy check */
+  compiledInMs: number;
+  /** Status after verification */
+  status: "witness" | "violations";
+}
+
+/** Result type for 1D partition builds (algebraic_partition_construction nodes) */
+export interface PartitionBuildResult {
+  /** The 1-indexed Int8Array partition (-1 = unassigned) */
+  partition: Int8Array;
+  /** computeSumFreeEnergy — 0 means a valid sum-free partition was found */
   energy: number;
   /** The description string from the config */
   description: string;
@@ -215,5 +231,105 @@ export class AlgebraicBuilder {
       compiledInMs,
       status,
     };
+  }
+
+  // ── Partition Methods (1D algebraic_partition_construction) ───────────────────
+
+  /**
+   * Compile an algebraic partition rule into a 1-indexed Int8Array.
+   *
+   * partition_rule_js is executed via new Function('i', body). Receives each
+   * integer i from 1 to domain_size, returns a bucket index [0, num_partitions)
+   * or -1 (unassigned — left for Z3 LNS to finish).
+   *
+   * @throws SandboxError if rule is syntactically invalid or throws at runtime
+   * @throws Error if rule returns an out-of-range bucket value
+   */
+  static buildPartition(config: AlgebraicPartitionConfig): Int8Array {
+    const { domain_size, num_partitions, partition_rule_js } = config;
+    const partition = new Int8Array(domain_size + 1).fill(-1); // 1-indexed
+
+    let ruleFn: (i: number) => number | undefined;
+    try {
+      ruleFn = new Function('i', partition_rule_js) as (i: number) => number | undefined;
+    } catch (e: any) {
+      throw new SandboxError(`Failed to compile partition_rule_js: ${e.message}`);
+    }
+
+    for (let i = 1; i <= domain_size; i++) {
+      let bucket: number | undefined;
+      try {
+        bucket = ruleFn(i);
+      } catch (e: any) {
+        throw new SandboxError(`partition_rule_js threw at i=${i}: ${e.message}`);
+      }
+
+      if (bucket === undefined || bucket === null || (bucket as number) === -1) {
+        partition[i] = -1; // unassigned
+      } else if (Number.isInteger(bucket) && (bucket as number) >= 0 && (bucket as number) < num_partitions) {
+        partition[i] = bucket as number;
+      } else {
+        throw new Error(
+          `partition_rule_js returned invalid bucket ${bucket} for i=${i}. ` +
+          `Expected integer in [0, ${num_partitions}) or -1.`
+        );
+      }
+    }
+
+    return partition;
+  }
+
+  /**
+   * Full pipeline for partition problems: compile → evaluate → log → return result.
+   * Accepts nullable journal and workspace for unit-test ergonomics.
+   */
+  static async buildAndVerifyPartition(
+    config: AlgebraicPartitionConfig,
+    journal: { record(obs: string): void } | null,
+    workspace: { paths: { scratch: string } } | null,
+  ): Promise<PartitionBuildResult> {
+    const t0 = Date.now();
+    const { domain_size, num_partitions, description } = config;
+
+    console.log(`\n🗂️  [AlgebraicBuilder] Compiling Partition: ${description}`);
+    console.log(`   Rule: ${config.partition_rule_js.slice(0, 80)}${
+      config.partition_rule_js.length > 80 ? "..." : ""
+    }`);
+
+    const partition = AlgebraicBuilder.buildPartition(config);
+    const energy = computeSumFreeEnergy(partition, domain_size, num_partitions);
+    const compiledInMs = Date.now() - t0;
+    const status: "witness" | "violations" = energy === 0 ? "witness" : "violations";
+
+    const assignedCount = partition.slice(1).filter((b) => b >= 0).length;
+    console.log(
+      `   Compiled in ${compiledInMs}ms: domain=${domain_size}, ` +
+      `partitions=${num_partitions}, assigned=${assignedCount}/${domain_size}, E=${energy}`
+    );
+
+    if (status === "witness") {
+      console.log(`   ✅ E=0 — valid sum-free ${num_partitions}-partition found!`);
+      journal?.record(`PartitionBuilder SAT: ${description} → E=0 (${num_partitions}-coloring of {1..${domain_size}})`);
+    } else {
+      console.log(`   ℹ️  E=${energy} violations — not a witness. Recording for memetic seeding.`);
+      journal?.record(`PartitionBuilder UNSAT: ${description} → E=${energy} on {1..${domain_size}}`);
+    }
+
+    if (workspace) {
+      const { join } = await import("node:path");
+      const candidatePath = join(workspace.paths.scratch, "partition_candidate.json");
+      const colorClasses: number[][] = Array.from({ length: num_partitions }, () => []);
+      for (let i = 1; i <= domain_size; i++) {
+        const b = partition[i];
+        if (b !== undefined && b >= 0) colorClasses[b]!.push(i);
+      }
+      await Bun.write(
+        candidatePath,
+        JSON.stringify({ domain_size, num_partitions, energy, description, color_classes: colorClasses }, null, 2),
+      );
+      console.log(`   💾 Saved partition candidate to ${candidatePath}`);
+    }
+
+    return { partition, energy, description, compiledInMs, status };
   }
 }

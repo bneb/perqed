@@ -857,6 +857,44 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 console.log(`   ❌ Algebraic Construction ${node.id} failed (E=${buildResult.energy}). Journaling for replan...`);
               }
               return buildResult;
+            },
+            algebraic_partition_construction: async (node) => {
+              console.log(`   ⚙️  Compiling Partition Rule for node ${node.id}...`);
+              const partConfig = node.config as any;
+              let partResult;
+              try {
+                partResult = await AlgebraicBuilder.buildAndVerifyPartition(partConfig, safeJournal, workspace as any);
+              } catch (e: any) {
+                console.log(`\n   💥 [PartitionBuilder] Rule compilation failed: ${e.message}`);
+                await journal.addEntry({
+                  type: "failure_mode",
+                  claim: `PartitionBuilder Error: ${e.message}`,
+                  target_goal: targetGoal,
+                  evidence: "buildAndVerifyPartition",
+                });
+                return { energy: NaN, status: "violations", note: e.message };
+              }
+
+              if (partResult.energy === 0) {
+                console.log(`   ✅ Partition Construction SAT! Witness found.`);
+                witnessFound = true;
+                const witnessPath = join(workspace.paths.scratch, "partition_witness.json");
+                const colorClasses: number[][] = Array.from({ length: partConfig.num_partitions }, () => []);
+                for (let i = 1; i <= partConfig.domain_size; i++) {
+                  const b = partResult.partition[i];
+                  if (b !== undefined && b >= 0) colorClasses[b]!.push(i);
+                }
+                await Bun.write(witnessPath, JSON.stringify({
+                  domain_size: partConfig.domain_size,
+                  num_partitions: partConfig.num_partitions,
+                  description: partResult.description,
+                  color_classes: colorClasses,
+                }, null, 2));
+                console.log(`\n📄 Partition witness written: ${witnessPath}`);
+              } else {
+                console.log(`   ❌ Partition Construction ${node.id} failed (E=${partResult.energy}). Journaling for replan...`);
+              }
+              return partResult;
             }
           });
 

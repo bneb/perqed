@@ -12,13 +12,15 @@
 
 import { ramseyEnergy } from "../math/graph/RamseyEnergy";
 import type { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
+import { computeSumFreeEnergy } from "../math/optim/SumFreeEnergy";
 
 // ── Evaluator type enum ───────────────────────────────────────────────────────
 
 export type EvaluatorType =
   | "RAMSEY_CLIQUES"
   | "SRG_PARAMETERS"
-  | "MATRIX_ORTHOGONALITY";
+  | "MATRIX_ORTHOGONALITY"
+  | "SUM_FREE_PARTITION";
 
 // ── Options passed to EvaluatorRouter ────────────────────────────────────────
 
@@ -28,6 +30,10 @@ export interface EvaluatorOptions {
   r?: number;
   /** Blue independent set size — required for RAMSEY_CLIQUES */
   s?: number;
+  /** Domain size — required for SUM_FREE_PARTITION */
+  domain_size?: number;
+  /** Number of color classes — required for SUM_FREE_PARTITION */
+  num_partitions?: number;
 }
 
 // ── Error ─────────────────────────────────────────────────────────────────────
@@ -50,22 +56,30 @@ export class NotImplementedError extends Error {
 
 export class EvaluatorRouter {
   /**
-   * Evaluate an adjacency matrix using the backend specified in `options`.
+   * Evaluate a graph or partition using the backend specified in `options`.
    *
-   * @param adj     The compiled graph to evaluate
+   * @param state   Either an AdjacencyMatrix (graph problems) or Int8Array (partition problems)
    * @param options Routing options including evaluator_type and backend params
    * @returns       Energy score (0 = valid witness)
    * @throws        NotImplementedError for uncompiled backends
    */
   static async evaluate(
-    adj: AdjacencyMatrix,
+    state: AdjacencyMatrix | Int8Array,
     options: EvaluatorOptions,
   ): Promise<number> {
     switch (options.evaluator_type) {
       case "RAMSEY_CLIQUES": {
+        if (state instanceof Int8Array) throw new Error("RAMSEY_CLIQUES expects an AdjacencyMatrix, not Int8Array");
         const r = options.r ?? 4;
         const s = options.s ?? 6;
-        return ramseyEnergy(adj, r, s);
+        return ramseyEnergy(state, r, s);
+      }
+
+      case "SUM_FREE_PARTITION": {
+        if (!(state instanceof Int8Array)) throw new Error("SUM_FREE_PARTITION expects Int8Array, not AdjacencyMatrix");
+        const domain_size = options.domain_size ?? state.length - 1;
+        const num_partitions = options.num_partitions ?? 2;
+        return computeSumFreeEnergy(state, domain_size, num_partitions);
       }
 
       case "SRG_PARAMETERS":
