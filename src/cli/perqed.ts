@@ -691,35 +691,27 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
         const allJournalEntries = await journal.getEntriesForGoal(targetGoal);
 
-        console.log(`\n   🏛️  Asking ARCHITECT to formulate ProofDAG...`);
-        const dag = await callSafe(
-          () => architectClient.formulateDAG(
-            "Initial Wiles mode formulation.",
+        console.log(`\n   🏛️  Asking ARCHITECT to formulate Algebraic Rule directly...`);
+        const { AlgebraicConstructionConfigSchema } = await import("../proof_dag/algebraic_construction_config");
+        
+        let builderConfig: any;
+        builderConfig = await callSafe(
+          () => architectClient.formulateAlgebraicRule(
             targetGoal,
-            [], // no skills needed to be passed dynamically here, they are hardcoded
-            allJournalEntries,
-            journal,
-            true, // forceWilesMode
+            allJournalEntries
           ),
           1,
-          "ARCHITECT formulateDAG (Wiles)"
+          "ARCHITECT formulateAlgebraicRule (Wiles)"
         );
 
-        if (!dag) throw new Error("formulateDAG failed to return a DAG.");
+        if (!builderConfig) throw new Error("formulateAlgebraicRule failed to return a valid config.");
 
-        console.log(`   🗺️  ARCHITECT emitted ProofDAG (${dag.nodes.length} nodes):`);
-        dag.nodes.forEach((n: any) =>
-          console.log(`      [${n.kind}] ${n.id}: ${n.label}`)
-        );
+        builderConfig = AlgebraicConstructionConfigSchema.parse(builderConfig);
 
-        const algebraicNode = dag.nodes.find(n => n.kind === "algebraic_graph_construction");
+        console.log(`   🗺️  ARCHITECT emitted Algebraic Rule for ${builderConfig.vertices} vertices.`);
 
-        if (algebraicNode) {
-          console.log(`\n   🏗️  [AlgebraicBuilder] Executing algebraic construction from DAG...`);
-          const { AlgebraicConstructionConfigSchema } = await import("../proof_dag/algebraic_construction_config");
-          const { AlgebraicBuilder } = await import("../search/algebraic_builder");
-
-          const builderConfig = AlgebraicConstructionConfigSchema.parse(algebraicNode.config);
+        console.log(`\n   🏗️  [AlgebraicBuilder] Executing algebraic construction...`);
+        const { AlgebraicBuilder } = await import("../search/algebraic_builder");
 
           const safeJournal = {
             record: (obs: string) => {
@@ -775,11 +767,6 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
             console.log(`   ❌ Algebraic Construction failed (E=${builderResult.energy}). Feeding back to Architect...`);
             // Note: AlgebraicBuilder already recorded the E>0 result into the Journal!
           }
-        } else {
-          console.log(`   ⚠️  No 'algebraic_graph_construction' node found in DAG.`);
-        }
-
-        dagAttempted = true;
       } catch (e: any) {
         console.error(`   ❌ Failed to execute Algebraic Builder: ${e.message}`);
       }

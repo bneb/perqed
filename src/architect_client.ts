@@ -100,6 +100,23 @@ export const WILES_OPF_PROMPT = [
   "CRITICAL: Keep the DAG as simple as possible. Output ONLY ONE node (`algebraic_graph_construction`). Do not include any other nodes."
 ].join("\n");
 
+export const WILES_OPF_PROMPT_DIRECT = [
+  "MANDATORY WILES MANEUVER (ORTHOGONAL PARADIGM FORCING):",
+  "You are operating in 'Wiles Mode'. You must completely abandon the standard approaches to this problem.",
+  "Identify the most obvious, standard mathematical techniques historically applied to this specific problem class and DO NOT use them.",
+  "You MUST translate this problem into a completely orthogonal mathematical category (e.g. algebra, spectral bounds, Flag Algebras).",
+  "",
+  "You are in Wiles Mode. Output ONLY a single JSON object matching this schema:",
+  "{",
+  "  \"vertices\": number,",
+  "  \"description\": string,",
+  "  \"edge_rule_js\": string",
+  "}",
+  "Do not include a 'nodes' array. Do not include 'createdAt', 'kind', 'id', 'dependsOn' or 'status'.",
+  "The JS rule is a function body evaluated for each (i, j) pair. Example: \"return Math.abs(i - j) % 2 === 1;\".",
+  "CRITICAL: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`)."
+].join("\n");
+
 
 // ──────────────────────────────────────────────
 // Escalation Ladder — temperature & meta-strategy
@@ -407,6 +424,80 @@ export class ArchitectClient {
 
     throw new Error(`formulateDAG failed after 3 attempts: ${lastError}`);
   }
+
+  /**
+   * Directly formulates an AlgebraicConstructionConfig, bypassing the entire
+   * ProofDAG schema wrapper. Used exclusively in Wiles Mode.
+   */
+  async formulateAlgebraicRule(
+    goal: string,
+    journalEntries: JournalEntry[]
+  ): Promise<any> {
+    const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+
+    const journalText =
+      journalEntries.length === 0
+        ? "No previous failures. First attempt."
+        : "Previous failures:\\n" +
+          journalEntries.map((e) => `- ${e.claim}`).join("\n");
+
+    const directSystemPrompt = [
+      WILES_OPF_PROMPT_DIRECT,
+      "---",
+      "CURRENT GOAL:",
+      goal,
+      "---",
+      "PREVIOUS FAILURES (Avoid these):",
+      journalText,
+    ].join("\n\n");
+
+    const payload = {
+      system_instruction: {
+        parts: [{ text: directSystemPrompt }],
+      },
+      contents: [{ parts: [{ text: "Emit the AlgebraicConstructionConfig JSON object now." }] }],
+      generationConfig: {
+        temperature: 0.95,
+        response_mime_type: "application/json",
+      },
+    };
+
+    let lastError = "";
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(60000),
+        });
+        if (!response.ok) {
+          throw new Error(`Gemini HTTP ${response.status}: ${await response.text()}`);
+        }
+        const body = (await response.json()) as GeminiApiResponse;
+        const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+        try {
+          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.config.model, prompt: "Wiles Direct Formulation", response: rawText }) + "\n");
+        } catch (e) {}
+
+        if (!rawText) throw new Error("Empty Gemini response");
+
+        const jsonString = JsonHandler.extractAndRepair(rawText);
+        const parsed = JSON.parse(jsonString);
+
+        return parsed; // We will parse it in CLI using AlgebraicConstructionConfigSchema
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        console.warn(`   ⚠️ [Architect.formulateAlgebraicRule] attempt ${attempt}/3: ${lastError}`);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+
+    throw new Error(`formulateAlgebraicRule failed after 3 attempts: ${lastError}`);
+  }
+
 }
 
 
