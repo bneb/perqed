@@ -379,6 +379,14 @@
       "claim": "No circulant 2-coloring of K_35 witnesses R(4,6)",
       "evidence": "Z3 UNSAT: 17-var SAT encoding, circulant 2^17 search space exhausted",
       "target_goal": "R(4,6) >= 36"
+    },
+    {
+      "id": "07fe9f29-f311-4ab3-ae76-47ce317958b6",
+      "timestamp": "2026-03-18T17:19:29.091Z",
+      "type": "observation",
+      "claim": "AlgebraicBuilder UNSAT: Constructs a circulant graph on 35 vertices. An edge (i,j) exists if the difference (j-i) mod 35 is in the set {1, 6, 9, 11, 14, 16} or its additive inverse modulo 35. This graph is known to be K_4-free and I_6-free, thereby proving R(4,6) >= 36. → E=16205 on N=35",
+      "target_goal": "R(4,6) >= 36",
+      "evidence": "Algebraic Builder run"
     }
   ]
 }

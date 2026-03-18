@@ -95,7 +95,9 @@ export const WILES_OPF_PROMPT = [
   "This node configures a high-performance VM sandbox that will compile and verify your mathematical pattern.",
   "Set the config with `vertices`, `r`, `s`, `description`, and a Javascript rule `edge_rule_js`.",
   "The JS rule is a function body evaluated for each (i, j) pair. Example: \"return Math.abs(i - j) % 2 === 1;\".",
-  "CRITICAL: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`)."
+  "CRITICAL: Since you are emitting JSON, you MUST use double quotes for the edge_rule_js string. NEVER use backticks (`).",
+  "",
+  "CRITICAL: Keep the DAG as simple as possible. Output ONLY ONE node (`algebraic_graph_construction`). Do not include any other nodes."
 ].join("\n");
 
 

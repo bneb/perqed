@@ -35,8 +35,8 @@ export const DAGNodeStatusSchema = z.enum([
 export const DAGNodeSchema = z.object({
   id: z.string().min(1),
   kind: DAGNodeKindSchema,
-  label: z.string().min(1),
-  dependsOn: z.array(z.string()),
+  label: z.string().optional(),
+  dependsOn: z.array(z.string()).optional().default([]),
   config: z.record(z.string(), z.unknown()),
   status: DAGNodeStatusSchema.default("pending"),
   result: z.unknown().optional(),
@@ -54,7 +54,7 @@ export const ProofDAGSchema = z.object({
       (nodes) => {
         // Every dependsOn reference must point to a real node id
         const ids = new Set(nodes.map((n) => n.id));
-        return nodes.every((n) => n.dependsOn.every((dep) => ids.has(dep)));
+        return nodes.every((n) => (n.dependsOn || []).every((dep) => ids.has(dep)));
       },
       { message: "DAG contains dangling dependsOn references" },
     )
@@ -62,7 +62,7 @@ export const ProofDAGSchema = z.object({
       (nodes) => {
         // Detect cycles via DFS
         const adj = new Map<string, string[]>();
-        for (const n of nodes) adj.set(n.id, n.dependsOn);
+        for (const n of nodes) adj.set(n.id, n.dependsOn || []);
         const visited = new Set<string>();
         const inStack = new Set<string>();
 
@@ -83,7 +83,7 @@ export const ProofDAGSchema = z.object({
       { message: "DAG contains a cycle" },
     ),
   // Accept any non-empty string for createdAt (ISO 8601 or otherwise)
-  createdAt: z.string().min(1),
+  createdAt: z.string().optional(),
 });
 
 export type ProofDAG = z.infer<typeof ProofDAGSchema>;
