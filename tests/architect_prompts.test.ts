@@ -54,4 +54,34 @@ describe("Architect Prompt Formatting", () => {
       global.fetch = originalFetch; // Restore
     }
   });
+
+  test("formulateAlgebraicRule injects EXPLOITATION vs EXPLORATION constraints", async () => {
+    const ai = new ArchitectClient({ apiKey: "test", model: "test" });
+    
+    let capturedBody = "";
+    const originalFetch = global.fetch;
+    
+    // Mock fetch to capture the injected prompt
+    global.fetch = (async (url: any, options: any) => {
+      if (options && typeof options.body === "string") {
+        capturedBody = options.body;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: "{\"description\":\"test\",\"vertices\":10,\"edge_rule_js\":\"return true\"}" }] } }]
+        })
+      } as any;
+    }) as unknown as typeof fetch;
+
+    try {
+      await ai.formulateAlgebraicRule("Test Goal", "journal content", "EXPLOITATION");
+      expect(capturedBody).toContain("ATOMIC MUTATION");
+
+      await ai.formulateAlgebraicRule("Test Goal", "journal content", "EXPLORATION");
+      expect(capturedBody).not.toContain("ATOMIC MUTATION");
+    } finally {
+      global.fetch = originalFetch; // Restore
+    }
+  });
 });

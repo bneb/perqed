@@ -439,12 +439,17 @@ export class ArchitectClient {
    */
   async formulateAlgebraicRule(
     goal: string,
-    journalText: string
+    journalText: string,
+    cognitiveMode: "EXPLORATION" | "EXPLOITATION" = "EXPLORATION"
   ): Promise<any> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
+    const exploitationPrompt = cognitiveMode === "EXPLOITATION"
+      ? "\n\nSYSTEM STATE: EXPLOITATION MODE. You are sitting on a massive mathematical breakthrough (E < 300). DO NOT invent a new paradigm. Retrieve the `edge_rule_js` of your absolute best attempt from the Empirical Findings. Perform an ATOMIC MUTATION on that exact rule (e.g., swap one integer in the difference set). Keep the vertex size constant."
+      : "";
+
     const directSystemPrompt = [
-      WILES_OPF_PROMPT_DIRECT,
+      WILES_OPF_PROMPT_DIRECT + exploitationPrompt,
       "---",
       "CURRENT GOAL:",
       goal,

@@ -156,6 +156,8 @@ export interface RunConfig {
     undirected?: boolean;
     no_self_loops?: boolean;
   };
+  /** The C++ penalty function backend to load */
+  evaluator_type: "RAMSEY_CLIQUES" | "SRG_PARAMETERS" | "MATRIX_ORTHOGONALITY";
 }
 
 const RUN_CONFIG_SCHEMA = {
@@ -229,11 +231,16 @@ const RUN_CONFIG_SCHEMA = {
         no_self_loops: { type: SchemaType.BOOLEAN as const, description: "True if all self-loops must be false" },
       },
     },
+    evaluator_type: {
+      type: SchemaType.STRING as const,
+      enum: ["RAMSEY_CLIQUES", "SRG_PARAMETERS", "MATRIX_ORTHOGONALITY"],
+      description: "The targeted C++ heuristic evaluator algorithm to spin up for score validation.",
+    },
   },
   required: [
     "run_name", "problem_description", "theorem_name",
     "theorem_signature", "max_iterations", "objective_md", "domain_skills_md",
-    "search_config",
+    "search_config", "evaluator_type"
   ],
 };
 
@@ -287,7 +294,8 @@ Your job is to produce a structured run configuration that the Perqed proof engi
 3. **objective_md**: A detailed markdown description of the problem for the TACTICIAN agents
 4. **domain_skills_md**: Problem-specific tactical advice (which Lean tactics work for this class of problem, common pitfalls)
 5. **max_iterations**: How many orchestrator iterations to budget
-6. **search_config**: Structured parameters for the search engine (REQUIRED — see below)
+6. **evaluator_type**: Must be EXACTLY ONE OF: "RAMSEY_CLIQUES", "SRG_PARAMETERS", "MATRIX_ORTHOGONALITY". Select the correct C++ backend metric to grade these graphs.
+7. **search_config**: Structured parameters for the search engine (REQUIRED — see below)
 
 ## search_config (CRITICAL)
 
@@ -726,13 +734,14 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         });
 
         const journalSummaryText = await journal.getSummary(targetGoal);
+        const cognitiveMode = await journal.getCognitiveTemperature(targetGoal);
 
         console.log(`\n   🏛️  Asking ARCHITECT to formulate Algebraic Rule directly...`);
         const { AlgebraicConstructionConfigSchema } = await import("../proof_dag/algebraic_construction_config");
         
         let builderConfig: any;
         builderConfig = await callSafe(
-          () => architectClient.formulateAlgebraicRule(targetGoal, journalSummaryText),
+          () => architectClient.formulateAlgebraicRule(targetGoal, journalSummaryText, cognitiveMode),
           1,
           "ARCHITECT formulateAlgebraicRule (Wiles)"
         );

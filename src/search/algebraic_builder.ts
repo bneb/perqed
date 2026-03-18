@@ -19,6 +19,8 @@ import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
 import { ramseyEnergy } from "../math/graph/RamseyEnergy";
 import type { AlgebraicConstructionConfig } from "../proof_dag/algebraic_construction_config";
 import { InvariantValidator } from "./invariant_validator";
+import { EvaluatorRouter } from "./evaluator_router";
+import type { EvaluatorType } from "./evaluator_router";
 
 // ── Error type ────────────────────────────────────────────────────────────────
 
@@ -132,14 +134,16 @@ export class AlgebraicBuilder {
   /**
    * Verify an adjacency matrix against Ramsey constraints.
    *
+   * @param evaluatorType  Which C++ backend to route to (default: RAMSEY_CLIQUES)
    * @returns energy (0 = valid witness) and a status label
    */
-  static verify(
+  static async verify(
     adj: AdjacencyMatrix,
     r: number,
     s: number,
-  ): { energy: number; status: "witness" | "violations" } {
-    const energy = ramseyEnergy(adj, r, s);
+    evaluatorType: EvaluatorType = "RAMSEY_CLIQUES"
+  ): Promise<{ energy: number; status: "witness" | "violations" }> {
+    const energy = await EvaluatorRouter.evaluate(adj, { evaluator_type: evaluatorType, r, s });
     return { energy, status: energy === 0 ? "witness" : "violations" };
   }
 
@@ -161,7 +165,8 @@ export class AlgebraicBuilder {
     s: number,
     journal: { record(obs: string): void } | null,
     workspace: { paths: { scratch: string } } | null,
-    constraints?: { exact_vertices?: number; undirected?: boolean; no_self_loops?: boolean }
+    constraints?: { exact_vertices?: number; undirected?: boolean; no_self_loops?: boolean },
+    evaluatorType: EvaluatorType = "RAMSEY_CLIQUES"
   ): Promise<AlgebraicBuildResult> {
     const t0 = Date.now();
 
@@ -171,7 +176,7 @@ export class AlgebraicBuilder {
     const adj = AlgebraicBuilder.compile(config);
     InvariantValidator.validate(adj, constraints);
     
-    const { energy, status } = AlgebraicBuilder.verify(adj, r, s);
+    const { energy, status } = await AlgebraicBuilder.verify(adj, r, s, evaluatorType);
     const compiledInMs = Date.now() - t0;
 
     const edgeCount = adj.edgeCount();
