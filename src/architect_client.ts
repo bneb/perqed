@@ -104,10 +104,10 @@ export const WILES_OPF_PROMPT = [
   "Even though you are translating the proof into an orthogonal domain, the top-level `signature` of the theorem",
   "MUST remain grounded in standard, constructive Lean 4 types.",
   "- You are STRICTLY FORBIDDEN from inventing nonexistent Mathlib definitions",
-  "  (e.g., do NOT use made-up predicates like `Ramsey.colorable`).",
+  "  (e.g., do NOT use made-up predicates like `Ramsey.colorable` or `no_mono_clique_of_size`).",
   "- You MUST use the constructive witness form for the signature. Example format:",
-  "  (n : ℕ) (hn : n = 36) : ∃ (g : Fin n → Fin n → Bool),",
-  "    (no_mono_clique_of_size g 4) ∧ (no_mono_clique_of_size (complement g) 6)",
+  "  (n : Nat) (hn : n = 35) : ∃ (g : Fin n → Fin n → Bool),",
+  "    (∀ i j, g i j = g j i) ∧ (∀ i, g i i = false)",
   "Your orthogonal translation belongs INSIDE the proof body, not the theorem statement.",
 ].join("\n");
 

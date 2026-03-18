@@ -17,8 +17,9 @@
 
 import { describe, test, expect, beforeEach } from "bun:test";
 
-import { computeEscalation, ArchitectClient } from "../src/architect_client";
+import { computeEscalation, ArchitectClient, WILES_OPF_PROMPT } from "../src/architect_client";
 import { parseArgs, buildFormulationPreamble, shouldRunSearchPhase } from "../src/cli/perqed";
+
 
 // ── 1: computeEscalation escalation ladder (existing, must stay GREEN) ────────
 
@@ -113,6 +114,14 @@ describe("buildFormulationPreamble (formulate() wilesMode injection)", () => {
     expect(preamble).toContain("STEP 2 - THE STRICT BAN");
     expect(preamble).toContain("STEP 3 - THE FUNCTORIAL LEAP");
     expect(preamble).toContain("STEP 4 - THE SIGNATURE ANCHOR (ANTI-HALLUCINATION)");
+    // Verify the example uses valid Lean 4 syntax (not fake predicates)
+    expect(preamble).toContain("(n : Nat) (hn : n = 35) : ∃ (g : Fin n → Fin n → Bool)");
+    expect(preamble).toContain("(∀ i j, g i j = g j i) ∧ (∀ i, g i i = false)");
+    // no_mono_clique_of_size correctly appears in STEP 4 as an example of a FORBIDDEN
+    // predicate (not in the example format). Verify the example format lines are clean.
+    expect(WILES_OPF_PROMPT).toContain("(n : Nat) (hn : n = 35)");
+    expect(WILES_OPF_PROMPT).not.toContain("(n : ℕ) (hn : n = 36)");
+
   });
 
   test("wilesMode=false → preamble uses normal INITIAL TRIAGE text, no OPF", () => {
