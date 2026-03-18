@@ -81,6 +81,10 @@ export class AlgebraicBuilder {
     // inherited globalThis / __proto__ leakage.
     const sandbox = Object.create(null) as Record<string, unknown>;
     sandbox["Math"] = Math;
+    sandbox["Set"] = Set;
+    sandbox["Map"] = Map;
+    sandbox["Array"] = Array;
+    sandbox["console"] = { log: (...args: any[]) => {} };
     const context = vm.createContext(sandbox);
 
     // Compile the function once (not per-edge) for performance.

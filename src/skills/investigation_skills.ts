@@ -16,6 +16,10 @@ import * as vm from "node:vm";
 export function calculate_degrees_of_freedom(edge_rule_js: string, vertices: number): string {
   const sandbox = Object.create(null) as Record<string, unknown>;
   sandbox["Math"] = Math;
+  sandbox["Set"] = Set;
+  sandbox["Map"] = Map;
+  sandbox["Array"] = Array;
+  sandbox["console"] = { log: (...args: any[]) => {} };
   const context = vm.createContext(sandbox);
 
   let ruleFn: (i: number, j: number) => any;
