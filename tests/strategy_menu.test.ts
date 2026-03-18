@@ -129,7 +129,7 @@ describe("GraphSeeds — perturbGraph", () => {
 
 describe("Orchestrator — orchestratedSearch", () => {
 
-  test("single strategy with random seed finds R(3,3) witness", () => {
+  test("single strategy with random seed finds R(3,3) witness", async () => {
     const config: OrchestratedSearchConfig = {
       n: 5, r: 3, s: 3,
       saIterations: 100_000,
@@ -137,13 +137,13 @@ describe("Orchestrator — orchestratedSearch", () => {
       workers: 1,
       seed: "random",
     };
-    const result = orchestratedSearch(config);
+    const result = await orchestratedSearch(config);
     expect(result.best.bestEnergy).toBe(0);
     expect(result.best.witness).not.toBeNull();
     expect(result.workersRan).toBe(1);
   });
 
-  test("island_model runs multiple workers", () => {
+  test("island_model runs multiple workers", async () => {
     const config: OrchestratedSearchConfig = {
       n: 5, r: 3, s: 3,
       saIterations: 100_000,
@@ -151,7 +151,7 @@ describe("Orchestrator — orchestratedSearch", () => {
       workers: 3,
       seed: "random",
     };
-    const result = orchestratedSearch(config);
+    const result = await orchestratedSearch(config);
     expect(result.best.bestEnergy).toBe(0);
     // May exit early if first worker finds it
     expect(result.workersRan).toBe(3);
@@ -159,7 +159,7 @@ describe("Orchestrator — orchestratedSearch", () => {
     expect(result.bestWorkerIndex).toBeLessThan(3);
   });
 
-  test("paley seed: Paley(17) makes R(4,4) trivial (E=0 instantly)", () => {
+  test("paley seed: Paley(17) makes R(4,4) trivial (E=0 instantly)", async () => {
     const config: OrchestratedSearchConfig = {
       n: 17, r: 4, s: 4,
       saIterations: 1000,  // barely any iterations needed — seed IS the witness
@@ -167,11 +167,11 @@ describe("Orchestrator — orchestratedSearch", () => {
       workers: 1,
       seed: "paley",
     };
-    const result = orchestratedSearch(config);
+    const result = await orchestratedSearch(config);
     expect(result.best.bestEnergy).toBe(0);
   });
 
-  test("paley seed with non-eligible n falls back to random", () => {
+  test("paley seed with non-eligible n falls back to random", async () => {
     // n=8 is not prime, so Paley is not eligible → falls back to random
     const config: OrchestratedSearchConfig = {
       n: 8, r: 3, s: 4,
@@ -181,11 +181,11 @@ describe("Orchestrator — orchestratedSearch", () => {
       seed: "paley",
     };
     // Should not crash, just run with random init
-    const result = orchestratedSearch(config);
+    const result = await orchestratedSearch(config);
     expect(result.best.bestEnergy).toBeGreaterThanOrEqual(0);
   });
 
-  test("totalWallTime is reported", () => {
+  test("totalWallTime is reported", async () => {
     const config: OrchestratedSearchConfig = {
       n: 5, r: 3, s: 3,
       saIterations: 10_000,
@@ -193,7 +193,7 @@ describe("Orchestrator — orchestratedSearch", () => {
       workers: 1,
       seed: "random",
     };
-    const result = orchestratedSearch(config);
+    const result = await orchestratedSearch(config);
     expect(result.totalWallTime).toBeGreaterThanOrEqual(0);
   });
 });
