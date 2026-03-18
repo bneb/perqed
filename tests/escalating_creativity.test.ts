@@ -263,4 +263,29 @@ describe("ArchitectClient.formulateDAG — escalation ladder", () => {
     expect(callCount).toBe(2); // failed once, succeeded on retry
     expect(lastPayload.generationConfig.temperature).toBe(0.95);
   });
+  test("formulateDAG handles prose-wrapped fenced JSON (Gemini 2.5 Flash pattern)", async () => {
+    // Gemini 2.5 Flash sometimes prefixes the JSON with a sentence and wraps
+    // it in a code fence, rather than returning raw JSON directly. The old
+    // extractJSON regex (anchored with ^ and $) silently passed the backtick
+    // through to JSON.parse, causing 'Unrecognized token `' on every attempt.
+    const PROSE_WRAPPED = `Here is the ProofDAG for this problem:\n\n\`\`\`json\n${VALID_DAG}\n\`\`\`\n\nLet me know if adjustments are needed.`;
+
+    (globalThis as any).fetch = async (_url: string, opts: RequestInit) => {
+      lastPayload = JSON.parse(opts.body as string);
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: PROSE_WRAPPED }] } }],
+        }),
+        text: async () => "",
+      };
+    };
+
+    const journal = journalWithEntries([]);
+    const client = makeClient();
+    // Must NOT throw — extractJSON should strip the fence and prose
+    const dag = await client.formulateDAG("ctx", "R(4,6) >= 36", [], [], journal);
+    expect(dag.goal).toBe("R(4,6) >= 36");
+    expect(dag.nodes.length).toBeGreaterThan(0);
+  });
 });

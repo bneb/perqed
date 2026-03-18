@@ -31,13 +31,27 @@ export interface ArchitectClientConfig {
 // ──────────────────────────────────────────────
 
 function extractJSON(raw: string): string {
-  let cleaned = raw.trim();
-  const fencePattern = /^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/;
-  const match = cleaned.match(fencePattern);
-  if (match?.[1]) {
-    cleaned = match[1].trim();
+  const trimmed = raw.trim();
+
+  // Pass 1: strip any ```json ... ``` or ``` ... ``` fence found ANYWHERE in the string.
+  // The old regex required ^ and $ anchors — this broke when Gemini 2.5 Flash prefaced
+  // the JSON with a prose sentence or trailing commentary.
+  const fenceMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  if (fenceMatch?.[1]) {
+    return fenceMatch[1].trim();
   }
-  return cleaned;
+
+  // Pass 2: brace-balanced extraction — find the first '{' and walk forward to its
+  // matching '}', tolerating any surrounding prose. This handles responses like:
+  //   "Here is the DAG:\n{...}\n\nLet me know if you need changes."
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start !== -1 && end !== -1 && end > start) {
+    return trimmed.slice(start, end + 1);
+  }
+
+  // Pass 3: return as-is and let JSON.parse throw with a useful message.
+  return trimmed;
 }
 
 // ──────────────────────────────────────────────
