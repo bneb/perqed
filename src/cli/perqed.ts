@@ -162,8 +162,8 @@ export interface RunConfig {
     undirected?: boolean;
     no_self_loops?: boolean;
   };
-  /** The C++ penalty function backend to load */
-  evaluator_type: "RAMSEY_CLIQUES" | "SRG_PARAMETERS" | "MATRIX_ORTHOGONALITY";
+  /** The C++ penalty function backend to load. Optional — defaults based on problem_class when omitted. */
+  evaluator_type?: "RAMSEY_CLIQUES" | "SRG_PARAMETERS" | "MATRIX_ORTHOGONALITY";
 }
 
 const RUN_CONFIG_SCHEMA = {
@@ -246,7 +246,7 @@ const RUN_CONFIG_SCHEMA = {
   required: [
     "run_name", "problem_description", "theorem_name",
     "theorem_signature", "max_iterations", "objective_md", "domain_skills_md",
-    "search_config", "evaluator_type"
+    "search_config"
   ],
 };
 
@@ -1255,8 +1255,20 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
               const funnelResult = await optimizeThroughFunnel(result.bestAdj, surrogate);
               // Target 2: compute EXACT ground-truth energy — reject surrogate hallucinations
               const router = EvaluatorRouter.getInstance(config.run_name);
+              // Use the config's evaluator_type if set; for Ramsey-class problems default
+              // to RAMSEY_CLIQUES. For non-Ramsey problems (Schur, partition) skip the
+              // surrogate exact-energy guard — the funnel is Ramsey-specific anyway.
+              const evalType = config.evaluator_type ?? (
+                (config.search_config as any)?.problem_class === "ramsey_coloring"
+                  ? "RAMSEY_CLIQUES"
+                  : null
+              );
+              if (!evalType) {
+                console.log("   🧠 [Surrogate] Skipping exact-energy guard (non-Ramsey problem class).");
+                return;
+              }
               const exactEnergy = await router.evaluate(funnelResult.bestMatrix, {
-                evaluator_type: "RAMSEY_CLIQUES",
+                evaluator_type: evalType as any,
                 r: (config.search_config as any)?.r ?? 4,
                 s: (config.search_config as any)?.s ?? 6,
               });
