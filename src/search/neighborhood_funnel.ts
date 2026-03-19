@@ -34,37 +34,50 @@ export function flattenMatrix(adj: AdjacencyMatrix): string {
  * Generate `count` neighbours of `baseMatrix` by randomly flipping between
  * 1 and `maxFlips` edges in the upper triangle.  Symmetry is always enforced.
  *
- * The base matrix is never mutated.
+ * Edges where **both** endpoints are in `lockedVertices` are never flipped,
+ * preserving the Frozen Core's internal zero-energy structure.
  *
- * @param baseMatrix  Starting adjacency matrix (read-only)
- * @param count       Number of mutant neighbours to produce
- * @param maxFlips    Maximum number of edges to flip per neighbour (default 3)
+ * @param baseMatrix    Starting adjacency matrix (read-only)
+ * @param count         Number of mutant neighbours to produce
+ * @param maxFlips      Maximum number of edges to flip per neighbour (default 3)
+ * @param lockedVertices  Set of vertex indices that form the Frozen Core
  */
 export function generateNeighbors(
   baseMatrix: AdjacencyMatrix,
   count: number,
-  maxFlips: number = 3
+  maxFlips: number = 3,
+  lockedVertices: ReadonlySet<number> = new Set()
 ): AdjacencyMatrix[] {
   const n = baseMatrix.n;
 
-  // Pre-build the list of upper-triangle (i,j) pairs once
-  const upperTriangle: [number, number][] = [];
+  // Pre-build the list of MUTABLE upper-triangle (i,j) pairs:
+  // An edge is free iff at least one endpoint is outside the locked core.
+  const freeEdges: [number, number][] = [];
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      upperTriangle.push([i, j]);
+      if (!(lockedVertices.has(i) && lockedVertices.has(j))) {
+        freeEdges.push([i, j]);
+      }
     }
   }
-  const edgeCount = upperTriangle.length;
+  const edgeCount = freeEdges.length;
 
   const neighbors: AdjacencyMatrix[] = [];
 
   for (let k = 0; k < count; k++) {
     const neighbor = baseMatrix.clone();
 
-    // Pick a random number of flips in [1..maxFlips]
-    const numFlips = 1 + Math.floor(Math.random() * maxFlips);
+    // Cap flips to available free edges
+    const actualMaxFlips = Math.min(maxFlips, edgeCount);
+    if (actualMaxFlips === 0) {
+      neighbors.push(neighbor); // nothing to flip
+      continue;
+    }
 
-    // Fisher-Yates partial shuffle to pick numFlips distinct indices efficiently
+    // Pick a random number of flips in [1..actualMaxFlips]
+    const numFlips = 1 + Math.floor(Math.random() * actualMaxFlips);
+
+    // Fisher-Yates partial shuffle over free-edge indices to pick distinct edges
     const indices = Array.from({ length: edgeCount }, (_, i) => i);
     for (let f = 0; f < numFlips; f++) {
       const swapIdx = f + Math.floor(Math.random() * (edgeCount - f));
@@ -72,7 +85,7 @@ export function generateNeighbors(
     }
 
     for (let f = 0; f < numFlips; f++) {
-      const [i, j] = upperTriangle[indices[f]!]!;
+      const [i, j] = freeEdges[indices[f]!]!;
       if (neighbor.hasEdge(i, j)) {
         neighbor.removeEdge(i, j); // removeEdge enforces symmetry
       } else {

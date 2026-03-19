@@ -12,6 +12,7 @@ import { ramseySearch, type RamseySearchConfig, type RamseySearchResult } from "
 import { extractCliques } from "./lns_window";
 import { adaptiveZ3Solve } from "./z3_lns_optimizer";
 import { SolverBridge } from "../solver";
+import { findFrozenCore } from "./frozen_core";
 
 export type SearchStrategy = "single" | "island_model";
 export type SeedType = "random" | "paley" | "circulant";
@@ -213,6 +214,21 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
             for (let i = 0; i < rawData.length; i++) basinAdj.raw[i] = rawData[i]!;
 
             const cliques = extractCliques(basinAdj, config.r, config.s);
+
+            // ── Frozen Core: lock the zero-energy subgraph ───────────────────
+            // When E < 100 we identify the largest internal clique-free
+            // subgraph and lock it so Z3/the mutator only touches the crust.
+            let lockedVertices: ReadonlySet<number> | undefined;
+            if (basinEnergy < 100) {
+              const coreResult = findFrozenCore(basinAdj, config.r, config.s);
+              if (coreResult.lockedVertices.length > 0) {
+                lockedVertices = new Set(coreResult.lockedVertices);
+                console.log(
+                  `   ❅️  [FrozenCore] E=${basinEnergy} → ${coreResult.lockedVertices.length} vertices locked, ` +
+                  `${coreResult.freeVertices.length} in crust`
+                );
+              }
+            }
 
             (async () => {
               const patchStart = Date.now();
