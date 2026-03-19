@@ -398,6 +398,20 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
     },
   });
 
+  // ── SkillLibrary: inject relevant skill context into the formulation prompt ──
+  let skillContext = "";
+  try {
+    const { SkillLibrary } = await import("../skills/skill_library");
+    const skillsRoot = join(process.cwd(), ".agents", "skills");
+    const skillLib = await SkillLibrary.loadAll(skillsRoot);
+    if (skillLib.size() > 0) {
+      skillContext = "\n\n" + skillLib.getSummaryBlock(prompt, 3);
+      console.log(`📎 SkillLibrary: injecting ${Math.min(3, skillLib.size())} relevant skills into formulation`);
+    }
+  } catch {
+    // Skills dir absent or parse error — proceed without skills
+  }
+
   // ── Librarian: inject relevant literature context ──
   let libraryContext = "";
   try {
@@ -423,7 +437,7 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
   }
 
   const doFormulate = async (previousError?: string) => {
-    let p = buildFormulationPreamble(wilesMode) + "## The User's Problem Description\n\n" + prompt + libraryContext;
+    let p = buildFormulationPreamble(wilesMode) + "## The User's Problem Description\n\n" + prompt + skillContext + libraryContext;
 
     if (previousError) {
       p += `\n\n## ⚠️ Previous Response Error\nYour last response caused this error:\n\`\`\`\n${previousError}\n\`\`\`\nPlease respond with a valid JSON object only. No markdown.`;
@@ -662,7 +676,19 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   // Write objective + domain skills
   await Bun.write(workspace.paths.objective, config.objective_md);
   const skillsPath = join(workspace.paths.domainSkills, "problem_context.md");
-  await Bun.write(skillsPath, config.domain_skills_md);
+  // Augment the ARCHITECT-generated domain_skills_md with SkillLibrary content
+  // so the prover MCTS agent sees full proof-technique guidance.
+  let enrichedDomainSkills = config.domain_skills_md;
+  try {
+    const { SkillLibrary } = await import("../skills/skill_library");
+    const skillsRoot = join(process.cwd(), ".agents", "skills");
+    const skillLib = await SkillLibrary.loadAll(skillsRoot);
+    if (skillLib.size() > 0) {
+      const contextText = `${config.problem_description} ${config.theorem_signature}`;
+      enrichedDomainSkills += "\n\n" + skillLib.getSummaryBlock(contextText, 3);
+    }
+  } catch { /* proceed with ARCHITECT-only skills */ }
+  await Bun.write(skillsPath, enrichedDomainSkills);
 
   // Memetic warm-start: carry best graph across all pivot attempts.
   // Persisted to disk so it survives kills, reboots, and cross-machine moves.
