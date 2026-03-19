@@ -425,8 +425,9 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
     const searchQuery = extractSearchQuery(prompt);
 
     // Bug 1: use the same absolute DB path as the seeder in executeRun().
-    // import.meta.dir resolves to the directory of the compiled binary entry.
-    const canonicalDbPath = join(import.meta.dir, "..", "data", "perqed.lancedb");
+    // Use process.cwd() instead of import.meta.dir to avoid read-only $bunfs
+    // errors when running as a compiled standalone binary.
+    const canonicalDbPath = join(process.cwd(), "data", "perqed.lancedb");
     const embedder = new LocalEmbedder();
     const db = new VectorDatabase(canonicalDbPath);
     await db.initialize();
@@ -737,11 +738,11 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   console.log(`  Workspace: ${workspace.paths.runDir}`);
   console.log("═══════════════════════════════════════════════\n");
 
-  // ── Background Library Seeding (non-blocking) ─────────────────────────
-  // Bug 1: canonical import.meta.dir-relative path so formulate() and
-  // executeRun() share exactly the same LanceDB directory regardless of CWD.
+  // ── Background Library Seeding (non-blocking) ──────────────────────────────
+  // Bug 1: canonical process.cwd()-derived path so formulate() and
+  // executeRun() share the same LanceDB directory regardless of CWD.
   // Bug 3: needsSeeding() replaces the count()<10 + magic-999-sentinel check.
-  const DB_PATH = join(import.meta.dir, "..", "data", "perqed.lancedb");
+  const DB_PATH = join(process.cwd(), "data", "perqed.lancedb");
   void (async () => {
     try {
       const librarian = new ArxivLibrarian({
