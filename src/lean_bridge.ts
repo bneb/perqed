@@ -38,20 +38,30 @@ export class LeanBridge {
    * Build a complete Lean 4 source file from theorem components.
    *
    * The generated file has the structure:
+   *   import Mathlib
+   *   open Nat
+   *
    *   theorem <name> <signature> := by
    *     <tactic1>
    *     <tactic2>
    *     ...
    *   def main : IO Unit := IO.println "PROOF_VALID"
+   *
+   * @param preamble Optional import block override. Defaults to
+   *   'import Mathlib\nopen Nat\n\n' which provides ℕ, Fin, LE, OfNat,
+   *   and all Mathlib instances needed for Ramsey/Schur theorem signatures.
    */
   buildLeanSource(
     theoremName: string,
     signature: string,
     tactics: string[],
+    preamble: string = "import Mathlib\nopen Nat\n\n",
   ): string {
     const tacticBlock = tactics.map((t) => `  ${t}`).join("\n");
 
     return [
+      preamble.trimEnd(),
+      "",
       `theorem ${theoremName} ${signature} := by`,
       tacticBlock,
       "",

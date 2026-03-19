@@ -199,14 +199,15 @@ const RUN_CONFIG_SCHEMA = {
     },
     search_config: {
       type: SchemaType.OBJECT as const,
-      description: "Structured search configuration. problem_class must be 'ramsey_coloring' or 'unknown'.",
+      description: "Structured search configuration. Set problem_class to indicate the search strategy.",
       properties: {
         problem_class: {
           type: SchemaType.STRING as const,
-          enum: ["ramsey_coloring", "unknown"],
+          enum: ["ramsey_coloring", "schur_partition", "unknown"],
         },
-        domain_size: { type: SchemaType.NUMBER as const, description: "Number of vertices, e.g. 35 for K_35" },
+        domain_size: { type: SchemaType.NUMBER as const, description: "Number of integers (Schur) or vertices (Ramsey)" },
         num_colors: { type: SchemaType.NUMBER as const },
+        num_partitions: { type: SchemaType.NUMBER as const, description: "Number of color classes for Schur/partition problems" },
         r: { type: SchemaType.NUMBER as const, description: "Clique size for color 0 (red)" },
         s: { type: SchemaType.NUMBER as const, description: "Clique size for color 1 (blue)" },
         forbidden_subgraphs: {
@@ -275,7 +276,8 @@ export function shouldRunSearchPhase(
   wilesMode: boolean,
 ): boolean {
   const pc = searchConfig?.problem_class;
-  return pc !== undefined && pc !== "unknown";
+  // Run SA for any known constructive problem class
+  return pc === "ramsey_coloring" || pc === "schur_partition";
 }
 
 
@@ -300,14 +302,13 @@ Your job is to produce a structured run configuration that the Perqed proof engi
 3. **objective_md**: A detailed markdown description of the problem for the TACTICIAN agents
 4. **domain_skills_md**: Problem-specific tactical advice (which Lean tactics work for this class of problem, common pitfalls)
 5. **max_iterations**: How many orchestrator iterations to budget
-6. **evaluator_type**: Must be EXACTLY ONE OF: "RAMSEY_CLIQUES", "SRG_PARAMETERS", "MATRIX_ORTHOGONALITY". Select the correct C++ backend metric to grade these graphs.
-7. **search_config**: Structured parameters for the search engine (REQUIRED — see below)
+6. **search_config**: Structured parameters for the search engine (REQUIRED — see below)
 
 ## search_config (CRITICAL)
 
-If the problem requires constructing a witness (∃ in the theorem signature), you must populate search_config:
+If the problem requires constructing a witness (∃ in the theorem signature), you must populate search_config with the correct problem_class.
 
-For Ramsey lower bounds R(r,s) ≥ n (i.e., construct a 2-coloring of K_{n-1}):
+### Ramsey lower bounds R(r,s) ≥ n (construct a 2-coloring of K_{n-1})
 \`\`\`json
 {
   "problem_class": "ramsey_coloring",
@@ -318,13 +319,27 @@ For Ramsey lower bounds R(r,s) ≥ n (i.e., construct a 2-coloring of K_{n-1}):
   "symmetry": "circulant"
 }
 \`\`\`
-For example, R(4,6) ≥ 36 — the known Exoo (1989) witness IS a circulant on 35 vertices:
+Example — R(4,6) ≥ 36:
 \`\`\`json
 { "problem_class": "ramsey_coloring", "domain_size": 35, "num_colors": 2, "r": 4, "s": 6, "symmetry": "circulant" }
 \`\`\`
-**IMPORTANT**: When \`symmetry: circulant\` is used, the Z3 SMT solver is attempted first (exact, ~5-30s). If Z3 returns UNSAT, the circulant space is provably empty and the engine will retry unconstrained.
+**IMPORTANT**: When \`symmetry: circulant\` is used, Z3 SMT is attempted first (~5-30s). If UNSAT, retries unconstrained.
 
-For problems that do NOT require a constructive witness:
+### Schur number lower bounds S(r) ≥ N (find an r-coloring of {1..N} with no monochromatic x+y=z)
+\`\`\`json
+{
+  "problem_class": "schur_partition",
+  "domain_size": <N>,
+  "num_partitions": <r>
+}
+\`\`\`
+Example — S(6) ≥ 537:
+\`\`\`json
+{ "problem_class": "schur_partition", "domain_size": 537, "num_partitions": 6 }
+\`\`\`
+The SA engine will search for a partition_rule_js (a JS function body \`return (i-1) % 6;\` style) that yields zero monochromatic x+y=z violations.
+
+### Problems that do NOT require a constructive witness
 \`\`\`json
 { "problem_class": "unknown" }
 \`\`\`
@@ -340,7 +355,7 @@ For problems that do NOT require a constructive witness:
 ## Available Infrastructure
 
 The Perqed engine has:
-- Simulated Annealing search engine (graph-level, ~500K IPS per core)
+- Simulated Annealing search engine (partition-level, ~500K IPS per core)
 - Multi-core Island Model orchestrator (8 workers, ~4M IPS total)
 - Lean 4 kernel verification via \`decide\` tactic
 - DeepSeek Prover (local) + Gemini (cloud) multi-agent tactic search
@@ -720,7 +735,10 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   // ── Research Journal: persistent cross-run memory ──
   const journalPath = defaultJournalPath(join(workspace.paths.runDir, "..", ".."));
   const journal = new ResearchJournal(journalPath);
-  const targetGoal = `R(${(config.search_config as any)?.r ?? "?"},${(config.search_config as any)?.s ?? "?"}) >= ${((config.search_config as any)?.domain_size ?? 0) + 1}`;
+  const sc = config.search_config as any;
+  const targetGoal = sc?.problem_class === "schur_partition"
+    ? `S(${sc?.num_partitions ?? "?"}) >= ${sc?.domain_size ?? "?"}`
+    : `R(${sc?.r ?? "?"},${sc?.s ?? "?"}) >= ${(sc?.domain_size ?? 0) + 1}`;
 
   let searchPhase: SearchPhase | null = null;
   let witnessFound = false;
