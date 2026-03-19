@@ -373,28 +373,36 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
     try { w.terminate(); } catch {}
   }
 
-  // ── P2: Obstruction Detector ─────────────────────────────────────────────
-  // After all workers settle, check if ≥3 produced near-miss graphs (E ≤ 2).
-  // If so, extract the shared topological obstruction and log it to the journal.
+  // ── Obstruction Detector (Target 5 refinement) ───────────────────────────
+  // After all workers settle, check if ≥3 produced near-miss graphs.
+  // Target 5: energy > 0 to exclude exact witnesses; energy <= 2 for tightest near-misses.
   const nearMisses = allResults
-    .filter(r => r.bestEnergy <= 2 && r.bestAdj)
+    .filter(r => r.bestEnergy > 0 && r.bestEnergy <= 2 && r.bestAdj)
     .map(r => r.bestAdj!);
 
   if (nearMisses.length >= 3) {
     console.log(`[ObstructionDetector] Analyzing ${nearMisses.length} near-miss graphs for structural convergence...`);
     const obstruction = extractCommonSubgraph(nearMisses);
-    const desc = describeObstruction(obstruction);
-    console.log(`[ObstructionDetector] ${desc}`);
+    // Count invariant edges directly (AdjacencyMatrix has no edgeCount property)
+    let obstructionEdgeCount = 0;
+    for (let i = 0; i < obstruction.n; i++)
+      for (let j = i + 1; j < obstruction.n; j++)
+        if (obstruction.hasEdge(i, j)) obstructionEdgeCount++;
 
-    // Non-blocking journal write — failure must never crash the search
-    const journalPath = defaultJournalPath(join(process.cwd(), "agent_workspace"));
-    const journal = new ResearchJournal(journalPath);
-    journal.addEntry({
-      type: "observation",
-      claim: `Topological obstruction detected: ${desc}`,
-      evidence: `${nearMisses.length} workers independently converged on near-miss graphs with E≤2`,
-      target_goal: `R(${config.r},${config.s})`,
-    }).catch(() => {});
+    if (obstructionEdgeCount > 0) {
+      const desc = describeObstruction(obstruction);
+      console.log(`[ObstructionDetector] ${desc}`);
+
+      // Non-blocking journal write — failure must never crash the search
+      const journalPath = defaultJournalPath(join(process.cwd(), "agent_workspace"));
+      const journal = new ResearchJournal(journalPath);
+      journal.addEntry({
+        type: "observation",
+        claim: desc,
+        evidence: `Convergence across ${nearMisses.length} independent SA workers.`,
+        target_goal: `R(${config.r},${config.s})`,
+      }).catch(() => {});
+    }
   }
 
   return {

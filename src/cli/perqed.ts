@@ -745,14 +745,18 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         console.log(`\n   🏛️  Asking ARCHITECT to formulate Algebraic Rule directly...`);
         const { AlgebraicConstructionConfigSchema } = await import("../proof_dag/algebraic_construction_config");
         
+    // Target 1: Track the last graph actually evaluated by the AlgebraicBuilder.
+        // This is what Gemini should SEE — not the memetic seed (starting point).
+        let lastEvaluatedAdj: AdjacencyMatrix | null = memeticSeed;
         let builderConfig: any;
+
         builderConfig = await callSafe(
           () => architectClient.formulateAlgebraicRule(
             targetGoal,
             journalSummaryText,
             cognitiveMode,
-            memeticSeed ?? undefined,   // Phase 4: stuckAdj → Chalkboard Vision attachment
-            config.run_name,            // Phase 4: runName → scratch/stuck_state.svg path
+            lastEvaluatedAdj ?? undefined,  // Target 1: show ARCHITECT what its rule produced
+            config.run_name,                 // Phase 4: runName → scratch/stuck_state.svg path
           ),
           1,
           "ARCHITECT formulateAlgebraicRule (Wiles)"
@@ -867,6 +871,13 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 }
               } else {
                 console.log(`   ❌ Algebraic Construction ${node.id} failed (E=${buildResult.energy}). Journaling for replan...`);
+                // Target 1: update lastEvaluatedAdj so next Vision prompt shows this graph
+                lastEvaluatedAdj = buildResult.adj;
+                // If Algebraic Build produced a better graph than the current memetic seed, adopt it
+                if (!memeticSeed || buildResult.energy < (memeticSeedEnergy ?? Infinity)) {
+                  memeticSeed = buildResult.adj;
+                  memeticSeedEnergy = buildResult.energy;
+                }
               }
               return buildResult;
             },
@@ -937,9 +948,26 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         console.error(`   ❌ Failed to execute Algebraic Builder: ${e.message}`);
       }
     } // end while(wilesAttempts < MAX)
+
+    // Target 3: Wiles→SA Fallback
+    // If Wiles Mode exhausted all attempts without a witness, log the transition
+    // and fall through to let the standard SA Island Model take over.
+    // The best memeticSeed produced by Wiles becomes the warm-start for SA workers.
+    if (!witnessFound) {
+      console.log("\n🔁 [Wiles] Orthogonal Paradigm Forcing exhausted all attempts.");
+      console.log("   Falling back to SA Island Model with memetic seed as warm-start...");
+      await journal.addEntry({
+        type: "observation",
+        claim: "Wiles Mode Orthogonal Forcing exhausted. Falling back to SA Island Model.",
+        evidence: `${MAX_ARCHITECT_PIVOTS} outer × 3 inner attempts consumed without E=0 witness.`,
+        target_goal: targetGoal,
+      }).catch(() => {});
+    }
   }
 
-  const needsSearch = !wilesMode && !witnessFound && shouldRunSearchPhase(config.search_config, false);
+  // Target 3: needsSearch now also fires when wilesMode is exhausted (witnessFound = false)
+  // Previously "!wilesMode" hard-blocked SA after Wiles. Now SA runs as fallback.
+  const needsSearch = !witnessFound && shouldRunSearchPhase(config.search_config, false);
 
   if (needsSearch) {
     const searchConfig = extractSearchConfig(config.search_config);
@@ -1039,6 +1067,41 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
       // ── SA Path: heuristic search (fallback or symmetry=none) ──
 
+      // Target 4: Pre-warm JIT C++ evaluator in background.
+      // CompilerAgent synthesizes an AVX-512 energy function; EvaluatorRouter
+      // caches the compiled FFI handle for reuse by the surrogate funnel.
+      // Fire-and-forget — compilation failure silently falls back to TS evaluator.
+      void (async () => {
+        try {
+          const { CompilerAgent } = await import("../agents/compiler");
+          const { EvaluatorRouter } = await import("../search/evaluator_router");
+          const compilerAgent = new CompilerAgent({ apiKey });
+          const r = sp.r ?? 4;
+          const s = sp.s ?? 6;
+          const n = sp.vertices ?? 35;
+          const cppSource = await compilerAgent.generateEvaluator({
+            constraint: `R(${r},${s}) Ramsey energy: count K_${r} red cliques and K_${s} blue independent sets`,
+            n,
+            r,
+            s,
+          });
+          if (cppSource) {
+            const { AdjacencyMatrix } = await import("../math/graph/AdjacencyMatrix");
+            const router = EvaluatorRouter.getInstance(config.run_name);
+            // Warmup call on a trivial 2-vertex graph to trigger compile and cache
+            await router.evaluate(new AdjacencyMatrix(2), {
+              evaluator_type: "JIT_CPP",
+              r,
+              s,
+              cppSource,
+            });
+            console.log(`   ⚡ [JIT] C++ evaluator compiled and cached for run=${config.run_name}`);
+          }
+        } catch {
+          // Compilation failed or clang++ unavailable — TS fallback active
+        }
+      })();
+
       // Clamp workers to PHYSICAL cores, not logical threads.
       // os.cpus().length returns logical threads (SMT). Two SA workers on one
       // physical core thrash each other's L1/L2 cache, killing IPS.
@@ -1135,26 +1198,37 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
       }
       addEvent(`SA complete: best E=${result.bestEnergy} after ${result.iterations.toLocaleString()} iters`);
 
-      // ── P3: Surrogate Funnel — post-SA beam search via Value Network ─────
+      // ── P3 + T2: Surrogate Funnel + Exact Energy Guard ────────────────────
       // If the PyTorch surrogate server is running, run the best graph through
       // the neighborhood funnel to find a lower-energy candidate before Z3.
-      // Non-blocking: if the server is down, silently skip.
+      // Target 2: NEVER trust the surrogate's prediction for state updates.
+      // Always verify the funnel's best candidate with the exact TS energy function.
       if (result.bestEnergy > 0 && result.bestAdj) {
         void (async () => {
           try {
             const { SurrogateClient } = await import("../search/surrogate_client");
             const { optimizeThroughFunnel } = await import("../search/neighborhood_funnel");
+            const { EvaluatorRouter } = await import("../search/evaluator_router");
             const surrogate = new SurrogateClient();
             const healthy = await surrogate.checkHealth();
             if (healthy) {
               console.log(`   🧠 [Surrogate] Server healthy — running neighborhood funnel on E=${result.bestEnergy} graph...`);
               const funnelResult = await optimizeThroughFunnel(result.bestAdj, surrogate);
-              if (funnelResult.predictedEnergy < result.bestEnergy) {
-                console.log(`   🧠 [Surrogate] Funnel improved: E=${result.bestEnergy} → predicted E=${funnelResult.predictedEnergy}`);
-                if (!memeticSeed || funnelResult.predictedEnergy < (memeticSeedEnergy ?? Infinity)) {
+              // Target 2: compute EXACT ground-truth energy — reject surrogate hallucinations
+              const router = EvaluatorRouter.getInstance(config.run_name);
+              const exactEnergy = await router.evaluate(funnelResult.bestMatrix, {
+                evaluator_type: "RAMSEY_CLIQUES",
+                r: (config.search_config as any)?.r ?? 4,
+                s: (config.search_config as any)?.s ?? 6,
+              });
+              if (exactEnergy < result.bestEnergy) {
+                console.log(`   🧠 [Surrogate] Funnel verified: surrogate predicted E=${funnelResult.predictedEnergy}, exact E=${exactEnergy} (was ${result.bestEnergy}) — adopting.`);
+                if (!memeticSeed || exactEnergy < (memeticSeedEnergy ?? Infinity)) {
                   memeticSeed = funnelResult.bestMatrix;
-                  memeticSeedEnergy = funnelResult.predictedEnergy;
+                  memeticSeedEnergy = exactEnergy;
                 }
+              } else {
+                console.log(`   🧠 [Surrogate] Funnel rejected: surrogate predicted E=${funnelResult.predictedEnergy}, exact E=${exactEnergy} ≥ current E=${result.bestEnergy} — discarded.`);
               }
             }
           } catch {
