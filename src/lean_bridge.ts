@@ -241,4 +241,59 @@ export class LeanBridge {
       .filter(p => p.length > 0)
       .filter(p => !/^\d+\s+goals$/i.test(p)); // Strip the "N goals" header
   }
+
+  // ──────────────────────────────────────────────
+  // Phase 7 P1: Structural Skeleton Verification
+  // ──────────────────────────────────────────────
+
+  /**
+   * Verify that a sorry-laden Lean 4 skeleton is structurally valid.
+   *
+   * Mathematical invariant: a skeleton is "valid" if and only if:
+   *   1. Lean compiles it with exit code 0 (no hard type errors)
+   *   2. The output contains sorry warnings (hasSorry = true)
+   *   3. The output contains NO "error:" substring (distinguishes sorry warnings from failures)
+   *
+   * If valid, extracts the names of all sorry-stubbed declarations so the
+   * orchestrator can spawn targeted tactic sub-nodes for each.
+   *
+   * Warning formats Lean 4 emits for sorry stubs:
+   *   "warning: declaration 'NAME' uses 'sorry'"   ← standard
+   *   "warning: 'NAME' uses `sorry`"               ← older/alternate
+   *
+   * @param leanCode  Raw Lean 4 source (may include imports and def main)
+   * @param timeoutMs Timeout passed to executeLean (default 30s)
+   */
+  async verifyStructuralSkeleton(
+    leanCode: string,
+    timeoutMs: number = 30_000,
+  ): Promise<{ valid: boolean; sorryGoals: string[] }> {
+    const result = await this.executeLean(leanCode, timeoutMs);
+
+    // Hard error (type mismatch, unknown identifier, syntax error) — skeleton is broken
+    if (result.rawOutput.includes("error:")) {
+      return { valid: false, sorryGoals: [] };
+    }
+
+    // A fully proved proof is not a sorry skeleton (nothing left to decompose)
+    if (!result.hasSorry) {
+      return { valid: false, sorryGoals: [] };
+    }
+
+    // Skeleton is structurally valid — extract sorry goal names
+    // Pattern 1: warning: declaration 'NAME' uses 'sorry'
+    // Pattern 2: warning: 'NAME' uses `sorry`
+    const sorryGoals: string[] = [];
+    const pattern =
+      /warning:\s+(?:declaration\s+)?'([^']+)'\s+uses\s+[`']sorry[`']/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(result.rawOutput)) !== null) {
+      const name = match[1]!;
+      if (!sorryGoals.includes(name)) {
+        sorryGoals.push(name);
+      }
+    }
+
+    return { valid: true, sorryGoals };
+  }
 }

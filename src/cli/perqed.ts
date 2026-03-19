@@ -1699,6 +1699,70 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 theoremSignature: cfg.theoremSignature ?? "",
               };
             },
+
+            // ── lean_skeleton: sorry-stub structural decomposition (Phase 7 P1) ──
+            // Axiomatic invariant: a sorry-laden skeleton is "valid" iff Lean
+            // accepts the overall type structure (no hard errors) but defers the
+            // proofs of individual lemmas to sorry.
+            // Handler:
+            //   1. Runs verifyStructuralSkeleton — exits 0 + hasSorry, no "error:"
+            //   2. If valid: spawns one `tactic` DAGNode per sorry goal, injecting
+            //      each into currentDag so the executor picks them up next iteration
+            //   3. If invalid: throws — marks node as failed, ARCHITECT must replan
+            lean_skeleton: async (node) => {
+              const leanCode = (node.config as any).leanCode as string | undefined;
+              if (!leanCode) {
+                throw new Error(`[LeanSkeleton] node "${node.id}" missing config.leanCode`);
+              }
+
+              console.log(`   🦴 [LeanSkeleton] Verifying structural skeleton for node "${node.id}"...`);
+              const skeletonResult = await lean.verifyStructuralSkeleton(leanCode);
+
+              if (!skeletonResult.valid) {
+                throw new Error(
+                  `[LeanSkeleton] Structural skeleton for "${node.id}" failed Lean type-checking. ` +
+                  `Skeleton must compile with only sorry warnings, not hard errors.`
+                );
+              }
+
+              console.log(
+                `   🦴 [LeanSkeleton] Skeleton valid. Decomposing into ` +
+                `${skeletonResult.sorryGoals.length} subgoal(s): ${skeletonResult.sorryGoals.join(", ")}`
+              );
+
+              // Dynamically expand the DAG: one tactic node per sorry stub
+              for (const goal of skeletonResult.sorryGoals) {
+                const subNodeId = `skel_tactic_${node.id}_${goal}`;
+                if (!dag.nodes.find((n: any) => n.id === subNodeId)) {
+                  dag.nodes.push({
+                    id: subNodeId,
+                    kind: "lean" as const,
+                    label: `Resolve sorry stub: ${goal}`,
+                    dependsOn: [node.id],
+                    config: {
+                      target_goal: goal,
+                      parentSkeleton: node.id,
+                      leanCode,
+                    },
+                    status: "pending" as const,
+                  });
+                }
+              }
+
+              // Journal the structural decomposition
+              await journal.addEntry({
+                type: "observation",
+                claim: `Lean skeleton "${node.id}" valid — decomposed into ${skeletonResult.sorryGoals.length} sub-lemmas`,
+                evidence: `sorry goals: ${skeletonResult.sorryGoals.join(", ")}`,
+                target_goal: config.theorem_name,
+              });
+
+              return {
+                valid: true,
+                sorryGoals: skeletonResult.sorryGoals,
+                spawnedNodes: skeletonResult.sorryGoals.map(g => `skel_tactic_${node.id}_${g}`),
+              };
+            },
           });
 
           const dagResult = await executor.execute();

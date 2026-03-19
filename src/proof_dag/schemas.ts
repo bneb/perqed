@@ -18,13 +18,14 @@ export const DAGNodeKindSchema = z.enum([
   "skill_apply",
   "aggregate",
   "mathlib_query",
-  "smt_constraint",                // Wiles Mode: Z3 synthesis
-  "algebraic_graph_construction",  // Wiles Mode: compile edge_rule_js → AdjacencyMatrix → verify
-  "algebraic_partition_construction", // Wiles Mode: compile partition_rule_js → Int8Array → verify
-  "calculate_degrees_of_freedom",  // Wiles Mode: investigation skill
-  "query_known_graphs",            // Wiles Mode: investigation skill
-  "query_literature",              // Wiles Mode: dynamic JIT retrieval
-  "lemma_abstraction",             // Phase 3: obstruction detection → Lean 4 lemma emission
+  "smt_constraint",                  // Wiles Mode: Z3 synthesis
+  "algebraic_graph_construction",    // Wiles Mode: compile edge_rule_js → AdjacencyMatrix → verify
+  "algebraic_partition_construction",// Wiles Mode: compile partition_rule_js → Int8Array → verify
+  "calculate_degrees_of_freedom",    // Wiles Mode: investigation skill
+  "query_known_graphs",              // Wiles Mode: investigation skill
+  "query_literature",                // Wiles Mode: dynamic JIT retrieval
+  "lemma_abstraction",               // Phase 3: obstruction detection → Lean 4 lemma emission
+  "lean_skeleton",                   // Phase 7 P1: sorry-stub skeleton decomposition
 ]);
 
 

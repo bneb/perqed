@@ -694,8 +694,14 @@ CRITICAL FORMAT RULES (both construction kinds):
    GRAPH valid: "return (i + j) % 5 === 0;"   PARTITION valid: "return (i - 1) % 6;"
 2. Description: CRITICAL: MUST NOT exceed 2 sentences to prevent timeouts.
 
-Output ONLY a JSON object matching this schema describing the NEW nodes to append:
+MANDATORY OUTPUT FORMAT:
+You MUST output a JSON object with a top-level "diagnostic" field BEFORE the node list.
+The "diagnostic" must trace the mathematical root cause of the previous failure rigorously
+(minimum 20 characters). Shallow or missing diagnostics will cause a retry.
+
+Output ONLY a JSON object matching this schema:
 {
+  "diagnostic": "<string: rigorous mathematical root-cause analysis of the previous failure. Min 20 chars. Example: 'The Paley graph over GF(37) fails because its automorphism group acts transitively, creating K_4 sub-cliques in every neighbourhood.'>",
   "id": "replan_xyz",
   "goal": "${currentDag.goal.replace(/"/g, '\\"')}",
   "nodes": [
@@ -708,6 +714,7 @@ Output ONLY a JSON object matching this schema describing the NEW nodes to appen
 }
 
 DO NOT wrap your JSON in markdown.`;
+
 
 
     const payload = {
@@ -741,7 +748,17 @@ DO NOT wrap your JSON in markdown.`;
         
         const jsonString = JsonHandler.extractAndRepair(rawText);
         const parsed = JSON.parse(jsonString);
-        
+
+        // P0 — Diagnostic Guard: enforce substantive self-critique before schema parsing.
+        // Mathematical invariant: an ARCHITECT that cannot explain why an attempt failed
+        // cannot propose a better one. Trivial or missing diagnostics force a retry.
+        if (!parsed.diagnostic || parsed.diagnostic.trim().length < 20) {
+          throw new Error(
+            "Architect failed to provide a rigorous mathematical diagnostic. Retrying."
+          );
+        }
+        console.log(`   🧠 [Architect.replanDAG] Diagnostic: ${parsed.diagnostic.slice(0, 120)}...`);
+
         return ProofDAGSchema.parse(parsed);
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);
