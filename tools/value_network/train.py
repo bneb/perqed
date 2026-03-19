@@ -9,8 +9,10 @@ CLI usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import time
+from pathlib import Path
 from typing import Optional
 
 import torch
@@ -20,6 +22,33 @@ from torch.utils.data import DataLoader
 
 from dataset import MatrixEnergyDataset
 from model import ValueNetwork
+
+
+# ── MetricsLogger ─────────────────────────────────────────────────────────────────
+
+class MetricsLogger:
+    """Append structured JSON telemetry to a JSONL file immediately on every log() call.
+
+    The file is cleared on instantiation so each training run starts fresh.
+    Each record contains: epoch, batch, loss, timestamp.
+    """
+
+    def __init__(self, filepath: str = "training_metrics.jsonl") -> None:
+        self.filepath = Path(filepath)
+        # Clear previous run's metrics
+        if self.filepath.exists():
+            self.filepath.unlink()
+
+    def log(self, epoch: int, batch: int, loss: float) -> None:
+        record = {
+            "epoch": epoch,
+            "batch": batch,
+            "loss": loss,
+            "timestamp": time.time(),
+        }
+        with open(self.filepath, "a") as f:
+            f.write(json.dumps(record) + "\n")
+            f.flush()  # Flush immediately so concurrent readers see the record
 
 
 # ── Public API (imported by tests) ──────────────────────────────────────────
@@ -52,6 +81,8 @@ def train_one_epoch(
     checkpoint_every: int = 10_000,
     log_every: int = 1_000,
     return_losses: bool = False,
+    metrics_logger: Optional[MetricsLogger] = None,
+    metrics_every: int = 50,
 ) -> list[float] | None:
     """Run one full pass over ``loader``.
 
@@ -83,6 +114,10 @@ def train_one_epoch(
         loss_val = loss.item()
         if return_losses:
             losses.append(loss_val)
+
+        # ── Structured telemetry (every metrics_every batches) ─────────────────────
+        if metrics_logger is not None and batch_idx % metrics_every == 0:
+            metrics_logger.log(epoch=epoch, batch=batch_idx, loss=loss_val)
 
         if batch_idx > 0 and batch_idx % log_every == 0:
             elapsed = time.time() - t0
@@ -116,6 +151,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--checkpoint", default="value_network.pt", help="Checkpoint output path")
     p.add_argument("--checkpoint-every", type=int, default=10_000)
     p.add_argument("--log-every", type=int, default=1_000)
+    p.add_argument("--metrics", default="training_metrics.jsonl", help="Telemetry JSONL output")
+    p.add_argument("--metrics-every", type=int, default=50, help="Log metrics every N batches")
     return p.parse_args()
 
 
@@ -138,6 +175,8 @@ def main() -> None:
     model = ValueNetwork()
     optimizer = build_optimizer(model, lr=args.lr, weight_decay=args.weight_decay)
     criterion = build_criterion()
+    metrics_logger = MetricsLogger(filepath=args.metrics)
+    print(f"📊 Telemetry → {args.metrics}  (every {args.metrics_every} batches)")
 
     for epoch in range(args.epochs):
         print(f"\n── Epoch {epoch + 1}/{args.epochs} ──")
@@ -148,6 +187,8 @@ def main() -> None:
             checkpoint_path=args.checkpoint,
             checkpoint_every=args.checkpoint_every,
             log_every=args.log_every,
+            metrics_logger=metrics_logger,
+            metrics_every=args.metrics_every,
         )
 
     print("\n✅ Training complete.")
