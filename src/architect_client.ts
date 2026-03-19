@@ -549,7 +549,7 @@ export class ArchitectClient {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
     const exploitationPrompt = cognitiveMode === "EXPLOITATION"
-      ? "\n\nSYSTEM STATE: EXPLOITATION MODE. You are sitting on a massive mathematical breakthrough (E < 300). DO NOT invent a new paradigm. Retrieve the `edge_rule_js` of your absolute best attempt from the Empirical Findings. Perform an ATOMIC MUTATION on that exact rule (e.g., swap one integer in the difference set). Keep the vertex size constant."
+      ? "\n\nSYSTEM STATE: EXPLOITATION MODE. You are sitting on a massive mathematical breakthrough (E < 300). DO NOT invent a new paradigm. Retrieve the construction rule (edge_rule_js for graphs, partition_rule_js for partitions) of your absolute best attempt from the Empirical Findings. Perform an ATOMIC MUTATION on that exact rule (e.g., swap one integer in the connection set, shift the period by ±1). Keep the domain size constant."
       : "";
 
     const directSystemPrompt = [
@@ -579,9 +579,10 @@ export class ArchitectClient {
     }
 
     const chalkboardPromptAddendum = chalkboardPart
-      ? `\n\nCHALKBOARD: An SVG image of the current stuck graph has been attached. ` +
+      ? `\n\nCHALKBOARD: An SVG image of the current stuck state has been attached. ` +
         `Visually analyze the symmetry breaks, clusters, and bottlenecks. ` +
-        `Propose a new edge_rule_js for Wiles Mode that algebraically bypasses this structural trap.`
+        `Propose a new construction rule (edge_rule_js for graphs, partition_rule_js for partitions) ` +
+        `that algebraically bypasses this structural trap.`
       : "";
 
     const payload = {
