@@ -23,6 +23,8 @@ import { InvariantValidator } from "./invariant_validator";
 import { EvaluatorRouter } from "./evaluator_router";
 import type { EvaluatorType } from "./evaluator_router";
 import { computeSumFreeEnergy } from "../math/optim/SumFreeEnergy";
+import { SurrogateClient } from "./surrogate_client";
+import { optimizeThroughFunnel } from "./neighborhood_funnel";
 
 // ── Error type ────────────────────────────────────────────────────────────────
 
@@ -191,8 +193,30 @@ export class AlgebraicBuilder {
 
     const adj = AlgebraicBuilder.compile(config);
     InvariantValidator.validate(adj, constraints);
-    
-    const { energy, status } = await AlgebraicBuilder.verify(adj, r, s, evaluatorType);
+
+    // ── Surrogate Funnel (optional) ─────────────────────────────────────────
+    // If the PyTorch Value Network is running, quickly generate 500 neighbours
+    // and pick the one with the lowest predicted energy before exact evaluation.
+    const surrogate = new SurrogateClient();
+    let candidateAdj: AdjacencyMatrix = adj;
+    if (await surrogate.checkHealth()) {
+      try {
+        const N = config.vertices;
+        console.log(`   🤖 [Surrogate] Running neighbourhood funnel (N=${N})…`);
+        const { bestMatrix, predictedEnergy } = await optimizeThroughFunnel(adj, surrogate);
+        console.log(`   🤖 [Surrogate] Funnel complete — predicted E=${predictedEnergy.toFixed(1)}`);
+        journal?.record(
+          `SurrogateFunnel: LLM seed optimised via 500-neighbour funnel → predicted E=${predictedEnergy.toFixed(1)}`
+        );
+        candidateAdj = bestMatrix;
+      } catch (err) {
+        // Non-fatal: fall back to original LLM matrix
+        console.warn(`   ⚠️ [Surrogate] Funnel error — falling back to base matrix: ${err}`);
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
+    const { energy, status } = await AlgebraicBuilder.verify(candidateAdj, r, s, evaluatorType);
     const compiledInMs = Date.now() - t0;
 
     const edgeCount = adj.edgeCount();
