@@ -71,6 +71,8 @@ interface CliArgs {
   wiles: boolean;
   /** Override the maximum number of architect replanning pivots (default 5). */
   maxPivots: number;
+  /** Run the Auto-Curriculum Daemon (autonomous research loop). */
+  daemon: boolean;
 }
 
 export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
@@ -81,10 +83,12 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
   const maxPivotsArg = args.find((a) => a.startsWith("--max-pivots="));
   const noconfirm = args.includes("--noconfirm");
   const wiles = args.includes("--wiles");
+  const daemon = args.includes("--daemon");
 
   const maxPivots = maxPivotsArg ? parseInt(maxPivotsArg.replace("--max-pivots=", ""), 10) : 5;
 
-  if (!promptArg && !promptFileArg && !configArg) {
+  // --daemon bypasses the prompt/config requirement
+  if (!daemon && !promptArg && !promptFileArg && !configArg) {
     console.error("Usage:");
     console.error("  perqed --prompt=\"<problem description>\"");
     console.error("  perqed --prompt_file=<path/to/prompt.txt>");
@@ -92,6 +96,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     console.error("  perqed --prompt=\"...\" --noconfirm");
     console.error("  perqed --prompt=\"...\" --wiles   # Force Wiles Mode (Conceptual Scatter)");
     console.error("  perqed --prompt=\"...\" --max-pivots=1000");
+    console.error("  perqed --daemon                  # Auto-Curriculum: autonomous research loop");
     process.exit(1);
   }
 
@@ -113,6 +118,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     noconfirm,
     wiles,
     maxPivots,
+    daemon,
   };
 }
 
@@ -1654,6 +1660,19 @@ async function main() {
   if (!apiKey) {
     console.error("❌ GEMINI_API_KEY not set. Export it or add to .env");
     process.exit(1);
+  }
+
+  // ── Phase 5: Auto-Curriculum Daemon ──────────────────────────────────────
+  if (args.daemon) {
+    const { AutoCurriculumDaemon } = await import("../librarian/auto_curriculum");
+    const daemon = new AutoCurriculumDaemon({
+      apiKey,
+      verifiedLibDir: join(process.cwd(), "verified_lib"),
+    });
+    console.log("🤖 [perqed] --daemon flag detected — launching Auto-Curriculum Daemon");
+    console.log("   Press Ctrl+C to stop.\n");
+    await daemon.run();
+    return;
   }
 
   let config: RunConfig;

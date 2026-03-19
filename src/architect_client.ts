@@ -14,6 +14,8 @@ import { JsonHandler } from "./utils/json_handler";
 import { ArchitectResponseSchema, type ArchitectResponse } from "./schemas";
 import { ProofDAGSchema, type ProofDAG } from "./proof_dag/schemas";
 import { buildTabuHashBlock, type JournalEntry, type ResearchJournal } from "./search/research_journal";
+import { renderToSVG, svgToBase64 } from "./search/chalkboard";
+import type { AdjacencyMatrix } from "./math/graph/AdjacencyMatrix";
 
 // ──────────────────────────────────────────────
 // Configuration
@@ -460,7 +462,9 @@ export class ArchitectClient {
   async formulateAlgebraicRule(
     goal: string,
     journalText: string,
-    cognitiveMode: "EXPLORATION" | "EXPLOITATION" = "EXPLORATION"
+    cognitiveMode: "EXPLORATION" | "EXPLOITATION" = "EXPLORATION",
+    stuckAdj?: AdjacencyMatrix,
+    runName?: string,
   ): Promise<any> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
@@ -478,11 +482,38 @@ export class ArchitectClient {
       journalText,
     ].join("\n\n");
 
+    // ── Phase 4: Chalkboard Vision attachment ───────────────────────────────
+    // When the system is stuck (EXPLOITATION) and an adj matrix is provided,
+    // render it to SVG and attach it as a Gemini Vision inlineData part.
+    let chalkboardPart: { inlineData: { mimeType: string; data: string } } | null = null;
+    if (stuckAdj && runName) {
+      try {
+        const svgPath = `agent_workspace/runs/${runName}/scratch/stuck_state.svg`;
+        await renderToSVG(stuckAdj, svgPath);
+        const base64 = await svgToBase64(svgPath);
+        chalkboardPart = { inlineData: { mimeType: "image/svg+xml", data: base64 } };
+        console.log(`   🖼️  [Chalkboard] SVG rendered → ${svgPath}`);
+      } catch (err) {
+        console.warn(`   ⚠️  [Chalkboard] SVG render failed (non-fatal): ${err}`);
+      }
+    }
+
+    const chalkboardPromptAddendum = chalkboardPart
+      ? `\n\nCHALKBOARD: An SVG image of the current stuck graph has been attached. ` +
+        `Visually analyze the symmetry breaks, clusters, and bottlenecks. ` +
+        `Propose a new edge_rule_js for Wiles Mode that algebraically bypasses this structural trap.`
+      : "";
+
     const payload = {
       system_instruction: {
-        parts: [{ text: directSystemPrompt }],
+        parts: [{ text: directSystemPrompt + chalkboardPromptAddendum }],
       },
-      contents: [{ parts: [{ text: "Emit the AlgebraicConstructionConfig JSON object now." }] }],
+      contents: [{
+        parts: [
+          { text: "Emit the AlgebraicConstructionConfig JSON object now." },
+          ...(chalkboardPart ? [chalkboardPart] : []),
+        ],
+      }],
       generationConfig: {
         temperature: 0.95,
         response_mime_type: "application/json",

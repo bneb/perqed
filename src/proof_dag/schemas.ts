@@ -24,6 +24,7 @@ export const DAGNodeKindSchema = z.enum([
   "calculate_degrees_of_freedom",  // Wiles Mode: investigation skill
   "query_known_graphs",            // Wiles Mode: investigation skill
   "query_literature",              // Wiles Mode: dynamic JIT retrieval
+  "lemma_abstraction",             // Phase 3: obstruction detection → Lean 4 lemma emission
 ]);
 
 
