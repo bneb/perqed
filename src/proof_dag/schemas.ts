@@ -21,6 +21,7 @@ export const DAGNodeKindSchema = z.enum([
   "smt_constraint",                  // Wiles Mode: Z3 synthesis
   "algebraic_graph_construction",    // Wiles Mode: compile edge_rule_js → AdjacencyMatrix → verify
   "algebraic_partition_construction",// Wiles Mode: compile partition_rule_js → Int8Array → verify
+  "partition_sa_search",             // SA optimizer for sum-free partitions (Schur, VdW)
   "calculate_degrees_of_freedom",    // Wiles Mode: investigation skill
   "query_known_graphs",              // Wiles Mode: investigation skill
   "query_literature",                // Wiles Mode: dynamic JIT retrieval

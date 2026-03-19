@@ -131,3 +131,22 @@ expect(memeticSeedEnergy).toBe(ramseyEnergy(memeticSeed, r, s));
 4. Do **not** hard-block a lower mode with a `!wilesMode` guard or equivalent flag after exhaustion.
 
 The hierarchy is: `Wiles (algebraic) → SA Island Model (stochastic) → MicroSAT Z3-LNS (exact patch) → Lean 4 (formal proof)`. Each layer can escalate up or fall through down, but never terminates without exhausting the layers below it.
+
+---
+
+## Rule 9: Git Commit Message Safety
+
+**Failure mode**: Using `git commit -m "..."` with multi-line or special-character messages (∃, →, backticks, quotes) causes zsh shell escaping errors that corrupt the commit or break the terminal.
+
+**Rule**: **Always** write commit messages to a tmp file and use `git commit -F`.
+
+```
+# Step 1: write_to_file tool → /tmp/commit_msg.txt
+# Step 2: run_command
+git -C /path/to/repo add <files> && git -C /path/to/repo commit -F /tmp/commit_msg.txt && git -C /path/to/repo push
+```
+
+- Use `write_to_file` (not echo/cat/heredoc) to create the message file
+- Use `git -C /path/to/repo` instead of `cd && git` to avoid shell state issues
+- `-m` is only acceptable for single-line messages with no special characters
+- See `.agents/skills/git-commit/SKILL.md` for full reference

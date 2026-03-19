@@ -645,7 +645,8 @@ export class ArchitectClient {
   async replanDAG(
     currentDag: ProofDAG,
     journalText: string,
-    cognitiveMode: "EXPLOITATION" | "EXPLORATION" = "EXPLORATION"
+    cognitiveMode: "EXPLOITATION" | "EXPLORATION" = "EXPLORATION",
+    availableSkills: string[] = []
   ): Promise<ProofDAG> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
@@ -688,7 +689,13 @@ SUPPORTED CONSTRUCTION KINDS:
 
 - \`algebraic_partition_construction\` — for INTEGER PARTITION problems (Schur, Van der Waerden, sum-free). Config: { domain_size, num_partitions, description, partition_rule_js }
   partition_rule_js: function body taking (i) where i is 1-indexed integer, returns bucket [0, num_partitions) or -1.
+  CRITICAL: MUST include explicit \`return\` statement — bare expressions return undefined and score E=domain_size.
   EXAMPLE FOR S(6): { "kind": "algebraic_partition_construction", "config": { "domain_size": 537, "num_partitions": 6, "description": "Periodic mod-6 warm start.", "partition_rule_js": "return (i - 1) % 6;" } }
+
+- \`partition_sa_search\` — SA optimizer for sum-free partitions. Use after algebraic attempts fail. Config: { domain_size, num_partitions, sa_iterations, warm_start_from_node?, description }
+  warm_start_from_node: id of a prior algebraic_partition_construction node whose partition seeds the SA.
+  EXAMPLE: { "kind": "partition_sa_search", "config": { "domain_size": 537, "num_partitions": 6, "sa_iterations": 5000000, "warm_start_from_node": "init_alg", "description": "SA from algebraic warm start" } }
+  ${availableSkills.length > 0 ? `\nAVAILABLE SKILLS (emit skill_apply nodes to read and apply these): ${availableSkills.join(", ")}` : ""}
 
 CRITICAL FORMAT RULES (both construction kinds):
 1. Body-Only Rule: Output ONLY the raw function body. No arrow functions, no function declarations.

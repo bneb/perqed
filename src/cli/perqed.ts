@@ -744,8 +744,15 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   let witnessFound = false;
 
   // ── Wiles Mode Intercept: Evaluate DAG upfront ──
-  if (wilesMode) {
-    console.log(`\n🧮 [Wiles] SA bypass active — intercepting for Algebraic Builder DAG`);
+  // Also fires for schur_partition — the algebraic partition loop is the correct
+  // search strategy for Schur/Van der Waerden regardless of the --wiles flag.
+  const isSchurPartition = config.search_config?.problem_class === "schur_partition";
+  if (wilesMode || isSchurPartition) {
+    if (wilesMode) {
+      console.log(`\n🧮 [Wiles] SA bypass active — intercepting for Algebraic Builder DAG`);
+    } else {
+      console.log(`\n🔢 [Schur] Partition search — routing to algebraic_partition_construction DAG loop`);
+    }
 
     let wilesAttempts = 0;
     while (wilesAttempts < MAX_ARCHITECT_PIVOTS && !witnessFound) {
@@ -782,15 +789,25 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
         if (!builderConfig) throw new Error("formulateAlgebraicRule failed to return a valid config.");
 
-        builderConfig = AlgebraicConstructionConfigSchema.parse(builderConfig);
-        console.log(`   🗺️  ARCHITECT emitted Algebraic Rule for ${builderConfig.vertices} vertices.`);
+        // Branch on problem class to select the right schema and node kind
+        let initNodeKind: string;
+        if (isSchurPartition) {
+          const { AlgebraicPartitionConfigSchema } = await import("../proof_dag/algebraic_partition_config");
+          builderConfig = AlgebraicPartitionConfigSchema.parse(builderConfig);
+          initNodeKind = "algebraic_partition_construction";
+          console.log(`   🗺️  ARCHITECT emitted Partition Rule for ${builderConfig.domain_size} integers, ${builderConfig.num_partitions} partitions.`);
+        } else {
+          builderConfig = AlgebraicConstructionConfigSchema.parse(builderConfig);
+          initNodeKind = "algebraic_graph_construction";
+          console.log(`   🗺️  ARCHITECT emitted Algebraic Rule for ${builderConfig.vertices} vertices.`);
+        }
 
         const currentDag: any = {
           id: `wiles_run_${wilesAttempts}`,
           goal: targetGoal,
           nodes: [{
             id: "init_alg",
-            kind: "algebraic_graph_construction",
+            kind: initNodeKind,
             dependsOn: [],
             config: builderConfig
           }]
@@ -934,9 +951,59 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 console.log(`\n📄 Partition witness written: ${witnessPath}`);
               } else {
                 console.log(`   ❌ Partition Construction ${node.id} failed (E=${partResult.energy}). Journaling for replan...`);
+                await journal.addEntry({
+                  type: "observation",
+                  claim: `PartitionBuilder UNSAT: E=${partResult.energy} for ${partResult.description}. Algebraic rule insufficient — escalate to partition_sa_search.`,
+                  evidence: `buildAndVerifyPartition on {1..${partConfig.domain_size}} with ${partConfig.num_partitions} classes. Rule: ${partConfig.partition_rule_js?.slice(0, 60)}`,
+                  target_goal: targetGoal,
+                });
               }
               return partResult;
-            }
+            },
+
+            // ── partition_sa_search: Metropolis SA optimizer for sum-free partitions ──
+            // Warm-starts from a prior algebraic_partition_construction result if available.
+            partition_sa_search: async (node, dagResults) => {
+              const cfg = node.config as any;
+              const domainSize: number = cfg.domain_size ?? (config.search_config as any)?.domain_size ?? 537;
+              const numPartitions: number = cfg.num_partitions ?? (config.search_config as any)?.num_partitions ?? 6;
+              const saIterations: number = cfg.sa_iterations ?? 5_000_000;
+              const description: string = cfg.description ?? `SA partition search {1..${domainSize}}, ${numPartitions} classes`;
+
+              // Pull warm-start partition from a prior node's result
+              let warmStart: Int8Array | undefined;
+              if (cfg.warm_start_from_node) {
+                const priorResult = dagResults?.get(cfg.warm_start_from_node) as any;
+                if (priorResult?.partition instanceof Int8Array) {
+                  warmStart = priorResult.partition;
+                  console.log(`   🌡️  Warm-starting SA from node '${cfg.warm_start_from_node}' (E=${priorResult.energy})`);
+                }
+              }
+
+              console.log(`   ⚡ Partition SA: {1..${domainSize}}, ${numPartitions} classes, ${saIterations.toLocaleString()} iters...`);
+              const { runPartitionSA } = await import("../search/partition_sa_worker");
+              const saResult = await runPartitionSA({ domain_size: domainSize, num_partitions: numPartitions, sa_iterations: saIterations, warmStart, description });
+
+              console.log(`   Partition SA finished: E=${saResult.energy} after ${saResult.iterations.toLocaleString()} iters`);
+
+              if (saResult.energy === 0) {
+                console.log(`   ✅ Partition SA found E=0 witness!`);
+                witnessFound = true;
+                const witnessPath = join(workspace.paths.scratch, "partition_witness.json");
+                const colorClasses: number[][] = Array.from({ length: numPartitions }, () => []);
+                for (let i = 1; i <= domainSize; i++) {
+                  const b = saResult.partition[i];
+                  if (b !== undefined && b >= 0) colorClasses[b]!.push(i);
+                }
+                await Bun.write(witnessPath, JSON.stringify({ domain_size: domainSize, num_partitions: numPartitions, description, color_classes: colorClasses }, null, 2));
+                console.log(`\n📄 Partition SA witness written: ${witnessPath}`);
+                await journal.addEntry({ type: "observation", claim: `PartitionSA SAT: E=0 witness found for {1..${domainSize}} with ${numPartitions} classes.`, evidence: `SA ran ${saIterations.toLocaleString()} iters`, target_goal: targetGoal });
+              } else {
+                console.log(`   ❌ Partition SA no witness (E=${saResult.energy}). Journaling...`);
+                await journal.addEntry({ type: "observation", claim: `PartitionSA UNSAT: best E=${saResult.energy} after ${saIterations.toLocaleString()} iters. Try more iterations or a different warm start.`, evidence: description, target_goal: targetGoal });
+              }
+              return saResult;
+            },
           });
 
           await executor.execute();
@@ -946,9 +1013,19 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
           console.log(`   📝 DAG cycle finished without witness. Invoking Replanner...`);
           const currentJournalsText = await journal.getSummary(targetGoal);
           const cognitiveMode = await journal.getCognitiveTemperature(targetGoal);
+
+          // Discover available SKILLs so the Wiles ARCHITECT can apply them in replanDAG
+          let wilesAvailableSkills: string[] = [];
+          try {
+            const { readdir } = await import("node:fs/promises");
+            const skillsRoot = join(workspaceBase, "..", ".agents", "skills");
+            const entries = await readdir(skillsRoot, { withFileTypes: true });
+            wilesAvailableSkills = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+          } catch { /* skills dir absent */ }
+
           let appendedDag: any;
           appendedDag = await callSafe(
-            () => architectClient.replanDAG(currentDag, currentJournalsText, cognitiveMode),
+            () => architectClient.replanDAG(currentDag, currentJournalsText, cognitiveMode, wilesAvailableSkills),
             1,
             "ARCHITECT replanDAG"
           );
@@ -989,7 +1066,6 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
   if (needsSearch) {
     const searchConfig = extractSearchConfig(config.search_config);
-
     if (searchConfig) {
       searchPhase = {
         type: searchConfig.type as "ramsey_sa",
@@ -1005,7 +1081,8 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
       console.log(`   Problem class: ${config.search_config.problem_class}`);
       const symLabel = searchConfig.symmetry === 'circulant' ? ' [CIRCULANT 2^¹⁷]' : '';
       console.log(`   Search config: ${searchConfig.n}v, R(${searchConfig.r},${searchConfig.s}), ${searchConfig.saIterations.toLocaleString()} iters, ${searchConfig.workers} workers (${searchConfig.strategy})${symLabel}`);
-    } else {
+    } else if (config.search_config?.problem_class !== "schur_partition") {
+      // schur_partition is handled by the Wiles/algebraic DAG loop above — not a warning
       console.log(`\n⚠️  Constructive existence detected but problem class unknown — skipping search phase`);
     }
   }

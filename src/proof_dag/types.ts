@@ -22,6 +22,8 @@ export type DAGNodeKind =
   | "literature"    // Retrieve + format relevant papers from LanceDB
   | "skill_apply"   // Read SKILL.md and inject technique into a downstream prompt
   | "algebraic_graph_construction" // VM execution of topological rules
+  | "algebraic_partition_construction" // VM execution of integer partition rules
+  | "partition_sa_search"  // SA optimizer for sum-free partitions (schur, vdW)
   | "smt_constraint"// Z3 synthesis of structural rules
   | "mathlib_query" // LanceDB lookups of Lean4 Mathlib
   | "aggregate";    // Merge results from multiple preceding nodes
@@ -95,6 +97,18 @@ export interface SkillApplyNodeConfig {
 export interface AggregateNodeConfig {
   strategy: "best_energy" | "union_constraints" | "majority_vote";
   sourceNodes: string[];
+}
+
+export interface PartitionSANodeConfig {
+  /** Number of integers to assign, i.e. {1..domain_size} */
+  domain_size: number;
+  /** Number of color classes */
+  num_partitions: number;
+  /** SA iterations (default 5_000_000) */
+  sa_iterations?: number;
+  /** Pull warm-start Int8Array partition from a preceding node's result */
+  warm_start_from_node?: string;
+  description: string;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
