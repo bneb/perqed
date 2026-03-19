@@ -1,0 +1,257 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>On March 18, we gave the ARCHITECT the ability to panic. When a Simulated Annealing search
+hit an energy floor, it could recognize the trap, halt the process, and formulate an
+entirely new DAG strategy. It was a huge leap in autonomy, but we realized almost immediately
+that we had just pushed the bottleneck up one level.</p>
+
+<p>The engine was still, fundamentally, <em>guessing</em>. It was extremely capable of searching a
+problem space, and highly resilient in pivoting when stuck, but it didn't actually
+<em>know</em> anything about mathematics beyond what a base LLM hallucinated.</p>
+
+<p>Over the last 24 hours, we changed that. Perqed is no longer a dedicated graph-coloring engine.
+It's a generalized mathematical reasoning platform that actively searches literature, reads
+formal proof techniques, and applies them to arbitrary problem domains.</p>
+
+<h2>Beyond Graph Coloring: Universalizing the Engine</h2>
+
+<p>The first structural change was decoupling the engine from the Ramsey problem domain.
+We moved from pure \</code>graph_coloring\<code> to supporting arbitrary mathematical structures, starting
+with \</code>schur_partition\<code>.</p>
+
+<p>The test case: proving Schur Number S(6) ≥ 537 by exhibiting a valid 6-coloring.
+This introduced entirely new challenges. How does an LLM write an energy function for an
+arbitrary partition rather than an adjacency matrix? We added the <code>partition_sa_search</code>
+DAG node, effectively forcing the ARCHITECT to write JavaScript evaluation functions on the fly
+that the fast SA loop could consume.</p>
+
+<p>This led to one of our favorite engine bugs so far: the ARCHITECT generated a rule that instantly
+achieved <strong>E = 0</strong> indicating a perfect witness. The problem? The drafted JavaScript
+omitted a <code>return</code> statement. The SA worker evaluated 537 undefined buckets and scored
+it as a perfect zero-violation partition. We wired an <code>ObstructionDetector</code> into the main
+SA loop to catch these false-positive mathematical sleights of hand.</p>
+
+<h2>Universal Skill Injection</h2>
+
+<p>Even with domain decoupling, the ARCHITECT was still relying on its training weights to generate
+algebraic rules, leading to naive periodic assignments (e.g., <code>(i-1) % 6</code>) that failed
+instantly. It needed to learn actual techniques.</p>
+
+<p>We built the <strong>SkillLibrary</strong>, which scans a designated <code>.agents/skills/</code> directory
+containing over 30 formal mathematical proof techniques (e.g., <code>bijections</code>,
+<code>pigeonhole_principle</code>, <code>explicit_construction</code>). The engine now performs
+relevance overlap matching against the current target (e.g., "Schur partition sum-free") and
+injects the raw text of the 3 most relevant skills directly into the LLM context prior to
+DAG formulation and MCTS verification.</p>
+
+<p>We stopped asking the LLM to invent techniques, and started forcing it to read them.</p>
+
+<h2>The Librarian Stage: Grounding in Reality</h2>
+
+<p>If the engine reads skills, it should also read literature. Enter the <strong>Librarian Stage</strong>.
+We wired a LanceDB vector store into the pipeline to ingest mathematical papers.</p>
+
+<p>But when we tried to bundle Perqed into a standalone <code>bun</code> executable, the whole stage
+silently dropped dead with an infuriating <code>Read-only file system (os error 30)</code>.
+It turned out <code>import.meta.dir</code> evaluates to an internal <code>/$bunfs/...</code> path
+when compiled, trapping the LanceDB initialization. A quick pivot to <code>process.cwd()</code>
+resolved the trap, allowing the executable to drop its database natively in the user's workspace.</p>
+
+<p>To make the Librarian bulletproof, we also stripped away naive zero-vector threshold checks
+that required LLM/Ollama uptime, replacing them with a purely offline JSON sidecar. We added a
+<code>seed_literature.json</code> corpus containing 240+ arXiv abstracts across 7 domains (Schur,
+Turán, Razborov flag algebras). Now, before the ARCHITECT even begins formulation, it has
+hundreds of relevant academic papers embedded in its context window.</p>
+
+<h2>Conclusion</h2>
+
+<p>The delta from March 18 to March 19 isn't just a list of features. It's a phase shift in
+the engine's cognitive loop.</p>
+
+<p>Perqed now has the capacity to <strong>search</strong> (Simulated Annealing), <strong>prove</strong> (Lean 4),
+<strong>plan</strong> (DAG scaling), <strong>panic</strong> (triage and replan), and crucially,
+<strong>read</strong> (Librarian RAG + Universal Skill Injection). It is no longer just a
+fast brute-forcer — it is a mathematically grounded researcher.</p>
+`;
+---
+
+<BaseLayout title="The Engine Reads Mathematics Now — Blog" activeNav="blog">
+  <article class="blog-post">
+    <div class="container blog-container">
+      <header class="post-header">
+        <a href="/blog/" class="back-link">← Back to all posts</a>
+        <div class="post-meta">
+          <time>March 19, 2026</time>
+          <span class="tag">architecture</span>
+          <span class="tag">rag</span>
+          <span class="tag">llm</span>
+        </div>
+        <h1 class="post-title">The Engine Reads Mathematics Now</h1>
+        <p class="post-subtitle">From graph coloring to universal domains: how we taught Perqed to read academic papers, inject mathematical skills, and escape the read-only $bunfs trap.</p>
+      </header>
+
+      <div class="post-content" set:html={blogContent} />
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .blog-post {
+    padding: 60px 0 100px;
+  }
+
+  .blog-container {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .back-link {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    margin-bottom: 32px;
+    transition: color 0.2s ease;
+  }
+
+  .back-link:hover {
+    color: var(--text-primary);
+  }
+
+  .post-header {
+    margin-bottom: 48px;
+  }
+
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .post-meta time {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    background: var(--accent-purple-subtle);
+    color: var(--accent-purple);
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-weight: 500;
+  }
+
+  .post-title {
+    font-family: var(--font-serif);
+    font-size: 2.8rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+  }
+
+  .post-subtitle {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    max-width: 600px;
+  }
+
+  .post-content {
+    font-size: 1.1rem;
+    line-height: 1.75;
+    color: var(--text-primary);
+  }
+
+  .post-content :global(h2) {
+    font-family: var(--font-serif);
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin: 48px 0 24px;
+    letter-spacing: -0.02em;
+  }
+
+  .post-content :global(h3) {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 32px 0 16px;
+  }
+
+  .post-content :global(p) {
+    margin-bottom: 24px;
+  }
+
+  .post-content :global(ul), .post-content :global(ol) {
+    margin-bottom: 24px;
+    padding-left: 24px;
+  }
+
+  .post-content :global(li) {
+    margin-bottom: 8px;
+  }
+
+  .post-content :global(a) {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .post-content :global(a:hover) {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .post-content :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--background-highlight);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent-green);
+  }
+
+  .post-content :global(pre) {
+    background: var(--background-card);
+    border: 1px solid var(--border-color);
+    padding: 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 32px 0;
+  }
+
+  .post-content :global(pre code) {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .post-content :global(strong) {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .post-content :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 20px;
+    margin: 32px 0;
+    font-style: italic;
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 640px) {
+    .blog-post { padding: 40px 0 80px; }
+    .post-title { font-size: 2.2rem; }
+    .post-subtitle { font-size: 1.1rem; }
+  }
+</style>
