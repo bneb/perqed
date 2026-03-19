@@ -57,7 +57,7 @@ import { AlgebraicBuilder } from "../search/algebraic_builder";
 import { SmtWilesBuilder } from "../search/smt_wiles_builder";
 import { SmtWilesConfigSchema } from "../proof_dag/smt_wiles_config";
 import { AlgebraicConstructionConfigSchema } from "../proof_dag/algebraic_construction_config";
-
+import { extractCommonSubgraph, describeObstruction } from "../search/obstruction_detector";
 
 // ──────────────────────────────────────────────
 // CLI Argument Parsing
@@ -1197,6 +1197,45 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         console.log(`   Workers: ${orchResult.workersRan} ran, best from worker ${orchResult.bestWorkerIndex}`);
       }
       addEvent(`SA complete: best E=${result.bestEnergy} after ${result.iterations.toLocaleString()} iters`);
+
+      // ── Phase 8: Obstruction Detector — post-SA near-miss analysis ─────────
+      // Mathematical axiom: if ≥3 independent workers converge on E∈[1,2],
+      // the shared topological substructure is the common edge set ─ an
+      // 80%-threshold intersection. This is a heuristic fingerprint of the
+      // glass floor obstruction, not a formal proof.
+      // We filter E>0 to exclude exact witnesses, and E≤2 for tightest near-misses.
+      void (async () => {
+        try {
+          const nearMisses = orchResult.allResults
+            .filter(r => r.bestEnergy > 0 && r.bestEnergy <= 2 && r.bestAdj)
+            .map(r => r.bestAdj!);
+
+          if (nearMisses.length >= 3) {
+            console.log(`\n🔍 [ObstructionDetector] ${nearMisses.length} workers stalled at E≤2 — extracting glass-floor fingerprint...`);
+            const obs = extractCommonSubgraph(nearMisses);
+            const desc = describeObstruction(obs);
+
+            // Count invariant edges (AdjacencyMatrix has no .edgeCount property)
+            let obstructionEdgeCount = 0;
+            for (let i = 0; i < obs.n; i++)
+              for (let j = i + 1; j < obs.n; j++)
+                if (obs.hasEdge(i, j)) obstructionEdgeCount++;
+
+            if (obstructionEdgeCount > 0) {
+              console.log(`🔍 [ObstructionDetector] Glass floor identified: ${desc}`);
+              // Fire-and-forget: journal write must never block the next pivot
+              journal.addEntry({
+                type: "observation",
+                claim: `Structural obstruction detected: ${desc}`,
+                evidence: `Identified across ${nearMisses.length} parallel SA workers stalling at E ≤ 2.`,
+                target_goal: targetGoal,
+              }).catch(e => console.error("[ObstructionDetector] Failed to write to journal:", e));
+            }
+          }
+        } catch {
+          // Obstruction detection is non-critical — never crash the main loop
+        }
+      })();
 
       // ── P3 + T2: Surrogate Funnel + Exact Energy Guard ────────────────────
       // If the PyTorch surrogate server is running, run the best graph through
