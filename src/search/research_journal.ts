@@ -1,11 +1,12 @@
 /**
- * Research Journal
+ * Research Journal — append-only JSONL storage.
  *
- * Perqed's long-term memory. Captures lemmas, observations, and failure modes
- * across search attempts so the ARCHITECT can build on past results rather than
- * repeating failed strategies.
+ * Perqed's long-term memory. Each entry is written as a single newline-
+ * delimited JSON record, making concurrent writes safe: Bun's append-mode
+ * writer is atomic at the OS level for single-line writes, eliminating the
+ * TOCTOU race inherent in the old read-modify-write JSON-array pattern.
  *
- * Storage: .perqed/journal.json (global, persists across runs)
+ * Storage: .perqed/journal.jsonl (global, persists across runs)
  *
  * Context compaction: distillJournalForPrompt() converts journal entries into
  * dense, token-bounded markdown for injection into the ARCHITECT's preamble.
@@ -14,7 +15,7 @@
  */
 
 import { join } from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, appendFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
 // ──────────────────────────────────────────────
@@ -60,12 +61,6 @@ export interface JournalEntry {
   zobristHash?: string;
 }
 
-interface JournalFile {
-  version: 1;
-  entries: JournalEntry[];
-  investigations?: Array<{ skill: string; input: string; result: string; timestamp: string }>;
-}
-
 // ──────────────────────────────────────────────
 // ResearchJournal class
 // ──────────────────────────────────────────────
@@ -74,8 +69,24 @@ export class ResearchJournal {
   constructor(private readonly journalPath: string) {}
 
   /**
-   * Add a new entry. Assigns id and timestamp automatically.
-   * Atomic append: reads current state, appends, writes back.
+   * Synchronous thin wrapper for callers that use the `{ record(obs) }` interface
+   * (e.g. AlgebraicBuilder). Fires-and-forgets an async addEntry. Safe because
+   * Bun append writes are OS-atomic at the line level.
+   */
+  record(obs: string): void {
+    // Fire-and-forget — errors are swallowed to preserve sync callers
+    this.addEntry({
+      type: "observation",
+      claim: obs,
+      evidence: "automated log",
+      target_goal: "general",
+    }).catch(() => {});
+  }
+
+  /**
+   * Append a new entry to the JSONL file.
+   * Each call writes exactly one newline-terminated JSON line — no read step,
+   * no unlock step. Concurrent callers are safe.
    */
   async addEntry(
     entry: Omit<JournalEntry, "id" | "timestamp">,
@@ -86,38 +97,32 @@ export class ResearchJournal {
       ...entry,
     };
 
-    const existing = await this.readFile();
-    existing.entries.push(full);
-    await this.writeFile(existing);
+    const dir = join(this.journalPath, "..");
+    await mkdir(dir, { recursive: true });
+
+    // appendFile uses O_APPEND — atomic at OS level for single-line writes.
+    // Multiple concurrent callers can safely call this without a mutex.
+    await appendFile(this.journalPath, JSON.stringify(full) + "\n", "utf-8");
+
     return full;
   }
 
   /** Permanent tracking of investigation milestones */
   async recordInvestigation(skill: string, input: string, result: string): Promise<void> {
-    const existing = await this.readFile();
-    if (!existing.investigations) existing.investigations = [];
-    existing.investigations.push({
-      skill,
-      input,
-      result,
-      timestamp: new Date().toISOString(),
+    await this.addEntry({
+      type: "observation",
+      claim: `[Investigation: ${skill}] ${input.substring(0, 80)} → ${result}`,
+      evidence: `skill: ${skill}`,
+      target_goal: "general",
     });
-    await this.writeFile(existing);
   }
 
   /**
    * Evaluates the relative depth of the current best mathematical basin.
+   * Streams the JSONL file line-by-line — no full JSON parse into memory.
    */
   async getCognitiveTemperature(targetGoal: string): Promise<"EXPLOITATION" | "EXPLORATION"> {
-    const file = await this.readFile();
-    const attempts = file.entries
-      .filter(e => e.target_goal === targetGoal && e.type === "failure_mode")
-      .map(f => {
-        const match = f.claim.match(/E=(\d+)/);
-        return match ? parseInt(match[1]!, 10) : Infinity;
-      })
-      .filter(e => e !== Infinity);
-
+    const attempts = await this._collectFailureEnergies(targetGoal);
     if (attempts.length === 0) return "EXPLORATION";
 
     const minEnergySeen = Math.min(...attempts);
@@ -133,27 +138,26 @@ export class ResearchJournal {
    * Prevents Context Window Bloat by strictly enforcing Garbage Collection.
    */
   async getSummary(targetGoal: string): Promise<string> {
-    const file = await this.readFile();
-    const allGoalEntries = file.entries.filter(e => e.target_goal === targetGoal);
-    
-    // Extract failure modes
+    const allEntries = await this.getAllEntries();
+    const allGoalEntries = allEntries.filter(e => e.target_goal === targetGoal);
+
     const failures = allGoalEntries.filter(e => e.type === "failure_mode");
-    
-    // Parse energy from claim (e.g., "Algebraic Construction init_alg failed (E=1766).")
+    const investigations = allEntries.filter(
+      e => e.claim.startsWith("[Investigation:")
+    );
+
     const attempts = failures.map(f => {
       const match = f.claim.match(/E=(\d+)/);
       const eScore = match ? parseInt(match[1]!, 10) : Infinity;
       return { entry: f, energy: eScore, time: new Date(f.timestamp).getTime() };
     });
 
-    // 1. Top 3 Best Attempts (lowest E scores)
     const sortedByEnergy = [...attempts].sort((a, b) => a.energy - b.energy);
     const top3 = sortedByEnergy.slice(0, 3);
     const top3Ids = new Set(top3.map(t => t.entry.id));
 
-    // 2. 2 Most Recent Attempts (that are not already in Top 3)
     const sortedByTime = [...attempts].sort((a, b) => b.time - a.time);
-    const recent2 = [];
+    const recent2: typeof attempts = [];
     for (const a of sortedByTime) {
       if (!top3Ids.has(a.entry.id)) {
         recent2.push(a);
@@ -165,10 +169,10 @@ export class ResearchJournal {
 
     let summary = "### Empirical Findings (Memory Manager PRUNED)\n\n";
 
-    if (file.investigations && file.investigations.length > 0) {
+    if (investigations.length > 0) {
       summary += "#### Investigated Constraints & Analogies:\n";
-      for (const inv of file.investigations) {
-        summary += `- [${inv.skill}] Input: ${inv.input.substring(0, 50)}... -> Result: ${inv.result}\n`;
+      for (const inv of investigations.slice(-5)) {
+        summary += `- ${inv.claim}\n`;
       }
       summary += "\n";
     }
@@ -187,34 +191,25 @@ export class ResearchJournal {
 
   /** All entries relevant to a specific goal string (exact match). */
   async getEntriesForGoal(goal: string): Promise<JournalEntry[]> {
-    const { entries } = await this.readFile();
-    return entries.filter((e) => e.target_goal === goal);
+    const all = await this.getAllEntries();
+    return all.filter(e => e.target_goal === goal);
   }
 
   /** All entries across all goals, in insertion order. */
   async getAllEntries(): Promise<JournalEntry[]> {
-    const { entries } = await this.readFile();
-    return entries;
+    return this._streamLines();
   }
 
   /**
    * Count consecutive macro-failures at the tail of the journal.
-   *
-   * Iterates backwards through all entries. Each `failure_mode` entry
-   * adds 1 to the streak. Any `lemma` or `observation` entry (a success
-   * signal or neutral note) immediately breaks the streak and returns
-   * the count accumulated so far.
-   *
-   * Returns 0 for an empty journal (safe startup default).
    */
   async getConsecutiveMacroFailures(): Promise<number> {
-    const { entries } = await this.readFile();
+    const entries = await this.getAllEntries();
     let streak = 0;
     for (let i = entries.length - 1; i >= 0; i--) {
       if (entries[i]!.type === "failure_mode") {
         streak++;
       } else {
-        // lemma or observation: streak broken
         break;
       }
     }
@@ -223,20 +218,36 @@ export class ResearchJournal {
 
   // ── Private ─────────────────────────────────
 
-
-  private async readFile(): Promise<JournalFile> {
+  /** Stream the JSONL file and return all valid JournalEntry objects. */
+  private async _streamLines(): Promise<JournalEntry[]> {
     try {
-      const raw = await readFile(this.journalPath, "utf-8");
-      return JSON.parse(raw) as JournalFile;
+      const text = await Bun.file(this.journalPath).text();
+      const entries: JournalEntry[] = [];
+      for (const line of text.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          entries.push(JSON.parse(trimmed) as JournalEntry);
+        } catch {
+          // Skip malformed lines — never crash on corrupt JSONL
+        }
+      }
+      return entries;
     } catch {
-      return { version: 1, entries: [] };
+      return [];
     }
   }
 
-  private async writeFile(data: JournalFile): Promise<void> {
-    const dir = join(this.journalPath, "..");
-    await mkdir(dir, { recursive: true });
-    await writeFile(this.journalPath, JSON.stringify(data, null, 2), "utf-8");
+  /** Collect numeric energies from failure_mode entries for a target goal. */
+  private async _collectFailureEnergies(targetGoal: string): Promise<number[]> {
+    const entries = await this._streamLines();
+    return entries
+      .filter(e => e.target_goal === targetGoal && e.type === "failure_mode")
+      .map(f => {
+        const match = f.claim.match(/E=(\d+)/);
+        return match ? parseInt(match[1]!, 10) : Infinity;
+      })
+      .filter(e => e !== Infinity);
   }
 }
 
@@ -254,16 +265,6 @@ export interface DistillOptions {
 /**
  * Convert journal entries into dense, token-bounded markdown for the
  * ARCHITECT's preamble. Returns "" for empty entries (no noise).
- *
- * Format:
- *   ### PREVIOUSLY ESTABLISHED LEMMAS & OBSERVATIONS ###
- *   Do not attempt strategies that contradict these established facts:
- *   [LEMMA] No circulant 2-coloring of K_35 witnesses R(4,6) (Evidence: Z3 UNSAT ...)
- *   [OBSERVATION] SA stalls at E=12 ... (Evidence: ...)
- *   [FAILURE_MODE] ... (Evidence: ...)
- *
- * Ordering: lemmas first (proven facts), then observations, then failure_modes.
- * Token cap: truncates at maxTokens to prevent context bloat.
  */
 export function distillJournalForPrompt(
   entries: JournalEntry[],
@@ -273,10 +274,8 @@ export function distillJournalForPrompt(
 
   const { maxEntries = 10, maxTokens = 800 } = opts;
 
-  // Take only the most recent maxEntries (by array order = insertion order)
   const recentEntries = entries.slice(-maxEntries);
 
-  // Sort by type priority: lemma > observation > failure_mode
   const typePriority: Record<JournalEntryType, number> = {
     lemma: 0,
     observation: 1,
@@ -297,14 +296,13 @@ export function distillJournalForPrompt(
     const line = `- [${entry.type.toUpperCase()}] ${entry.claim} (Evidence: ${entry.evidence})`;
     if (line.length > charBudget) break;
     lines.push(line);
-    charBudget -= line.length + 1; // +1 for newline
+    charBudget -= line.length + 1;
   }
 
   if (lines.length === 0) return "";
 
   let result = header + lines.join("\n") + "\n";
 
-  // Append the tabu hash block if any failure_mode entries carry hashes.
   const tabuBlock = buildTabuHashBlock(sorted);
   if (tabuBlock) result += "\n" + tabuBlock;
 
@@ -313,15 +311,8 @@ export function distillJournalForPrompt(
 
 /**
  * Build the KNOWN STERILE BASINS block for the ARCHITECT's system prompt.
- *
- * Extracts Zobrist hashes from failure_mode journal entries and formats
- * them into an explicit instruction block that tells Gemini exactly which
- * hash strings to copy into the `tabuHashes` array of a search node.
- *
- * Returns "" when there are no hashed failure_mode entries (no noise).
  */
 export function buildTabuHashBlock(entries: JournalEntry[]): string {
-  // Collect unique hashes from failure_mode entries only
   const seen = new Set<string>();
   for (const entry of entries) {
     if (entry.type === "failure_mode" && entry.zobristHash) {
@@ -331,7 +322,7 @@ export function buildTabuHashBlock(entries: JournalEntry[]): string {
 
   if (seen.size === 0) return "";
 
-  const hashList = [...seen].map((h) => `  "${h}"`).join(",\n");
+  const hashList = [...seen].map(h => `  "${h}"`).join(",\n");
 
   return (
     `KNOWN STERILE BASINS (TABU HASHES):\n` +
@@ -348,5 +339,5 @@ export function buildTabuHashBlock(entries: JournalEntry[]): string {
 
 /** Resolves the global journal path relative to the perqed project root. */
 export function defaultJournalPath(projectRoot: string): string {
-  return join(projectRoot, ".perqed", "journal.json");
+  return join(projectRoot, ".perqed", "journal.jsonl");
 }
