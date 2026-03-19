@@ -412,24 +412,44 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
     // Skills dir absent or parse error — proceed without skills
   }
 
-  // ── Librarian: inject relevant literature context ──
+  // ── Librarian: inject relevant literature context (vector search + offline fallback) ──
   let libraryContext = "";
   try {
     const { LocalEmbedder } = await import("../embeddings/embedder");
     const { VectorDatabase } = await import("../embeddings/vector_store");
+    const { extractSearchQuery, keywordLiteratureFallback, formatLibraryMatch } =
+      await import("../librarian/librarian_utils");
+
+    // Bug 4: normalise the raw prompt before embedding — strips code blocks,
+    // JSON, markdown structure so the embedding reflects math semantics only.
+    const searchQuery = extractSearchQuery(prompt);
+
+    // Bug 1: use the same absolute DB path as the seeder in executeRun().
+    // import.meta.dir resolves to the directory of the compiled binary entry.
+    const canonicalDbPath = join(import.meta.dir, "..", "data", "perqed.lancedb");
     const embedder = new LocalEmbedder();
-    const db = new VectorDatabase();
+    const db = new VectorDatabase(canonicalDbPath);
     await db.initialize();
 
-    const queryVector = await embedder.embed(prompt);
+    const queryVector = await embedder.embed(searchQuery);
     if (queryVector.length > 0) {
       const matches = await db.search(queryVector, 5);
       if (matches.length > 0) {
+        // Bug 2: type-aware rendering — [Paper] for ARXIV, [Lemma] for MATHLIB
         libraryContext = "\n\n## Relevant Literature (from vector DB)\n\n";
         matches.forEach((m, i) => {
-          libraryContext += `${i + 1}. **${m.theoremSignature}**\n   ${m.successfulTactic}\n\n`;
+          libraryContext += formatLibraryMatch(m, i + 1) + "\n\n";
         });
         console.log(`📚 Librarian found ${matches.length} relevant premises`);
+      }
+    }
+
+    // Bug 5: if vector search is unavailable or returns nothing, fall back to
+    // the curated offline corpus in seed_literature.json — no Ollama required.
+    if (!libraryContext) {
+      libraryContext = keywordLiteratureFallback(searchQuery);
+      if (libraryContext) {
+        console.log("📚 Librarian: using offline keyword fallback (Ollama unavailable or DB empty)");
       }
     }
   } catch {
@@ -718,9 +738,10 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   console.log("═══════════════════════════════════════════════\n");
 
   // ── Background Library Seeding (non-blocking) ─────────────────────────
-  // If the vector store has fewer than 10 papers, kick off a background seed
-  // so the ARCHITECT has domain context on the next attempt.
-  const DB_PATH = join(workspaceBase, "..", "data", "perqed.lancedb");
+  // Bug 1: canonical import.meta.dir-relative path so formulate() and
+  // executeRun() share exactly the same LanceDB directory regardless of CWD.
+  // Bug 3: needsSeeding() replaces the count()<10 + magic-999-sentinel check.
+  const DB_PATH = join(import.meta.dir, "..", "data", "perqed.lancedb");
   void (async () => {
     try {
       const librarian = new ArxivLibrarian({
@@ -728,9 +749,8 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         maxPerQuery: 15,
         dbPath: DB_PATH,
       });
-      const count = await librarian.count();
-      if (count < 10) {
-        console.log("📚 [Librarian] DB sparse — seeding domain papers in background...");
+      if (await librarian.needsSeeding()) {
+        console.log("📚 [Librarian] DB sparse or stale — seeding domain papers in background...");
         const { ingested } = await librarian.run();
         if (ingested > 0) {
           console.log(`📚 [Librarian] Background seeding complete: ${ingested} papers ingested`);

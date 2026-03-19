@@ -10,6 +10,7 @@
  */
 
 import { XMLParser } from "fast-xml-parser";
+import { join } from "node:path";
 import { LocalEmbedder } from "../embeddings/embedder";
 import { VectorDatabase, type Premise } from "../embeddings/vector_store";
 
@@ -42,6 +43,11 @@ export class ArxivLibrarian {
   constructor(private readonly cfg: LibrarianConfig) {
     this.embedder = new LocalEmbedder();
     this.db = new VectorDatabase(cfg.dbPath);
+  }
+
+  /** Path to the JSON sidecar that persists ingestion metadata. */
+  private get metaPath(): string {
+    return join(this.cfg.dbPath, "librarian_meta.json");
   }
 
   /**
@@ -89,6 +95,9 @@ export class ArxivLibrarian {
           id: `arxiv-${papers[i]!.arxivId}`,
           theoremSignature: papers[i]!.title,
           successfulTactic: papers[i]!.abstract.slice(0, 500),
+          // Populate arXiv-specific fields with clear labeling (Bug 2)
+          paperTitle: papers[i]!.title,
+          paperAbstract: papers[i]!.abstract.slice(0, 800),
           type: "ARXIV",
           vector: v,
         });
@@ -101,27 +110,49 @@ export class ArxivLibrarian {
       console.log(`[Librarian] "${query}": +${premises.length} papers (${papers.length - premises.length} skipped)`);
     }
 
+    // Write metadata sidecar so count() doesn't need Ollama or zero-vector search
+    const meta = {
+      totalIngested: ingested,
+      lastSeeded: new Date().toISOString(),
+    };
+    await Bun.write(this.metaPath, JSON.stringify(meta, null, 2));
+
     return { ingested, skipped };
   }
 
   /**
-   * Counts the number of premises currently in the vector store.
-   * Used by perqed.ts to decide whether background seeding is needed.
+   * Counts ingested premises using the sidecar metadata file.
+   *
+   * Bug 3 fix: the previous implementation searched LanceDB with a zero
+   * vector (unreliable, Ollama-dependent, returns magic sentinel 999).
+   * We now write a simple JSON sidecar at the end of every run() and read
+   * it here — zero network calls, zero Ollama dependency, exact count.
+   *
+   * @returns Number of premises ingested in the last run(), or 0 on first run.
    */
   async count(): Promise<number> {
-    await this.db.initialize();
-    // Use a zero-dim query that returns 0 results to check table existence,
-    // then fall through to a tiny dummy query.
     try {
-      // Embed a dummy string — if Ollama is down, this returns [].
-      // We can't (easily) count rows in LanceDB without a search,
-      // so we use a 1-NN search on a zero vector as a proxy.
-      const dummyVec = new Array(768).fill(0) as number[];
-      const results = await this.db.search(dummyVec, 1);
-      // If any results come back, there are rows in the table.
-      return results.length > 0 ? 999 : 0; // 999 = "enough, don't seed"
+      const f = Bun.file(this.metaPath);
+      if (!(await f.exists())) return 0;
+      const meta = await f.json() as { totalIngested: number; lastSeeded: string };
+      if (typeof meta.totalIngested !== "number") return 0;
+      return meta.totalIngested;
     } catch {
       return 0;
+    }
+  }
+
+  /** Returns true when the DB is sparse enough to warrant background re-seeding. */
+  async needsSeeding(minPremises = 50, maxAgeDays = 7): Promise<boolean> {
+    try {
+      const f = Bun.file(this.metaPath);
+      if (!(await f.exists())) return true;
+      const meta = await f.json() as { totalIngested: number; lastSeeded: string };
+      if ((meta.totalIngested ?? 0) < minPremises) return true;
+      const ageMs = Date.now() - new Date(meta.lastSeeded).getTime();
+      return ageMs > maxAgeDays * 24 * 60 * 60 * 1000;
+    } catch {
+      return true;
     }
   }
 

@@ -18,8 +18,12 @@ export interface Premise {
   id: string;
   theoremSignature: string;
   successfulTactic: string;
-  type?: "MATHLIB" | "ARXIV";
+  type?: "MATHLIB" | "ARXIV" | "LEAN_RESULT";
   vector: number[];
+  /** arXiv-specific: full paper title (distinct from theoremSignature for clarity) */
+  paperTitle?: string;
+  /** arXiv-specific: paper abstract (up to 800 chars, distinct from successfulTactic) */
+  paperAbstract?: string;
 }
 
 // ── Table name constants ──────────────────────────────────────────────────
@@ -129,7 +133,7 @@ export class VectorDatabase {
       try {
         results = await table
           .search(queryVector)
-          .select(["id", "theoremSignature", "successfulTactic", "type"])
+          .select(["id", "theoremSignature", "successfulTactic", "type", "paperTitle", "paperAbstract"])
           .limit(k)
           .execute();
       } catch {
@@ -140,7 +144,9 @@ export class VectorDatabase {
         id: r.id as string,
         theoremSignature: r.theoremSignature as string,
         successfulTactic: r.successfulTactic as string,
-        ...(r.type != null ? { type: r.type as "MATHLIB" | "ARXIV" } : {}),
+        ...(r.type != null ? { type: r.type as "MATHLIB" | "ARXIV" | "LEAN_RESULT" } : {}),
+        ...(r.paperTitle != null ? { paperTitle: r.paperTitle as string } : {}),
+        ...(r.paperAbstract != null ? { paperAbstract: r.paperAbstract as string } : {}),
       }));
     } catch (error: any) {
       console.error(`[VectorDB] Search on "${tableName}" failed:`, error.message);
