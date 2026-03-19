@@ -747,7 +747,13 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         
         let builderConfig: any;
         builderConfig = await callSafe(
-          () => architectClient.formulateAlgebraicRule(targetGoal, journalSummaryText, cognitiveMode),
+          () => architectClient.formulateAlgebraicRule(
+            targetGoal,
+            journalSummaryText,
+            cognitiveMode,
+            memeticSeed ?? undefined,   // Phase 4: stuckAdj → Chalkboard Vision attachment
+            config.run_name,            // Phase 4: runName → scratch/stuck_state.svg path
+          ),
           1,
           "ARCHITECT formulateAlgebraicRule (Wiles)"
         );
@@ -1128,6 +1134,34 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         console.log(`   Workers: ${orchResult.workersRan} ran, best from worker ${orchResult.bestWorkerIndex}`);
       }
       addEvent(`SA complete: best E=${result.bestEnergy} after ${result.iterations.toLocaleString()} iters`);
+
+      // ── P3: Surrogate Funnel — post-SA beam search via Value Network ─────
+      // If the PyTorch surrogate server is running, run the best graph through
+      // the neighborhood funnel to find a lower-energy candidate before Z3.
+      // Non-blocking: if the server is down, silently skip.
+      if (result.bestEnergy > 0 && result.bestAdj) {
+        void (async () => {
+          try {
+            const { SurrogateClient } = await import("../search/surrogate_client");
+            const { optimizeThroughFunnel } = await import("../search/neighborhood_funnel");
+            const surrogate = new SurrogateClient();
+            const healthy = await surrogate.checkHealth();
+            if (healthy) {
+              console.log(`   🧠 [Surrogate] Server healthy — running neighborhood funnel on E=${result.bestEnergy} graph...`);
+              const funnelResult = await optimizeThroughFunnel(result.bestAdj, surrogate);
+              if (funnelResult.predictedEnergy < result.bestEnergy) {
+                console.log(`   🧠 [Surrogate] Funnel improved: E=${result.bestEnergy} → predicted E=${funnelResult.predictedEnergy}`);
+                if (!memeticSeed || funnelResult.predictedEnergy < (memeticSeedEnergy ?? Infinity)) {
+                  memeticSeed = funnelResult.bestMatrix;
+                  memeticSeedEnergy = funnelResult.predictedEnergy;
+                }
+              }
+            }
+          } catch {
+            // Surrogate server unavailable or funnel error — proceed without
+          }
+        })();
+      }
 
       if (result.witness) {
         // Save witness as JSON

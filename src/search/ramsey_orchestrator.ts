@@ -13,6 +13,9 @@ import { extractCliques } from "./lns_window";
 import { adaptiveZ3Solve } from "./z3_lns_optimizer";
 import { SolverBridge } from "../solver";
 import { findFrozenCore } from "./frozen_core";
+import { extractCommonSubgraph, describeObstruction } from "./obstruction_detector";
+import { ResearchJournal, defaultJournalPath } from "./research_journal";
+import { join } from "node:path";
 
 export type SearchStrategy = "single" | "island_model";
 export type SeedType = "random" | "paley" | "circulant";
@@ -233,7 +236,7 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
             (async () => {
               const patchStart = Date.now();
               const solver = new SolverBridge();
-              const patchedGraph = await adaptiveZ3Solve(basinAdj, cliques, solver, config.r, config.s);
+              const patchedGraph = await adaptiveZ3Solve(basinAdj, cliques, solver, config.r, config.s, lockedVertices);
               const ms = Date.now() - patchStart;
 
               if (patchedGraph && !resolved) {
@@ -368,6 +371,30 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
   // Clean up any remaining workers
   for (const w of workers) {
     try { w.terminate(); } catch {}
+  }
+
+  // ── P2: Obstruction Detector ─────────────────────────────────────────────
+  // After all workers settle, check if ≥3 produced near-miss graphs (E ≤ 2).
+  // If so, extract the shared topological obstruction and log it to the journal.
+  const nearMisses = allResults
+    .filter(r => r.bestEnergy <= 2 && r.bestAdj)
+    .map(r => r.bestAdj!);
+
+  if (nearMisses.length >= 3) {
+    console.log(`[ObstructionDetector] Analyzing ${nearMisses.length} near-miss graphs for structural convergence...`);
+    const obstruction = extractCommonSubgraph(nearMisses);
+    const desc = describeObstruction(obstruction);
+    console.log(`[ObstructionDetector] ${desc}`);
+
+    // Non-blocking journal write — failure must never crash the search
+    const journalPath = defaultJournalPath(join(process.cwd(), "agent_workspace"));
+    const journal = new ResearchJournal(journalPath);
+    journal.addEntry({
+      type: "observation",
+      claim: `Topological obstruction detected: ${desc}`,
+      evidence: `${nearMisses.length} workers independently converged on near-miss graphs with E≤2`,
+      target_goal: `R(${config.r},${config.s})`,
+    }).catch(() => {});
   }
 
   return {

@@ -2,6 +2,7 @@
  * surrogate_client.ts — HTTP client for the PyTorch Value Network FastAPI server.
  *
  * Calls POST /predict → returns predicted Ramsey energy float.
+ * Calls POST /predict_batch → returns predicted energies for a batch.
  * Handles server-offline gracefully via checkHealth().
  */
 
@@ -50,5 +51,44 @@ export class SurrogateClient {
 
     const body = (await res.json()) as { energy: number };
     return body.energy;
+  }
+
+  /**
+   * Batch-predict energy scores for multiple flattened adjacency matrices.
+   *
+   * Accepts an array of either:
+   *   - binary strings (e.g. "001101...") — converted to int arrays internally
+   *   - int arrays (e.g. [0, 0, 1, 1, ...]) — passed directly to /predict_batch
+   *
+   * @param matrices  Array of flattened adjacency matrices (strings or int arrays)
+   * @returns         Array of predicted energy floats in the same order
+   * @throws          On non-2xx response or network failure
+   */
+  async predictBatch(matrices: (string | number[])[]): Promise<number[]> {
+    if (matrices.length === 0) return [];
+
+    // Normalise all inputs to int arrays for the /predict_batch endpoint
+    const normalised: number[][] = matrices.map((m) => {
+      if (typeof m === "string") {
+        return m.split("").map(Number);
+      }
+      return m;
+    });
+
+    const res = await fetch(`${this.baseUrl}/predict_batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ matrices: normalised }),
+    });
+
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(
+        `SurrogateClient.predictBatch failed: HTTP ${res.status} — ${JSON.stringify(detail)}`
+      );
+    }
+
+    const body = (await res.json()) as { predictions: number[] };
+    return body.predictions;
   }
 }
