@@ -321,11 +321,14 @@ export class AlgebraicBuilder {
     }`);
 
     const partition = AlgebraicBuilder.buildPartition(config);
-    const energy = computeSumFreeEnergy(partition, domain_size, num_partitions);
+    const sumFreeViolations = computeSumFreeEnergy(partition, domain_size, num_partitions);
+    const assignedCount = partition.slice(1).filter((b) => b >= 0).length;
+    const unassignedCount = domain_size - assignedCount;
+    // An unassigned element is always a violation — a valid witness must cover {1..domain_size}
+    const energy = sumFreeViolations + unassignedCount;
     const compiledInMs = Date.now() - t0;
     const status: "witness" | "violations" = energy === 0 ? "witness" : "violations";
 
-    const assignedCount = partition.slice(1).filter((b) => b >= 0).length;
     console.log(
       `   Compiled in ${compiledInMs}ms: domain=${domain_size}, ` +
       `partitions=${num_partitions}, assigned=${assignedCount}/${domain_size}, E=${energy}`
