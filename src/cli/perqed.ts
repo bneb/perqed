@@ -1989,6 +1989,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
     leanBridge: lean,
     theoremName: config.theorem_name,
     theoremSignature: config.theorem_signature,
+    objective: config.objective_md,
     agentFactory: factory,
     batchSize: 3,
   });

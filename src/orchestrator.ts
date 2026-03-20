@@ -110,6 +110,8 @@ export interface OrchestratorConfig {
   theoremName?: string;
   /** Theorem signature for Lean proofs (e.g., "(n m : Nat) : n + m = m + n"). */
   theoremSignature?: string;
+  /** Full problem description/objective markdown to ground the Agent's reasoning. */
+  objective?: string;
   /** Sprint 8: AgentFactory for dynamic routing. When set, enables specialist routing. */
   agentFactory?: AgentFactory;
   /** Sprint 13: Local embedding service (Ollama nomic-embed-text). */
@@ -635,6 +637,11 @@ export async function runDynamicLoop(
     } else if (nextRole === "ARCHITECT") {
       // Sprint 12d: Architect gets the frontier digest from the ProofTree
       context = tree.buildFrontierDigest() + `\n## Theorem: ${cfg.theoremName} ${cfg.theoremSignature}`;
+
+      if (cfg.objective) {
+        // Ground the Architect in the original objective so it doesn't hallucinate "impossible"
+        context = `## Original Mathematical Objective:\n${cfg.objective}\n\n` + context;
+      }
 
       // Sprint 13: 📚 LIBRARIAN INJECTION — Neural Premise Selection
       if (cfg.vectorDb && cfg.embedder) {

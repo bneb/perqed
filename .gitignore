@@ -70,3 +70,4 @@ website/node_modules/
 **/paper/*.log
 **/paper/*.out
 **/paper/*.zip
+data/perqed.lancedb/

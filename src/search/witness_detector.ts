@@ -40,8 +40,19 @@ export interface UnknownArchitectConfig {
   problem_class: "unknown";
 }
 
+export interface SchurPartitionArchitectConfig {
+  problem_class: "schur_partition";
+  /** Number of integers to color, i.e. {1..domain_size} */
+  domain_size: number;
+  /** Number of color classes (partitions) */
+  num_partitions: number;
+}
+
 /** Discriminated union of all ARCHITECT-emittable search configs */
-export type ArchitectSearchConfig = RamseyArchitectConfig | UnknownArchitectConfig;
+export type ArchitectSearchConfig =
+  | RamseyArchitectConfig
+  | SchurPartitionArchitectConfig
+  | UnknownArchitectConfig;
 
 // ──────────────────────────────────────────────
 // Types consumed by the SA engine
