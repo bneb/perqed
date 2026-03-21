@@ -458,18 +458,16 @@ axiom sieve_lower_bound_open
         ∃ q : ℕ, Nat.Prime q ∧ q ≤ Nat.ceil (C * (Real.log N) ^ 2) ∧
           Nat.Prime (2 * N - q)
 
-/-- **The original additive bridge, now DERIVED from the 5-lemma chain.**
-    This shows that the decomposition is complete: Lemmas 1–5 together
-    imply the full additive_from_multiplicative statement.
+/-- **The additive bridge** — axiom encoding Goldbach for all N > 1.
+    Logically, for N ≥ N₀ this follows from `sieve_lower_bound_open`:
+    for large N, ∃ prime q with 2N-q prime, giving p + q = 2N.
+    For N < N₀, Goldbach is verified computationally (Oliveira e Silva 2013,
+    verified for all N ≤ 4·10¹⁸). Since the finite verification is a
+    separate computation, we keep this as an axiom.
 
-    The proof assembles the lemmas:
-      1. sieve_lower_bound (Lemma 5) gives a prime q ≤ W with 2N-q prime
-      2. Setting p = 2N - q gives p + q = 2N with both prime
-      3. Lemmas 1-4 are used implicitly (they justify WHY Lemma 5's
-         threshold is achievable, though the formal proof only needs Lemma 5)
-
-    The factoring reveals that the ENTIRE open content of the Goldbach
-    conjecture (via this route) is concentrated in `sieve_lower_bound_open`. -/
+    The geometric hypotheses (hembed, hpairs) motivate WHY the theorem
+    should be true but are logically unused — `sieve_lower_bound_open`
+    alone suffices for the asymptotic case. -/
 axiom additive_from_multiplicative
     (A : ArithmeticHyperbolicSurface)
     (hembed : ∀ p : ℕ, Nat.Prime p → ∃ γ : ClosedGeodesic A.toHyperbolicSurface,
