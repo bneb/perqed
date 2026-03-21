@@ -21,16 +21,16 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
         <p>In our <a href="/blog/goldbach-spectral-decomposition/">previous post</a>, we showed how the Goldbach conjecture's parity wall can be bypassed using the spectral route, reducing the problem to proving that Dirichlet L-functions have no exceptional "Siegel zeros."</p>
 
-        <p>This post details the final steps of that formalization. We've constructed a complete "tunnel" from Goldbach's conjecture down to a single, highly specific inequality about polynomial amplifiers. Even better, we built a custom FFT simulator to test this final inequality up to $N=100,000$ &mdash; and empirical results confirm it holds.</p>
+        <p>This post details the final steps of that formalization. We've constructed a complete "tunnel" from Goldbach's conjecture down to a single, highly specific inequality about polynomial amplifiers. Even better, we built a custom FFT simulator to test this final inequality up to N=100,000 &mdash; and empirical results confirm it holds.</p>
 
         <h2>The Compatibility Theorem</h2>
 
-        <p>To unconditionally eliminate Siegel zeros, we use the <em>amplified second moment</em> of L-functions. The core idea is to build a "resonator" polynomial $A(\chi)$ that artificially inflates the contribution of any character $\chi_0$ that might carry a Siegel zero.</p>
+        <p>To unconditionally eliminate Siegel zeros, we use the <em>amplified second moment</em> of L-functions. The core idea is to build a "resonator" polynomial A(&chi;) that artificially inflates the contribution of any character &chi;&lt;sub&gt;0&lt;/sub&gt; that might carry a Siegel zero.</p>
 
         <p>If a Siegel zero exists, the lower bound for the total moment must be strictly larger than the theoretical upper bound for the single exceptional term, creating a contradiction. This requires three established pillars of analytic number theory:</p>
 
         <ul>
-          <li><strong>Perron's Formula:</strong> Ensures $A(\chi_0)$ successfully detects the Siegel zero (detects $\beta \approx 1$).</li>
+          <li><strong>Perron's Formula:</strong> Ensures A(&chi;&lt;sub&gt;0&lt;/sub&gt;) successfully detects the Siegel zero (detects &beta; &approx; 1).</li>
           <li><strong>Iwaniec-Sarnak (2000):</strong> Shows a positive proportion of L-functions don't vanish, providing the dense lower bound.</li>
           <li><strong>Petrow-Young (2020):</strong> The crucial Weyl-strength subconvexity bound |L(1/2, &chi;)|&sup2; &le; q&lt;sup&gt;1/3+&epsilon;&lt;/sup&gt;, which caps the maximum possible size of the exceptional term.</li>
         </ul>
@@ -41,7 +41,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
         <p>This complete tunnel relies on exactly one unproven assumption, which we've isolated in Lean as <code>off_diagonal_bound</code>.</p>
         
-        <p>To compute the total amplified moment, we expand $|A(\chi)|^2$ into diagonal and off-diagonal terms. The diagonal is well-understood. The off-diagonal requires bounding the <em>shifted convolution</em> of the amplifier's coefficients $a_n$:</p>
+        <p>To compute the total amplified moment, we expand |A(&chi;)|&sup2; into diagonal and off-diagonal terms. The diagonal is well-understood. The off-diagonal requires bounding the <em>shifted convolution</em> of the amplifier's coefficients a&lt;sub&gt;n&lt;/sub&gt;:</p>
 
         <pre><code>S(h) = &sum; a_n &middot; a&lt;sub&gt;n+h&lt;/sub&gt;  &lt;  (Main Diagonal)</code></pre>
 
@@ -49,7 +49,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
         <h2>Empirical Verification to N=100,000</h2>
 
-        <p>Does the off-diagonal correlation actually decay? We wrote a custom Fast Fourier Transform (FFT) simulator in C to compute the maximum shifted correlation $\max|S(h)| / S(0)$ for different amplifiers. Because an $O(N^2)$ direct computation is too slow, the $O(N \log N)$ FFT approach allowed us to push to $N=100,000$.</p>
+        <p>Does the off-diagonal correlation actually decay? We wrote a custom Fast Fourier Transform (FFT) simulator in C to compute the maximum shifted correlation max|S(h)| / S(0) for different amplifiers. Because an O(N&sup2;) direct computation is too slow, the O(N log N) FFT approach allowed us to push to N=100,000.</p>
 
         <p>Here is how the maximum correlation decays relative to the main diagonal:</p>
 
@@ -59,10 +59,10 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
         <ul>
             <li>The classic <strong>Selberg</strong> amplifier drops cleanly to <strong>6.0%</strong> correlation at N=100,000.</li>
-            <li>The simpler <strong>Sharp</strong> weighting ($a_n = \mu(n)$) performs even better, decaying to just <strong>2.4%</strong>.</li>
+            <li>The simpler <strong>Sharp</strong> weighting (a&lt;sub&gt;n&lt;/sub&gt; = &mu;(n)) performs even better, decaying to just <strong>2.4%</strong>.</li>
         </ul>
 
-        <p>The correlation exhibits a long "burn-in" period due to local resonances at shifts that are multiples of small primes (like 3 and 5), but as $N$ scales, the sheer volume of larger primes washes these out. The ratio predictably crosses below 10% and continues dropping.</p>
+        <p>The correlation exhibits a long "burn-in" period due to local resonances at shifts that are multiples of small primes (like 3 and 5), but as N scales, the sheer volume of larger primes washes these out. The ratio predictably crosses below 10% and continues dropping.</p>
 
         <h2>The Ledger is Clean</h2>
 
