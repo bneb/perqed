@@ -32,10 +32,10 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
         <ul>
           <li><strong>Perron's Formula:</strong> Ensures $A(\chi_0)$ successfully detects the Siegel zero (detects $\beta \approx 1$).</li>
           <li><strong>Iwaniec-Sarnak (2000):</strong> Shows a positive proportion of L-functions don't vanish, providing the dense lower bound.</li>
-          <li><strong>Petrow-Young (2020):</strong> The crucial Weyl-strength subconvexity bound $|L(1/2, \chi)|^2 \le q^{1/3+\epsilon}$, which caps the maximum possible size of the exceptional term.</li>
+          <li><strong>Petrow-Young (2020):</strong> The crucial Weyl-strength subconvexity bound |L(1/2, &chi;)|&sup2; &le; q&lt;sup&gt;1/3+&epsilon;&lt;/sup&gt;, which caps the maximum possible size of the exceptional term.</li>
         </ul>
 
-        <p>Our formalization (the <code>compatibility_theorem</code>) assembles these pieces. If the exceptional character exists, its relative contribution to the total moment is bounded by $q^{5/6} / q = q^{-1/6}$. Because this ratio strictly decays to $0$ as $q \to \infty$, the exceptional character is eventually drowned out by the rest of the spectrum! It cannot exist.</p>
+        <p>Our formalization (the <code>compatibility_theorem</code>) assembles these pieces. If the exceptional character exists, its relative contribution to the total moment is bounded by q&lt;sup&gt;5/6&lt;/sup&gt; / q = q&lt;sup&gt;-1/6&lt;/sup&gt;. Because this ratio strictly decays to 0 as q &rarr; &infin;, the exceptional character is eventually drowned out by the rest of the spectrum! It cannot exist.</p>
 
         <h2>The Single Remaining Gap</h2>
 
@@ -43,9 +43,9 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
         
         <p>To compute the total amplified moment, we expand $|A(\chi)|^2$ into diagonal and off-diagonal terms. The diagonal is well-understood. The off-diagonal requires bounding the <em>shifted convolution</em> of the amplifier's coefficients $a_n$:</p>
 
-        <pre><code>S(h) = &sum; a_n &middot; a_{n+h}  &lt;  (Main Diagonal)</code></pre>
+        <pre><code>S(h) = &sum; a_n &middot; a&lt;sub&gt;n+h&lt;/sub&gt;  &lt;  (Main Diagonal)</code></pre>
 
-        <p>For the Selberg amplifier ($a_n = \mu(n) \frac{\log(N/n)}{\log N}$), this is a question about the autocorrelation of the Möbius function $\mu(n)$. Proving this bound rigorously relies on Kloosterman sums and the Kuznetsov trace formula.</p>
+        <p>For the Selberg amplifier (a&lt;sub&gt;n&lt;/sub&gt; = &mu;(n) &middot; log(N/n) / log N), this is a question about the autocorrelation of the Möbius function &mu;(n). Proving this bound rigorously relies on Kloosterman sums and the Kuznetsov trace formula.</p>
 
         <h2>Empirical Verification to N=100,000</h2>
 
