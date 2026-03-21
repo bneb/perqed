@@ -545,6 +545,7 @@ export class ArchitectClient {
     cognitiveMode: "EXPLORATION" | "EXPLOITATION" = "EXPLORATION",
     stuckAdj?: AdjacencyMatrix,
     runName?: string,
+    fewShotBlock?: string,
   ): Promise<any> {
     const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
@@ -557,6 +558,7 @@ export class ArchitectClient {
       "---",
       "CURRENT GOAL:",
       goal,
+      ...(fewShotBlock ? ["---", fewShotBlock] : []),
       "---",
       "CRITICAL: Review the 'Empirical Findings' in your context. DO NOT propose any symmetry or rule that generated an Energy > 0 in past attempts. DO NOT propose symmetries that generated too many degrees of freedom.",
       journalText,

@@ -91,4 +91,81 @@ export class SurrogateClient {
     const body = (await res.json()) as { predictions: number[] };
     return body.predictions;
   }
+
+  // ── Partition Value Network ──────────────────────────────────────────────────
+
+  /**
+   * Block-histogram encoder for Schur partitions.
+   * Matches partition_model.py encode_partition() exactly.
+   *
+   * @param partition  Int8Array, 1-indexed (index 0 unused), values in [0, K)
+   * @param N          Domain size
+   * @param K          Number of color classes
+   * @param block      Block size (default 20)
+   * @returns          Feature vector of length ⌈N/block⌉ × K, values in [0, 1]
+   */
+  static encodePartition(
+    partition: Int8Array,
+    N: number,
+    K: number,
+    block: number = 20,
+  ): number[] {
+    const nBlocks = Math.ceil(N / block);
+    const features: number[] = [];
+    for (let b = 0; b < nBlocks; b++) {
+      const start = b * block + 1;   // 1-indexed
+      const end = Math.min((b + 1) * block, N);
+      const blockLen = end - start + 1;
+      const counts = new Array<number>(K).fill(0);
+      for (let i = start; i <= end; i++) {
+        const color = partition[i] ?? 0;
+        if (color >= 0 && color < K) counts[color]++;
+      }
+      for (let k = 0; k < K; k++) features.push(counts[k]! / blockLen);
+    }
+    return features;
+  }
+
+  /**
+   * Returns true if the partition value network endpoint is reachable.
+   */
+  async checkPartitionHealth(): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/partition/health`);
+      if (!res.ok) return false;
+      const body = (await res.json()) as { status?: string };
+      return body.status === "ok";
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Predict Schur energy for a single encoded partition.
+   * @param enc  Feature vector from encodePartition()
+   */
+  async predictPartition(enc: number[]): Promise<number> {
+    const res = await fetch(`${this.baseUrl}/partition/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ partition_enc: enc }),
+    });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(
+        `SurrogateClient.predictPartition failed: HTTP ${res.status} — ${JSON.stringify(detail)}`
+      );
+    }
+    const body = (await res.json()) as { energy: number };
+    return body.energy;
+  }
+
+  /**
+   * Batch-predict energies for multiple encoded partitions.
+   */
+  async predictPartitionBatch(encs: number[][]): Promise<number[]> {
+    if (encs.length === 0) return [];
+    return Promise.all(encs.map(enc => this.predictPartition(enc)));
+  }
 }
+

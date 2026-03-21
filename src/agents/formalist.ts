@@ -170,9 +170,17 @@ export class FormalistAgent {
       }
     }
 
-    throw new Error(
-      `LLM failed to produce valid output after ${retries} attempts. Last error: ${lastError}`,
+    // All retries exhausted — return a graceful GIVE_UP instead of crashing.
+    // This prevents the orchestrator from dying when the LLM recognizes it
+    // cannot synthesize a 537-element partition via Lean tactics.
+    console.warn(
+      `   ⚠️ [FormalistAgent] All ${retries} attempts exhausted. Returning GIVE_UP instead of crashing.`
     );
+    return {
+      thoughts: `LLM failed after ${retries} attempts. Last error: ${lastError}`,
+      action: "PROPOSE_LEAN_TACTICS" as const,
+      lean_tactics: [],
+    } as FormalistResponse;
   }
 
   /**

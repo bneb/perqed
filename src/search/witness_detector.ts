@@ -146,3 +146,44 @@ export function extractSearchConfig(cfg: ArchitectSearchConfig): SearchConfig | 
       return null;
   }
 }
+
+// ──────────────────────────────────────────────
+// 3. MCTS Short-Circuit for Computational Searches
+// ──────────────────────────────────────────────
+
+/**
+ * Determines whether the MCTS Lean tactic loop should be skipped entirely
+ * for a given problem class. Some combinatorial problems (like Schur partition
+ * searches) require a computational witness found by SA/Z3 — no LLM can
+ * synthesize a 537-element partition array via Lean tactics.
+ *
+ * Returns `true` if MCTS should be skipped (= the problem is computational-only
+ * AND the SA engine failed to find E=0).
+ *
+ * @param opts.problem_class - The ARCHITECT-assigned problem class
+ * @param opts.bestEnergy    - The best energy found by the SA/algebraic search (0 = witness found)
+ */
+export function shouldSkipMCTSForCombinatorialSearch(opts: {
+  problem_class: string;
+  bestEnergy: number;
+}): boolean {
+  // Problem classes where the proof is PURELY constructive —
+  // the LLM writes a witness function, not a tactic chain.
+  const COMPUTATIONAL_ONLY_CLASSES = new Set([
+    "schur_partition",
+    // Future: "van_der_waerden_partition", "rado_partition", etc.
+  ]);
+
+  if (!COMPUTATIONAL_ONLY_CLASSES.has(opts.problem_class)) {
+    return false; // Not computational-only → MCTS is fine
+  }
+
+  // If E=0, the SA engine found the witness → no need to skip, the proof
+  // can be completed by injecting the witness into a `by decide` proof.
+  if (opts.bestEnergy === 0) {
+    return false;
+  }
+
+  // SA failed to find a witness → MCTS is futile for this class
+  return true;
+}

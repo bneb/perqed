@@ -17,13 +17,34 @@
 
 import { computeSumFreeEnergy } from "../math/optim/SumFreeEnergy";
 
+/**
+ * Available initialization strategies for the SA partition.
+ *
+ * - "modular":       (i-1) % K  — original default, strong attractor at E≈6
+ * - "random":        uniform random — maximum diversity, different basin each run
+ * - "gaussian_norm": ((i*i+1) % 13) % K — quadratic Gaussian residue, E≈420 seed
+ * - "lookup_shift":  period-18 LUT shifted by seed_offset — E≈407 seed
+ * - "blocks":        consecutive blocks of floor(N/K) — monotone start
+ * - "crossover":     uniform crossover of two parent partitions (genetic)
+ */
+export type SeedStrategy =
+  | "modular"
+  | "random"
+  | "gaussian_norm"
+  | "lookup_shift"
+  | "blocks"
+  | "crossover";
+
 export interface PartitionSAConfig {
   domain_size: number;
   num_partitions: number;
-  sa_iterations?: number;       // default 5_000_000
+  sa_iterations?: number;       // default 10_000_000
   initial_temperature?: number; // default 5.0
   cooling_rate?: number;        // default computed to reach ~0.01 by end
-  warmStart?: Int8Array;        // 1-indexed; if omitted, random init
+  warmStart?: Int8Array;        // 1-indexed; takes priority over seed_strategy
+  seed_strategy?: SeedStrategy; // default "modular"
+  seed_offset?: number;         // for "lookup_shift": shifts the LUT start
+  crossover_parents?: [Int8Array, Int8Array]; // required for "crossover"
   description: string;
 }
 
@@ -36,13 +57,54 @@ export interface PartitionSAResult {
 }
 
 /**
- * Build a fresh random partition with all elements in [0, num_partitions).
+ * Build the initial partition according to the configured SeedStrategy.
+ * warmStart takes priority — if provided, it is returned as-is (with missing
+ * elements filled randomly).
  */
-function randomPartition(domain_size: number, num_partitions: number): Int8Array {
-  const p = new Int8Array(domain_size + 1).fill(-1);
-  for (let i = 1; i <= domain_size; i++) {
-    p[i] = Math.floor(Math.random() * num_partitions);
+export function initializePartition(config: PartitionSAConfig): Int8Array {
+  const { domain_size: N, num_partitions: K, seed_strategy = "modular", seed_offset = 0 } = config;
+
+  // warmStart always wins
+  if (config.warmStart && config.warmStart.length === N + 1) {
+    const p = new Int8Array(config.warmStart);
+    for (let i = 1; i <= N; i++) {
+      if (p[i]! < 0 || p[i]! >= K) p[i] = Math.floor(Math.random() * K);
+    }
+    return p;
   }
+
+  const p = new Int8Array(N + 1);
+
+  switch (seed_strategy) {
+    case "random":
+      for (let i = 1; i <= N; i++) p[i] = Math.floor(Math.random() * K);
+      break;
+
+    case "gaussian_norm":
+      for (let i = 1; i <= N; i++) p[i] = ((i * i + 1) % 13) % K;
+      break;
+
+    case "lookup_shift": {
+      const lut = [0, 1, 2, 3, 4, 5, 0, 1, 2, 4, 5, 3, 0, 2, 1, 4, 5, 3];
+      for (let i = 1; i <= N; i++) p[i] = lut[(i - 1 + seed_offset) % lut.length]! % K;
+      break;
+    }
+
+    case "blocks":
+      for (let i = 1; i <= N; i++) p[i] = Math.min(Math.floor((i - 1) * K / N), K - 1);
+      break;
+
+    case "crossover": {
+      if (!config.crossover_parents) throw new Error("crossover strategy requires crossover_parents");
+      const [pa, pb] = config.crossover_parents;
+      for (let i = 1; i <= N; i++) p[i] = Math.random() < 0.5 ? pa[i]! : pb[i]!;
+      break;
+    }
+
+    default: // "modular"
+      for (let i = 1; i <= N; i++) p[i] = (i - 1) % K;
+  }
+
   return p;
 }
 
@@ -100,24 +162,15 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
     domain_size,
     num_partitions,
     description,
-    sa_iterations = 5_000_000,
+    sa_iterations = 10_000_000,
     initial_temperature = 5.0,
   } = config;
 
   // Cooling: reach T~0.01 by end of run
   const cooling_rate = config.cooling_rate ?? Math.pow(0.01 / initial_temperature, 1 / sa_iterations);
 
-  // Initialize partition
-  let current: Int8Array;
-  if (config.warmStart && config.warmStart.length === domain_size + 1) {
-    current = new Int8Array(config.warmStart);
-    // Fix any unassigned elements from warm start
-    for (let i = 1; i <= domain_size; i++) {
-    if (current[i] < 0) current[i] = Math.floor(Math.random() * num_partitions);
-    }
-  } else {
-    current = randomPartition(domain_size, num_partitions);
-  }
+  // Initialize partition via configured seed strategy (warmStart wins if provided)
+  let current: Int8Array = initializePartition(config);
 
   let currentEnergy = computeSumFreeEnergy(current, domain_size, num_partitions);
 

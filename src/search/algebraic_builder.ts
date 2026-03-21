@@ -273,9 +273,10 @@ export class AlgebraicBuilder {
     const { domain_size, num_partitions, partition_rule_js } = config;
     const partition = new Int8Array(domain_size + 1).fill(-1); // 1-indexed
 
-    let ruleFn: (i: number) => number | undefined;
+    let ruleFn: (i: number, np: number, ds: number) => number | undefined;
     try {
-      ruleFn = new Function('i', partition_rule_js) as (i: number) => number | undefined;
+      ruleFn = new Function('i', 'num_partitions', 'domain_size', partition_rule_js) as
+        (i: number, np: number, ds: number) => number | undefined;
     } catch (e: any) {
       throw new SandboxError(`Failed to compile partition_rule_js: ${e.message}`);
     }
@@ -283,7 +284,7 @@ export class AlgebraicBuilder {
     for (let i = 1; i <= domain_size; i++) {
       let bucket: number | undefined;
       try {
-        bucket = ruleFn(i);
+        bucket = ruleFn(i, num_partitions, domain_size);
       } catch (e: any) {
         throw new SandboxError(`partition_rule_js threw at i=${i}: ${e.message}`);
       }

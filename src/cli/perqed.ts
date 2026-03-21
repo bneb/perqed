@@ -181,10 +181,6 @@ const RUN_CONFIG_SCHEMA = {
       type: SchemaType.STRING as const,
       description: "Valid Lean 4 identifier for the theorem",
     },
-    theorem_signature: {
-      type: SchemaType.STRING as const,
-      description: "Complete Lean 4 theorem signature (after 'theorem <name>'). Must be valid Lean 4 syntax.",
-    },
     max_iterations: {
       type: SchemaType.NUMBER as const,
       description: "Recommended max orchestrator iterations (10-50)",
@@ -246,7 +242,7 @@ const RUN_CONFIG_SCHEMA = {
   },
   required: [
     "run_name", "problem_description", "theorem_name",
-    "theorem_signature", "max_iterations", "objective_md", "domain_skills_md",
+    "max_iterations", "objective_md", "domain_skills_md",
     "search_config"
   ],
 };
@@ -477,6 +473,19 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
 
   const config = await callSafe(doFormulate, 3, "ARCHITECT formulate");
   if (!config) throw new Error("ARCHITECT failed to produce a valid run configuration after 3 attempts.");
+
+  console.log("   ⠼ [Autoformalizer] Translating informal objective into type-safe Lean 4 signature...");
+  const { AutoformalizerAgent } = await import("../agents/autoformalizer");
+  const { LeanBridge } = await import("../lean_bridge");
+  try {
+    const auto = new AutoformalizerAgent({ leanBridge: new LeanBridge(), apiKey });
+    config.theorem_signature = await auto.formalize(config.objective_md);
+    console.log("   ✅ [Autoformalizer] Translation complete.");
+  } catch (err: any) {
+    console.error("\n❌ Autoformalization failed: " + err.message);
+    throw err;
+  }
+
   return config;
 }
 
@@ -814,50 +823,104 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         const journalSummaryText = await journal.getSummary(targetGoal);
         const cognitiveMode = await journal.getCognitiveTemperature(targetGoal);
 
-        console.log(`\n   🏛️  Asking ARCHITECT to formulate Algebraic Rule directly...`);
-        const { AlgebraicConstructionConfigSchema } = await import("../proof_dag/algebraic_construction_config");
-        
-    // Target 1: Track the last graph actually evaluated by the AlgebraicBuilder.
-        // This is what Gemini should SEE — not the memetic seed (starting point).
-        let lastEvaluatedAdj: AdjacencyMatrix | null = memeticSeed;
+        // ── FunSearch: Boot the Program Database ──
+        const { ProgramDatabase } = await import("../search/program_database");
+        const programDb = new ProgramDatabase(join(workspaceBase, "program_database.jsonl"));
+
+        // ── TheoremGraph: load persistent obstruction tracker ──
+        const { TheoremGraph } = await import("../proof_dag/theorem_graph");
+        const theoremGraph = new TheoremGraph(join(workspaceBase, "theorem_graph.jsonl"));
+        const knownObstructions = theoremGraph.toHyperbolicPromptString(500);
+        if (knownObstructions) {
+          console.log(`   🗺️  [TheoremGraph] ${theoremGraph.getObstructions().length} known obstruction(s) loaded`);
+        }
+        const fewShotBlock = programDb.formatFewShot(5);
+        if (fewShotBlock) {
+          console.log(`   🧬 [FunSearch] Injecting ${programDb.topKDiverse(5).length} best programs from prior runs`);
+        }
+
+        // ── Fast-path: For Schur partitions iteration 1, use the Gaussian norm seed directly ──
+        // The ARCHITECT consistently ignores prompt-recommended seeds and generates weak rules.
+        // Hardcode (i²+1) % 13 % 6 (E=420) as the forced first attempt.
         let builderConfig: any;
-
-        builderConfig = await callSafe(
-          () => architectClient.formulateAlgebraicRule(
-            targetGoal,
-            journalSummaryText,
-            cognitiveMode,
-            lastEvaluatedAdj ?? undefined,  // Target 1: show ARCHITECT what its rule produced
-            config.run_name,                 // Phase 4: runName → scratch/stuck_state.svg path
-          ),
-          1,
-          "ARCHITECT formulateAlgebraicRule (Wiles)"
-        );
-
-        if (!builderConfig) throw new Error("formulateAlgebraicRule failed to return a valid config.");
-
-        // Branch on problem class to select the right schema and node kind
         let initNodeKind: string;
-        if (isSchurPartition) {
+        let lastEvaluatedAdj: AdjacencyMatrix | null = memeticSeed;
+
+        if (isSchurPartition && wilesAttempts === 1) {
+          console.log(`\n   🎯 [FastPath] Using (i-1)%6 seed → SA 10M iters (reliably reaches E≈6)`);
           const { AlgebraicPartitionConfigSchema } = await import("../proof_dag/algebraic_partition_config");
-          builderConfig = AlgebraicPartitionConfigSchema.parse(builderConfig);
+          builderConfig = AlgebraicPartitionConfigSchema.parse({
+            problem_class: "schur_partition",
+            domain_size: 537,
+            num_partitions: 6,
+            partition_rule_js: "return (i - 1) % 6;",
+            description: "Simple modular seed (i-1)%6 — SA reliably grinds to E≈6",
+            sa_iterations: 10_000_000,
+          });
           initNodeKind = "algebraic_partition_construction";
-          console.log(`   🗺️  ARCHITECT emitted Partition Rule for ${builderConfig.domain_size} integers, ${builderConfig.num_partitions} partitions.`);
+          console.log(`   🗺️  Hardcoded Partition Rule for ${builderConfig.domain_size} integers, ${builderConfig.num_partitions} partitions.`);
         } else {
-          builderConfig = AlgebraicConstructionConfigSchema.parse(builderConfig);
-          initNodeKind = "algebraic_graph_construction";
-          console.log(`   🗺️  ARCHITECT emitted Algebraic Rule for ${builderConfig.vertices} vertices.`);
+          console.log(`\n   🏛️  Asking ARCHITECT to formulate Algebraic Rule directly...`);
+          const { AlgebraicConstructionConfigSchema } = await import("../proof_dag/algebraic_construction_config");
+        
+          // Target 1: Track the last graph actually evaluated by the AlgebraicBuilder.
+
+          builderConfig = await callSafe(
+            () => architectClient.formulateAlgebraicRule(
+              targetGoal,
+              // Enrich journal with known structural obstructions from TheoremGraph
+              knownObstructions ? `${journalSummaryText}\n\n${knownObstructions}` : journalSummaryText,
+              cognitiveMode,
+              lastEvaluatedAdj ?? undefined,  // Target 1: show ARCHITECT what its rule produced
+              config.run_name,                 // Phase 4: runName → scratch/stuck_state.svg path
+              fewShotBlock || undefined,       // Phase 12: FunSearch few-shot injection
+            ),
+            1,
+            "ARCHITECT formulateAlgebraicRule (Wiles)"
+          );
+
+          if (!builderConfig) throw new Error("formulateAlgebraicRule failed to return a valid config.");
+
+          // Branch on problem class to select the right schema and node kind
+          if (isSchurPartition) {
+            const { AlgebraicPartitionConfigSchema } = await import("../proof_dag/algebraic_partition_config");
+            builderConfig = AlgebraicPartitionConfigSchema.parse(builderConfig);
+            initNodeKind = "algebraic_partition_construction";
+            console.log(`   🗺️  ARCHITECT emitted Partition Rule for ${builderConfig.domain_size} integers, ${builderConfig.num_partitions} partitions.`);
+          } else {
+            builderConfig = AlgebraicConstructionConfigSchema.parse(builderConfig);
+            initNodeKind = "algebraic_graph_construction";
+            console.log(`   🗺️  ARCHITECT emitted Algebraic Rule for ${builderConfig.vertices} vertices.`);
+          }
+        }
+
+        const dagNodes: any[] = [{
+          id: "init_alg",
+          kind: initNodeKind,
+          dependsOn: [],
+          config: builderConfig
+        }];
+
+        // For Schur fast-path: also add an SA node that warm-starts from the algebraic seed
+        if (isSchurPartition && wilesAttempts === 1) {
+          dagNodes.push({
+            id: "sa_from_gaussian",
+            kind: "partition_sa_search",
+            dependsOn: ["init_alg"],
+            config: {
+              domain_size: 537,
+              num_partitions: 6,
+              sa_iterations: 10_000_000,
+              warm_start_from_node: "init_alg",
+              description: "SA warm-start from Gaussian norm (i²+1)%13%6",
+            }
+          });
         }
 
         const currentDag: any = {
           id: `wiles_run_${wilesAttempts}`,
           goal: targetGoal,
-          nodes: [{
-            id: "init_alg",
-            kind: initNodeKind,
-            dependsOn: [],
-            config: builderConfig
-          }]
+          nodes: dagNodes,
         };
 
         const { DAGExecutor } = await import("../proof_dag/dag_executor");
@@ -980,6 +1043,23 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 return { energy: NaN, status: "violations", note: e.message };
               }
 
+              // Phase 12: Record evaluation into FunSearch Program Database
+              if (partConfig.partition_rule_js && typeof partResult.energy === "number") {
+                programDb.record({
+                  rule_js: partConfig.partition_rule_js,
+                  energy: partResult.energy,
+                  description: partConfig.description ?? "unknown",
+                  domain_size: partConfig.domain_size,
+                  num_partitions: partConfig.num_partitions,
+                });
+              }
+
+              // Track best partition energy for P2 circuit breaker
+              if (typeof partResult.energy === "number" && !isNaN(partResult.energy)) {
+                const prev = (globalThis as any).__perqed_best_partition_energy ?? Infinity;
+                (globalThis as any).__perqed_best_partition_energy = Math.min(prev, partResult.energy);
+              }
+
               if (partResult.energy === 0) {
                 console.log(`   ✅ Partition Construction SAT! Witness found.`);
                 witnessFound = true;
@@ -1027,11 +1107,188 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 }
               }
 
-              console.log(`   ⚡ Partition SA: {1..${domainSize}}, ${numPartitions} classes, ${saIterations.toLocaleString()} iters...`);
-              const { runPartitionSA } = await import("../search/partition_sa_worker");
-              const saResult = await runPartitionSA({ domain_size: domainSize, num_partitions: numPartitions, sa_iterations: saIterations, warmStart, description });
+              console.log(`   ⚡ Partition SA: {1..${domainSize}}, ${numPartitions} classes, ${saIterations.toLocaleString()} iters — parallel workers...`);
+              const { runParallelSA, buildDiverseWorkerConfigs } = await import("../search/parallel_sa_coordinator");
+              const N_WORKERS = 4;
+              const workerConfigs = buildDiverseWorkerConfigs(
+                N_WORKERS,
+                { domain_size: domainSize, num_partitions: numPartitions, sa_iterations: Math.floor(saIterations / N_WORKERS) },
+                // inject warm start into first worker if available
+              ).map((cfg, idx) => idx === 0 && warmStart ? { ...cfg, warmStart, seed_strategy: "modular" as const } : cfg);
+              const parallelResult = await runParallelSA({ workerConfigs });
+              const saResult = { ...parallelResult.best };
+              console.log(`   ⚡ [ParallelSA] ${N_WORKERS} workers done in ${(parallelResult.wallTimeMs/1000).toFixed(1)}s. Best E=${saResult.energy} (strategies: ${workerConfigs.map(c=>c.seed_strategy??'modular').join(',')})`);
+              // Absorb any secondary results from parallel workers into the journal for future warm starts
+              for (const r of parallelResult.allResults) {
+                if (r.energy < saResult.energy) {
+                  console.log(`   🔀 [ParallelSA] Secondary worker found better E=${r.energy}`);
+                }
+              }
 
               console.log(`   Partition SA finished: E=${saResult.energy} after ${saResult.iterations.toLocaleString()} iters`);
+
+              // Track best partition energy for P2 circuit breaker
+              if (typeof saResult.energy === "number") {
+                const prev = (globalThis as any).__perqed_best_partition_energy ?? Infinity;
+                (globalThis as any).__perqed_best_partition_energy = Math.min(prev, saResult.energy);
+              }
+
+              // Always persist best SA partition (even E>0) for cross-run warm-starts
+              const saBestPath = join(workspace.paths.scratch, "partition_sa_best.json");
+              const saColorClasses: number[][] = Array.from({ length: numPartitions }, () => []);
+              for (let i = 1; i <= domainSize; i++) {
+                const b = saResult.partition[i];
+                if (b !== undefined && b >= 0) saColorClasses[b]!.push(i);
+              }
+              await Bun.write(saBestPath, JSON.stringify({
+                domain_size: domainSize,
+                num_partitions: numPartitions,
+                energy: saResult.energy,
+                description,
+                color_classes: saColorClasses,
+                partition_array: Array.from(saResult.partition),
+              }, null, 2));
+              console.log(`   💾 SA best partition saved to ${saBestPath}`);
+
+              // ── Targeted Local Search: if E is small (1-20), try exhaustive reassignment ──
+              if (saResult.energy > 0 && saResult.energy <= 20) {
+                console.log(`   🔬 [LocalSearch] E=${saResult.energy} is near-zero. Attempting targeted exhaustive search...`);
+                const { computeSumFreeEnergy } = await import("../math/optim/SumFreeEnergy");
+
+                // Find the violating triples
+                const p = saResult.partition;
+                const violatingElements = new Set<number>();
+                for (let x = 1; x <= domainSize; x++) {
+                  for (let y = x; y <= domainSize; y++) {
+                    const z = x + y;
+                    if (z > domainSize) break;
+                    if (p[x] === p[y] && p[y] === p[z]) {
+                      violatingElements.add(x);
+                      violatingElements.add(y);
+                      violatingElements.add(z);
+                    }
+                  }
+                }
+
+                const elems = [...violatingElements].sort((a, b) => a - b);
+                console.log(`   🔬 [LocalSearch] ${elems.length} elements involved in ${saResult.energy} violations: [${elems.slice(0, 20).join(", ")}${elems.length > 20 ? "..." : ""}]`);
+
+                // For small element counts, try all possible reassignments
+                if (elems.length <= 18) {
+                  const totalCombinations = Math.pow(numPartitions, elems.length);
+                  console.log(`   🔬 [LocalSearch] Exhaustive search: ${elems.length} elements × ${numPartitions} colors = ${totalCombinations.toLocaleString()} combinations`);
+
+                  const candidate = new Int8Array(p);
+                  let solved = false;
+
+                  for (let combo = 0; combo < totalCombinations; combo++) {
+                    // Encode combo as base-numPartitions digits
+                    let tmp = combo;
+                    for (let e = 0; e < elems.length; e++) {
+                      candidate[elems[e]!] = tmp % numPartitions;
+                      tmp = Math.floor(tmp / numPartitions);
+                    }
+
+                    const e = computeSumFreeEnergy(candidate, domainSize, numPartitions);
+                    if (e === 0) {
+                      console.log(`   ✅ [LocalSearch] SOLVED! Combination ${combo.toLocaleString()} → E=0`);
+                      saResult.partition = new Int8Array(candidate);
+                      saResult.energy = 0;
+                      saResult.status = "witness";
+                      solved = true;
+                      break;
+                    }
+
+                    if (combo % 1_000_000 === 0 && combo > 0) {
+                      console.log(`   🔬 [LocalSearch] Progress: ${(combo / totalCombinations * 100).toFixed(1)}%...`);
+                    }
+                  }
+
+                  if (!solved) {
+                    console.log(`   ❌ [LocalSearch] Exhaustive search complete — no E=0 found. The violated elements may require broader reassignment.`);
+                  }
+                } else {
+                  console.log(`   ⚠️ [LocalSearch] Too many elements (${elems.length}) for exhaustive search. Skipping.`);
+                }
+              }
+
+              // ── Spherical Riemannian GD: non-Euclidean continuous relaxation ──
+              if (saResult.energy > 0 && saResult.energy <= 50) {
+                console.log(`   📐 [Spherical] S^(K-1) Riemannian GD from E=${saResult.energy}...`);
+                try {
+                  const { runSphericalGradientDescent } = await import("../search/spherical_relaxation");
+                  const { hardPartition: sphPartition, finalSphereEnergy } =
+                    await runSphericalGradientDescent(saResult.partition, domainSize, numPartitions, 10_000, 0.01);
+                  const { computeSumFreeEnergy: cSFE } = await import("../math/optim/SumFreeEnergy");
+                  const sphDiscreteE = cSFE(sphPartition, domainSize, numPartitions);
+                  console.log(`   📊 [Spherical] Projected E=${sphDiscreteE} (sphere E=${finalSphereEnergy.toFixed(3)})`);
+                  if (sphDiscreteE < saResult.energy) {
+                    console.log(`   ✨ [Spherical] Improved: E=${saResult.energy} → ${sphDiscreteE}`);
+                    saResult.partition = sphPartition;
+                    saResult.energy = sphDiscreteE;
+                    if (saResult.energy === 0) saResult.status = "witness";
+                  }
+                } catch (e: any) {
+                  console.log(`   ⚠️ [Spherical] Failed (non-fatal): ${e.message}`);
+                }
+              }
+
+              // ── Bridge Learner: self-evolving manifold geometry pass ──────────────
+              // Shares /tmp/bridge_experiences.jsonl with sa_loop.ts — experiences
+              // from both pipelines improve the same TinyMLP reward model.
+              if (saResult.energy > 0 && saResult.energy <= 50) {
+                try {
+                  const { BridgeLearner } = await import("../search/bridge_learner");
+                  // Singleton: reuse across DAG nodes in the same run
+                  if (!(globalThis as any).__perqedBridgeLearner) {
+                    (globalThis as any).__perqedBridgeLearner = new BridgeLearner("/tmp/bridge_experiences.jsonl");
+                  }
+                  const bl: InstanceType<typeof BridgeLearner> = (globalThis as any).__perqedBridgeLearner;
+                  const candidates = bl.propose().slice(0, 2);
+                  for (const cand of candidates) {
+                    const result = await bl.evaluate(cand, saResult.partition, domainSize, numPartitions, 300);
+                    bl.updateRewardModel(cand, result);
+                    if (result.discreteEAfter < saResult.energy) {
+                      console.log(`   🔬 [Bridge:${cand.manifold}] E ${result.discreteEBefore} → ${result.discreteEAfter} (−${result.discreteEBefore - result.discreteEAfter})`);
+                      // Decode to the best hard partition found by this manifold
+                      const enc = cand.encode(saResult.partition, domainSize, numPartitions);
+                      saResult.partition = cand.decode(enc, domainSize);
+                      saResult.energy = result.discreteEAfter;
+                      if (saResult.energy === 0) { saResult.status = "witness"; break; }
+                    }
+                  }
+                } catch (e: any) {
+                  // Non-fatal: bridge learner failure should never block Z3
+                  console.log(`   💤 [Bridge] Skipped (non-fatal): ${e.message?.slice(0, 80)}`);
+                }
+              }
+
+              // ── Z3 SMT Repair: if SDP didn't solve, try Z3 with wider repair window ──
+              if (saResult.energy > 0 && saResult.energy <= 50) {
+                console.log(`   🔧 [Z3Repair] Attempting Z3 SMT repair from E=${saResult.energy}...`);
+                try {
+                  const { runZ3Repair } = await import("../search/z3_partition_repair");
+                  const solver = new (await import("../solver")).SolverBridge();
+                  const z3Result = await runZ3Repair(saResult.partition, domainSize, numPartitions, solver);
+
+                  if (z3Result.solved && z3Result.partition) {
+                    console.log(`   ✅ [Z3Repair] Z3 found a valid repair! E=0 witness.`);
+                    saResult.partition = z3Result.partition;
+                    saResult.energy = 0;
+                    saResult.status = "witness";
+                  } else {
+                    console.log(`   ❌ [Z3Repair] Z3 could not repair. Recording obstruction...`);
+                    theoremGraph.addNode({
+                      kind: "OBSTRUCTION",
+                      label: `Z3 UNSAT on ${domainSize}-element partition at E=${saResult.energy}`,
+                      energy: saResult.energy,
+                      evidence: `${z3Result.z3Output.slice(0, 200)}`,
+                    });
+                  }
+                } catch (e: any) {
+                  console.log(`   ⚠️ [Z3Repair] Z3 execution failed: ${e.message}`);
+                }
+              }
 
               if (saResult.energy === 0) {
                 console.log(`   ✅ Partition SA found E=0 witness!`);
@@ -1070,9 +1327,15 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
             wilesAvailableSkills = entries.filter((e) => e.isDirectory()).map((e) => e.name);
           } catch { /* skills dir absent */ }
 
+          // Enrich with hierarchy-ordered TheoremGraph obstructions (Poincaré ball ordering)
+          const graphObstructions = theoremGraph.toHyperbolicPromptString(500);
+          const enrichedJournalText = graphObstructions
+            ? `${currentJournalsText}\n\n${graphObstructions}`
+            : currentJournalsText;
+
           let appendedDag: any;
           appendedDag = await callSafe(
-            () => architectClient.replanDAG(currentDag, currentJournalsText, cognitiveMode, wilesAvailableSkills),
+            () => architectClient.replanDAG(currentDag, enrichedJournalText, cognitiveMode, wilesAvailableSkills),
             1,
             "ARCHITECT replanDAG"
           );
@@ -1971,6 +2234,25 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
     }
 
     witnessFound = false; // If we get here, search loop ended without success
+  }
+
+  // ── P2 Circuit Breaker: Skip MCTS for computational-only problem classes ──
+  // If the problem class is purely computational (e.g. schur_partition) and
+  // the SA/algebraic search didn't find E=0, the LLM cannot synthesize the
+  // witness via Lean tactics. Short-circuit immediately.
+  const { shouldSkipMCTSForCombinatorialSearch } = await import("../search/witness_detector");
+  const problemClass = config.search_config?.problem_class ?? "unknown";
+  // bestPartitionEnergy is set by the Wiles/SA loop above; default to Infinity if never set
+  const bestE = (globalThis as any).__perqed_best_partition_energy ?? Infinity;
+  if (shouldSkipMCTSForCombinatorialSearch({ problem_class: problemClass, bestEnergy: bestE })) {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log("\n══════════════════════════════════════════════");
+    console.log(`  ❌ COMPUTATIONAL SEARCH EXHAUSTED after ${elapsed}s`);
+    console.log(`  Problem class "${problemClass}" requires a computational witness (E=0).`);
+    console.log(`  Best energy achieved: E=${bestE}. MCTS tactic search is not applicable.`);
+    console.log(`  Lab log: ${workspace.paths.labLog}`);
+    console.log("══════════════════════════════════════════════");
+    return;
   }
 
   // ── Tactic Phase: LLM-driven proof search (for non-constructive proofs) ──

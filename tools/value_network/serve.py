@@ -21,6 +21,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
 
 from model import ValueNetwork, INPUT_DIM
+from partition_model import PartitionValueNetwork, INPUT_DIM as P_INPUT_DIM, encode_partition
 from train import get_device
 
 
@@ -28,27 +29,37 @@ from train import get_device
 
 _model: ValueNetwork | None = None
 _device: torch.device | None = None
+_partition_model: PartitionValueNetwork | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load model at startup; release at shutdown."""
-    global _model, _device
+    """Load models at startup; release at shutdown."""
+    global _model, _device, _partition_model
 
     _device = get_device()
-    ckpt_path = os.environ.get("VALUE_NETWORK_PATH", "value_network.pt")
 
+    # ── Ramsey graph value network ─────────────────────────────────────────────
+    ckpt_path = os.environ.get("VALUE_NETWORK_PATH", "value_network.pt")
     if os.path.exists(ckpt_path):
         _model = ValueNetwork.load(ckpt_path, device=_device)
-        print(f"✅ Loaded model from {ckpt_path} on {_device}")
+        print(f"✅ Ramsey model loaded from {ckpt_path} on {_device}")
     else:
-        # Fall back to a random model for /health checks without a checkpoint
-        print(f"⚠️  No checkpoint at {ckpt_path} — using random weights")
+        print(f"⚠️  No Ramsey checkpoint at {ckpt_path} — using random weights")
         _model = ValueNetwork().to(_device).eval()
 
-    yield
+    # ── Partition value network ────────────────────────────────────────────────
+    p_ckpt = os.environ.get("PARTITION_NETWORK_PATH", "partition_value_network.pt")
+    if os.path.exists(p_ckpt):
+        _partition_model = PartitionValueNetwork.load(p_ckpt, device=_device)
+        print(f"✅ Partition model loaded from {p_ckpt} on {_device}")
+    else:
+        print(f"⚠️  No partition checkpoint at {p_ckpt} — using random weights")
+        _partition_model = PartitionValueNetwork().to(_device).eval()
 
+    yield
     _model = None
+    _partition_model = None
 
 
 app = FastAPI(
@@ -103,5 +114,50 @@ def predict(req: PredictRequest) -> PredictResponse:
 
     with torch.no_grad():
         energy = _model(features).item()
+
+    return PredictResponse(energy=float(energy))
+
+
+# ── Partition endpoints ───────────────────────────────────────────────────────
+
+class PartitionPredictRequest(BaseModel):
+    partition_enc: list[float]
+
+    @field_validator("partition_enc")
+    @classmethod
+    def validate_enc(cls, v: list[float]) -> list[float]:
+        if len(v) != P_INPUT_DIM:
+            raise ValueError(
+                f"partition_enc must have {P_INPUT_DIM} elements, got {len(v)}"
+            )
+        return v
+
+
+class PartitionHealthResponse(BaseModel):
+    status: str
+    device: str
+    checkpoint_loaded: bool
+
+
+@app.get("/partition/health", response_model=PartitionHealthResponse)
+def partition_health() -> PartitionHealthResponse:
+    import os
+    ckpt = os.environ.get("PARTITION_NETWORK_PATH", "partition_value_network.pt")
+    return PartitionHealthResponse(
+        status="ok",
+        device=str(_device),
+        checkpoint_loaded=os.path.exists(ckpt),
+    )
+
+
+@app.post("/partition/predict", response_model=PredictResponse)
+def partition_predict(req: PartitionPredictRequest) -> PredictResponse:
+    if _partition_model is None:
+        raise HTTPException(status_code=503, detail="Partition model not loaded")
+
+    features = torch.tensor(req.partition_enc, dtype=torch.float32)\
+        .unsqueeze(0).to(_device)
+    with torch.no_grad():
+        energy = _partition_model(features).item()
 
     return PredictResponse(energy=float(energy))
