@@ -52,24 +52,30 @@ static void build_sieve(int limit) {
 /* ─── Goldbach counting ──────────────────────────────────────── */
 
 typedef struct {
-    int standard;     /* r(2N): pairs with p+q = 2N */
-    int product;      /* r_prod(2N,M): pairs with p+q = 2N AND p*q ≤ M */
+    int standard;        /* r(2N): pairs with p+q = 2N */
+    int product;         /* r_prod(2N,M): pairs with p+q = 2N AND p*q ≤ M */
+    int64_t min_product; /* min p*q over all pairs with p+q = 2N */
+    int64_t max_product; /* max p*q over all pairs with p+q = 2N */
 } goldbach_count_t;
 
 static goldbach_count_t count_goldbach(int two_n, int64_t prod_bound) {
-    goldbach_count_t c = {0, 0};
+    goldbach_count_t c = {0, 0, INT64_MAX, 0};
     if (two_n < 4 || (two_n & 1)) return c;
 
     for (int i = 0; i < prime_count; i++) {
         int p = primes[i];
-        if (p > two_n / 2) break;   /* unordered: p ≤ q */
+        if (p > two_n / 2) break;
         int q = two_n - p;
         if (q < 2 || q > two_n) break;
         if (!sieve[q]) continue;
         c.standard++;
-        if ((int64_t)p * q <= prod_bound)
+        int64_t pq = (int64_t)p * q;
+        if (pq < c.min_product) c.min_product = pq;
+        if (pq > c.max_product) c.max_product = pq;
+        if (pq <= prod_bound)
             c.product++;
     }
+    if (c.standard == 0) c.min_product = 0;
     return c;
 }
 
@@ -341,6 +347,318 @@ int main(int argc, char **argv) {
     }
     printf("\n");
 
+    /* ── Hyperbolic Geodesic Analysis ────────────────────────── */
+    printf("╔═════════════════════════════════════════════════════════════╗\n");
+    printf("║  🌀 Hyperbolic Geodesic Analysis                            ║\n");
+    printf("╚═════════════════════════════════════════════════════════════╝\n\n");
+
+    /*
+     * On an arithmetic surface, each prime p corresponds to a prime geodesic
+     * of length ℓ(γ) = 2·log(p). We analyze:
+     *   1. The length spectrum distribution
+     *   2. The geodesic pair count Π₂(x) = #{(γ,γ') : ℓ(γ)+ℓ(γ') ≤ x}
+     *   3. Comparison to the theoretical eˣ/x² asymptotic
+     *   4. What integer sums p+q the geodesic pairs actually produce
+     */
+
+    /* ── 1. Length spectrum ─────────────────────────────────── */
+    printf("  1. LENGTH SPECTRUM ℓ(γ) = 2·log(p)\n");
+    printf("  ─────────────────────────────────────\n");
+    double min_length = 2.0 * log(2.0);
+    double max_length = 2.0 * log((double)primes[prime_count - 1]);
+    printf("  Primes in sieve:  %d\n", prime_count);
+    printf("  Min geodesic len: %.4f  (p=2, ℓ=2·log2)\n", min_length);
+    printf("  Max geodesic len: %.4f  (p=%d, ℓ=2·log%d)\n",
+           max_length, primes[prime_count - 1], primes[prime_count - 1]);
+
+    /* Length histogram: bucket geodesic lengths */
+    int n_lbuckets = 20;
+    double l_step = max_length / n_lbuckets;
+    int *l_hist = calloc(n_lbuckets + 1, sizeof(int));
+    for (int i = 0; i < prime_count; i++) {
+        double l = 2.0 * log((double)primes[i]);
+        int b = (int)(l / l_step);
+        if (b >= n_lbuckets) b = n_lbuckets - 1;
+        l_hist[b]++;
+    }
+    int l_hist_max = 0;
+    for (int b = 0; b < n_lbuckets; b++)
+        if (l_hist[b] > l_hist_max) l_hist_max = l_hist[b];
+
+    printf("\n  Length spectrum histogram:\n");
+    for (int b = 0; b < n_lbuckets; b++) {
+        if (l_hist[b] == 0) continue;
+        int bar = (l_hist[b] * 40) / (l_hist_max > 0 ? l_hist_max : 1);
+        printf("  [%5.2f-%5.2f] %6d  ", b * l_step, (b + 1) * l_step, l_hist[b]);
+        for (int j = 0; j < bar; j++) printf("▓");
+        printf("\n");
+    }
+    free(l_hist);
+
+    /* ── 2. Geodesic pair count Π₂(x) ─────────────────────── */
+    printf("\n  2. GEODESIC PAIR COUNT Π₂(x) vs eˣ/x²\n");
+    printf("  ─────────────────────────────────────────\n");
+    printf("  Π₂(x) = #{ordered (p,q) prime : 2·log(p) + 2·log(q) ≤ x}\n");
+    printf("        = #{(p,q) prime : p·q ≤ e^(x/2)}\n\n");
+
+    printf("  %8s  %12s  %12s  %10s  %10s\n",
+           "x", "e^(x/2)", "Π₂(x)", "eˣ/x²", "ratio");
+    printf("  %8s  %12s  %12s  %10s  %10s\n",
+           "────────", "────────────", "────────────", "──────────", "──────────");
+
+    /* Sample x values from 4 to 2·log(M) */
+    double x_max = 2.0 * log((double)M);
+    int n_samples = 15;
+    for (int s = 0; s < n_samples; s++) {
+        double x = 4.0 + (x_max - 4.0) * s / (n_samples - 1);
+        double prod_lim = exp(x / 2.0);  /* p·q ≤ e^(x/2) */
+        int64_t plim = (int64_t)prod_lim;
+        if (plim > (int64_t)M * M) plim = (int64_t)M * M;
+
+        /* Count ordered pairs (p,q) with p·q ≤ plim */
+        int64_t pair_cnt = 0;
+        for (int i = 0; i < prime_count; i++) {
+            int p = primes[i];
+            if ((int64_t)p * p > plim) break;
+            /* For each p, count primes q ≤ plim/p via binary search */
+            int64_t q_max = plim / p;
+            /* Binary search for largest prime index j with primes[j] ≤ q_max */
+            int lo = i, hi = prime_count - 1, best = -1;
+            while (lo <= hi) {
+                int mid = lo + (hi - lo) / 2;
+                if (primes[mid] <= q_max) { best = mid; lo = mid + 1; }
+                else hi = mid - 1;
+            }
+            if (best >= i) {
+                pair_cnt += 2 * (best - i);  /* ordered: (p,q) and (q,p) */
+                pair_cnt += 1;               /* p == q case */
+            }
+        }
+
+        double theoretical = exp(x) / (x * x);
+        double ratio = (theoretical > 0) ? pair_cnt / theoretical : 0;
+        printf("  %8.2f  %12.0f  %12lld  %10.0f  %10.4f\n",
+               x, prod_lim, (long long)pair_cnt, theoretical, ratio);
+    }
+
+    /* ── 3. Geodesic pair → integer sum coverage ──────────── */
+    printf("\n  3. GEODESIC PAIR → INTEGER SUM COVERAGE\n");
+    printf("  ─────────────────────────────────────────\n");
+    printf("  For each x, what fraction of even integers ≤ 2·√(e^(x/2))\n");
+    printf("  are achievable as p+q where p·q ≤ e^(x/2)?\n\n");
+
+    printf("  %8s  %10s  %10s  %10s  %10s\n",
+           "x", "prod_bnd", "max_sum", "evens_hit", "coverage");
+    printf("  %8s  %10s  %10s  %10s  %10s\n",
+           "────────", "──────────", "──────────", "──────────", "──────────");
+
+    for (int s = 0; s < 10; s++) {
+        double x = 6.0 + (x_max - 6.0) * s / 9.0;
+        double prod_lim = exp(x / 2.0);
+        int64_t plim = (int64_t)prod_lim;
+        if (plim > (int64_t)M) plim = M;  /* limited by sieve */
+
+        /* Max possible sum for pairs with product ≤ plim:
+         * p + q ≤ p·q + 1 ≤ plim + 1  (for p,q ≥ 2)
+         * But more precisely, max sum is 2 + (plim/2) when p=2 */
+        int max_sum = (int)(plim / 2) + 2;
+        if (max_sum > M) max_sum = M;
+
+        /* Track which even integers are hit */
+        int sum_slots = max_sum / 2 + 1;
+        uint8_t *hit = calloc(sum_slots, 1);
+        int evens_hit = 0;
+
+        for (int i = 0; i < prime_count; i++) {
+            int p = primes[i];
+            if ((int64_t)p * p > plim) break;
+            int64_t q_max = plim / p;
+            for (int j = i; j < prime_count && primes[j] <= q_max; j++) {
+                int s_val = p + primes[j];
+                if (s_val <= max_sum && (s_val % 2 == 0)) {
+                    int idx = s_val / 2;
+                    if (idx < sum_slots && !hit[idx]) {
+                        hit[idx] = 1;
+                        evens_hit++;
+                    }
+                }
+            }
+        }
+
+        int total_evens = max_sum / 2 - 1;  /* even integers 4..max_sum */
+        double coverage = total_evens > 0 ? 100.0 * evens_hit / total_evens : 0;
+        printf("  %8.2f  %10lld  %10d  %10d  %9.2f%%\n",
+               x, (long long)plim, max_sum, evens_hit, coverage);
+        free(hit);
+    }
+
+    /* ── 4. Bridge gap: geodesic vs additive ──────────────── */
+    printf("\n  4. BRIDGE GAP ANALYSIS\n");
+    printf("  ─────────────────────────────────────────\n");
+    printf("  The additive_from_multiplicative axiom asks:\n");
+    printf("  does p·q ≤ M for primes p,q guarantee p+q hits all evens?\n\n");
+
+    /* Use full sieve limit M as the product bound */
+    {
+        int max_sum_full = M / 2 + 2;
+        if (max_sum_full > M) max_sum_full = M;
+        int sum_slots = max_sum_full / 2 + 1;
+        uint8_t *hit = calloc(sum_slots, 1);
+        int evens_hit = 0;
+        int64_t total_pairs = 0;
+
+        for (int i = 0; i < prime_count; i++) {
+            int p = primes[i];
+            if ((int64_t)p * p > (int64_t)M) break;
+            int64_t q_max = (int64_t)M / p;
+            for (int j = i; j < prime_count && primes[j] <= q_max; j++) {
+                total_pairs++;
+                int s_val = p + primes[j];
+                if (s_val <= max_sum_full && (s_val % 2 == 0)) {
+                    int idx = s_val / 2;
+                    if (idx < sum_slots && !hit[idx]) {
+                        hit[idx] = 1;
+                        evens_hit++;
+                    }
+                }
+            }
+        }
+
+        int total_evens = max_sum_full / 2 - 1;
+        printf("  Product bound:       M = %d\n", M);
+        printf("  Total geodesic pairs (p·q ≤ M): %lld\n", (long long)total_pairs);
+        printf("  Max achievable sum:  %d\n", max_sum_full);
+        printf("  Even integers hit:   %d / %d (%.2f%%)\n",
+               evens_hit, total_evens, 100.0 * evens_hit / (total_evens > 0 ? total_evens : 1));
+        printf("  Even integers missed: %d\n\n", total_evens - evens_hit);
+
+        if (evens_hit >= total_evens) {
+            printf("  ✅ ALL even integers up to %d are geodesic-reachable!\n\n", max_sum_full);
+        } else {
+            /* Find the first missed even */
+            int first_miss = -1;
+            for (int k = 2; k < sum_slots; k++) {
+                if (!hit[k]) { first_miss = 2 * k; break; }
+            }
+            printf("  ⚠️  First even integer NOT reachable: %d\n", first_miss);
+            printf("  This is an even N where no primes p,q with p·q ≤ %d sum to N.\n\n", M);
+
+            /* Count missed by magnitude */
+            printf("  Missed even integers by range:\n");
+            int range_sz = max_sum_full / 10;
+            for (int r = 0; r < 10; r++) {
+                int r_start = r * range_sz / 2;
+                int r_end = (r + 1) * range_sz / 2;
+                if (r_end > sum_slots) r_end = sum_slots;
+                int missed_in_range = 0;
+                int total_in_range = 0;
+                for (int k = r_start; k < r_end; k++) {
+                    if (k >= 2) {  /* skip 0 and 2 */
+                        total_in_range++;
+                        if (!hit[k]) missed_in_range++;
+                    }
+                }
+                printf("    [%6d - %6d]: %5d missed / %5d (%.1f%%)\n",
+                       r * range_sz, (r + 1) * range_sz,
+                       missed_in_range, total_in_range,
+                       total_in_range > 0 ? 100.0 * missed_in_range / total_in_range : 0);
+            }
+            printf("\n");
+        }
+        free(hit);
+    }
+
+    /* ── 5. Delta/Epsilon Distance Analysis ─────────────────── */
+    printf("\n");
+    printf("╔═════════════════════════════════════════════════════════════╗\n");
+    printf("║  📏 Delta/Epsilon Distance Analysis                         ║\n");
+    printf("╚═════════════════════════════════════════════════════════════╝\n\n");
+    printf("  δ(2N) = min_{p+q=2N, p,q prime} p·q\n");
+    printf("  ε(2N) = δ(2N) / M  (normalized: <1 means product bound satisfied)\n\n");
+
+    /* Recompute with distance tracking */
+    int64_t *delta_arr = malloc(num_evens * sizeof(int64_t));
+    int64_t *delta_max_arr = malloc(num_evens * sizeof(int64_t));
+    for (int i = 0; i < num_evens; i++) {
+        int two_n = 2 * (i + 2);
+        goldbach_count_t gc = count_goldbach(two_n, (int64_t)M);
+        delta_arr[i] = gc.min_product;
+        delta_max_arr[i] = gc.max_product;
+    }
+
+    /* Delta distribution by 2N range */
+    printf("  %12s  %12s  %12s  %12s  %12s\n",
+           "2N range", "avg δ(2N)", "avg ε=δ/M", "min δ", "max δ");
+    printf("  %12s  %12s  %12s  %12s  %12s\n",
+           "────────────", "────────────", "────────────", "────────────", "────────────");
+
+    int d_ranges = 10;
+    int d_range_size = num_evens / d_ranges;
+    for (int r = 0; r < d_ranges; r++) {
+        int start = r * d_range_size;
+        int end = (r == d_ranges - 1) ? num_evens : (r + 1) * d_range_size;
+        double avg_delta = 0;
+        int64_t min_d = INT64_MAX, max_d = 0;
+        int cnt = 0;
+        for (int i = start; i < end; i++) {
+            if (delta_arr[i] > 0) {
+                avg_delta += (double)delta_arr[i];
+                if (delta_arr[i] < min_d) min_d = delta_arr[i];
+                if (delta_arr[i] > max_d) max_d = delta_arr[i];
+                cnt++;
+            }
+        }
+        avg_delta = cnt > 0 ? avg_delta / cnt : 0;
+        int two_n_lo = 2 * (start + 2);
+        int two_n_hi = 2 * (end + 1);
+        printf("  [%5d-%5d]  %12.0f  %12.6f  %12lld  %12lld\n",
+               two_n_lo, two_n_hi, avg_delta, avg_delta / M,
+               (long long)(min_d == INT64_MAX ? 0 : min_d), (long long)max_d);
+    }
+
+    /* Epsilon threshold analysis */
+    printf("\n  Epsilon threshold: how many 2N have ε ≤ threshold?\n");
+    double thresholds[] = {0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 100.0};
+    int n_thresh = sizeof(thresholds) / sizeof(thresholds[0]);
+    printf("  %10s  %10s  %10s\n", "ε ≤", "count", "fraction");
+    printf("  %10s  %10s  %10s\n", "──────────", "──────────", "──────────");
+    for (int t = 0; t < n_thresh; t++) {
+        int cnt = 0;
+        for (int i = 0; i < num_evens; i++) {
+            double eps = (double)delta_arr[i] / M;
+            if (eps <= thresholds[t]) cnt++;
+        }
+        printf("  %10.2f  %10d  %10.4f\n", thresholds[t], cnt, (double)cnt / num_evens);
+    }
+
+    /* CSV export */
+    {
+        char csv_path[256];
+        snprintf(csv_path, sizeof(csv_path),
+                 "/Users/kevin/projects/perqed/tools/goldbach_geodesic_M%d.csv", M);
+        FILE *csv = fopen(csv_path, "w");
+        if (csv) {
+            fprintf(csv, "two_n,r_standard,r_product,min_product,max_product,"
+                         "epsilon,log_two_n,geodesic_x\n");
+            for (int i = 0; i < num_evens; i++) {
+                int two_n = 2 * (i + 2);
+                double eps = (double)delta_arr[i] / M;
+                double geodesic_x = (delta_arr[i] > 0) ? 2.0 * log((double)delta_arr[i]) : 0;
+                fprintf(csv, "%d,%d,%d,%lld,%lld,%.8f,%.6f,%.6f\n",
+                        two_n, r_standard[i], r_product[i],
+                        (long long)delta_arr[i], (long long)delta_max_arr[i],
+                        eps, log((double)two_n), geodesic_x);
+            }
+            fclose(csv);
+            printf("\n  📁 CSV exported: %s\n", csv_path);
+            printf("  Columns: two_n, r_standard, r_product, min_product,\n");
+            printf("           max_product, epsilon, log_two_n, geodesic_x\n");
+        }
+    }
+
+    free(delta_arr);
+    free(delta_max_arr);
+
     /* ── Cleanup ────────────────────────────────────────────── */
     free_mod_analysis(ma);
     free(r_standard);
@@ -351,3 +669,4 @@ int main(int argc, char **argv) {
     printf("Done.\n");
     return 0;
 }
+

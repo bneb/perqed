@@ -78,3 +78,7 @@ data/perqed.lancedb/
 
 # Lean / Lake build artifacts (Mathlib cache, .olean objects)
 src/lean/.lake/
+
+# Goldbach explorer generated data
+tools/goldbach_geodesic_M*.csv
+tools/goldbach_explorer
