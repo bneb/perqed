@@ -918,6 +918,17 @@ the full GRH or the sieve parity problem. Iwaniec (2006) and
 Goldfeld (1976) have partial results.
 -/
 
+/-- **Eventual Domination Lemma** (standard calculus).
+    For A > 0, c > 0, C > 0:
+      c · N / log²N > C · N · exp(-A · √log N) for all sufficiently large N.
+    Equivalently: exp(A·√log N) > (C/c)·log²N eventually.
+    This is immediate since exp grows faster than any polynomial of log.
+    Reference: any introductory real analysis textbook (L'Hôpital or comparison test). -/
+axiom exp_dominates_log_poly (A c C : ℝ) (hA : A > 0) (hc : c > 0) (hC : C > 0) :
+    ∃ N₀ : ℕ, ∀ N : ℕ, N ≥ N₀ → N > 1 →
+      c * (N : ℝ) / (Real.log N) ^ 2 >
+        C * (N : ℝ) * Real.exp (- A * Real.sqrt (Real.log N))
+
 /-- **Sub-axiom A: Goldbach Explicit Formula** (ESTABLISHED).
     The Goldbach count r(2N) equals a main term (from the pole of ζ(s))
     minus a sum of error terms, one for each nontrivial zero of each
@@ -1052,8 +1063,32 @@ theorem spectral_error_from_zeros
   --   DensityError ≤ Cd·N·exp(-Ad·√logN) = o(N/log²N)  [since exp(-√logN) dies]
   --   SiegelError ≤ N^{1-δ} = o(N/log²N)  [from no_siegel_zeros]
   -- Therefore r(2N) = MT + ZE > 0
-  -- The full proof requires bounding each piece; we axiomatize the assembly
-  sorry  -- Assembly of real-analytic bounds (tedious but mechanical given Sub-A through Sub-D)
+  --
+  -- Assembly: we need N₀ such that for N ≥ N₀:
+  --   MT(N) + ZE(N) > 0, i.e., MT(N) > |ZE(N)|
+  -- From zero_density_estimate, ZE(N) is bounded by Cd·N·exp(-Ad·√log N).
+  -- From goldbach_explicit_formula, MT(N) ≥ c·N/log²N.
+  -- So we need: c·N/log²N > Cd·N·exp(-Ad·√log N)
+  --           ⟺ c/log²N > Cd·exp(-Ad·√log N)
+  --           ⟺ exp(Ad·√log N) > (Cd/c)·log²N
+  -- This holds for all sufficiently large N since exp grows faster than any polynomial of log.
+  -- We axiomatize this standard calculus fact:
+  have hdom : ∃ N₀ : ℕ, ∀ N : ℕ, N ≥ N₀ → N > 1 →
+      c * (N : ℝ) / (Real.log N) ^ 2 >
+        Cd * (N : ℝ) * Real.exp (- Ad * Real.sqrt (Real.log N)) :=
+    exp_dominates_log_poly Ad c Cd hAd hc hCd
+  obtain ⟨N₀, hN₀⟩ := hdom
+  exact ⟨N₀, fun N hNN₀ hN1 => by
+    -- goldbachCount N = MT N + ZE N  (from explicit formula)
+    have hgc := hdecomp N hN1
+    -- MT N ≥ c · N / log²N
+    have hmt_bound := hmt N hN1
+    -- |ZE_density| ≤ Cd · N · exp(-Ad · √log N)
+    obtain ⟨ZEd, hZEd⟩ := hdensity N hN1
+    -- For N ≥ N₀: c·N/log²N > Cd·N·exp(-Ad·√logN) ≥ |ZE(N)|
+    have hdom_N := hN₀ N hNN₀ hN1
+    -- Therefore MT N + ZE N > 0
+    sorry⟩  -- Final inequality assembly: MT + ZE > |MT| - |ZE| > 0
 
 /-
   §8a COMPLETE AUDIT — THREE LAYERS OF DECOMPOSITION
