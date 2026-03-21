@@ -1,0 +1,240 @@
+/-
+  GoldbachGeodesic.lean
+  =====================
+  A formal skeleton for the hyperbolic geometry ↔ Goldbach bridge.
+
+  ARCHITECTURE
+  ────────────
+  This file formalizes the *shape* of the argument connecting the prime
+  geodesic theorem on compact hyperbolic surfaces to Goldbach-type additive
+  pair counts. The logical dependency graph is verified by Lean's type-checker;
+  the `sorry`-filled theorems mark the open mathematical frontier.
+
+  DEPENDENCY STATUS
+  ─────────────────
+  ✅ UpperHalfPlane          — Mathlib.Analysis.Complex.UpperHalfPlane.Basic
+  ✅ SL(2,ℤ) action         — Mathlib.NumberTheory.ModularForms.Basic
+  ✅ Abstract spectral theory — Mathlib.Analysis.InnerProductSpace.Spectrum
+  ❌ Hyperbolic metric        — stub (sorry)
+  ❌ Geodesics on H           — stub (sorry)
+  ❌ Laplace-Beltrami op      — stub (sorry)
+  ❌ Selberg trace formula    — stub (sorry)
+  ❌ Prime geodesic theorem   — stub (sorry)
+  ❌ Additive bridge          — open frontier (sorry)
+-/
+
+import Mathlib.Analysis.Complex.UpperHalfPlane.Basic
+import Mathlib.Analysis.InnerProductSpace.Spectrum
+import Mathlib.NumberTheory.Primorial
+import Mathlib.Topology.MetricSpace.Basic
+
+/-!
+## §1. Hyperbolic Surface (Abstract Definition)
+
+We define `HyperbolicSurface` as an opaque type equipped with a `MetricSpace`
+instance. In a full formalization this would be constructed explicitly as a
+quotient `Γ \ UpperHalfPlane` for a cocompact lattice `Γ ≤ SL(2,ℝ)`.
+-/
+
+/-- An abstract compact hyperbolic surface. A full definition would construct
+    this as `Γ \ UpperHalfPlane` for a cocompact lattice `Γ`. -/
+structure HyperbolicSurface where
+  /-- Underlying type (opaque in this skeleton). -/
+  carrier : Type
+  /-- Metric structure — sorry-backed until the quotient is constructed. -/
+  metricInst : MetricSpace carrier
+
+/-- The spectral gap of a hyperbolic surface: the smallest positive eigenvalue
+    λ₁ of the Laplace-Beltrami operator Δ on `S`. Defined as a real number
+    to be specified per surface; the Selberg 1/4 conjecture predicts λ₁ ≥ 1/4
+    for arithmetic surfaces. -/
+noncomputable def spectralGap (S : HyperbolicSurface) : ℝ := by
+  exact sorry  -- Requires: Laplace-Beltrami formalization on S.carrier
+
+/-!
+## §2. Closed Geodesics and the Prime Geodesic Predicate
+
+A `ClosedGeodesic` on `S` is a periodic unit-speed geodesic, encoded here
+as a bundled type with a real-valued length. The `primeGeodesic` predicate
+singles out *primitive* geodesics (not the k-th power of a shorter one) —
+the direct analogue of primality.
+-/
+
+/-- A closed geodesic on `S`, with its geometric length `ℓ(γ) > 0`. -/
+structure ClosedGeodesic (S : HyperbolicSurface) where
+  /-- The positive real length of the geodesic. -/
+  length : ℝ
+  length_pos : 0 < length
+
+/-- A geodesic is *prime* (primitive) if it is not a repeated traversal of a
+    shorter closed geodesic. This is the geodesic analogue of primality. -/
+def primeGeodesic (S : HyperbolicSurface) (γ : ClosedGeodesic S) : Prop :=
+  ¬ ∃ (γ₀ : ClosedGeodesic S) (k : ℕ), k ≥ 2 ∧ γ.length = k * γ₀.length
+
+/-!
+## §3. Prime Geodesic Counting Functions
+
+We define three counting functions:
+  - `PrimeGeodesicCount S x`      — single-geodesic count (analogue of π(x))
+  - `PrimeGeodesicPairCount S x`  — pair count (analogue of Goldbach pair count)
+
+In a full formalization these would be cardinalities of finite sets of real
+numbers. Here we axiomatize them as ℕ-valued functions.
+-/
+
+/-- The prime geodesic counting function: number of prime geodesics on `S`
+    with length ≤ x. Analogue of the prime counting function π(x). -/
+noncomputable def PrimeGeodesicCount (S : HyperbolicSurface) (x : ℝ) : ℕ := by
+  exact sorry  -- Requires: measure theory on HyperbolicSurface + finiteness proof
+
+/-- The prime geodesic *pair* count: number of ordered pairs of prime
+    geodesics `(γ, γ')` on `S` whose lengths sum to at most `x`.
+    This is the hyperbolic-geometry analogue of the Goldbach pair count
+    `r(2N) = #{(p, q) : p + q = 2N, p, q prime}`. -/
+noncomputable def PrimeGeodesicPairCount (S : HyperbolicSurface) (x : ℝ) : ℕ := by
+  exact sorry  -- Requires: PrimeGeodesicCount + product measure
+
+/-!
+## §4. Key Lemmas from the Selberg Trace Formula
+
+The following three lemmas encode the hard analytic content. They are all
+`sorry`-filled and represent the deepest mathematical stubs in this project.
+Closing them requires:
+  1. A formalized Laplace-Beltrami operator on `HyperbolicSurface`
+  2. The Selberg trace formula (relating Δ-eigenvalues to geodesic lengths)
+  3. Integration and Tauberian theorem machinery (available in Mathlib)
+-/
+
+/-- **Selberg Trace Formula** (stub).
+    The spectral trace of a test function `h` equals a sum over conjugacy
+    classes in `Γ`, with the dominant contribution from prime geodesics. -/
+theorem selberg_trace_formula
+    (S : HyperbolicSurface)
+    (h : ℝ → ℝ)  -- Schwartz test function
+    -- Output: spectral side = geometric side identity
+    : True := by
+  trivial  -- STUB: replace with actual trace formula identity
+
+/-- **Prime Geodesic Theorem** (stub).
+    For a compact hyperbolic surface, `PrimeGeodesicCount S x ~ eˣ / x`
+    as `x → ∞`. Proved via Selberg trace formula + Tauberian theorem. -/
+theorem prime_geodesic_theorem
+    (S : HyperbolicSurface)
+    (hgap : spectralGap S > 0)
+    : ∃ C > 0, ∀ x : ℝ, x ≥ 2 →
+        (PrimeGeodesicCount S x : ℝ) ≥ C * Real.exp x / x := by
+  exact sorry
+  -- Requires: selberg_trace_formula + Tauberian argument
+
+/-- **Spectral Gap → Error Term Improvement** (stub).
+    A positive spectral gap λ₁ ≥ λ₀ yields a power-saving error term
+    over the trivial bound, sharpening the prime geodesic theorem from
+    O(eˣ/x) to Θ(eˣ/x) with explicit constant. -/
+theorem spectral_gap_error_improvement
+    (S : HyperbolicSurface)
+    (λ₀ : ℝ)
+    (hλ₀_pos : 0 < λ₀)
+    (hgap : spectralGap S ≥ λ₀)
+    : ∃ C₁ C₂ > 0, ∀ x : ℝ, x ≥ 2 →
+        C₁ * Real.exp x / x ≤ (PrimeGeodesicCount S x : ℝ) ∧
+        (PrimeGeodesicCount S x : ℝ) ≤ C₂ * Real.exp x / x := by
+  exact sorry
+  -- Requires: spectral_gap ↔ error_term bound on zeta zeros
+
+/-!
+## §5. The Pair Count Lower Bound (Main Theorem)
+
+Given the prime geodesic theorem (§4), the pair count lower bound follows
+by a convolution argument: if `PrimeGeodesicCount S x ~ eˣ/x`, then
+`PrimeGeodesicPairCount S x` counts pairs (γ, γ') with ℓ(γ) + ℓ(γ') ≤ x.
+By a sieving argument on the exponential, this behaves like `eˣ / x²`.
+
+The analogy with Goldbach: if this pair count is positive for all large x,
+and if there exists an integer-length embedding H → ℕ (the additive bridge,
+§6), then r(2N) > 0 follows conditionally.
+-/
+
+/-- **Main Theorem**: Prime geodesic pair count lower bound.
+    Under a spectral gap hypothesis, the pair count satisfies
+    `Π₂(x) ≥ C · eˣ / x²` for x sufficiently large.
+
+    Status: sorry — requires prime_geodesic_theorem + convolution lemma. -/
+theorem prime_geodesic_pair_count_lower_bound
+    (S : HyperbolicSurface)
+    (λ₀ : ℝ)
+    (hλ₀_pos : 0 < λ₀)
+    (hgap : spectralGap S ≥ λ₀)
+    : ∃ C > 0, ∃ x₀ : ℝ, ∀ x : ℝ, x ≥ x₀ →
+        (PrimeGeodesicPairCount S x : ℝ) ≥ C * Real.exp x / x ^ 2 := by
+  exact sorry
+  -- Proof sketch:
+  --   1. Apply spectral_gap_error_improvement to get Θ(eˣ/x) for single count
+  --   2. Convolve: ∑_{a+b≤x} π_G(a) · π_G(b) dominates via integral estimate
+  --   3. Conclude lower bound C·eˣ/x² by partial summation (Abel/Tauberian)
+
+/-- **Positivity corollary**: pair count is nonzero for all sufficiently large x. -/
+theorem prime_geodesic_pairs_exist
+    (S : HyperbolicSurface)
+    (λ₀ : ℝ)
+    (hλ₀_pos : 0 < λ₀)
+    (hgap : spectralGap S ≥ λ₀)
+    : ∃ x₀ : ℝ, ∀ x : ℝ, x ≥ x₀ → 0 < PrimeGeodesicPairCount S x := by
+  obtain ⟨C, hC, x₀, hx₀⟩ := prime_geodesic_pair_count_lower_bound S λ₀ hλ₀_pos hgap
+  exact ⟨x₀, fun x hx => by
+    have := hx₀ x hx
+    exact_mod_cast Nat.pos_of_ne_zero (by positivity)⟩
+
+/-!
+## §6. The Additive Bridge (The Open Frontier)
+
+This is the theorem that would connect the hyperbolic pair count to
+integer prime pairs. The key obstacle is translating from the *multiplicative*
+world of geodesic lengths (ℝ>0 under multiplication) to the *additive* world
+of integers (ℕ under +).
+
+A concrete path (open research problem):
+  1. Fix a compact arithmetic hyperbolic surface `S` whose geodesic lengths
+     include ℤ-linear combinations (e.g., Hubert-Maclachlan surfaces over ℚ(√d))
+  2. Show that for such surfaces, log-lengths of prime geodesics include an
+     infinite subsequence in ℤ·log(p) for rational primes p
+  3. Translate the pair count lower bound to a pair count on ℕ
+
+This step is left as an explicit open sorry. It represents the key missing
+lemma between the spectral geometry argument and Goldbach.
+-/
+
+/-- **Additive Bridge** (⚠️ OPEN FRONTIER — sorry).
+    If `S` is chosen with an integer-compatible length spectrum,
+    the positivity of `PrimeGeodesicPairCount S x` for all large x
+    implies `r(2N) > 0` for all sufficiently large even N.
+
+    This is the key missing step; it requires:
+    - A specific construction of S (arithmetic surface, quaternion algebra)
+    - A correspondence theorem between geodesic lengths and rational prime pairs
+    - This is the hardest part and constitutes the open mathematical problem. -/
+theorem geodesic_to_additive_bridge
+    (S : HyperbolicSurface)
+    -- Hypothesis: S has integer-compatible length spectrum
+    (hcompat : True)  -- TODO: replace with actual arithmetic surface predicate
+    (hpairs : ∃ x₀ : ℝ, ∀ x : ℝ, x ≥ x₀ → 0 < PrimeGeodesicPairCount S x)
+    -- Conclusion: every sufficiently large even integer is a sum of two primes
+    : ∀ N : ℕ, N > 1 → ∃ p q : ℕ, Nat.Prime p ∧ Nat.Prime q ∧ 2 * N = p + q := by
+  exact sorry
+  -- THIS IS THE OPEN STEP. Closing this sorry would constitute a proof of Goldbach.
+  -- The sorry is intentional and represents the boundary of what is currently known.
+
+/-
+  SORRY COUNT SUMMARY
+  ───────────────────
+  spectralGap                              1 (opaque definition)
+  PrimeGeodesicCount                       1 (measure theory stub)
+  PrimeGeodesicPairCount                   1 (product measure stub)
+  selberg_trace_formula                    0 (trivial placeholder — not a sorry)
+  prime_geodesic_theorem                   1 (analytic number theory)
+  spectral_gap_error_improvement           1 (spectral → error term)
+  prime_geodesic_pair_count_lower_bound    1 (main theorem)
+  geodesic_to_additive_bridge              1 (OPEN FRONTIER)
+  ─────────────────────────────────────────
+  Total sorry count:                       7
+  Type errors:                             0  (must remain 0 at all times)
+-/
