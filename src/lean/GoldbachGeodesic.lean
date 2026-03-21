@@ -107,25 +107,43 @@ def primeGeodesic (S : HyperbolicSurface) (γ : ClosedGeodesic S) : Prop :=
 /-!
 ## §3. Prime Geodesic Counting Functions
 
-We define three counting functions:
-  - `PrimeGeodesicCount S x`      — single-geodesic count (analogue of π(x))
-  - `PrimeGeodesicPairCount S x`  — pair count (analogue of Goldbach pair count)
-
-In a full formalization these would be cardinalities of finite sets of real
-numbers. Here we axiomatize them as ℕ-valued functions.
+We define counting functions as cardinalities of finite sets of geodesics.
+The key mathematical fact enabling this is **local finiteness of the length
+spectrum**: on any compact hyperbolic surface, there are only finitely many
+closed geodesics with length ≤ x for any finite x. This is axiomatized below;
+it follows from the discreteness of the geodesic length spectrum, which in turn
+follows from the cocompactness of `Γ` and the structure of `PSL(2,ℝ)`.
 -/
 
+/-- **Length spectrum local finiteness** (axiom).
+    The set of prime geodesics on `S` with length ≤ x is finite.
+    Proof sketch: cocompactness of Γ ↔ finite-area surface ↔ discrete
+    length spectrum (Margulis lemma). -/
+axiom primeGeodesicsFinite (S : HyperbolicSurface) (x : ℝ) :
+    Set.Finite { γ : ClosedGeodesic S | primeGeodesic S γ ∧ γ.length ≤ x }
+
 /-- The prime geodesic counting function: number of prime geodesics on `S`
-    with length ≤ x. Analogue of the prime counting function π(x). -/
-noncomputable def PrimeGeodesicCount (S : HyperbolicSurface) (x : ℝ) : ℕ := by
-  exact sorry  -- Requires: measure theory on HyperbolicSurface + finiteness proof
+    with length ≤ x. Analogue of the prime counting function π(x).
+
+    This is a genuine definition: the cardinality of a finite set of geodesics.
+    Finiteness is guaranteed by `primeGeodesicsFinite`. -/
+noncomputable def PrimeGeodesicCount (S : HyperbolicSurface) (x : ℝ) : ℕ :=
+  (primeGeodesicsFinite S x).toFinset.card
+
+/-- **Pair finiteness**: ordered pairs of prime geodesics summing to ≤ x are finite.  -/
+axiom primeGeodesicPairsFinite (S : HyperbolicSurface) (x : ℝ) :
+    Set.Finite { p : ClosedGeodesic S × ClosedGeodesic S |
+      primeGeodesic S p.1 ∧ primeGeodesic S p.2 ∧ p.1.length + p.2.length ≤ x }
 
 /-- The prime geodesic *pair* count: number of ordered pairs of prime
     geodesics `(γ, γ')` on `S` whose lengths sum to at most `x`.
     This is the hyperbolic-geometry analogue of the Goldbach pair count
-    `r(2N) = #{(p, q) : p + q = 2N, p, q prime}`. -/
-noncomputable def PrimeGeodesicPairCount (S : HyperbolicSurface) (x : ℝ) : ℕ := by
-  exact sorry  -- Requires: PrimeGeodesicCount + product measure
+    `r(2N) = #{(p, q) : p + q = 2N, p, q prime}`.
+
+    Genuine definition via cardinality; finiteness by `primeGeodesicPairsFinite`. -/
+noncomputable def PrimeGeodesicPairCount (S : HyperbolicSurface) (x : ℝ) : ℕ :=
+  (primeGeodesicPairsFinite S x).toFinset.card
+
 
 /-!
 ## §4. Key Lemmas from the Selberg Trace Formula
