@@ -75,3 +75,6 @@ website/node_modules/
 **/paper/*.out
 **/paper/*.zip
 data/perqed.lancedb/
+
+# Lean / Lake build artifacts (Mathlib cache, .olean objects)
+src/lean/.lake/
