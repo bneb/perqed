@@ -922,10 +922,36 @@ Goldfeld (1976) have partial results.
     Equivalently: exp(A·√log N) > (C/c)·log²N eventually.
     This is immediate since exp grows faster than any polynomial of log.
     Reference: any introductory real analysis textbook (L'Hôpital or comparison test). -/
-axiom exp_dominates_log_poly (A c C : ℝ) (hA : A > 0) (hc : c > 0) (hC : C > 0) :
+theorem exp_dominates_log_poly (A c C : ℝ) (hA : A > 0) (hc : c > 0) (hC : C > 0) :
     ∃ N₀ : ℕ, ∀ N : ℕ, N ≥ N₀ → N > 1 →
       c * (N : ℝ) / (Real.log N) ^ 2 >
-        C * (N : ℝ) * Real.exp (- A * Real.sqrt (Real.log N))
+        C * (N : ℝ) * Real.exp (- A * Real.sqrt (Real.log N)) := by
+  -- STRATEGY: Reduce to showing (log N)^2 * exp(-A*√(log N)) < c/C for large N.
+  -- This follows from t^4 * exp(-A*t) → 0 as t → ∞, composed through t = √(log N).
+  --
+  -- Step 1: Extract the "eventually small" bound from Mathlib's asymptotics.
+  -- tendsto_rpow_mul_exp_neg_mul_atTop_nhds_zero 4 A hA :
+  --   Tendsto (fun t => t^(4:ℝ) * exp(-A*t)) atTop (𝓝 0)
+  -- Compose with √ ∘ log ∘ Nat.cast → atTop to get:
+  --   ∀ᶠ N in atTop, (√(log N))^4 * exp(-A*√(log N)) < c/C
+  -- Since (√x)^4 = x^2 for x ≥ 0, this gives (log N)^2 * exp(-A*√(log N)) < c/C.
+  --
+  -- Step 2: For N > 1, we have N > 0 and log N > 0, so:
+  --   (log N)^2 * exp(-A*√(log N)) < c/C
+  --   ⟹ C * (log N)^2 * exp(-A*√(log N)) < c        [multiply by C > 0]
+  --   ⟹ C * exp(-A*√(log N)) < c / (log N)^2         [divide by (log N)^2 > 0]
+  --   ⟹ C * N * exp(-A*√(log N)) < c * N / (log N)^2  [multiply by N > 0]
+  --
+  -- The filter composition (√ ∘ log ∘ Nat.cast → atTop) uses:
+  --   tendsto_natCast_atTop_atTop : Tendsto Nat.cast atTop atTop
+  --   Real.tendsto_log_atTop : Tendsto log atTop atTop
+  --   tendsto_rpow_atTop (half_pos) : Tendsto (· ^ (1/2)) atTop atTop
+  --   Real.sqrt_eq_rpow : √x = x ^ (1/2 : ℝ)
+  --
+  -- MATHLIB REFERENCE: Asymptotics.lean line 140-143
+  --   tendsto_rpow_mul_exp_neg_mul_atTop_nhds_zero (s : ℝ) (b : ℝ) (hb : 0 < b) :
+  --     Tendsto (fun x : ℝ => x ^ s * exp (-b * x)) atTop (𝓝 0)
+  sorry
 
 /-- **Sub-axiom A: Goldbach Explicit Formula** (ESTABLISHED).
     The Goldbach count r(2N) equals a main term (from the pole of ζ(s))
@@ -1632,20 +1658,20 @@ theorem compatibility_theorem
       ↑ offdiag_nonneg_and_moment_bound [REAL PROOF]
       ↑ rankin_selberg_positivity    ⚠️  DEEPEST LEAF AXIOM (1939/1940)
 
-  SCOREBOARD (after type audit, March 21 2026)
+  SCOREBOARD (updated March 21 2026, 15:44 PST)
   ─────────────────────────────────────────────────────────
-  Total sorrys:    0
+  Total sorrys:    1  (exp_dominates_log_poly — standard calculus, roadmap complete)
   Total axioms:   31  (down from 34: eliminated moment_is_nonneg,
                        lvalue_kernel_psd → theorem, char_orthogonality → theorem)
   Real proofs:    15  (up from 11: + lvalue_kernel_psd,
                        character_orthogonality_extraction,
                        offdiag_nonneg_and_moment_bound,
                        siegel_elimination_from_subconvexity [non-vacuous])
+  Pending:         1  (exp_dominates_log_poly: axiom→theorem, sorry on filter composition)
   Definitions:     3  (goldbachCount, selbergCoeff, selbergAmplifier)
   Key axioms:      rankin_selberg_positivity         ⚠️ THE DEEPEST LEAF
                    spectral_assembly_bridge         (assembly of Sub-A...D)
                    compatibility_bridge             (C ≤ q^ε, non-vacuous)
-                   exp_dominates_log_poly           (standard calculus)
                    moment_decomposition             (M = D + OffDiag ∧ M ≥ 0)
   Vacuous stubs:   selberg_trace_formula            (conclusion is True — STUB)
   Type errors:     0
