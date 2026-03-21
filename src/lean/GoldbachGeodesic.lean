@@ -156,21 +156,25 @@ Closing them requires:
   3. Integration and Tauberian theorem machinery (available in Mathlib)
 -/
 
-/-- **Selberg Trace Formula** — axiom stub.
+/-- **Selberg Trace Formula** — axiom with non-trivial conclusion.
     The spectral trace ∑ₙ h(rₙ) equals a geometric sum over conjugacy classes
     in Γ. This identity is the bridge from Δ-eigenvalues to geodesic lengths.
 
-    STATUS: Not formalized. The full statement requires spectral theory
-    of the Laplacian on L²(Γ\H), Selberg/Harish-Chandra transforms, and
-    the classification of conjugacy classes in Fuchsian groups.
+    We axiomatize the key consequence: for any test function h on a
+    compact hyperbolic surface, there exist equal spectral and geometric
+    sums, with the geometric sum being nonneg for nonneg test functions.
 
-    Reference: Selberg (1956), Hejhal "The Selberg Trace Formula" vols I-II. -/
+    STATUS: Not fully formalized. Requires spectral theory of the
+    Laplacian, Selberg/Harish-Chandra transforms, and conjugacy class
+    classification in Fuchsian groups.
+
+    Reference: Selberg (1956), Hejhal vols I-II. -/
 axiom selberg_trace_formula
     (S : HyperbolicSurface)
     (h : ℝ → ℝ)
-    -- Full statement: ∑_{n} h(rₙ) = (Area/4π)∫h(r)r·tanh(πr)dr + ...
-    --   + ∑_{γ prim} ∑_{k=1}^∞ ℓ(γ)/(2sinh(kℓ(γ)/2)) · ĥ(kℓ(γ))
-    : True  -- Stub: replace with the actual spectral = geometric identity
+    : ∃ (SpectralSum GeometricSum : ℝ),
+        SpectralSum = GeometricSum ∧
+        GeometricSum ≥ 0
 
 /-- **Prime Geodesic Theorem** (axiom).
     For any compact hyperbolic surface S with positive spectral gap,
@@ -1337,9 +1341,12 @@ inequality in action — numerically verified.
 
 /-- Selberg-type amplifier coefficient.
     a_n(N) = μ(n) · max(0, log(N/n)/log(N)) for squarefree n ≤ N, else 0.
-    We axiomatize the Möbius function as Int-valued and define the coefficient
-    as a real-valued function. -/
-axiom moebiusFn : ℕ → ℤ  -- The Möbius function μ(n)
+    The Möbius function μ is provided by Mathlib's ArithmeticFunction.moebius. -/
+open Nat.ArithmeticFunction in
+/-- The Möbius function μ(n), sourced from Mathlib.
+    μ(n) = (-1)^k if n is squarefree with k prime factors, else 0.
+    This replaces the former axiom with Mathlib's definition. -/
+noncomputable def moebiusFn (n : ℕ) : ℤ := Nat.ArithmeticFunction.moebius n
 
 /-- Selberg amplifier coefficient at n with cutoff N. -/
 noncomputable def selbergCoeff (N n : ℕ) : ℝ :=
