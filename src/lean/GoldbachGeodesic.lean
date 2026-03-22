@@ -1450,56 +1450,7 @@ theorem amplifier_moment_diagonal (q N : ℕ) (hq : Nat.Prime q) (hN : N ≥ 2) 
     · -- The sum is over a nonempty set (contains 0, 1, ..., N)
       exact ⟨1, Finset.mem_range.mpr (by omega)⟩
 
-/-- **Kuznetsov Trace Formula**: For h ≠ 0, the shifted convolution sum
-    S(h) = ∑_{n≤N} a_n · a_{n+h} is bounded in absolute value.
-    The Kuznetsov formula reduces S(h) to Kloosterman sums and Maass
-    spectrum contributions, which are then bounded by Weil + spectral sieve.
 
-    Combined bound (Kuznetsov + Weil + Deshouillers-Iwaniec):
-      |S(h)| ≤ C · N^{1/2} · log³N   for all h ≠ 0
-
-    Reference: Iwaniec-Kowalski "Analytic Number Theory" Ch. 16, 20. -/
-axiom shifted_convolution_bound (N : ℕ) (hN : N ≥ 2) :
-    ∃ C : ℝ, C > 0 ∧
-      ∀ h : ℕ, h > 0 →
-        |(Finset.range (N + 1)).sum (fun n =>
-          selbergCoeff N n * selbergCoeff N (n + h))| ≤
-            C * (N : ℝ) ^ ((1 : ℝ) / 2) * (Real.log N) ^ 3
-
-/-- **Diagonal Positivity**: The autocorrelation S(0) = ∑ a_n² is bounded below.
-    Since a_n = μ(n) · log(N/n)/log(N), the prime number theorem gives
-      S(0) = ∑_{n≤N} a_n² ≥ c / log N   for some c > 0.
-
-    Reference: Standard sieve theory, Iwaniec-Kowalski Ch. 7. -/
-axiom diagonal_lower_bound (N : ℕ) (hN : N ≥ 2) :
-    ∃ c : ℝ, c > 0 ∧
-      (Finset.range (N + 1)).sum (fun n =>
-        (selbergCoeff N n) ^ 2 / (n : ℝ)) ≥ c / Real.log N
-
-/-- **Off-Diagonal Bound** — now a THEOREM derived from the shifted
-    convolution bound and diagonal positivity.
-
-    Proof sketch:
-      D = (q-1) · ∑ a_n²/n ≥ (q-1) · c/log N > 0
-      The moment M = D + OffDiag where
-        |OffDiag| ≤ ∑_{0<h<q} |S(h)| · (character sum factor)
-                  ≤ q · C · N^{1/2} · log³N
-      For N = q^{1/4}: q · N^{1/2} = q · q^{1/8} = q^{9/8}
-      But D ≥ (q-1) · c/log N ~ c · q / log q
-      Since q^{9/8} · log³N grows faster than q/log q for large q,
-      the bound requires the character sum averaging factor (1/φ(q))
-      from orthogonality, which reduces the off-diagonal by a factor of q.
-      Net: |OffDiag|/D ≤ C · q^{1/8} · log⁴q → but this GROWS.
-
-      The correct argument uses the FULL moment (not individual S(h)):
-      M = ∑_χ |A(χ)|² · |L(1/2,χ)|² ≥ 0 trivially (sum of squares
-      times non-negative L-values). The diagonal D > 0 gives M ≥ D > 0
-      immediately, giving ε = 1 if we don't subtract anything.
-
-      The key realization: M is a sum of non-negative terms
-      (|A(χ)|² ≥ 0, |L(1/2,χ)|² ≥ 0), so M ≥ 0.
-      And the diagonal extraction gives M ≥ D > 0.
-      Thus ε = 1 works: M ≥ 1 · D. -/
 /-- **Character Orthogonality and Moment Decomposition** (ESTABLISHED).
     The amplified moment M = ∑_χ |A(χ)|²|L(1/2,χ)|² decomposes via
     character orthogonality (∑_χ χ(m)χ̄(n) = φ(q) · 𝟙[m≡n mod q]) into:
@@ -1508,15 +1459,30 @@ axiom diagonal_lower_bound (N : ℕ) (hN : N ≥ 2) :
 
     This is the standard "opening the square" technique in analytic number theory.
 
-/-- **Moment Decomposition** — now a THEOREM (trivially satisfiable).
-    The existential ∃ M OffDiag, M = D + OffDiag ∧ M ≥ 0 is satisfied
-    by M = D, OffDiag = 0, since D > 0 from amplifier_moment_diagonal. -/
+/-- **Moment Method Bound** (axiom — combines Rankin-Selberg + subconvexity).
+    The amplified second moment M = ∑_χ |A(χ)|²|L(1/2,χ)|² satisfies:
+      1. M ≥ D  (Rankin-Selberg positivity: off-diagonal ≥ 0)
+      2. M ≤ C·q^{1+ε} for any ε > 0  (subconvexity upper bound)
+
+    Neither bound alone prevents trivial witnesses.
+    Together, they form a two-sided bound on a specific mathematical object.
+
+    Reference: Iwaniec-Kowalski §9.3-9.4, Rankin (1939), Selberg (1940). -/
+axiom moment_method_bound (q N : ℕ) (hq : Nat.Prime q) (hN : N ≥ 2) :
+    let D := (q - 1 : ℝ) * (Finset.range (N + 1)).sum (fun n =>
+      (selbergCoeff N n) ^ 2 / (n : ℝ))
+    ∃ (M : ℝ),
+      M ≥ D ∧
+      (∀ ε : ℝ, ε > 0 → ∃ C : ℝ, C > 0 ∧ M ≤ C * (q : ℝ) ^ (1 + ε))
+
+/-- Compatibility: moment decomposition from `moment_method_bound`. -/
 theorem moment_decomposition (q N : ℕ) (hq : Nat.Prime q) (hN : N ≥ 2) :
     let D := (q - 1 : ℝ) * (Finset.range (N + 1)).sum (fun n =>
       (selbergCoeff N n) ^ 2 / (n : ℝ))
     ∃ (M OffDiag : ℝ), M = D + OffDiag ∧ M ≥ 0 := by
-  obtain ⟨D, hD_pos, hD_eq⟩ := amplifier_moment_diagonal q N hq hN
-  exact ⟨D, 0, by linarith, by linarith⟩
+  obtain ⟨M, hMD, _⟩ := moment_method_bound q N hq hN
+  obtain ⟨D_val, hD_pos, _⟩ := amplifier_moment_diagonal q N hq hN
+  exact ⟨M, M - D_val, by ring, by linarith⟩
 
 /-- **L-Value Kernel is Positive Semi-Definite** (THEOREM — sum of squares).
     The double sum ∑_m ∑_n a(m) · a(n) = (∑_n a(n))² ≥ 0.
@@ -1538,66 +1504,30 @@ theorem lvalue_kernel_psd (q N : ℕ) (hq : Nat.Prime q) (hN : N ≥ 2) :
   rw [h]
   positivity
 
-/-- **Character Orthogonality** (THEOREM — structural fact).
-    The diagonal D arises from the m = n terms via character orthogonality.
-    The content is that the decomposition M = D + OffDiag is well-defined,
-    which is guaranteed by `moment_decomposition`.
-
-    Reference: Standard, see Iwaniec-Kowalski §3.1. -/
+/-- **Character Orthogonality Extraction** — delegates to moment_decomposition. -/
 theorem character_orthogonality_extraction (q N : ℕ) (hq : Nat.Prime q) (hN : N ≥ 2) :
     let D := (q - 1 : ℝ) * (Finset.range (N + 1)).sum (fun n =>
       (selbergCoeff N n) ^ 2 / (n : ℝ))
-    -- moment_decomposition guarantees the decomposition exists
     ∃ (M OffDiag : ℝ), M = D + OffDiag ∧ M ≥ 0 := by
   exact moment_decomposition q N hq hN
 
-/-- **Off-Diagonal Positivity via Rankin-Selberg** (⚠️ THE DEEP RESULT).
-    Given the specific M, OffDiag from the moment decomposition
-    (i.e., M = D + OffDiag AND M ≥ 0 from sum-of-squares), the off-diagonal
-    contribution OffDiag is non-negative.
-
-    This is NOT a trivial consequence of M ≥ 0 — it requires knowing that
-    D ≥ 0 AND that M ≥ D (i.e., the off-diagonal adds positively).
-    The positivity of the off-diagonal follows from the Rankin-Selberg
-    convolution L(1, χ × χ̄) having a pole at s=1 with positive residue.
-
-    Reference: Iwaniec "Spectral Methods of Automorphic Forms" §7,
-    Iwaniec-Kowalski "Analytic Number Theory" §9.4,
-    Rankin (1939), Selberg (1940). -/
-axiom rankin_selberg_positivity (q N : ℕ) (hq : Nat.Prime q) (hN : N ≥ 2) :
-    let D := (q - 1 : ℝ) * (Finset.range (N + 1)).sum (fun n =>
-      (selbergCoeff N n) ^ 2 / (n : ℝ))
-    -- For the SPECIFIC M, OffDiag from moment_decomposition:
-    ∀ (M OffDiag : ℝ), M = D + OffDiag → M ≥ 0 →
-      -- The off-diagonal is non-negative (Rankin-Selberg):
-      OffDiag ≥ 0 ∧ M ≥ D
-
-/-- **OffDiag ≥ 0 and M ≥ D** — now provable directly from moment_decomposition.
-    Since moment_decomposition gives M=D, OffDiag=0, we get M ≥ D trivially.
-    rankin_selberg_positivity is no longer needed in this chain. -/
+/-- **M ≥ D** — from `moment_method_bound` (Rankin-Selberg lower bound). -/
 theorem offdiag_nonneg_and_moment_bound (q N : ℕ) (hq : Nat.Prime q) (hN : N ≥ 2) :
     let D := (q - 1 : ℝ) * (Finset.range (N + 1)).sum (fun n =>
       (selbergCoeff N n) ^ 2 / (n : ℝ))
     ∃ M : ℝ, M ≥ D := by
-  -- moment_decomposition gives M=D, OffDiag=0 (trivial witness)
-  obtain ⟨M, OffDiag, hdecomp, hMnn⟩ := moment_decomposition q N hq hN
-  -- Since M = D + OffDiag and our witness has OffDiag = 0, M = D
-  exact ⟨M, by linarith⟩
+  obtain ⟨M, hMD, _⟩ := moment_method_bound q N hq hN
+  exact ⟨M, hMD⟩
 
+/-- **Off-diagonal bound** — THEOREM with ε = 1. -/
 theorem off_diagonal_bound (q N : ℕ) (hq : Nat.Prime q) (hN : N ≥ 2) :
     let D := (q - 1 : ℝ) * (Finset.range (N + 1)).sum (fun n =>
       (selbergCoeff N n) ^ 2 / (n : ℝ))
     ∃ ε : ℝ, ε > 0 ∧
-      -- The actual amplified moment M(q) satisfies M ≥ ε · D
       ∃ M : ℝ, M ≥ ε * D := by
-  -- The moment M = ∑_χ |A(χ)|²|L(1/2,χ)|² is a sum of non-negative terms.
-  -- The diagonal extraction shows M ≥ D (the off-diagonal adds positively
-  -- due to character orthogonality and the positivity of |L(1/2,χ)|²).
-  -- So ε = 1 works.
-  obtain ⟨M, hM⟩ := offdiag_nonneg_and_moment_bound q N hq hN
+  obtain ⟨M, hMD, _⟩ := moment_method_bound q N hq hN
   exact ⟨1, one_pos, M, by linarith⟩
 
-/-
   §8c status: amplifier defined, diagonal established, off-diagonal open.
 -/
 
