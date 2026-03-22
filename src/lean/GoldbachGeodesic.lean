@@ -1136,16 +1136,71 @@ theorem no_siegel_zeros
       (N : ℝ) ^ ((1 : ℝ) / 2) < (N : ℝ) / (Real.log N) ^ 2 / 2 by
     obtain ⟨N₀, hN₀⟩ := h
     exact ⟨N₀, fun N hN SE hSE => lt_of_le_of_lt hSE (hN₀ N hN)⟩
-  -- N^{1/2} < N/(2·log²N) ↔ 2·log²N · N^{-1/2} < 1 ↔ log²N / N^{1/2} < 1/2
-  -- log²N / N^{1/2} → 0 as N → ∞ (log is dominated by any positive power).
-  -- Use Mathlib: Real.tendsto_pow_mul_div_rpow_atTop shows
-  -- x^k / x^α → 0 when α > k, and log^k(x)/x^α → 0 for any α > 0.
-  -- Since we can't easily access Filter.Eventually for ℕ in this context,
-  -- we use a concrete witness: N₀ = 10^6 works since
-  -- √(10^6) = 1000 and 2·(log(10^6))² ≈ 2·191 = 382 < 1000.
-  -- But proving this concretely requires norm_num/native_decide.
-  -- Instead, use the abstract Filter approach.
-  sorry
+  -- Step 1: log(x)/x^{1/4} → 0 as x → ∞ (Mathlib)
+  -- So eventually log(x)/x^{1/4} < 1, i.e., log(x) < x^{1/4}
+  -- Squaring: (log x)² < x^{1/2}, so 2·(log x)² < 2·x^{1/2} ≤ x for N ≥ 4
+  -- This gives x^{1/2} ≤ x/(2·(log x)²) when 2·(log x)² < x^{1/2}
+  have h_ev_R : ∀ᶠ (x : ℝ) in Filter.atTop,
+      (Real.log x) ^ 2 / x ^ ((1 : ℝ) / 2) < 1 / 2 := by
+    have h1 := Real.tendsto_log_div_rpow_nhds_zero_atTop (1/4 : ℝ) (by norm_num)
+    have h2 := (tendsto_order.1 h1).2 (1 / Real.sqrt 2) (by positivity)
+    filter_upwards [h2, Filter.eventually_ge_atTop (1 : ℝ)] with x hx hx1
+    have hx_pos : 0 < x := by linarith
+    have hlog_nn : 0 ≤ Real.log x := Real.log_nonneg (by linarith)
+    have hrpow_pos : 0 < x ^ ((1 : ℝ) / 4) := rpow_pos_of_pos hx_pos _
+    have hrpow2_pos : 0 < x ^ ((1 : ℝ) / 2) := rpow_pos_of_pos hx_pos _
+    -- hx : log(x) / x^{1/4} < 1/√2
+    -- We need: log²(x) / x^{1/2} < 1/2
+    -- log²(x) / x^{1/2} = (log(x)/x^{1/4})² since x^{1/2} = (x^{1/4})²
+    have h_sq : (Real.log x) ^ 2 / x ^ ((1 : ℝ) / 2) =
+        (Real.log x / x ^ ((1 : ℝ) / 4)) ^ 2 := by
+      rw [div_pow, sq (x ^ ((1 : ℝ) / 4)),
+          show x ^ ((1 : ℝ) / 4) * x ^ ((1 : ℝ) / 4) = x ^ ((1 : ℝ) / 2) from by
+            rw [← rpow_add hx_pos.le]; norm_num]
+    rw [h_sq]
+    -- (log x / x^{1/4})² < (1/√2)² = 1/2
+    have hq : Real.log x / x ^ ((1 : ℝ) / 4) < 1 / Real.sqrt 2 := hx
+    have hq_nn : 0 ≤ Real.log x / x ^ ((1 : ℝ) / 4) :=
+      div_nonneg hlog_nn hrpow_pos.le
+    calc (Real.log x / x ^ ((1 : ℝ) / 4)) ^ 2
+        < (1 / Real.sqrt 2) ^ 2 := sq_lt_sq' (by linarith) hq
+      _ = 1 / 2 := by
+          rw [div_pow, one_pow, sq_sqrt (by norm_num : (0 : ℝ) ≤ 2)]
+  -- Step 2: Transfer from ℝ filter to ℕ
+  rw [Filter.eventually_atTop] at h_ev_R
+  obtain ⟨M, hM⟩ := h_ev_R
+  refine ⟨max (Nat.ceil M) 4, fun N hN => ?_⟩
+  have hN4 : N ≥ 4 := le_trans (le_max_right _ _) hN
+  have hN_R : (N : ℝ) ≥ M := by
+    have h := Nat.le_ceil M
+    have := le_trans (le_max_left _ _) hN
+    exact le_trans h (by exact_mod_cast this)
+  -- Step 3: Get the bound for this N
+  have hbound := hM (N : ℝ) hN_R
+  -- hbound : log²N / N^{1/2} < 1/2
+  have hN_pos : (0 : ℝ) < (N : ℝ) := by positivity
+  have hN_sqrt_pos : (0 : ℝ) < (N : ℝ) ^ ((1 : ℝ) / 2) := rpow_pos_of_pos hN_pos _
+  have hlog_pos : (0 : ℝ) < Real.log (N : ℝ) :=
+    Real.log_pos (by exact_mod_cast (show N > 1 by omega))
+  have hlogsq_pos : (0 : ℝ) < (Real.log (N : ℝ)) ^ 2 := by positivity
+  -- From log²N / N^{1/2} < 1/2: multiply by N^{1/2}:
+  -- log²N < N^{1/2}/2
+  -- So 2·log²N < N^{1/2}
+  -- Multiply by N^{1/2}/(2·log²N):
+  -- N^{1/2} < N/(2·log²N) = N/(log²N · 2) = N/log²N/2
+  rw [div_lt_div_iff hlogsq_pos (by norm_num : (0:ℝ) < 2)] at hbound
+  -- hbound : log²N * 2 < N^{1/2} * 1 ... actually need to check
+  -- Goal: N^{1/2} < N / (log N)² / 2
+  rw [lt_div_iff (by norm_num : (0:ℝ) < 2), lt_div_iff hlogsq_pos]
+  -- Goal: N^{1/2} * 2 * (log N)² < N
+  -- From hbound after rearranging: (log N)² < N^{1/2} / 2
+  -- So 2 * (log N)² < N^{1/2}
+  -- So N^{1/2} * 2 * (log N)² < N^{1/2} * N^{1/2} = N
+  have h_two_log_sq : 2 * (Real.log ↑N) ^ 2 < (↑N : ℝ) ^ ((1 : ℝ) / 2) := by
+    rwa [div_lt_iff hN_sqrt_pos, one_div, inv_mul_lt_iff_lt_mul (by norm_num : (0:ℝ) < 2)] at hbound
+  have h_sq_eq : (↑N : ℝ) ^ ((1 : ℝ) / 2) * (↑N : ℝ) ^ ((1 : ℝ) / 2) = (↑N : ℝ) := by
+    rw [← rpow_add hN_pos.le]; norm_num; exact rpow_one _
+  nlinarith [h_sq_eq]
 
 /-- **Spectral Error Bridge** — deriving `spectral_error_sufficient`
     from the 4 sub-axioms.
