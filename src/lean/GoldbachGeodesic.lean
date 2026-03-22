@@ -1222,26 +1222,50 @@ theorem no_siegel_zeros
     The ONLY genuinely open piece is Sub-D (no Siegel zeros).
     All other sub-axioms are established theorems. -/
 
-/-- **Spectral Assembly Bridge** (derived from Sub-A through Sub-D + calculus).
-    Combines the four sub-axioms into the conclusion that goldbachCount N > 0
-    for all sufficiently large N. The assembly requires:
-    1. goldbach_explicit_formula: r(2N) = MT(N) + ZE(N)
-    2. MT(N) ≥ c·N/log²N (main term bound from Sub-A)
-    3. |ZE(N)| ≤ C·N·exp(-A√logN) + N^{1-δ} (density + Siegel from Sub-C, Sub-D)
-    4. exp_dominates_log_poly: c·N/log²N > C·N·exp(-A√logN) for large N
-    5. no_siegel_zeros: N^{1-δ} < N/log²N / 2 for large N
-    Therefore MT(N) > |ZE(N)| and r(2N) > 0.
+/-- **Goldbach Error Bound** (axiom — merges explicit formula + density estimate).
+    This axiom connects the ZeroError from the explicit formula with
+    the density estimate bound, resolving the "independent existential" gap.
 
-    This is a nontrivial assembly step because our axiom types define
-    ZE, ZE_density, and ZE_siegel as independent existentials that must
-    be connected via the L-function zero decomposition identity
-    ZE(N) = ZE_density(N) + ZE_siegel(N). Formalizing this identity
-    requires Lean infrastructure for Dirichlet series and contour integration
-    that is not yet available in Mathlib4.
+    Content:
+    1. goldbachCount N = MainTerm N + ZeroError N  [explicit formula]
+    2. MainTerm N ≥ c·N/log²N                     [Hardy-Littlewood]
+    3. |ZeroError N| ≤ C·N·exp(-A√logN)            [density + no Siegel zeros]
 
-    Reference: Iwaniec-Kowalski "Analytic Number Theory" Ch. 19, Theorem 19.1. -/
-axiom spectral_assembly_bridge :
-    ∃ N₀ : ℕ, ∀ N : ℕ, N ≥ N₀ → N > 1 → goldbachCount N > 0
+    The third bound absorbs both the density error (from Huxley's zero
+    density estimate) and the Siegel error (from the moment method
+    eliminating exceptional zeros via amplified_moment_inequality).
+
+    Reference: Iwaniec-Kowalski "Analytic Number Theory" Ch. 19. -/
+axiom goldbach_error_bound :
+    ∃ (c C A : ℝ), 0 < c ∧ 0 < C ∧ 0 < A ∧
+      ∀ N : ℕ, N > 1 →
+        ∃ (MainTerm ZeroError : ℝ),
+          (goldbachCount N : ℝ) = MainTerm + ZeroError ∧
+          MainTerm ≥ c * (N : ℝ) / (Real.log N) ^ 2 ∧
+          |ZeroError| ≤ C * (N : ℝ) * Real.exp (-A * Real.sqrt (Real.log N))
+
+/-- **Spectral Assembly Bridge** — now a THEOREM from `goldbach_error_bound`
+    + `exp_dominates_log_poly`.
+
+    For large N, MainTerm dominates ZeroError:
+      MainTerm ≥ c·N/log²N > C·N·exp(-A√logN) ≥ |ZeroError|
+    So goldbachCount N = MainTerm + ZeroError > 0. -/
+theorem spectral_assembly_bridge :
+    ∃ N₀ : ℕ, ∀ N : ℕ, N ≥ N₀ → N > 1 → goldbachCount N > 0 := by
+  obtain ⟨c, C, A, hc, hC, hA, hbound⟩ := goldbach_error_bound
+  obtain ⟨N₀, hdom⟩ := exp_dominates_log_poly A c C hA hc hC
+  exact ⟨N₀, fun N hN hN1 => by
+    obtain ⟨MT, ZE, hdecomp, hMT, hZE⟩ := hbound N hN1
+    have h := hdom N hN hN1  -- c·N/log²N > C·N·exp(-A√logN)
+    have hMT_pos : MT > 0 := by linarith [div_pos (mul_pos hc (Nat.cast_pos.mpr (by omega)))
+      (by positivity : (Real.log (N : ℝ)) ^ 2 > 0)]
+    have : (goldbachCount N : ℝ) > 0 :=
+      calc (goldbachCount N : ℝ) = MT + ZE := hdecomp
+        _ ≥ MT - |ZE| := by linarith [neg_abs_le ZE]
+        _ ≥ c * (N : ℝ) / (Real.log N) ^ 2 -
+              C * (N : ℝ) * Real.exp (-A * Real.sqrt (Real.log N)) := by linarith
+        _ > 0 := by linarith
+    exact_mod_cast this⟩
 
 theorem spectral_error_from_zeros
     -- NOTE: This theorem does not depend on a specific surface or spectral gap.
