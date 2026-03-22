@@ -1105,16 +1105,47 @@ axiom zero_density_estimate
     values (500K even integers). Siegel zeros would cause isolated
     values of 2N where r(2N) << HL(2N). We see none.
 
-    Formally: we axiomatize that the exceptional zero contribution
-    is bounded by N^{1-δ} for some δ > 0, which is o(N/log²N). -/
-axiom no_siegel_zeros
+    Formally: the exceptional zero contribution is bounded by N^{1-δ}
+    for some δ > 0. For sufficiently large N, N^{1-δ} < N/(2·log²N),
+    since this is equivalent to N^δ > 2·log²N (polynomial dominates log).
+
+    The mathematical content of "Siegel zeros don't actually exist for
+    large q" is encoded in `amplified_moment_inequality` (moment method).
+    This theorem is the pure analysis companion: it just says the BOUND
+    N^{1-δ} is subsumed by N/(2·log²N) once N is large enough.
+
+    NOTE: Changed from ∀ N > 1 to ∃ N₀, ∀ N ≥ N₀. The original
+    ∀ N > 1 was impossible for any δ < 1 (the function N^δ/(2·log²N)
+    dips below 1 at intermediate N ≈ e^{2/δ}). The weakened version
+    is still sufficient for spectral_assembly_bridge which already
+    has its own ∃ N₀ threshold. -/
+theorem no_siegel_zeros
     : ∃ δ : ℝ, 0 < δ ∧ δ < 1 ∧
-        ∀ N : ℕ, N > 1 →
+        ∃ N₀ : ℕ, ∀ N : ℕ, N ≥ N₀ →
           ∀ (SiegelError : ℝ),
-            -- If SiegelError is the contribution from potential Siegel zeros,
-            -- then it is bounded by N^{1-δ}, which is o(N/log²N)
             |SiegelError| ≤ (N : ℝ) ^ (1 - δ) →
-            |SiegelError| < (N : ℝ) / (Real.log N) ^ 2 / 2
+            |SiegelError| < (N : ℝ) / (Real.log N) ^ 2 / 2 := by
+  -- Pick δ = 1/2. Need: ∃ N₀, ∀ N ≥ N₀, N^{1/2} < N/(2·log²N)
+  -- i.e., 2·log²N < N^{1/2}, i.e., 2·log²N < √N
+  -- This is eventually true since √N grows faster than log²N.
+  use 1/2, by norm_num, by norm_num
+  -- For the N₀, we need a concrete threshold where √N > 2·log²N.
+  -- By Filter.Tendsto, N^{1/2}/log²N → ∞, so ∃ N₀ with this property.
+  -- We use the fact that for large N, N^δ dominates any power of log N.
+  suffices h : ∃ N₀ : ℕ, ∀ N : ℕ, N ≥ N₀ →
+      (N : ℝ) ^ ((1 : ℝ) / 2) < (N : ℝ) / (Real.log N) ^ 2 / 2 by
+    obtain ⟨N₀, hN₀⟩ := h
+    exact ⟨N₀, fun N hN SE hSE => lt_of_le_of_lt hSE (hN₀ N hN)⟩
+  -- N^{1/2} < N/(2·log²N) ↔ 2·log²N · N^{-1/2} < 1 ↔ log²N / N^{1/2} < 1/2
+  -- log²N / N^{1/2} → 0 as N → ∞ (log is dominated by any positive power).
+  -- Use Mathlib: Real.tendsto_pow_mul_div_rpow_atTop shows
+  -- x^k / x^α → 0 when α > k, and log^k(x)/x^α → 0 for any α > 0.
+  -- Since we can't easily access Filter.Eventually for ℕ in this context,
+  -- we use a concrete witness: N₀ = 10^6 works since
+  -- √(10^6) = 1000 and 2·(log(10^6))² ≈ 2·191 = 382 < 1000.
+  -- But proving this concretely requires norm_num/native_decide.
+  -- Instead, use the abstract Filter approach.
+  sorry
 
 /-- **Spectral Error Bridge** — deriving `spectral_error_sufficient`
     from the 4 sub-axioms.
