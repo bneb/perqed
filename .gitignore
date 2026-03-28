@@ -75,3 +75,26 @@ website/node_modules/
 **/paper/*.out
 **/paper/*.zip
 data/perqed.lancedb/
+
+# Lean / Lake build artifacts (Mathlib cache, .olean objects)
+src/lean/.lake/
+
+# Goldbach explorer generated data
+tools/goldbach_geodesic_M*.csv
+tools/goldbach_explorer
+
+# Goldbach — compiled C binaries (rebuild from .c sources)
+tools/goldbach_amplified_moment
+tools/goldbach_amplifier_compare
+tools/goldbach_amplifier_fft
+tools/goldbach_off_diagonal
+tools/goldbach_spectral_error
+tools/goldbach_threshold_test
+tools/*.dSYM/
+
+# Goldbach Forensic Exploration Compiled Binaries
+goldbach_exploration/crack*
+!goldbach_exploration/crack*.c
+goldbach_exploration/red_team_crack*
+!goldbach_exploration/red_team_crack*.c
+goldbach_exploration/*.dSYM/
