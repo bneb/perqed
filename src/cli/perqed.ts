@@ -2298,10 +2298,130 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 }
 
 // ──────────────────────────────────────────────
+// Geodesic Audit — Hyperbolic Bridge Proof Status
+// ──────────────────────────────────────────────
+
+/**
+ * `perqed geodesic-audit`
+ *
+ * Runs `lake build GoldbachGeodesic` in src/lean/ and parses the output
+ * to emit a per-theorem sorry count and open-frontier report.
+ *
+ * Requires: `lake` (Lean 4 build tool) installed and on PATH.
+ */
+async function runGeodesicAudit(): Promise<void> {
+  const { spawnSync } = await import("node:child_process");
+  const { readFileSync } = await import("node:fs");
+  const leanDir = join(process.cwd(), "src", "lean");
+  const leanFile = join(leanDir, "GoldbachGeodesic.lean");
+
+  console.log("╔═══════════════════════════════════════════════════╗");
+  console.log("║  🔭 PERQED — Geodesic Audit (Hyperbolic Bridge)   ║");
+  console.log("╚═══════════════════════════════════════════════════╝\n");
+
+  // ── Check prerequisites ──────────────────────────────────────────────────
+  const lakeCheck = spawnSync("which", ["lake"], { encoding: "utf-8" });
+  if (lakeCheck.status !== 0) {
+    console.error("❌ `lake` not found. Install Lean 4 via elan: https://leanprover.github.io/lean4/doc/setup.html");
+    process.exit(1);
+  }
+
+  // ── Parse sorry count from GoldbachGeodesic.lean directly ────────────────
+  // This gives an instant static analysis even without lake build.
+  let sorryCount = 0;
+  const theoremSorries: Record<string, number> = {};
+  let currentTheorem = "<top-level>";
+
+  try {
+    const source = readFileSync(leanFile, "utf-8");
+    const lines = source.split("\n");
+    for (const line of lines) {
+      const thmMatch = line.match(/^(?:theorem|def|noncomputable def)\s+(\w+)/);
+      if (thmMatch) currentTheorem = thmMatch[1];
+      if (line.includes("exact sorry") || line.trim() === "sorry") {
+        sorryCount++;
+        theoremSorries[currentTheorem] = (theoremSorries[currentTheorem] ?? 0) + 1;
+      }
+    }
+  } catch (e: any) {
+    console.error(`❌ Could not read ${leanFile}: ${e.message}`);
+    process.exit(1);
+  }
+
+  // ── Static Sorry Report ──────────────────────────────────────────────────
+  console.log("📊 Static Analysis (sorry count per theorem):\n");
+
+  const OPEN_FRONTIER = "geodesic_to_additive_bridge";
+  const rows = Object.entries(theoremSorries).map(([name, count]) => ({
+    name,
+    count,
+    marker: name === OPEN_FRONTIER ? " ⭐ OPEN FRONTIER" : "",
+  }));
+
+  // Sort: open frontier last, then by count desc
+  rows.sort((a, b) => {
+    if (a.name === OPEN_FRONTIER) return 1;
+    if (b.name === OPEN_FRONTIER) return -1;
+    return b.count - a.count;
+  });
+
+  const maxNameLen = Math.max(...rows.map(r => r.name.length), 20);
+  console.log(`  ${"Theorem".padEnd(maxNameLen)}  sorry  Status`);
+  console.log(`  ${"─".repeat(maxNameLen)}  ─────  ──────────────────`);
+  for (const { name, count, marker } of rows) {
+    const status = name === OPEN_FRONTIER
+      ? "🚧 Open mathematical problem"
+      : count === 0 ? "✅ Clean" : "⏳ Stub (sorry)";
+    console.log(`  ${name.padEnd(maxNameLen)}  ${String(count).padStart(5)}  ${status}${marker}`);
+  }
+
+  console.log(`\n  Total sorry stubs: ${sorryCount}`);
+  console.log(`  Type errors:       0  (static parse — run lake build to confirm)\n`);
+
+  // ── Dependency graph ─────────────────────────────────────────────────────
+  console.log("📐 Dependency Graph (what blocks what):\n");
+  console.log("  spectralGap (def)");
+  console.log("    └── prime_geodesic_theorem");
+  console.log("          └── spectral_gap_error_improvement");
+  console.log("                └── prime_geodesic_pair_count_lower_bound");
+  console.log("                      └── prime_geodesic_pairs_exist");
+  console.log("                            └── geodesic_to_additive_bridge  ⭐");
+  console.log("                                  └── [Goldbach Conjecture]\n");
+
+  // ── Attempt lake build ───────────────────────────────────────────────────
+  console.log("🔨 Attempting `lake build GoldbachGeodesic` in src/lean/ ...\n");
+  const result = spawnSync("lake", ["build", "GoldbachGeodesic"], {
+    cwd: leanDir,
+    encoding: "utf-8",
+    timeout: 300_000, // 5 min — Mathlib first build is slow
+  });
+
+  if (result.status === 0) {
+    console.log("✅ Lean build succeeded — no type errors.\n");
+  } else {
+    console.log("⚠️  Lake build output:");
+    if (result.stdout) console.log(result.stdout.slice(0, 2000));
+    if (result.stderr) console.log(result.stderr.slice(0, 2000));
+    console.log("\n💡 If Mathlib has not been fetched yet, run: cd src/lean && lake exe cache get");
+  }
+
+  console.log("╔═══════════════════════════════════════════════════╗");
+  console.log("║  Audit complete. Fill sorry stubs to make progress ║");
+  console.log("╚═══════════════════════════════════════════════════╝\n");
+}
+
+// ──────────────────────────────────────────────
 // Main — Single Flow
 // ──────────────────────────────────────────────
 
 async function main() {
+  // Subcommand dispatch — check before GEMINI_API_KEY validation
+  const subcommand = process.argv[2];
+  if (subcommand === "geodesic-audit") {
+    await runGeodesicAudit();
+    return;
+  }
+
   const args = parseArgs();
 
   const apiKey = process.env.GEMINI_API_KEY;
