@@ -44,6 +44,7 @@ torus-decomposition/
 ├── lean/
 │   ├── TorusTopologyM4.lean     # Formally verified m=4 proof
 │   ├── TorusTopologyM6.lean     # Formally verified m=6 proof
+│   ├── TorusEvenGeneralized.lean # Generalized open conjecture framework for even m>=8
 │   └── KnuthTorusM4.lean       # Earlier m=4 draft
 ├── paper/
 │   └── torus_decomposition.tex  # LaTeX manuscript
@@ -51,7 +52,8 @@ torus-decomposition/
 │   ├── state.ts                 # SA state (baseline, full recompute)
 │   ├── state_fast.ts            # SA state (incremental, O(1) delta)
 │   ├── hunt.ts                  # Baseline SA runner
-│   └── hunt_fast.ts             # Incremental SA runner
+│   ├── hunt_fast.ts             # Incremental SA runner
+│   └── even_closed_form.ts      # Empirical verification script mapping Ho Boon Suan's construction for m>=8
 └── data/
     ├── cycles_m4.json           # m=4 witness payload (64 elements)
     └── cycles_m6.json           # m=6 witness payload (216 elements)
