@@ -69,7 +69,7 @@ describe("validateWitnessPartition", () => {
     // Just check validation passes (energy may not be 0 but structure is valid)
     // For validation purposes: length and color range checks pass
     const isLengthOk = p.length >= 16;
-    const isColorsOk = Array.from(p).slice(1, 16).every((c: number) => c >= 0 && c < 5);
+    const isColorsOk = (Array.from(p) as number[]).slice(1, 16).every((c: number) => c >= 0 && c < 5);
     expect(isLengthOk).toBe(true);
     expect(isColorsOk).toBe(true);
     // If Salem-Spencer achieves E=0 for this problem (it may not at N=15):

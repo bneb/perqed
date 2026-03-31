@@ -42,14 +42,14 @@ describe("HunterTelemetry", () => {
     let capturedUrl = "";
     let capturedInit: RequestInit | undefined;
 
-    globalThis.fetch = mock(async (url: any, init?: any) => {
+    globalThis.fetch = (mock(async (url: any, init?: any) => {
       capturedUrl = url.toString();
       capturedInit = init;
       return new Response(JSON.stringify({ id: "test-gist-123" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
-    }) as any;
+    }) as any) as unknown as typeof fetch;
 
     await HunterTelemetry.push(DUMMY_PAYLOAD);
 
@@ -65,9 +65,9 @@ describe("HunterTelemetry", () => {
     process.env.PERQED_GIST_ID = "test-gist-123";
     process.env.PERQED_GITHUB_TOKEN = "ghp_test_token";
 
-    globalThis.fetch = mock(async () => {
+    globalThis.fetch = (mock(async () => {
       throw new Error("Network unreachable");
-    }) as any;
+    }) as any) as unknown as typeof fetch;
 
     // This MUST NOT throw
     await expect(HunterTelemetry.push(DUMMY_PAYLOAD)).resolves.toBeUndefined();
@@ -77,9 +77,9 @@ describe("HunterTelemetry", () => {
     process.env.PERQED_GIST_ID = "test-gist-123";
     process.env.PERQED_GITHUB_TOKEN = "ghp_test_token";
 
-    globalThis.fetch = mock(async () => {
+    globalThis.fetch = (mock(async () => {
       return new Response("Rate limited", { status: 429 });
-    }) as any;
+    }) as any) as unknown as typeof fetch;
 
     await expect(HunterTelemetry.push(DUMMY_PAYLOAD)).resolves.toBeUndefined();
   });
@@ -89,10 +89,10 @@ describe("HunterTelemetry", () => {
     delete process.env.PERQED_GITHUB_TOKEN;
 
     let fetchCalled = false;
-    globalThis.fetch = mock(async () => {
+    globalThis.fetch = (mock(async () => {
       fetchCalled = true;
       return new Response("", { status: 200 });
-    }) as any;
+    }) as any) as unknown as typeof fetch;
 
     await HunterTelemetry.push(DUMMY_PAYLOAD);
     expect(fetchCalled).toBe(false);

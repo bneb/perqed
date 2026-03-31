@@ -318,4 +318,3 @@ export function ramseyEnergyDeltaBatch(
 
   return newEnergy - oldEnergy;
 }
-

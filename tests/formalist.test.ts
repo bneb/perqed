@@ -101,10 +101,10 @@ describe("FormalistAgent — Think Tag Parsing", () => {
 
     // Mock fetch
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => mockOllamaResponse(R1_CLEAN_OUTPUT),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const result = await agent.generateMove("test context");
@@ -120,10 +120,10 @@ describe("FormalistAgent — Think Tag Parsing", () => {
     const agent = new FormalistAgent();
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => mockOllamaResponse(R1_FENCED_OUTPUT),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const result = await agent.generateMove("test context");
@@ -138,10 +138,10 @@ describe("FormalistAgent — Think Tag Parsing", () => {
     const agent = new FormalistAgent();
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => mockOllamaResponse(R1_NO_THINK),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const result = await agent.generateMove("test context");
@@ -156,10 +156,10 @@ describe("FormalistAgent — Think Tag Parsing", () => {
     const agent = new FormalistAgent();
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => mockOllamaResponse(R1_NESTED_THINK),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const result = await agent.generateMove("test context");
@@ -199,10 +199,10 @@ describe("FormalistAgent — Bare Tactic Wrapping", () => {
     const agent = new FormalistAgent();
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => mockOllamaResponse("omega"),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const result = await agent.generateMove("test context");
@@ -218,10 +218,10 @@ describe("FormalistAgent — Bare Tactic Wrapping", () => {
     const agent = new FormalistAgent();
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => mockOllamaResponse("intro n m\nomega"),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const result = await agent.generateMove("test context");
@@ -238,10 +238,10 @@ describe("FormalistAgent — Bare Tactic Wrapping", () => {
     const agent = new FormalistAgent();
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => mockOllamaResponse("```lean\nsimp [Nat.add_comm]\n```"),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const result = await agent.generateMove("test context");
@@ -256,7 +256,7 @@ describe("FormalistAgent — Bare Tactic Wrapping", () => {
     const agent = new FormalistAgent();
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => ({
         message: {
@@ -265,7 +265,7 @@ describe("FormalistAgent — Bare Tactic Wrapping", () => {
           thinking: "Model was thinking about commutativity",
         },
       }),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       // Content is empty and thinking doesn't contain "action" → should fail
@@ -286,7 +286,7 @@ describe("FormalistAgent — Retry Loop", () => {
     let callCount = 0;
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => {
+    globalThis.fetch = ((async () => {
       callCount++;
       return {
         ok: true,
@@ -300,7 +300,7 @@ describe("FormalistAgent — Retry Loop", () => {
           },
         }),
       };
-    }) as unknown as typeof fetch;
+    }) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const result = await agent.generateMove("test context", 3);
@@ -315,12 +315,12 @@ describe("FormalistAgent — Retry Loop", () => {
     const agent = new FormalistAgent();
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => ({
+    globalThis.fetch = ((async () => ({
       ok: true,
       json: async () => ({
         message: { role: "assistant", content: "", thinking: "Still thinking..." },
       }),
-    })) as unknown as typeof fetch;
+    })) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       await expect(agent.generateMove("test context", 2)).rejects.toThrow(/after 2 attempts/);

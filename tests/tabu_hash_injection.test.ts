@@ -143,11 +143,11 @@ describe("requestSearchPivot tabu hash injection", () => {
       // Note: no tabuHashes — the function must inject them
     });
 
-    globalThis.fetch = async () => ({
+    globalThis.fetch = (async () => ({
       ok: true,
       json: async () => ({ candidates: [{ content: { parts: [{ text: MOCK_PHASE }] } }] }),
       text: async () => "",
-    }) as any;
+    }) as any) as unknown as typeof fetch;
 
     // Dynamically import *after* mocking fetch so the module picks up our mock
     const { getTabuHashesFromJournal } = await import("../src/cli/perqed_tabu_utils");

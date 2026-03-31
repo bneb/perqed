@@ -9,6 +9,7 @@
 import { runPartitionSA } from "./partition_sa_worker";
 import type { PartitionSAConfig } from "./partition_sa_worker";
 
+declare var self: Worker;
 self.onmessage = async (e: MessageEvent) => {
   const raw = e.data.config as Record<string, unknown>;
 
@@ -29,7 +30,7 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     const result = await runPartitionSA(config);
     // postMessage the result (partition is Int8Array — transferable)
-    self.postMessage(result, [result.partition.buffer]);
+    self.postMessage(result, [result.partition.buffer as ArrayBuffer]);
   } catch (err) {
     self.postMessage({ error: String(err) });
   }

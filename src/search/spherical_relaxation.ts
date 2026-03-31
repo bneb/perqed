@@ -69,7 +69,7 @@ export function initSphericalFromHard(
         const u1 = Math.random() + 1e-12;
         const u2 = Math.random();
         const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-        v[k] += temperature * z;
+        v[k]! += temperature * z;
       }
     }
     sv[i] = retractToSphere(v);
@@ -134,11 +134,11 @@ export function sphericalEnergyGradient(sv: SphereVectors, N: number, K: number)
         const vyk2 = vyk * vyk, vzk2 = vzk * vzk;
         const vxk2 = vxk * vxk;
         // ∂E/∂vx[k] — x as addend 1
-        gx[k] += 2 * vxk * vyk2 * vzk2;
+        gx[k]! += 2 * vxk * vyk2 * vzk2;
         // ∂E/∂vy[k] — y as addend 2
-        gy[k] += 2 * vyk * vxk2 * vzk2;
+        gy[k]! += 2 * vyk * vxk2 * vzk2;
         // ∂E/∂vz[k] — z as the sum
-        gz[k] += 2 * vzk * vxk2 * vyk2;
+        gz[k]! += 2 * vzk * vxk2 * vyk2;
       }
     }
   }

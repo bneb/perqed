@@ -28,6 +28,9 @@ function makePayload(overrides: Partial<TelemetryPayload> = {}): TelemetryPayloa
       isStuckInLoop: false,
       lastErrors: ["tactic 'simp' failed"],
       hasArchitectDirective: true,
+    globalFailures: 0,
+    identicalErrorCount: 0,
+    totalTacticianCalls: 0,
     },
     latestLog: {
       agent: "TACTICIAN",
@@ -100,11 +103,11 @@ describe("TelemetryEmitter", () => {
     let capturedInit: RequestInit = {};
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async (input: any, init?: any) => {
+    globalThis.fetch = ((async (input: any, init?: any) => {
       capturedUrl = typeof input === "string" ? input : input.url;
       capturedInit = init ?? {};
       return new Response(JSON.stringify({ id: "abc123gistid" }), { status: 200 });
-    }) as unknown as typeof fetch;
+    }) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const emitter = new TelemetryEmitter();
@@ -134,10 +137,10 @@ describe("TelemetryEmitter", () => {
     let capturedBody: any = null;
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async (_input: any, init?: any) => {
+    globalThis.fetch = ((async (_input: any, init?: any) => {
       capturedBody = JSON.parse(init?.body ?? "{}");
       return new Response("{}", { status: 200 });
-    }) as unknown as typeof fetch;
+    }) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const payload = makePayload({ iteration: 7, status: "SOLVED" });
@@ -171,9 +174,9 @@ describe("TelemetryEmitter", () => {
     process.env.GITHUB_GIST_ID = "abc123gistid";
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => {
+    globalThis.fetch = ((async () => {
       throw new Error("Network failure");
-    }) as unknown as typeof fetch;
+    }) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const emitter = new TelemetryEmitter();
@@ -196,10 +199,10 @@ describe("TelemetryEmitter", () => {
 
     let fetchCalled = false;
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => {
+    globalThis.fetch = ((async () => {
       fetchCalled = true;
       return new Response("{}", { status: 200 });
-    }) as unknown as typeof fetch;
+    }) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const emitter = new TelemetryEmitter();

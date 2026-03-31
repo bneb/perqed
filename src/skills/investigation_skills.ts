@@ -80,4 +80,3 @@ export async function query_literature(search_term: string): Promise<string> {
     return `Failed to query literature database: ${e.message}`;
   }
 }
-

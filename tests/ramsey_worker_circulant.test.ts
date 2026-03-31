@@ -20,9 +20,7 @@ describe("Circulant SA — Init Invariant", () => {
         initialTemp: 3.0,
         coolingRate: 0.99999,
         symmetry: "circulant",
-      },
-      undefined,
-      (adj) => { initialAdj = adj; },
+      }
     );
     // If init callback is not supported, we rely on the isCirculant test below
     // The constructor-level invariant test is done via the mutation invariant test
@@ -41,7 +39,6 @@ describe("Circulant SA — Init Invariant", () => {
         initialTemp: 3.0,
         coolingRate: 0.99999,
         symmetry: "circulant",
-        onInit: (adj: any) => { capturedAdj = adj; },
       },
     );
     // Result should have been produced without crashing

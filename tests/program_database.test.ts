@@ -41,9 +41,9 @@ describe("ProgramDatabase — record + topK", () => {
 
     const top3 = db.topK(3);
     expect(top3).toHaveLength(3);
-    expect(top3[0].energy).toBe(407);      // Period-18 lookup
-    expect(top3[1].energy).toBe(1093);     // 2-adic
-    expect(top3[2].energy).toBe(1432);     // Log2
+    expect(top3[0]!.energy).toBe(407);      // Period-18 lookup
+    expect(top3[1]!.energy).toBe(1093);     // 2-adic
+    expect(top3[2]!.energy).toBe(1432);     // Log2
   });
 
   it("topK returns all entries when k > total entries", () => {
@@ -154,7 +154,7 @@ describe("ProgramDatabase — deduplication", () => {
     db.record({ rule_js: "return i % 6;", energy: 1500, description: "improved", domain_size: 537, num_partitions: 6 });
 
     const all = db.topK(100);
-    expect(all[0].energy).toBe(1500);
+    expect(all[0]!.energy).toBe(1500);
   });
 });
 
@@ -173,16 +173,16 @@ describe("ProgramDatabase — JSONL persistence", () => {
     const db2 = new ProgramDatabase(TEST_DB_PATH);
     const top = db2.topK(3);
     expect(top).toHaveLength(3);
-    expect(top[0].energy).toBe(407);
+    expect(top[0]!.energy).toBe(407);
   });
 
   it("appends to existing file on subsequent records", () => {
     const db1 = new ProgramDatabase(TEST_DB_PATH);
-    db1.record(PROGRAMS[0]);
+    db1.record(PROGRAMS[0]!);
 
     // Separate instance appends
     const db2 = new ProgramDatabase(TEST_DB_PATH);
-    db2.record(PROGRAMS[1]);
+    db2.record(PROGRAMS[1]!);
 
     // Third instance reads all
     const db3 = new ProgramDatabase(TEST_DB_PATH);

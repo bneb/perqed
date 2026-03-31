@@ -39,9 +39,9 @@ const SAMPLE_THEOREMS: LeanTheorem[] = [
 
 describe("MathlibLibrarian — Ollama unavailable", () => {
   test("returns {ingested:0, skipped:0} and does NOT throw when Ollama is down", async () => {
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       throw new Error("ECONNREFUSED");
-    };
+    }) as unknown as typeof fetch;
 
     const lib = new MathlibLibrarian({ dbPath: TEST_DB + "_down" });
     const result = await lib.ingest(SAMPLE_THEOREMS);
@@ -58,7 +58,7 @@ describe("MathlibLibrarian — happy path", () => {
   const MOCK_VEC = new Array(4).fill(0.1);
 
   function mockOllamaUp() {
-    globalThis.fetch = async (url: any, _opts?: any) => {
+    globalThis.fetch = (async (url: any, _opts?: any) => {
       const u = String(url);
       if (u.includes("/api/tags")) {
         return new Response(JSON.stringify({ models: [] }), { status: 200 });
@@ -70,7 +70,7 @@ describe("MathlibLibrarian — happy path", () => {
         });
       }
       return new Response("not found", { status: 404 });
-    };
+    }) as unknown as typeof fetch;
   }
 
   test("ingests theorems and returns correct ingested count", async () => {
@@ -133,7 +133,7 @@ describe("MathlibLibrarian — happy path", () => {
 
   test("uses docstring for embedding when present, signature as fallback", async () => {
     const capturedPrompts: string[] = [];
-    globalThis.fetch = async (url: any, opts?: any) => {
+    globalThis.fetch = (async (url: any, opts?: any) => {
       const u = String(url);
       if (u.includes("/api/tags")) return new Response(JSON.stringify({ models: [] }), { status: 200 });
       if (u.includes("/api/embeddings")) {
@@ -145,7 +145,7 @@ describe("MathlibLibrarian — happy path", () => {
         });
       }
       return new Response("not found", { status: 404 });
-    };
+    }) as unknown as typeof fetch;
 
     const withDocstring: LeanTheorem = {
       theorem: "test_theorem",

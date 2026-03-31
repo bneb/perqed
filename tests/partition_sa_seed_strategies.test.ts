@@ -126,7 +126,7 @@ describe("initializePartition — crossover", () => {
     for (let i = 1; i <= N; i++) { pa[i] = 0; pb[i] = 5; }
     const p = initializePartition({ ...baseConfig(), seed_strategy: "crossover", crossover_parents: [pa, pb] });
     for (let i = 1; i <= N; i++) {
-      expect([0, 5]).toContain(p[i]);
+      expect([0, 5]).toContain(p[i]!);
     }
   });
   it("all elements in [0, K)", () => {

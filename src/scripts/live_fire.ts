@@ -202,10 +202,14 @@ async function main() {
         try {
           const scribe = new ScribeAgent(geminiKey);
           const winningPath = result.tree.getWinningPath(solvedNode.id);
-          const latex = await scribe.draftPaper(
-            `theorem ${THEOREM_NAME} ${THEOREM_SIGNATURE}`,
+          const latex = await scribe.draftResearchPaper({
+            plan: { prompt: "", seed_paper: { title: THEOREM_NAME, arxivId: "", abstract: "" }, extension_hypothesis: THEOREM_SIGNATURE, domains_to_probe: [], lean_target_sketch: `theorem ${THEOREM_NAME} ${THEOREM_SIGNATURE}` },
+            evidence: { hypothesis: "", results: [], synthesis: "", anomalies: [], kills: [] },
+            approvedConjecture: { signature: `theorem ${THEOREM_NAME} ${THEOREM_SIGNATURE}`, description: "" },
+            redTeamHistory: [],
+            proofStatus: "PROVED",
             winningPath,
-          );
+          });
           await fs.mkdir("./data", { recursive: true });
           await fs.writeFile("./data/draft_paper.tex", latex, "utf-8");
           console.log(`   📄 LaTeX draft: ./data/draft_paper.tex (${latex.split("\n").length} lines)`);

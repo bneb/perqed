@@ -16,6 +16,7 @@
  */
 
 import { computeSumFreeEnergy } from "../math/optim/SumFreeEnergy";
+import { computeAPEnergy, computeAPDelta } from "./ap_energy";
 
 /**
  * Available initialization strategies for the SA partition.
@@ -38,6 +39,8 @@ export type SeedStrategy =
 export interface PartitionSAConfig {
   domain_size: number;
   num_partitions: number;
+  energy_target?: "schur" | "vdw"; // default "schur"
+  ap_length?: number;              // required if energy_target === "vdw"
   sa_iterations?: number;       // default 10_000_000
   initial_temperature?: number; // default 5.0
   cooling_rate?: number;        // default computed to reach ~0.01 by end
@@ -162,9 +165,25 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
     domain_size,
     num_partitions,
     description,
+    energy_target = "schur",
+    ap_length,
     sa_iterations = 10_000_000,
     initial_temperature = 5.0,
   } = config;
+
+  if (energy_target === "vdw" && !ap_length) {
+    throw new Error("ap_length is required when energy_target is vdw");
+  }
+
+  const computeEnergy = (p: Int8Array) =>
+    energy_target === "vdw"
+      ? computeAPEnergy(p, domain_size, ap_length!)
+      : computeSumFreeEnergy(p, domain_size, num_partitions);
+
+  const getDeltaE = (p: Int8Array, elem: number, oldC: number, newC: number) =>
+    energy_target === "vdw"
+      ? computeAPDelta(p, domain_size, ap_length!, elem, oldC, newC)
+      : deltaEnergy(p, elem, oldC, newC, domain_size);
 
   // Cooling: reach T~0.01 by end of run
   const cooling_rate = config.cooling_rate ?? Math.pow(0.01 / initial_temperature, 1 / sa_iterations);
@@ -172,7 +191,7 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
   // Initialize partition via configured seed strategy (warmStart wins if provided)
   let current: Int8Array = initializePartition(config);
 
-  let currentEnergy = computeSumFreeEnergy(current, domain_size, num_partitions);
+  let currentEnergy = computeEnergy(current);
 
   // Best seen
   let bestPartition = new Int8Array(current);
@@ -189,7 +208,7 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
     let newClass = Math.floor(Math.random() * (num_partitions - 1));
     if (newClass >= oldClass) newClass++;
 
-    const dE = deltaEnergy(current, elem, oldClass, newClass, domain_size);
+    const dE = getDeltaE(current, elem, oldClass, newClass);
 
     if (dE <= 0 || Math.random() < Math.exp(-dE / T)) {
       current[elem] = newClass;
@@ -205,7 +224,7 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
   }
 
   // Final exact energy check on bestPartition
-  const finalEnergy = computeSumFreeEnergy(bestPartition, domain_size, num_partitions);
+  const finalEnergy = computeEnergy(bestPartition);
 
   return {
     partition: bestPartition,

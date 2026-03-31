@@ -107,8 +107,8 @@ export class ClaudeStateFast implements IState<number[]> {
       if (oldValOldS !== 1) this.inDegViolations--;
       if (oldValNewS !== 1) this.inDegViolations--;
 
-      this.inDeg[color]![oldS]--;
-      this.inDeg[color]![newS]++;
+      this.inDeg[color]![oldS] = (this.inDeg[color]![oldS] ?? 0) - 1;
+      this.inDeg[color]![newS] = (this.inDeg[color]![newS] ?? 0) + 1;
 
       if (this.inDeg[color]![oldS] !== 1) this.inDegViolations++;
       if (this.inDeg[color]![newS] !== 1) this.inDegViolations++;
@@ -199,7 +199,7 @@ export class ClaudeStateFast implements IState<number[]> {
 
       const deg = new Uint8Array(this.vCount);
       for (let v = 0; v < this.vCount; v++) {
-        deg[this.succ[color]![v]!]++;
+        deg[this.succ[color]![v]!] = (deg[this.succ[color]![v]!] ?? 0) + 1;
       }
       for (let v = 0; v < this.vCount; v++) {
         if (deg[v] !== 1) violations++;
@@ -257,7 +257,7 @@ export class ClaudeStateFast implements IState<number[]> {
         else if (assignment[1] === color) s = ii * m * m + ((ji + 1) % m) * m + ki;
         else s = ii * m * m + ji * m + ((ki + 1) % m);
         succ[color]![v] = s;
-        inDeg[color]![s]++;
+        inDeg[color]![s] = (inDeg[color]![s] ?? 0) + 1;
       }
     }
 
@@ -267,7 +267,7 @@ export class ClaudeStateFast implements IState<number[]> {
       const visited = new Uint8Array(vCount);
       for (let start = 0; start < vCount; start++) {
         if (!visited[start]) {
-          colorCycles[color]++;
+          colorCycles[color]!++;
           let node = start;
           while (!visited[node]) { visited[node] = 1; node = succ[color]![node]!; }
         }

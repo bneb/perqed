@@ -48,12 +48,12 @@ describe("ArxivIngester", () => {
   });
 
   test("ingests papers from mocked arXiv XML and stores in VectorDB", async () => {
-    globalThis.fetch = async (_url: any) => {
+    globalThis.fetch = (async (_url: any) => {
       return new Response(MOCK_ARXIV_XML, {
         status: 200,
         headers: { "Content-Type": "application/xml" },
       });
-    };
+    }) as unknown as typeof fetch;
 
     const mockEmbedder = new MockEmbedder();
     const db = new VectorDatabase(TEST_DB_PATH);
@@ -74,12 +74,12 @@ describe("ArxivIngester", () => {
   });
 
   test("stored premises have type ARXIV and correct fields", async () => {
-    globalThis.fetch = async (_url: any) => {
+    globalThis.fetch = (async (_url: any) => {
       return new Response(MOCK_ARXIV_XML, {
         status: 200,
         headers: { "Content-Type": "application/xml" },
       });
-    };
+    }) as unknown as typeof fetch;
 
     const mockEmbedder = new MockEmbedder();
     const db = new VectorDatabase(TEST_DB_PATH);
@@ -105,9 +105,9 @@ describe("ArxivIngester", () => {
   });
 
   test("handles arXiv API failure gracefully", async () => {
-    globalThis.fetch = async (_url: any) => {
+    globalThis.fetch = (async (_url: any) => {
       return new Response("Service Unavailable", { status: 503 });
-    };
+    }) as unknown as typeof fetch;
 
     const mockEmbedder = new MockEmbedder();
     const db = new VectorDatabase(TEST_DB_PATH);

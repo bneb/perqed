@@ -30,7 +30,7 @@ for (const N of testNs) {
   
   energies.push(eSelberg);
   const trend = energies.length >= 2
-    ? (eSelberg < energies[energies.length - 2] ? "↓ DECREASING" : "↑ INCREASING")
+    ? (eSelberg < energies[energies.length - 2]! ? "↓ DECREASING" : "↑ INCREASING")
     : "—";
   
   console.log(`  ${String(N).padStart(4)} | ${eSelberg.toFixed(4).padStart(8)} | ${ePrime.toFixed(4).padStart(8)} | ${ratio.toFixed(3).padStart(6)} | ${trend}`);

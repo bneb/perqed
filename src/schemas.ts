@@ -145,4 +145,3 @@ export const ArchitectResponseSchema = z.object({
 });
 
 export type ArchitectResponse = z.infer<typeof ArchitectResponseSchema>;
-

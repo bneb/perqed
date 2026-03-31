@@ -28,7 +28,7 @@ describe("Orchestrator Concurrent Processing", () => {
     await processNode(child, tree, "test_thm", "(n : Nat) : n = n", deps);
 
     // Child should be DEAD_END (explored), and a new SOLVED grandchild should exist
-    expect(child.status).toBe("DEAD_END");
+    expect(child.status as string).toBe("DEAD_END");
     const solvedNode = Array.from(tree.nodes.values()).find(n => n.status === "SOLVED");
     expect(solvedNode).toBeDefined();
   });
@@ -51,7 +51,7 @@ describe("Orchestrator Concurrent Processing", () => {
     await processNode(child, tree, "test_thm", "(n : Nat) : n = n", deps);
 
     // Should unlock back to OPEN for retry
-    expect(child.status).toBe("OPEN");
+    expect(child.status as string).toBe("OPEN");
     expect(child.errorHistory.length).toBe(1);
   });
 
@@ -71,7 +71,7 @@ describe("Orchestrator Concurrent Processing", () => {
 
     await processNode(child, tree, "test_thm", "(n : Nat) : n = n", deps);
 
-    expect(child.status).toBe("OPEN");
+    expect(child.status as string).toBe("OPEN");
     expect(child.errorHistory[0]).toContain("Network timeout");
   });
 

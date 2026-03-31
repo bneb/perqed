@@ -88,7 +88,7 @@ export class ClaudeState implements IState<number[]> {
       // incoming arc of this color. Without this, lassos score E=0.
       const inDeg = new Uint8Array(this.vCount);
       for (let v = 0; v < this.vCount; v++) {
-        inDeg[this.successor(v, color)]++;
+        inDeg[this.successor(v, color)]!++;
       }
       for (let v = 0; v < this.vCount; v++) {
         if (inDeg[v] !== 1) inDegreeViolations++;

@@ -161,7 +161,7 @@ export class AlgebraicBuilder {
     s: number,
     evaluatorType: EvaluatorType = "RAMSEY_CLIQUES"
   ): Promise<{ energy: number; status: "witness" | "violations" }> {
-    const energy = await EvaluatorRouter.evaluate(adj, { evaluator_type: evaluatorType, r, s });
+    const energy = await EvaluatorRouter.getInstance("test").evaluate(adj, { evaluator_type: evaluatorType, r, s });
     return { energy, status: energy === 0 ? "witness" : "violations" };
   }
 

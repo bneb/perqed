@@ -44,7 +44,7 @@ export function initSoftPartitionFromHard(
     if (i >= 1 && i <= N) {
       const color = hard[i];
       if (color !== undefined && color >= 0 && color < K) {
-        p[color] += 1 - temp;
+        p[color]! += 1 - temp;
       }
     }
     return p;

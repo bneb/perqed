@@ -42,10 +42,14 @@ async function main() {
   const scribe = new ScribeAgent(apiKey);
   console.log("🧠 Translating Lean 4 trace to AMS-LaTeX...");
 
-  const latexOutput = await scribe.draftPaper(
-    "theorem nat_add_comm (n m : Nat) : n + m = m + n",
+  const latexOutput = await scribe.draftResearchPaper({
+    plan: { prompt: "", seed_paper: { title: "nat_add_comm", arxivId: "", abstract: "" }, extension_hypothesis: "n + m = m + n", domains_to_probe: [], lean_target_sketch: "theorem nat_add_comm (n m : Nat) : n + m = m + n" },
+    evidence: { hypothesis: "", results: [], synthesis: "", anomalies: [], kills: [] },
+    approvedConjecture: { signature: "theorem nat_add_comm (n m : Nat) : n + m = m + n", description: "Commutativity of addition" },
+    redTeamHistory: [],
+    proofStatus: "PROVED",
     winningPath,
-  );
+  });
 
   // Ensure data directory exists
   await fs.mkdir("./data", { recursive: true });

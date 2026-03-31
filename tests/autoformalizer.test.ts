@@ -31,7 +31,7 @@ describe("AutoformalizerAgent — Compiler-in-the-Loop", () => {
     // 2. Mock Fetch (Gemini)
     let fetchCallCount = 0;
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async (url: any, init?: any) => {
+    globalThis.fetch = (mock(async (url: any, init?: any) => {
       fetchCallCount++;
       
       let responseText = "";
@@ -50,7 +50,7 @@ describe("AutoformalizerAgent — Compiler-in-the-Loop", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
-    }) as any;
+    }) as any) as unknown as typeof fetch;
 
     try {
       const agent = new AutoformalizerAgent({

@@ -227,4 +227,3 @@ describe("computeAPDelta", () => {
     expect(delta).toBe(ePost - ePre);
   });
 });
-

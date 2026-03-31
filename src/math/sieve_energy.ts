@@ -21,12 +21,12 @@ function buildMobius(limit: number): Int8Array {
   }
 
   for (let n = 2; n <= limit; n++) {
-    const p = spf[n];
+    const p = spf[n]!;
     const m = n / p;
     if (m % p === 0) {
       mu[n] = 0; // p² divides n
     } else {
-      mu[n] = -mu[m]; // one more prime factor
+      mu[n] = -mu[m]!; // one more prime factor
     }
   }
 
@@ -74,23 +74,23 @@ export function computeSieveWeights(
     let P = 1.0;
     let tPow = t;
     for (let i = 0; i < coeffs.length; i++) {
-      P -= coeffs[i] * tPow;
+      P -= coeffs[i]! * tPow;
       tPow *= t;
     }
-    lambda[d] = mu[d] * P;
+    lambda[d] = mu[d]! * P;
   }
 
   // For each n, compute Σ_{d|n, d≤R} λ_d, then square
   for (let d = 1; d <= maxD; d++) {
     if (lambda[d] === 0) continue;
     for (let n = d; n <= N; n += d) {
-      weights[n] += lambda[d];
+      weights[n] = (weights[n] ?? 0) + lambda[d]!;
     }
   }
 
   // Square each weight
   for (let n = 1; n <= N; n++) {
-    weights[n] = weights[n] * weights[n];
+    weights[n] = weights[n]! * weights[n]!;
   }
 
   return weights;
@@ -144,8 +144,8 @@ export function fourierAnalysis(
     for (let n = 1; n <= N; n++) {
       if (weights[n] === 0) continue;
       const theta = 2 * Math.PI * n * alpha;
-      re += weights[n] * Math.cos(theta);
-      im += weights[n] * Math.sin(theta);
+      re += weights[n]! * Math.cos(theta);
+      im += weights[n]! * Math.sin(theta);
     }
     const mag = Math.sqrt(re * re + im * im);
 

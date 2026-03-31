@@ -1,0 +1,35 @@
+   4 error TS18048: 'best' is possibly 'undefined'.
+   3 error TS18048: 'c' is possibly 'undefined'.
+   2 error TS18048: 'p' is possibly 'undefined'.
+   6 error TS2304: Cannot find name 'self'.
+   1 error TS2307: Cannot find module '../math/cycle_finder' or its corresponding type declarations.
+   1 error TS2307: Cannot find module '../math/graph6' or its corresponding type declarations.
+   4 error TS2322: Type '{ totalAttempts: number; consecutiveFailures: number; globalFailures: number; goalCount: number; isStuckInLoop: boolean; lastErrors: string[]; hasArchitectDirective: boolean; identicalErrorCount?: number | undefined; totalTacticianCalls?: number | undefined; }' is not assignable to type 'RoutingSignals'.
+   1 error TS2322: Type 'Promise<typeof fetch>' is not assignable to type 'Promise<Response>'.
+   1 error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+   3 error TS2339: Property 'draftPaper' does not exist on type 'ScribeAgent'.
+   5 error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number'.
+   2 error TS2345: Argument of type 'Omit<ProgramEntry, "timestamp" | "island"> | undefined' is not assignable to parameter of type 'Omit<ProgramEntry, "timestamp" | "island">'.
+   7 error TS2352: Conversion of type 'Mock<(_url: string | URL | Request, _init?: RequestInit | undefined) => Promise<Response>>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+   1 error TS2352: Conversion of type 'Mock<(_url: string | URL | Request, init?: RequestInit | undefined) => Promise<Response>>' to type 'typeof fetch' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+   4 error TS2352: Conversion of type 'typeof fetch' to type 'Mock<(...args: any[]) => any>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+   1 error TS2353: Object literal may only specify known properties, and 'onInit' does not exist in type 'RamseySearchConfig'.
+  37 error TS2532: Object is possibly 'undefined'.
+   3 error TS2554: Expected 1 arguments, but got 2.
+   1 error TS2554: Expected 1-2 arguments, but got 3.
+  13 error TS2673: Constructor of class 'EvaluatorRouter' is private and only accessible within the class declaration.
+   1 error TS2739: Type '{ id: string; parentId: null; tacticApplied: null; leanState: string; status: "OPEN"; childrenIds: string[]; depth: number; visits: number; errorHistory: never[]; }' is missing the following properties from type 'ProofNode': splitType, value
+   1 error TS2739: Type '{ id: string; parentId: string; tacticApplied: string; leanState: string; status: "SOLVED"; childrenIds: never[]; depth: number; visits: number; errorHistory: never[]; }' is missing the following properties from type 'ProofNode': splitType, value
+   4 error TS2741: Property 'preconnect' is missing in type '(_url: any, _opts: any) => Promise<Response>' but required in type 'typeof fetch'.
+   2 error TS2741: Property 'preconnect' is missing in type '(_url: any, opts: any) => Promise<Response>' but required in type 'typeof fetch'.
+   3 error TS2741: Property 'preconnect' is missing in type '(_url: any) => Promise<Response>' but required in type 'typeof fetch'.
+   4 error TS2741: Property 'preconnect' is missing in type '() => Promise<never>' but required in type 'typeof fetch'.
+   3 error TS2741: Property 'preconnect' is missing in type '() => Promise<Response>' but required in type 'typeof fetch'.
+   2 error TS2741: Property 'preconnect' is missing in type '(url: any, _opts?: any) => Promise<Response>' but required in type 'typeof fetch'.
+   1 error TS2741: Property 'preconnect' is missing in type '(url: any, opts: any) => Promise<Response>' but required in type 'typeof fetch'.
+   1 error TS2741: Property 'preconnect' is missing in type '(url: any, opts?: any) => Promise<Response>' but required in type 'typeof fetch'.
+   4 error TS2741: Property 'preconnect' is missing in type '(url: any) => Promise<Response>' but required in type 'typeof fetch'.
+   8 error TS2769: No overload matches this call.
+   2 error TS7006: Parameter 'a' implicitly has an 'any' type.
+   1 error TS7006: Parameter 'adj' implicitly has an 'any' type.
+   1 error TS7006: Parameter 's' implicitly has an 'any' type.

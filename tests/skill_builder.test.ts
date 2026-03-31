@@ -135,7 +135,7 @@ describe("SkillBuilder.buildSkill()", () => {
   test("writes SKILL.md with correct frontmatter when Gemini is mocked", async () => {
     // Intercept Gemini call
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = async (_url: any, _opts: any) => {
+    globalThis.fetch = (async (_url: any, _opts: any) => {
       return new Response(
         JSON.stringify({
           candidates: [
@@ -148,7 +148,7 @@ describe("SkillBuilder.buildSkill()", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
-    };
+    }) as unknown as typeof fetch;
 
     const builder = new SkillBuilder(
       "fake-api-key",
@@ -177,7 +177,7 @@ describe("SkillBuilder.buildSkill()", () => {
 
   test("returns valid=false when Gemini returns malformed content", async () => {
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       return new Response(
         JSON.stringify({
           candidates: [
@@ -190,7 +190,7 @@ describe("SkillBuilder.buildSkill()", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
-    };
+    }) as unknown as typeof fetch;
 
     const builder = new SkillBuilder("fake-key", "gemini-2.5-flash", TEST_SKILLS_ROOT);
 
@@ -215,7 +215,7 @@ describe("SkillBuilder.buildSkill()", () => {
     const callCounts = { first: 0, second: 0 };
     let skillIndex = 0;
 
-    globalThis.fetch = async (url: any, opts: any) => {
+    globalThis.fetch = (async (url: any, opts: any) => {
       // Each buildSkill issues 1 Gemini call (with up to 3 retries on HTTP error)
       // We make the first skill's calls always 500, second always 200
       const body = opts ? JSON.parse(opts.body ?? "{}") : {};
@@ -233,7 +233,7 @@ describe("SkillBuilder.buildSkill()", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
-    };
+    }) as unknown as typeof fetch;
 
     const builder = new SkillBuilder("fake-key", "gemini-2.5-flash", TEST_SKILLS_ROOT);
 

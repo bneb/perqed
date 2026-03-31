@@ -70,7 +70,7 @@ export class SieveState implements IState<SieveParams> {
 
     if (idx < NUM_COEFFS) {
       // Perturb a polynomial coefficient
-      newParams.coeffs[idx] += perturbation;
+      newParams.coeffs[idx]! += perturbation;
     } else if (idx === NUM_COEFFS) {
       // Perturb rFrac
       newParams.rFrac += perturbation * 0.1;
@@ -103,7 +103,7 @@ export class SieveState implements IState<SieveParams> {
     );
     // Normalize: P(1) should be near 0 (P(0)=1, P(1)≈0)
     const sumCoeffs = coeffs.reduce((a, b) => a + b, 0);
-    coeffs[0] += (1.0 - sumCoeffs); // adjust so P(1) ≈ 0
+    coeffs[0]! += (1.0 - sumCoeffs); // adjust so P(1) ≈ 0
 
     return new SieveState(
       {

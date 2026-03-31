@@ -48,10 +48,18 @@ export interface SchurPartitionArchitectConfig {
   num_partitions: number;
 }
 
+export interface VdwPartitionArchitectConfig {
+  problem_class: "vdw_partition";
+  domain_size: number;
+  num_partitions: number;
+  vdw_length: number;
+}
+
 /** Discriminated union of all ARCHITECT-emittable search configs */
 export type ArchitectSearchConfig =
   | RamseyArchitectConfig
   | SchurPartitionArchitectConfig
+  | VdwPartitionArchitectConfig
   | UnknownArchitectConfig;
 
 // ──────────────────────────────────────────────
@@ -171,7 +179,8 @@ export function shouldSkipMCTSForCombinatorialSearch(opts: {
   // the LLM writes a witness function, not a tactic chain.
   const COMPUTATIONAL_ONLY_CLASSES = new Set([
     "schur_partition",
-    // Future: "van_der_waerden_partition", "rado_partition", etc.
+    "vdw_partition",
+    // Future: "rado_partition", etc.
   ]);
 
   if (!COMPUTATIONAL_ONLY_CLASSES.has(opts.problem_class)) {

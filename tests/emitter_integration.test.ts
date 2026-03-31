@@ -41,6 +41,9 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
         isStuckInLoop: false,
         lastErrors: ["tactic 'simp' failed"],
         hasArchitectDirective: true,
+    globalFailures: 0,
+    identicalErrorCount: 0,
+    totalTacticianCalls: 0,
       },
       latestLog: {
         agent: "TACTICIAN",
@@ -81,6 +84,9 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
         isStuckInLoop: false,
         lastErrors: [],
         hasArchitectDirective: false,
+    globalFailures: 0,
+    identicalErrorCount: 0,
+    totalTacticianCalls: 0,
       },
       latestLog: {
         agent: "TACTICIAN",
@@ -110,6 +116,9 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
         isStuckInLoop: true,
         lastErrors: ["maxRecDepth reached"],
         hasArchitectDirective: false,
+    globalFailures: 0,
+    identicalErrorCount: 0,
+    totalTacticianCalls: 0,
       },
       latestLog: {
         agent: "REASONER",
@@ -133,10 +142,10 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
 
     let capturedBody: any = null;
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async (_input: any, init?: any) => {
+    globalThis.fetch = ((async (_input: any, init?: any) => {
       capturedBody = JSON.parse(init?.body ?? "{}");
       return new Response("{}", { status: 200 });
-    }) as unknown as typeof fetch;
+    }) as unknown as typeof fetch) as unknown as typeof fetch;
 
     try {
       const emitter = new TelemetryEmitter();
@@ -152,6 +161,9 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
           isStuckInLoop: false,
           lastErrors: [],
           hasArchitectDirective: true,
+    globalFailures: 0,
+    identicalErrorCount: 0,
+    totalTacticianCalls: 0,
         },
         latestLog: { agent: "REASONER", action: "PROPOSE_LEAN_TACTICS", success: false, timestamp: Date.now() },
         history: [],

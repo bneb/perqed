@@ -111,7 +111,7 @@ async function main() {
   console.log(`\n[Phase 1 Results] Top 10 candidates:`);
   console.log(`  Baseline energy: ${baselineEnergy.toFixed(5)}`);
   for (let i = 0; i < top.length; i++) {
-    const c = top[i];
+    const c = top[i]!;
     const ratio = c.energy / baselineEnergy;
     const marker = ratio < 1.0 ? " ★" : "";
     console.log(`  #${i + 1}: E=${c.energy.toFixed(5)} (${(ratio * 100).toFixed(1)}% of baseline)${marker}`);
@@ -127,7 +127,7 @@ async function main() {
   console.log(`  Baseline at N=${deepN}: ${deepBaseEnergy.toFixed(5)}`);
 
   for (let i = 0; i < Math.min(5, top.length); i++) {
-    const c = top[i];
+    const c = top[i]!;
     const deepState = new SieveState(c.params, deepN, deepQ, GRID);
 
     // Also run more SA from this point
@@ -142,12 +142,12 @@ async function main() {
   console.log(`\n[Phase 3] Scaling check — does the best candidate scale?`);
   const best = top[0];
   const testNs = [250, 500, 1000, 2000];
-  console.log(`  Best candidate: rFrac=${best.params.rFrac.toFixed(4)}`);
+  console.log(`  Best candidate: rFrac=${best!.params.rFrac.toFixed(4)}`);
   console.log(`  ${"N".padStart(6)} | ${"E_sieve".padStart(10)} | ${"E_prime".padStart(10)} | ${"ratio".padStart(8)}`);
 
   for (const testN of testNs) {
     const testQ = Math.max(2, Math.floor(Q_FACTOR * Math.sqrt(testN)));
-    const sieveState = new SieveState(best.params, testN, testQ, GRID);
+    const sieveState = new SieveState(best!.params, testN, testQ, GRID);
     const sieveE = sieveState.getEnergy();
     const primeB = primeBaseline(testN, testQ, GRID);
     const primeE = primeB.sup / (testN / Math.log(testN));
@@ -158,8 +158,8 @@ async function main() {
 
   // Save best
   const output = {
-    bestParams: best.params,
-    bestEnergy: best.energy,
+    bestParams: best!.params,
+    bestEnergy: best!.energy,
     baselineEnergy,
     searchConfig: { baseN, restarts, itersPerRestart },
   };

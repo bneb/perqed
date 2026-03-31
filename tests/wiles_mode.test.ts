@@ -163,4 +163,3 @@ describe("shouldRunSearchPhase (SA bypass gate)", () => {
     expect(shouldRunSearchPhase(unknownConfig, true)).toBe(false);
   });
 });
-

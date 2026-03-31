@@ -129,7 +129,7 @@ describe("ArchitectClient — Schema Validation", () => {
   test("sends the context in the request body", async () => {
     const capturedBodies: string[] = [];
 
-    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+    globalThis.fetch = (mock(async (_url: string | URL | Request, init?: RequestInit) => {
       if (init?.body) {
         capturedBodies.push(
           typeof init.body === "string" ? init.body : await new Response(init.body).text(),
@@ -141,7 +141,7 @@ describe("ArchitectClient — Schema Validation", () => {
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
-    }) as unknown as typeof fetch;
+    }) as unknown as typeof fetch) as unknown as typeof fetch;
 
     const client = new ArchitectClient(TEST_CONFIG);
     await client.escalate("UNIQUE_CONTEXT_MARKER_12345");

@@ -19,6 +19,8 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
     isStuckInLoop: false,
     lastErrors: [],
     hasArchitectDirective: false,
+    identicalErrorCount: 0,
+    totalTacticianCalls: 0,
     ...overrides,
   };
 }

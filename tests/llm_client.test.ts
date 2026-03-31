@@ -92,7 +92,7 @@ describe("LocalAgent — Zod Validation", () => {
   });
 
   test("parses valid JSON into the Zod schema correctly", async () => {
-    globalThis.fetch = createMockFetch(VALID_JSON_STRING) as typeof fetch;
+    globalThis.fetch = createMockFetch(VALID_JSON_STRING) as unknown as typeof fetch;
 
     const agent = new LocalAgent(TEST_CONFIG);
     const result = await agent.generateMove("Prove x + 1 > x");
@@ -103,7 +103,7 @@ describe("LocalAgent — Zod Validation", () => {
   });
 
   test("strips markdown ```json fences before parsing", async () => {
-    globalThis.fetch = createMockFetch(MARKDOWN_WRAPPED_JSON) as typeof fetch;
+    globalThis.fetch = createMockFetch(MARKDOWN_WRAPPED_JSON) as unknown as typeof fetch;
 
     const agent = new LocalAgent(TEST_CONFIG);
     const result = await agent.generateMove("Prove x + 1 > x");
@@ -113,7 +113,7 @@ describe("LocalAgent — Zod Validation", () => {
   });
 
   test("strips bare markdown ``` fences before parsing", async () => {
-    globalThis.fetch = createMockFetch(MARKDOWN_WRAPPED_BARE) as typeof fetch;
+    globalThis.fetch = createMockFetch(MARKDOWN_WRAPPED_BARE) as unknown as typeof fetch;
 
     const agent = new LocalAgent(TEST_CONFIG);
     const result = await agent.generateMove("Prove x + 1 > x");
@@ -122,7 +122,7 @@ describe("LocalAgent — Zod Validation", () => {
   });
 
   test("throws ZodError when required field is missing", async () => {
-    globalThis.fetch = createMockFetch(MISSING_ACTION_JSON) as typeof fetch;
+    globalThis.fetch = createMockFetch(MISSING_ACTION_JSON) as unknown as typeof fetch;
 
     const agent = new LocalAgent(TEST_CONFIG);
 
@@ -143,7 +143,7 @@ describe("LocalAgent — Auto-Correction Loop", () => {
 
   test("retries on malformed output and succeeds on second attempt", async () => {
     // First call: garbage. Second call: valid.
-    globalThis.fetch = createMockFetch(GARBAGE_OUTPUT, VALID_JSON_STRING) as typeof fetch;
+    globalThis.fetch = createMockFetch(GARBAGE_OUTPUT, VALID_JSON_STRING) as unknown as typeof fetch;
 
     const agent = new LocalAgent(TEST_CONFIG);
     const result = await agent.generateMoveWithRetry("Prove x + 1 > x", 3);
@@ -152,18 +152,18 @@ describe("LocalAgent — Auto-Correction Loop", () => {
     expect(result.thoughts).toContain("contradiction");
 
     // Verify the fetch was called twice (original + 1 retry)
-    expect((globalThis.fetch as ReturnType<typeof mock>).mock.calls.length).toBe(2);
+    expect(((globalThis.fetch as unknown as ReturnType<typeof mock>)).mock.calls.length).toBe(2);
   });
 
   test("retries on Zod validation failure and succeeds on second attempt", async () => {
     // First call: valid JSON but missing action. Second call: perfect.
-    globalThis.fetch = createMockFetch(MISSING_ACTION_JSON, VALID_JSON_STRING) as typeof fetch;
+    globalThis.fetch = createMockFetch(MISSING_ACTION_JSON, VALID_JSON_STRING) as unknown as typeof fetch;
 
     const agent = new LocalAgent(TEST_CONFIG);
     const result = await agent.generateMoveWithRetry("Prove x + 1 > x", 3);
 
     expect(result.action).toBe("PROPOSE_TACTICS");
-    expect((globalThis.fetch as ReturnType<typeof mock>).mock.calls.length).toBe(2);
+    expect(((globalThis.fetch as unknown as ReturnType<typeof mock>)).mock.calls.length).toBe(2);
   });
 
   test("throws after maxRetries is exhausted", async () => {
@@ -173,7 +173,7 @@ describe("LocalAgent — Auto-Correction Loop", () => {
       GARBAGE_OUTPUT,
       GARBAGE_OUTPUT,
       GARBAGE_OUTPUT,
-    ) as typeof fetch;
+    ) as unknown as typeof fetch;
 
     const agent = new LocalAgent(TEST_CONFIG);
 
@@ -182,7 +182,7 @@ describe("LocalAgent — Auto-Correction Loop", () => {
     ).rejects.toThrow(/after 3 retries/i);
 
     // 1 initial + 3 retries = 4 total calls
-    expect((globalThis.fetch as ReturnType<typeof mock>).mock.calls.length).toBe(4);
+    expect(((globalThis.fetch as unknown as ReturnType<typeof mock>)).mock.calls.length).toBe(4);
   });
 
   test("correction prompt includes the previous error message", async () => {
@@ -191,7 +191,7 @@ describe("LocalAgent — Auto-Correction Loop", () => {
     // Intercept the body of each fetch call to verify error feedback is included
     let callIndex = 0;
     const bodies = [GARBAGE_OUTPUT, VALID_JSON_STRING];
-    globalThis.fetch = mock(async (_url: string | URL | Request, init?: RequestInit) => {
+    globalThis.fetch = (mock(async (_url: string | URL | Request, init?: RequestInit) => {
       if (init?.body) {
         calls.push(typeof init.body === "string" ? init.body : await new Response(init.body).text());
       }
@@ -201,7 +201,7 @@ describe("LocalAgent — Auto-Correction Loop", () => {
         JSON.stringify({ message: { role: "assistant", content: body } }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
-    }) as typeof fetch;
+    }) as unknown as typeof fetch) as unknown as typeof fetch;
 
     const agent = new LocalAgent(TEST_CONFIG);
     await agent.generateMoveWithRetry("Prove x + 1 > x", 3);

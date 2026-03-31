@@ -334,7 +334,7 @@ export class IncrementalSRGEngine {
       const delta = this.cnLog[i * 3 + 2]!;
       const key = row * n + col;
       this.markDirty(key);
-      this.netDelta[key] += delta;
+      this.netDelta[key]! += delta;
     }
 
     // Step 5: Compute triangle delta
@@ -472,7 +472,7 @@ export class IncrementalSRGEngine {
     for (let di = 0; di < this.dirtyCount; di++) {
       const key = this.dirtyPairs[di]!;
       if (this.netDeltaTracker[key] === ver) {
-        this.cn[key] += this.netDelta[key]!;
+        this.cn[key] = (this.cn[key] ?? 0) + this.netDelta[key]!;
       }
     }
 

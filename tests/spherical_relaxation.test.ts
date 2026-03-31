@@ -137,7 +137,7 @@ describe("decodeHard", () => {
     expect(hard[1]).toBe(0);
     expect(hard[2]).toBe(1);
     expect(hard[3]).toBe(2);
-    expect([0, 1]).toContain(hard[4]); // tie OK
+    expect([0, 1]).toContain(hard[4]!); // tie OK
   });
 
   test("all decoded colors in [0, K)", () => {

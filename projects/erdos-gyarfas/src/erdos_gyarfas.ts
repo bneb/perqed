@@ -259,7 +259,14 @@ async function main() {
 
     const theorem = `Erdős-Gyárfás Conjecture: Every graph G with δ(G) ≥ 3 contains a simple cycle of length 2^k for some positive integer k.`;
 
-    const latex = await scribe.draftPaper(theorem, syntheticPath);
+    const latex = await scribe.draftResearchPaper({
+      plan: { prompt: "", seed_paper: { title: "Erdős-Gyárfás", arxivId: "", abstract: "" }, extension_hypothesis: theorem, domains_to_probe: [], lean_target_sketch: "" },
+      evidence: { hypothesis: theorem, results: [], synthesis: findings, anomalies: [], kills: [] },
+      approvedConjecture: { signature: theorem, description: findings },
+      redTeamHistory: [],
+      proofStatus: counterexample ? "FAILED" : "PROVED",
+      winningPath: syntheticPath,
+    });
 
     await fs.mkdir(join(import.meta.dir, "../data"), { recursive: true });
     const outputPath = join(import.meta.dir, "../data/erdos_gyarfas_paper.tex");

@@ -14,6 +14,7 @@
 import { computeAPEnergy } from "./ap_energy";
 import { runWalkSATTabu, type WalkSATOpts } from "./walksat_tabu";
 
+declare var self: Worker;
 export interface IslandConfig {
   id: number;
   N: number;

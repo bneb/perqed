@@ -27,26 +27,26 @@ afterEach(() => {
 describe("LocalEmbedder.isAvailable()", () => {
   test("returns false when Ollama is unreachable", async () => {
     // Mock fetch to throw a connection error (matching real network failure)
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       throw new Error("ECONNREFUSED");
-    };
+    }) as unknown as typeof fetch;
     const e = new LocalEmbedder();
     expect(await e.isAvailable()).toBe(false);
   });
 
   test("returns true when Ollama responds 200", async () => {
-    globalThis.fetch = async (url: any) => {
+    globalThis.fetch = (async (url: any) => {
       if (String(url).includes("/api/tags")) {
         return new Response(JSON.stringify({ models: [] }), { status: 200 });
       }
       return new Response("not found", { status: 404 });
-    };
+    }) as unknown as typeof fetch;
     const e = new LocalEmbedder();
     expect(await e.isAvailable()).toBe(true);
   });
 
   test("returns false when Ollama responds non-200", async () => {
-    globalThis.fetch = async () => new Response("error", { status: 503 });
+    globalThis.fetch = (async () => new Response("error", { status: 503 })) as unknown as typeof fetch;
     const e = new LocalEmbedder();
     expect(await e.isAvailable()).toBe(false);
   });
@@ -59,7 +59,7 @@ describe("LocalEmbedder.isAvailable()", () => {
 describe("LocalEmbedder.embedBatch()", () => {
   test("returns vectors for successful embeds", async () => {
     const mockVec = [0.1, 0.2, 0.3];
-    globalThis.fetch = async (url: any) => {
+    globalThis.fetch = (async (url: any) => {
       if (String(url).includes("/api/embeddings")) {
         return new Response(JSON.stringify({ embedding: mockVec }), {
           status: 200,
@@ -67,7 +67,7 @@ describe("LocalEmbedder.embedBatch()", () => {
         });
       }
       return new Response("ok", { status: 200 });
-    };
+    }) as unknown as typeof fetch;
 
     const e = new LocalEmbedder();
     const results = await e.embedBatch(["text a", "text b"]);
@@ -77,9 +77,9 @@ describe("LocalEmbedder.embedBatch()", () => {
   });
 
   test("returns null for items that fail after all retries", async () => {
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       throw new Error("ECONNREFUSED");
-    };
+    }) as unknown as typeof fetch;
 
     const e = new LocalEmbedder();
     // retries=0 so we only try once per item
@@ -90,7 +90,7 @@ describe("LocalEmbedder.embedBatch()", () => {
 
   test("returns array parallel to input (mixed success/failure)", async () => {
     let callCount = 0;
-    globalThis.fetch = async (url: any) => {
+    globalThis.fetch = (async (url: any) => {
       if (!String(url).includes("/api/embeddings")) return new Response("ok", { status: 200 });
       callCount++;
       // First call succeeds, second fails
@@ -101,7 +101,7 @@ describe("LocalEmbedder.embedBatch()", () => {
         });
       }
       return new Response("error", { status: 500 });
-    };
+    }) as unknown as typeof fetch;
 
     const e = new LocalEmbedder();
     const results = await e.embedBatch(["ok", "fail"], 0);
@@ -116,10 +116,10 @@ describe("LocalEmbedder.embedBatch()", () => {
 
 describe("ArxivLibrarian.run()", () => {
   test("returns {ingested:0, skipped:0} and does not throw when Ollama is down", async () => {
-    globalThis.fetch = async (url: any) => {
+    globalThis.fetch = (async (url: any) => {
       if (String(url).includes("/api/tags")) return new Response("down", { status: 503 });
       return new Response("ok", { status: 200 });
-    };
+    }) as unknown as typeof fetch;
 
     const lib = new ArxivLibrarian({
       queries: ["Ramsey number lower bound"],
@@ -145,7 +145,7 @@ describe("ArxivLibrarian.run()", () => {
 
     const mockVec = new Array(768).fill(0.1);
 
-    globalThis.fetch = async (url: any, _opts?: any) => {
+    globalThis.fetch = (async (url: any, _opts?: any) => {
       const u = String(url);
       if (u.includes("/api/tags")) return new Response(JSON.stringify({ models: [] }), { status: 200 });
       if (u.includes("/api/embeddings")) {
@@ -161,7 +161,7 @@ describe("ArxivLibrarian.run()", () => {
         });
       }
       return new Response("not found", { status: 404 });
-    };
+    }) as unknown as typeof fetch;
 
     const lib = new ArxivLibrarian({
       queries: ["Ramsey number lower bound"],

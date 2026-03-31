@@ -119,7 +119,7 @@ export class SurrogateClient {
       const counts = new Array<number>(K).fill(0);
       for (let i = start; i <= end; i++) {
         const color = partition[i] ?? 0;
-        if (color >= 0 && color < K) counts[color]++;
+        if (color >= 0 && color < K) counts[color]!++;
       }
       for (let k = 0; k < K; k++) features.push(counts[k]! / blockLen);
     }
@@ -168,4 +168,3 @@ export class SurrogateClient {
     return Promise.all(encs.map(enc => this.predictPartition(enc)));
   }
 }
-

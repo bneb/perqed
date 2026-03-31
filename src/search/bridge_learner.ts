@@ -91,9 +91,9 @@ function schurEuclideanGradient(enc: number[][], N: number, K: number): number[]
       const gx = grad[x]!, gy = grad[y]!, gz = grad[z]!;
       for (let k = 0; k < K; k++) {
         const a = vx[k]!, b = vy[k]!, c = vz[k]!;
-        gx[k] += 2 * a * b * b * c * c;
-        gy[k] += 2 * b * a * a * c * c;
-        gz[k] += 2 * c * a * a * b * b;
+        gx[k]! += 2 * a * b * b * c * c;
+        gy[k]! += 2 * b * a * a * c * c;
+        gz[k]! += 2 * c * a * a * b * b;
       }
     }
   }
@@ -145,7 +145,7 @@ export function makeSphereBridge(params: { radius?: number; lr?: number } = {}):
         const v = new Array<number>(K).fill(0);
         v[Math.min(color, K - 1)] = 1.0;
         // Add tiny noise so argmax is well-defined
-        for (let k = 0; k < K; k++) v[k] += 0.001 * Math.random();
+        for (let k = 0; k < K; k++) v[k]! += 0.001 * Math.random();
         enc[i] = this.retract(v).map(x => x); // already at radius r after retract
       }
       return enc;

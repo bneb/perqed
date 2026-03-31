@@ -202,7 +202,7 @@ describe("degreePreservingSwap", () => {
       if (!swapped) continue;
 
       for (let v = 0; v < 9; v++) {
-        expect(swapped.degree(v)).toBe(originalDegrees[v]);
+        expect(swapped.degree(v)).toBe(originalDegrees[v]!);
       }
     }
   });
@@ -258,7 +258,7 @@ describe("degreePreservingSwap", () => {
     }
 
     for (let v = 0; v < 20; v++) {
-      expect(g.degree(v)).toBe(originalDegrees[v]);
+      expect(g.degree(v)).toBe(originalDegrees[v]!);
     }
   });
 });

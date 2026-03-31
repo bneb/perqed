@@ -194,4 +194,3 @@ export function extractTopHotZone(
     isValidForSAT: hotVertices.size <= topH && hotVertices.size > 0,
   };
 }
-
