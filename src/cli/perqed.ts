@@ -1393,13 +1393,16 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
     // The best memeticSeed produced by Wiles becomes the warm-start for SA workers.
     if (!witnessFound) {
       console.log("\n🔁 [Wiles] Orthogonal Paradigm Forcing exhausted all attempts.");
-      console.log("   Falling back to SA Island Model with memetic seed as warm-start...");
-      await journal.addEntry({
-        type: "observation",
-        claim: "Wiles Mode Orthogonal Forcing exhausted. Falling back to SA Island Model.",
-        evidence: `${MAX_ARCHITECT_PIVOTS} outer × 3 inner attempts consumed without E=0 witness.`,
-        target_goal: targetGoal,
-      }).catch(() => {});
+      
+      if (config.search_config?.problem_class === "ramsey_coloring") {
+        console.log("   Falling back to SA Island Model with memetic seed as warm-start...");
+        await journal.addEntry({
+          type: "observation",
+          claim: "Wiles Mode Orthogonal Forcing exhausted. Falling back to SA Island Model.",
+          evidence: `${MAX_ARCHITECT_PIVOTS} outer × 3 inner attempts consumed without E=0 witness.`,
+          target_goal: targetGoal,
+        }).catch(() => {});
+      }
     }
   }
 
@@ -1424,8 +1427,8 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
       console.log(`   Problem class: ${config.search_config.problem_class}`);
       const symLabel = searchConfig.symmetry === 'circulant' ? ' [CIRCULANT 2^¹⁷]' : '';
       console.log(`   Search config: ${searchConfig.n}v, R(${searchConfig.r},${searchConfig.s}), ${searchConfig.saIterations.toLocaleString()} iters, ${searchConfig.workers} workers (${searchConfig.strategy})${symLabel}`);
-    } else if (config.search_config?.problem_class !== "schur_partition") {
-      // schur_partition is handled by the Wiles/algebraic DAG loop above — not a warning
+    } else if (config.search_config?.problem_class !== "schur_partition" && config.search_config?.problem_class !== "vdw_partition") {
+      // algebraic paradigms handle their own inline SA loops — not a warning
       console.log(`\n⚠️  Constructive existence detected but problem class unknown — skipping search phase`);
     }
   }
