@@ -14,8 +14,19 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <p class="hero-sub animate-in animate-in-2">
         Perqed is an open-source system that searches for mathematical witnesses,
         verifies them in Lean&nbsp;4, and uses LLMs to direct the search when it
-        gets stuck. Currently targeting open Ramsey number problems.
+        gets stuck. Currently targeting open Ramsey number problems and Torus Decompositions.
       </p>
+
+      <div class="featured-alert animate-in animate-in-3" style="background: rgba(var(--accent-rgb), 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 16px; margin-bottom: 32px; max-width: 600px; text-align: left;">
+        <span style="font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: block;">Featured Publication</span>
+        <h3 style="font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.01em;">Machine-Checked Proofs of the m=4 and m=6 Directed Hamiltonian Torus Decompositions</h3>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">Verified proofs of Knuth's problem using Lean 4 and Perqed's parallel orchestrator.</p>
+        <div style="display: flex; gap: 12px;">
+          <a href="https://github.com/bneb/perqed/blob/main/projects/torus-decomposition/paper/arxiv/torus_decomposition.pdf" target="_blank" rel="noopener" style="font-size: 0.85rem; font-weight: 500; color: var(--accent); text-decoration: none;">View Paper (PDF) →</a>
+          <a href="https://github.com/bneb/perqed/tree/main/projects/torus-decomposition" target="_blank" rel="noopener" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); text-decoration: underline;">View Source Code</a>
+        </div>
+      </div>
+
       <div class="hero-actions animate-in animate-in-3">
         <a href="https://github.com/bneb/perqed" target="_blank" rel="noopener" class="btn btn-primary">
           View on GitHub

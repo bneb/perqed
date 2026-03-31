@@ -1,0 +1,2 @@
+{"recordType":"node","id":"92f4515d-6405-4e1d-8414-a077309a1242","timestamp":"2026-03-31T17:22:45.326Z","kind":"OBSTRUCTION","label":"Z3 UNSAT on 170-element partition at E=42","energy":42,"evidence":"unknown\n"}
+{"recordType":"node","id":"e4a03650-5ce5-4b01-a9c6-fdab4efeadc6","timestamp":"2026-03-31T17:27:15.936Z","kind":"OBSTRUCTION","label":"Z3 UNSAT on 169-element partition at E=43","energy":43,"evidence":"unknown\n"}
