@@ -42,9 +42,27 @@ graph TD
     end
 ```
 
+## Autonomous Research Pipeline (Mathematician in a Box)
+
+Perqed now includes a fully autonomous research orchestration loop. By providing a single natural-language prompt, the top-level **Research Director** agent coordinates:
+
+1. **Literature Seeding**: The Librarian fetches relevant arXiv papers to ground the research.
+2. **Planning**: Formulates a concrete, plausible extension hypothesis inspired by the seed literature.
+3. **Empirical Investigation**: The Explorer agent synthesizes C/Python scripts and runs them across safe, timeout-enforced subprocess sandboxes across multiple mathematical domains to seek empirical signal or counterexamples.
+4. **Conjecture Generation**: Synthesizes the literature context and empirical evidence into precise Lean 4 theorem signatures.
+5. **Adversarial Red-Teaming**: An independent Red Team auditor attempts to poke holes in the conjecture. Conjectures that are too broad or easily falsified are either rejected or forcefully weakened (up to 3 rounds of iterative revision).
+6. **Formal Verification**: Approved conjectures are sent to the MCTS proof engine to attempt formal Lean 4 verification.
+
+To run the pipeline:
+```bash
+perqed prompt="find a recent arXiv paper on spectral graph theory and conjecture an extension"
+```
+
+Use `--dry-run` to execute the entire pipeline up to the final proof stage (saves time and compute when evaluating the orchestrator).
+
 ## How It Works
 
-Perqed has two operational modes that work in tandem:
+Perqed's underlying solvers have two continuous operational modes:
 
 ### Combinatorial Witness Search
 
@@ -89,11 +107,11 @@ cp .env.example .env
 # Run the test suite
 bun test
 
-# Run a live proof
-bun run src/scripts/live_fire.ts
+# Run a live autonomous mathematical research pipeline
+bun run src/cli.ts prompt="find a recent paper on algebraic topology..."
 
-# Generate conjectures from arXiv literature
-bun run src/scripts/generate_conjectures.ts
+# Run a specific local proof search mock
+bun run src/cli.ts my_experiment_run --live
 ```
 
 ## Model Stack

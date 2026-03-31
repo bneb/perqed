@@ -20,19 +20,22 @@ interface ParsedArgs {
   prompt: string | null;
   runName: string;
   liveMode: boolean;
+  dryRun: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
+  const dryRun = argv.includes("--dry-run");
   const promptArg = argv.find((a) => a.startsWith("prompt="));
   if (promptArg) {
     const raw = promptArg.slice("prompt=".length);
     const prompt = raw.replace(/^["']|["']$/g, "");
-    return { prompt, runName: "research", liveMode: true };
+    return { prompt, runName: "research", liveMode: true, dryRun };
   }
   return {
     prompt: null,
     runName: argv[0] ?? "default_run",
     liveMode: argv.includes("--live"),
+    dryRun,
   };
 }
 
@@ -62,6 +65,16 @@ describe("CLI — prompt= argument detection", () => {
   test("sets liveMode=true when prompt= is present (pipeline always uses live)", () => {
     const r = parseArgs(['prompt="anything"']);
     expect(r.liveMode).toBe(true);
+  });
+
+  test("sets dryRun=true when --dry-run flag is present with prompt=", () => {
+    const r = parseArgs(['prompt="something"', '--dry-run']);
+    expect(r.dryRun).toBe(true);
+  });
+
+  test("dryRun is false by default in prompt mode", () => {
+    const r = parseArgs(['prompt="something"']);
+    expect(r.dryRun).toBe(false);
   });
 
   test("returns null prompt when no prompt= arg present", () => {
@@ -101,6 +114,11 @@ describe("CLI — legacy run_name mode", () => {
   test("prompt is null in legacy mode", () => {
     const r = parseArgs(["my_run", "--live"]);
     expect(r.prompt).toBeNull();
+  });
+
+  test("dryRun=true is captured in legacy mode", () => {
+    const r = parseArgs(["my_run", "--dry-run"]);
+    expect(r.dryRun).toBe(true);
   });
 });
 

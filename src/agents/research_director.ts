@@ -148,6 +148,9 @@ export class ResearchDirector {
 
     if (!approvedConjecture) {
       this.log("\n⚠️  No conjecture passed red team audit. Research run complete (no proof attempted).\n");
+      const summary = this.buildSummary(plan, evidence, approvedConjecture, allRedTeamHistory, "SKIPPED");
+      this.write(outputDir, "summary.md", summary);
+
       return {
         plan, evidence,
         approvedConjecture: null,
@@ -158,20 +161,14 @@ export class ResearchDirector {
     }
 
     // ── Step 6: Lean proof attempt ────────────────────────────────────────
+    let proofStatus: "PROVED" | "FAILED" | "SKIPPED" = "SKIPPED";
     if (!this.cfg.attemptProof) {
       this.log("\nStep 6/6 — Proof attempt skipped (attemptProof=false)\n");
-      return {
-        plan, evidence,
-        approvedConjecture,
-        redTeamHistory: allRedTeamHistory,
-        proofStatus: "SKIPPED",
-        outputDir,
-      };
+    } else {
+      this.log("\nStep 6/6 — Handing approved conjecture to MCTS proof engine...");
+      proofStatus = await this.attemptProof(approvedConjecture, outputDir);
+      this.log(`         Proof status: ${proofStatus}\n`);
     }
-
-    this.log("\nStep 6/6 — Handing approved conjecture to MCTS proof engine...");
-    const proofStatus = await this.attemptProof(approvedConjecture, outputDir);
-    this.log(`         Proof status: ${proofStatus}\n`);
 
     // Write final summary
     const summary = this.buildSummary(plan, evidence, approvedConjecture, allRedTeamHistory, proofStatus);
@@ -292,7 +289,7 @@ The hypothesis should be concrete and falsifiable — not vague. It should be th
   private buildSummary(
     plan: ResearchPlan,
     evidence: EvidenceReport,
-    conjecture: { signature: string; description: string },
+    conjecture: { signature: string; description: string } | null,
     redTeamHistory: RedTeamResult[],
     proofStatus: string,
   ): string {
@@ -316,11 +313,11 @@ ${plan.extension_hypothesis}
 ${evidence.synthesis}
 
 ## Approved Conjecture (after ${rounds} red team round${rounds === 1 ? "" : "s"})
-\`\`\`lean
+${conjecture ? `\`\`\`lean
 ${conjecture.signature}
 \`\`\`
 
-${conjecture.description}
+${conjecture.description}` : "*None approved*"}
 
 ## Formal Proof Status
 **${proofStatus}**

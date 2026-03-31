@@ -23,20 +23,23 @@ import type { AgentResponse, ArchitectResponse } from "./schemas";
 
 // ── Argument parsing ─────────────────────────────────────────────────────────
 
-function parseArgs(): { prompt: string | null; runName: string; liveMode: boolean } {
+function parseArgs(): { prompt: string | null; runName: string; liveMode: boolean; dryRun: boolean } {
   const args = process.argv.slice(2);
+
+  const dryRun = args.includes("--dry-run");
 
   // Look for prompt="..." or prompt=...
   const promptArg = args.find((a) => a.startsWith("prompt="));
   if (promptArg) {
     const prompt = promptArg.slice("prompt=".length).replace(/^["']|["']$/g, "");
-    return { prompt, runName: "research", liveMode: true };
+    return { prompt, runName: "research", liveMode: true, dryRun };
   }
 
   return {
     prompt: null,
     runName: args[0] ?? "default_run",
     liveMode: args.includes("--live"),
+    dryRun,
   };
 }
 
@@ -44,7 +47,7 @@ function parseArgs(): { prompt: string | null; runName: string; liveMode: boolea
 
 async function main() {
   const workspaceBase = process.env["PERQED_WORKSPACE"] ?? "./agent_workspace";
-  const { prompt, runName, liveMode } = parseArgs();
+  const { prompt, runName, liveMode, dryRun } = parseArgs();
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║         🔬 Perqed Proof Engine           ║");
@@ -67,6 +70,7 @@ async function main() {
       apiKey: geminiKey,
       workspaceDir: workspaceBase,
       domainDepth: 7,
+      attemptProof: !dryRun,
       verbose: true,
     });
 
