@@ -38,6 +38,9 @@ export interface ResearchDirectorConfig {
   plannerModel?: string;
   /** Whether to attempt a Lean proof after RedTeam approval (default: true) */
   attemptProof?: boolean;
+  /** Whether to execute a Cross-Pollination search across orthogonal fields (default: false) */
+  crossPollinate?: boolean;
+
   /** Verbose logging */
   verbose?: boolean;
 }
@@ -62,6 +65,8 @@ export class ResearchDirector {
       plannerModel: "gemini-2.5-pro",
       attemptProof: true,
       verbose: true,
+      crossPollinate: false,
+
       ...cfg,
     };
   }
@@ -114,7 +119,16 @@ export class ResearchDirector {
     // ── Step 4: Generate conjectures ──────────────────────────────────────
     this.log("Step 4/6 — Generating Lean 4 conjecture signatures...");
     const conjecturer = new ConjecturerAgent(this.cfg.apiKey);
-    const literatureContext = `Paper: ${plan.seed_paper.title}\n\nAbstract: ${plan.seed_paper.abstract}\n\nEvidence Synthesis: ${evidence.synthesis}`;
+    let literatureContext = `Paper: ${plan.seed_paper.title}\n\nAbstract: ${plan.seed_paper.abstract}\n\nEvidence Synthesis: ${evidence.synthesis}`;
+    
+    // Falsification Fork
+    if (evidence.kills.length > 0) {
+      this.log(`⚠️  Hypothesis Falsified! Activating Falsification Fork for Counter-Example Proof...`);
+      literatureContext += `\n\n[CRITICAL DIRECTIVE: FALSIFICATION FORK]\nYour original hypothesis was empirically falsified by the Python sandbox in the following domains: ${evidence.kills.join(", ")}.\nInstead of proving your original hypothesis, you must now formulate a Lean 4 theorem that explicitly proves the COUNTER-EXAMPLE discovered by the sandbox. You are no longer trying to prove the hypothesis; you are trying to prove why it fails.`;
+    } else {
+      this.log(`         No falsifications detected. Proceeding to formulate formal proof of hypothesis.`);
+    }
+
     const conjectures = await conjecturer.generateConjectures(literatureContext);
     this.write(outputDir, "conjectures.json", conjectures);
     this.log(`         Generated ${conjectures.length} candidates\n`);
@@ -216,7 +230,7 @@ export class ResearchDirector {
    * Uses Gemini to build a structured ResearchPlan from the user prompt
    * and the top literature matches in LanceDB.
    */
-  private async buildPlan(prompt: string, librarian: ArxivLibrarian): Promise<ResearchPlan> {
+  private async buildPlan(prompt: string, librarian: ArxivLibrarian, historyFeedback: string = ""): Promise<ResearchPlan> {
     const schema: Schema = {
       type: Type.OBJECT,
       properties: {
@@ -245,14 +259,65 @@ export class ResearchDirector {
     const randomIndex = Math.floor(Math.random() * Math.max(1, searchResults.length));
     const realSeedPaper = searchResults[randomIndex];
     
-    // Safety fallback just in case the database is completely empty
-    const arxivId = realSeedPaper?.id.replace("arxiv-", "") || "0000.00000";
-    const title = realSeedPaper?.paperTitle || realSeedPaper?.theoremSignature || "Fallback Title";
-    const abstract = realSeedPaper?.paperAbstract || realSeedPaper?.successfulTactic || "Fallback Abstract";
+    let arxivId = realSeedPaper?.id.replace("arxiv-", "") || "0000.00000";
+    let title = realSeedPaper?.paperTitle || realSeedPaper?.theoremSignature || "Fallback Title";
+    let abstract = realSeedPaper?.paperAbstract || realSeedPaper?.successfulTactic || "Fallback Abstract";
 
+    let p = "";
     const domainsInstruction = `Pick exactly ${this.cfg.domainDepth} distinct mathematical domains appropriate for empirically probing this hypothesis (e.g., "analytic_number_theory", "spectral_graph_theory", "algebraic_topology", "information_theory", "complex_analysis", "dynamical_systems", "probabilistic_combinatorics").`;
 
-    const p = `
+    if (this.cfg.crossPollinate) {
+      const orthogonalDomains = [
+        "Analytic Number Theory prime distribution",
+        "Algebraic Topology homology",
+        "Representation Theory Lie algebras",
+        "Differential Geometry manifolds",
+        "Information Theory entropy rates",
+        "Stochastic Calculus Ito integrals",
+        "Algebraic Geometry schemes",
+        "Category Theory functors",
+      ];
+      const randomDomain = orthogonalDomains[Math.floor(Math.random() * orthogonalDomains.length)]!;
+      const resultsB = await librarian.searchDatabase(randomDomain, { limit: 10 });
+      const paperB = resultsB[Math.floor(Math.random() * Math.max(1, resultsB.length))];
+      
+      const idB = paperB?.id.replace("arxiv-", "") || "1111.11111";
+      const titleB = paperB?.paperTitle || "Fallback Orthogonal Title";
+      const abstractB = paperB?.paperAbstract || "Fallback Orthogonal Abstract";
+
+      this.log(`         Cross-pollinating Mode Enabled`);
+      this.log(`         Paper A: ${title}`);
+      this.log(`         Paper B: (${randomDomain}) ${titleB}\n`);
+
+      p = `
+You are an elite mathematical architect. 
+You have been provided with two distinct mathematical abstracts from different sub-fields.
+
+Paper A: 
+Title: ${title}
+arXiv ID: ${arxivId}
+Abstract: ${abstract}
+
+Paper B: 
+Title: ${titleB}
+arXiv ID: ${idB}
+Abstract: ${abstractB}
+
+Cross-Pollination Task:
+1. Identify the Isomorphism: Explicitly define a structural bridge between the two papers. For example, if Paper A is about Graph Theory and Paper B is about Number Theory, define exactly how a graph's adjacency matrix can be constructed using a number-theoretic property (e.g., Paley Graphs using quadratic residues).
+2. The Synthesis Hypothesis: Propose a novel theorem that applies a technique from Paper B to solve a bounded problem in Paper A.
+3. The Finite Computability Guardrail: The resulting hypothesis MUST resolve into a finite, discrete, combinatorial bound that can be empirically verified by C/Python and formally proven in Lean 4 via native_decide or norm_num. Do not propose continuous or infinite limit theorems.
+4. ${domainsInstruction}
+
+DEFINITION GUARDRAIL (CRITICAL):
+Do NOT invent new mathematical functions, heuristic scoring systems, or synthetic metrics. Your hypothesis MUST be formulated exclusively using standard, existing mathematical definitions (e.g., chromatic number, clique number, Ramsey number, group order, graph homomorphism, topological genus, Betti number, eigenvalues of adjacency matrices). You are searching for novel RELATIONSHIPS between existing concepts, not inventing new concepts. If the Lean 4 theorem sketch references a function, that function must correspond to a standard mathematical definition that exists in Mathlib or could be trivially defined from Mathlib primitives.
+
+IMPORTANT: In your JSON response, for the \`seed_paper\` object, you MUST combine the title and abstract to reflect the Synthesis (e.g., Title: "Synthesis: [Title A] x [Title B]").
+
+\${historyFeedback}
+`;
+    } else {
+      p = `
 You are an elite mathematical architect. 
 Read the following abstract from a REAL, recently published arXiv paper:
 
@@ -272,7 +337,13 @@ If you formulate a Lean 4 theorem sketch for autonomous verification, it MUST be
 - Do NOT use existential quantifiers over infinite sets (∃ C : ℝ).
 - Do NOT use limits or asymptotics.
 - Formulate exact, finite combinatorial bounds for specific hardcoded values that can be verified via \`norm_num\`, \`decide\`, or \`rfl\`.
+
+DEFINITION GUARDRAIL (CRITICAL):
+Do NOT invent new mathematical functions, heuristic scoring systems, or synthetic metrics. Your hypothesis MUST be formulated exclusively using standard, existing mathematical definitions (e.g., chromatic number, clique number, Ramsey number, group order, graph homomorphism, topological genus, Betti number, eigenvalues of adjacency matrices). You are searching for novel RELATIONSHIPS between existing concepts, not inventing new concepts. If the Lean 4 theorem sketch references a function, that function must correspond to a standard mathematical definition that exists in Mathlib or could be trivially defined from Mathlib primitives.
+
+\${historyFeedback}
 `;
+    }
 
     const response = await this.ai.models.generateContent({
       model: this.cfg.plannerModel,

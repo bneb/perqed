@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * Perqed CLI — Entry point for the autonomous proof search engine.
  *
@@ -23,16 +24,23 @@ import type { AgentResponse, ArchitectResponse } from "./schemas";
 
 // ── Argument parsing ─────────────────────────────────────────────────────────
 
-function parseArgs(): { prompt: string | null; runName: string; liveMode: boolean; dryRun: boolean } {
+function parseArgs(): { prompt: string | null; runName: string; liveMode: boolean; dryRun: boolean; crossPollinate: boolean } {
   const args = process.argv.slice(2);
 
   const dryRun = args.includes("--dry-run");
+
+  const crossPollinate = args.includes("--cross-pollinate");
 
   // Look for prompt="..." or prompt=...
   const promptArg = args.find((a) => a.startsWith("prompt="));
   if (promptArg) {
     const prompt = promptArg.slice("prompt=".length).replace(/^["']|["']$/g, "");
-    return { prompt, runName: "research", liveMode: true, dryRun };
+    return { prompt, runName: "research", liveMode: true, dryRun, crossPollinate };
+  }
+
+  // If the user just typed `perqed --cross-pollinate` without a prompt, supply a global discovery prompt
+  if (crossPollinate && !promptArg) {
+    return { prompt: "Discover a profound, novel mathematical synthesis between distinct domains", runName: "research", liveMode: true, dryRun, crossPollinate };
   }
 
   return {
@@ -40,6 +48,7 @@ function parseArgs(): { prompt: string | null; runName: string; liveMode: boolea
     runName: args[0] ?? "default_run",
     liveMode: args.includes("--live"),
     dryRun,
+    crossPollinate,
   };
 }
 
@@ -47,7 +56,7 @@ function parseArgs(): { prompt: string | null; runName: string; liveMode: boolea
 
 async function main() {
   const workspaceBase = process.env["PERQED_WORKSPACE"] ?? "./agent_workspace";
-  const { prompt, runName, liveMode, dryRun } = parseArgs();
+  const { prompt, runName, liveMode, dryRun, crossPollinate } = parseArgs();
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║         🔬 Perqed Proof Engine           ║");
@@ -72,6 +81,7 @@ async function main() {
       domainDepth: 7,
       attemptProof: !dryRun,
       verbose: true,
+      crossPollinate,
     });
 
     const result = await director.run(prompt);

@@ -78,10 +78,12 @@ export class ConjecturerAgent {
       `inspired by this research. They must be syntactically valid Lean 4 and mathematically non-trivial.\n\n` +
       `Formalization Constraint:\n` +
       `If you formulate a Lean 4 theorem for autonomous verification, it MUST be finitely computable by the native_decide tactic.\n` +
-      `Do NOT use existential quantifiers over infinite sets (∃ C : ℝ, ∃ N : ℕ).\n` +
+      `Do NOT use existential quantifiers over infinite sets.\n` +
       `Do NOT use limits or asymptotics.\n` +
       `Instead of general asymptotic bounds, formulate exact, finite combinatorial bounds for specific hardcoded values (e.g., theorem exact_count_N_1000 : ... = X).\n` +
-      `If the hypothesis is falsified, formulate a Lean 4 theorem that proves the counter-example (e.g., proving the count for $t^2$ is strictly greater than $2t^2$ at $N=500$).`;
+      `If the hypothesis is falsified, formulate a Lean 4 theorem that proves the counter-example (e.g., proving the count for N=500 exceeds a stated bound).\n\n` +
+      `DEFINITION GUARDRAIL (CRITICAL):\n` +
+      `Do NOT invent new mathematical functions or synthetic definitions. Every function referenced in your Lean 4 theorem signature MUST correspond to a standard mathematical definition that exists in Mathlib or could be trivially defined from Mathlib primitives (e.g., Nat.card, SimpleGraph.chromaticNumber, Finset.filter, List.length). Do NOT define ad-hoc scoring functions, heuristic metrics, or proxy measures. You are formalizing relationships between EXISTING mathematical concepts, not inventing new ones.`;
 
     const response = await this.ai.models.generateContent({
       model: "gemini-3.1-pro-preview",

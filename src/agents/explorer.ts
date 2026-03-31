@@ -107,6 +107,9 @@ Do not cut any corners. Use a test driven approach with red-to-green workflows.
 For C: include all necessary #includes, a main() function, compile with: cc -O2 file.c -lm
 For Python: use only the standard library.
 
+DEFINITION GUARDRAIL (CRITICAL):
+Do NOT invent synthetic scoring functions, heuristic metrics, or proxy measures. Your scripts must compute standard, well-defined mathematical quantities (e.g., chromatic number, clique number, independence number, graph diameter, group order, number of solutions to an equation, partition counts). If a concept cannot be directly computed using standard definitions, state that the domain is not applicable rather than inventing an approximation.
+
 Generate exactly one script per domain. Keep scripts under 150 lines.`;
 
     const response = await this.ai.models.generateContent({
@@ -138,6 +141,9 @@ Generate exactly one script per domain. Keep scripts under 150 lines.`;
   private async runScript(script: InvestigationScript): Promise<ScriptResult> {
     const id = `perqed_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const start = Date.now();
+
+    // Unescape literal backslash-n that Gemini sometimes produces inside JSON strings
+    script.code = script.code.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
 
     if (script.language === "c") {
       return this.runC(script, id, start);

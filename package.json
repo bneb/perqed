@@ -3,8 +3,11 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "bin": {
+    "perqed": "src/cli.ts"
+  },
   "scripts": {
-    "perqed": "bun run src/cli/perqed.ts"
+    "perqed": "bun run src/cli.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
