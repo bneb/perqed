@@ -862,7 +862,12 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
         // ── Fast-path: For Schur partitions iteration 1, use the Gaussian norm seed directly ──
         // The ARCHITECT consistently ignores prompt-recommended seeds and generates weak rules.
-        // Hardcode (i²+1) % 13 % 6 (E=420) as the forced first attempt.
+        let explicitGoal = targetGoal;
+        const sc = config.search_config;
+        if (isPartitionProblem && sc && "num_partitions" in sc && "domain_size" in sc) {
+          explicitGoal += `\n\nCRITICAL ENFORCEMENT: You MUST output exactly num_partitions=${sc.num_partitions} and domain_size=${sc.domain_size}. Your \`partition_rule_js\` MUST return values precisely in the range [0, ${sc.num_partitions} - 1] inclusive.`;
+        }
+
         let builderConfig: any;
         let initNodeKind: string;
         let lastEvaluatedAdj: AdjacencyMatrix | null = memeticSeed;
@@ -888,7 +893,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
           builderConfig = await callSafe(
             () => architectClient.formulateAlgebraicRule(
-              targetGoal,
+              explicitGoal,
               // Enrich journal with known structural obstructions from TheoremGraph
               knownObstructions ? `${journalSummaryText}\n\n${knownObstructions}` : journalSummaryText,
               cognitiveMode,
@@ -945,7 +950,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
         const currentDag: any = {
           id: `wiles_run_${wilesAttempts}`,
-          goal: targetGoal,
+          goal: explicitGoal,
           nodes: dagNodes,
         };
 
