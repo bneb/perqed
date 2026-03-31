@@ -1,0 +1,81 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>Today I got a rejection letter from the Journal of Automated Reasoning for my Torus Decomposition formalization. The reasoning wasn't a flaw in the MCTS engine or a gap in the mathematical structure. It was because the editor clicked my GitHub link and was confronted by 98 C files named things like <code>goldbach_conspiracy.c</code>.</p>
+
+<p>The feedback was, almost verbatim: <em>"The repository that you link to contains code about Goldbach, not code on the topic of the paper."</em></p>
+
+<p>Honestly? Totally fair.</p>
+
+<p>When you've been working inside a mono-repo for months, you develop a certain flavor of structural blindness. To me, Perqed is a general-purpose formalization platform, and the Torus proofs were just the latest application living peacefully in <code>projects/torus-decomposition/</code>. Meanwhile, I had left a hundred scripts from a weekend Goldbach Conjecture binge sitting indiscriminately in the root <code>src/c/</code> folder.</p>
+
+<p>So, a reviewer drops into the repo looking for an elegant Lean 4 grid topology, and instead they find a chaotic spread of analytic number theory experiments. Naturally, they assume I submitted the wrong URL and bounce.</p>
+
+<h2>The Fix</h2>
+
+<p>This is a classic "works on my machine" but for academic citations. We've just pushed a massive cleanup:</p>
+
+<ul>
+<li><strong>Quarantined the Goldbach tests:</strong> They now live out of sight where they belong, so reviewers don't assume they stumbled into the wrong project.</li>
+<li><strong>Pinned the correct proofs:</strong> We put massive neon text on the README pointing directly to the Torus Decomposition artifacts. </li>
+<li><strong>Added Even-m Formalization:</strong> The reviewer also smartly suggested a formal generalization of the even-<em>m ≥ 8</em> closed-form rule. We natively transcompiled Ho Boon Suan's empirical construction into our TypeScript engine and pushed an Open Conjecture framework into Lean to satisfy it.</li>
+</ul>
+
+<p>It's always the unforced errors that get you. The Lean 4 kernel took 57 seconds to verify 10<sup>167</sup> Torus permutations perfectly with zero hiccups, but we tripped on folder organization. Lesson learned. We'll be submitting v2 later this week.</p>
+`;
+---
+
+<BaseLayout title="Rejected for Poor Repo Hygiene — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>March 31, 2026</time>
+            <span class="sep">·</span>
+            <span>3 min read</span>
+          </div>
+          <h1>Rejected for Poor Repo Hygiene</h1>
+          <p class="paper-ref">How an unforced directory structure error tanked our JAR submission.</p>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(.paper-ref) {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    border-left: 3px solid var(--accent);
+    padding-left: 12px;
+    margin: 24px 0;
+  }
+</style>
