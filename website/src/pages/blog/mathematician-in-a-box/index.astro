@@ -1,0 +1,162 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>When you build an AI research lab, the first major hurdle isn't getting it to write math—it's getting it to <em>stop inventing it</em>.</p>
+
+<p>Our initial autonomous pipeline was brilliant but structurally flawed. When given a prompt like "Find a recent arXiv paper on random graphs and extend it," the Architect (a Gemini inference engine) would hallucinate a magnificent, plausible paper—complete with a fake arXiv ID, a beautifully formatted abstract, and a profound-sounding hypothesis.</p>
+
+<p>It was executing the scientific method perfectly in a completely parallel, fictional universe. To build a true <strong>Mathematician in the Box</strong>—a system that contributes to human mathematical literature—we had to sever the hallucination.</p>
+
+<h2>The Fix: The RAG Bridge</h2>
+
+<p>The solution was a strict Retrieval-Augmented Generation (RAG) patch. Instead of prompting the LLM with a blank slate at a creative <code>temperature: 0.7</code>, we wired the Architect directly to our <strong>ArxivLibrarian</strong>, powered by a local LanceDB vector store.</p>
+
+<p>The pipeline now follows a cold, hard protocol:</p>
+<ol>
+  <li><strong>Query LanceDB</strong>: For a given prompt, the Librarian embeds the query and fetches the top 10 most relevant, actual peer-reviewed papers.</li>
+  <li><strong>Stochastic Selection</strong>: It stochastically samples one of the top matches to guarantee diverse starting points across continuous cron runs.</li>
+  <li><strong>Hard-Grounding</strong>: The Architect's prompt is completely rewritten to inject the real Title, arXiv ID, and Abstract, accompanied by a strict directive: <em>"Do not invent a new paper. Base your entire analysis strictly on the paper provided above."</em></li>
+</ol>
+<p>At an icy <code>temperature: 0.1</code>, the Architect behaves less like a sci-fi author and more like a rigorous graduate student.</p>
+
+<h2>The Breakthrough: Escaping the Asymptotic Trap</h2>
+
+<p>Once grounded to reality, the pipeline pulled actual papers like <em>"A limit theorem for small cliques in inhomogeneous random graphs"</em> (arXiv:1903.10570).</p>
+
+<p>The Architect extended the paper's findings on cliques to hypothesize about 4-cycles ($C_4$), predicting specific fluctuation regimes for the $p = 1/\\sqrt{n}$ critical density limit.</p>
+
+<p>The <strong>Explorer</strong> sub-agent spun up Python scripts across 7 domains (computational statistics, random matrix theory, etc.) and empirically found the quantitative predictions to be flawed. The hypothesis was asymptotically false.</p>
+
+<p>Here is where the magic happened. LLMs notoriously struggle to formally prove infinite limits or asymptotic bounds in Lean 4. To solve this, we injected a <strong>Computational Fast-Path Heuristic</strong>: a strict <code>native_decide</code> constraint forcing the Architect to target <em>finite, computable failing bounds</em> instead of general uncomputable limits.</p>
+
+<p>In response to the empirical Python failure, the AI dropped this exact theorem onto the Lean 4 MCTS Prover:</p>
+
+<pre><code class="language-lean">theorem c4_variance_falsification_N64 :
+  let n : ℕ := 64 in
+  let p : ℚ := 1 / 8 in
+  variance_subgraph_count (cycle_graph 4) n (fun (_ _ : Fin 64) => p) &gt; (n ^ 3 : ℚ) / 2
+</code></pre>
+
+<p>Look at the numbers: $N = 64$ and $p = 1/8$. The critical density threshold for a 4-cycle is exactly $p = 1/\\sqrt{N}$. The AI explicitly calculated $1/\\sqrt{64} = 1/8$ and hardcoded the exact mathematical boundary condition as a finite test case.</p>
+
+<p>Because it retreated to a finite bound, the MCTS Prover could immediately leverage the <code>norm_num</code> and <code>decide</code> tactics to computationally smash the threshold without needing complex logical induction.</p>
+
+<h2>The Best Part: Meeting "Reviewer 2"</h2>
+
+<p>We ran the pipeline again on a new topic: <em>"Template-Based Graph Clustering"</em> (arXiv:2107.019994). The hypothesis was robustly confirmed empirically by 8 different Python tests.</p>
+
+<p>But when the Architect tried to formalize the findings, every single Lean 4 candidate was brutally shot down by our internal <strong>Red Team</strong> agent.</p>
+
+<p>The Red Team's audit log read like a rejection letter from a top-tier journal:</p>
+<ul>
+  <li>It literally constructed a custom bipartite counterexample graph $K_{X,Y}$ to mathematically prove one conjecture false.</li>
+  <li>It rejected two bounds as "trivial and known", citing standard Cauchy-Schwarz variance minimization.</li>
+  <li>It rejected a technically correct theorem because the <em>description</em> oversold the implications of the bound.</li>
+</ul>
+
+<p>The pipeline killed its own run because the output wasn't novel, true, and properly scoped.</p>
+
+<h2>The Road Ahead</h2>
+
+<p>Perqed is no longer just a code generator. It is an autonomous, verifiable, neuro-symbolic research lab executing the Scientific Method.</p>
+
+<p>It reads live literature, writes empirical C/Python tests, falsifies its own hypotheses, and translates those exact failing boundaries into formally verified Lean 4 mathematics.</p>
+
+<p>We've added a 30-second DevOps patch so the pipeline automatically generates its own <code>lakefile.lean</code>, runs <code>lake update</code> to pull <code>Mathlib</code>, and bootstraps its environment with zero configuration.</p>
+
+<p>The Mathematician is in the Box. Now we just let it run.</p>
+`;
+---
+
+<BaseLayout title="Mathematician in a Box: RAG, Red Teams, and Falsification — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>March 30, 2026</time>
+            <span class="sep">·</span>
+            <span>6 min read</span>
+          </div>
+          <h1>Building a Mathematician in a Box: RAG, Red Teams, and Falsification</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    margin: 24px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .article :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+
+  .article :global(th) {
+    text-align: left;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+
+  .article :global(td) {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+  }
+
+  .article :global(tr:last-child td) {
+    border-bottom: none;
+  }
+
+  @media (max-width: 640px) {
+    .article { padding: 32px 0 48px; }
+
+    .article :global(table) {
+      font-size: 0.8rem;
+    }
+
+    .article :global(th),
+    .article :global(td) {
+      padding: 8px 10px;
+    }
+  }
+</style>
