@@ -156,6 +156,23 @@ export class ArxivLibrarian {
     }
   }
 
+  /** Search the embedded arXiv database using the LocalEmbedder */
+  async searchDatabase(query: string, options: { limit?: number } = {}): Promise<Omit<Premise, "vector">[]> {
+    await this.db.initialize();
+    
+    // Safety check: is Ollama alive?
+    const available = await this.embedder.isAvailable();
+    if (!available) {
+      console.warn("[Librarian] Ollama not available — falling back to empty search results");
+      return [];
+    }
+
+    const queryVector = await this.embedder.embed(query);
+    if (queryVector.length === 0) return [];
+    
+    return this.db.search(queryVector, options.limit ?? 5);
+  }
+
   // ── Private ──────────────────────────────────────────────────────────────
 
   private async fetchPapers(query: string, maxResults: number): Promise<ArxivPaper[]> {

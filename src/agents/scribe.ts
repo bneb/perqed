@@ -7,6 +7,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import type { ProofNode } from "../tree";
+import type { ResearchPlan, EvidenceReport, RedTeamResult } from "./research_types";
 
 export class ScribeAgent {
   private ai: GoogleGenAI;
@@ -16,40 +17,66 @@ export class ScribeAgent {
   }
 
   /**
-   * Translates a formal Lean 4 proof trace into an AMS-LaTeX paper.
-   *
-   * @param theoremSignature - Full theorem declaration
-   * @param winningPath - Ordered Root→Leaf path from ProofTree
-   * @returns Raw LaTeX string (compilable amsart document)
+   * Translates a complete autonomous research run into an AMS-LaTeX paper.
    */
-  async draftPaper(
-    theoremSignature: string,
-    winningPath: ProofNode[],
+  async draftResearchPaper(
+    data: {
+      plan: ResearchPlan;
+      evidence: EvidenceReport;
+      approvedConjecture: { signature: string; description: string } | null;
+      redTeamHistory: RedTeamResult[];
+      proofStatus: "PROVED" | "FAILED" | "SKIPPED";
+      winningPath?: ProofNode[];
+    }
   ): Promise<string> {
-    // Format the trace for the LLM
-    let traceContext = `Theorem: ${theoremSignature}\n\nFormal Lean 4 Trace:\n`;
-    winningPath.forEach((node, i) => {
-      traceContext += `Step ${i}:\n`;
-      if (node.tacticApplied) {
-        traceContext += `  Tactic Applied: \`${node.tacticApplied}\`\n`;
-      }
-      traceContext += `  Resulting State:\n  ${node.leanState}\n\n`;
-    });
+    const { plan, evidence, approvedConjecture, redTeamHistory, proofStatus, winningPath } = data;
 
-    const prompt = `You are an elite research mathematician. I have a formal, machine-verified proof of a theorem written in Lean 4.
+    let proofSection = "";
+    if (proofStatus === "PROVED" && winningPath) {
+      proofSection = `We have a formal, machine-verified proof of the conjecture written in Lean 4.
+Here is the formal trace:\n\n`;
+      winningPath.forEach((node, i) => {
+        proofSection += `Step ${i}:\n`;
+        if (node.tacticApplied) proofSection += `  Tactic: \`${node.tacticApplied}\`\n`;
+        proofSection += `  State:\n  ${node.leanState}\n\n`;
+      });
+    } else {
+      proofSection = `The conjecture currently remains an open problem. Formal verification failed or was skipped.`;
+    }
 
-Your task is to translate this formal trace into a rigorous, human-readable mathematical proof.
+    const prompt = `You are an elite research mathematician and the "Perqed" AI Orchestrator.
+You have just completed an autonomous research loop. Your task is to write a rigorous, human-readable academic paper summarizing your findings.
 
 Requirements:
 1. Output MUST be valid LaTeX code.
 2. Use the \\documentclass{amsart} template.
-3. Include a Title, Author (Perqed AI), Abstract, and the formal Theorem environment.
-4. Write the Proof environment narratively. Explain *why* the tactics work in informal math terms (e.g., translate 'induction n' into 'We proceed by induction on $n$.').
-5. Output ONLY the raw LaTeX string. Do not use markdown code blocks (\`\`\`latex). Just the raw code.
+3. Include a Title, Author (Perqed Autonomous Engine), Abstract, Introduction, Empirical Evidence, and Conclusion.
+4. If there is an approved conjecture, format it in a formal Theorem environment.
+5. If there is a formal trace provided, write the Proof narratively. Explain *why* the formal tactics work in informal math terms. If there is no trace, state the theorem remains an open conjecture.
+6. Output ONLY the raw LaTeX string. Do not use markdown code blocks (\`\`\`latex). Just the raw code.
 
-Here is the formal trace:
+Here is the data from the autonomous run:
 
-${traceContext}`;
+## Seed Paper
+Title: ${plan.seed_paper.title}
+arXiv ID: ${plan.seed_paper.arxivId}
+Abstract: ${plan.seed_paper.abstract}
+
+## Extension Hypothesis
+${plan.extension_hypothesis}
+
+## Empirical Investigation
+Domains Probed: ${plan.domains_to_probe.join(", ")}
+Anomalies: ${evidence.anomalies.join(", ") || "none"}
+Kills: ${evidence.kills.join(", ") || "none"}
+Synthesis: ${evidence.synthesis}
+
+## Final Approved Conjecture (after ${redTeamHistory.length} red team rounds)
+${approvedConjecture ? `Signature:\n${approvedConjecture.signature}\n\nDescription:\n${approvedConjecture.description}` : "None approved."}
+
+## Formal Proof Status
+Status: ${proofStatus}
+${proofSection}`;
 
     const response = await this.ai.models.generateContent({
       model: "gemini-3.1-pro-preview",

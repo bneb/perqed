@@ -102,6 +102,8 @@ For each domain, write a self-contained empirical investigation script that:
 4. Runs in under 20 seconds on a modern machine.
 5. Ends with a one-line verdict: "SIGNAL DETECTED" or "HYPOTHESIS FALSIFIED IN THIS DOMAIN".
 
+Do not cut any corners. Use a test driven approach with red-to-green workflows.
+
 For C: include all necessary #includes, a main() function, compile with: cc -O2 file.c -lm
 For Python: use only the standard library.
 
@@ -119,7 +121,12 @@ Generate exactly one script per domain. Keep scripts under 150 lines.`;
     });
 
     if (!response.text) throw new Error("[Explorer] Script generation failed: empty response");
-    return JSON.parse(response.text) as InvestigationScript[];
+    try {
+      return JSON.parse(response.text) as InvestigationScript[];
+    } catch (err: any) {
+      console.warn(`[Explorer] Warning: JSON parse failed during script generation: ${err.message}`);
+      return [];
+    }
   }
 
   /** Run all scripts concurrently in sandboxed subprocesses. */
@@ -298,10 +305,19 @@ Be skeptical. A non-zero result is not automatically a signal.`;
       };
     }
 
-    return JSON.parse(response.text) as {
-      synthesis: string;
-      anomalies: string[];
-      kills: string[];
-    };
+    try {
+      return JSON.parse(response.text) as {
+        synthesis: string;
+        anomalies: string[];
+        kills: string[];
+      };
+    } catch (err: any) {
+      console.warn(`[Explorer] Warning: JSON parse failed during synthesis: ${err.message}`);
+      return {
+        synthesis: "Synthesis unavailable due to LLM response truncation.",
+        anomalies: [],
+        kills: results.map((r) => r.domain),
+      };
+    }
   }
 }

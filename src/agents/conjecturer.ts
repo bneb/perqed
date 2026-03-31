@@ -75,7 +75,13 @@ export class ConjecturerAgent {
       `You are an elite mathematical researcher. Review the following recent excerpts from arXiv:\n\n` +
       `${literatureContext}${evidenceSection}\n\n` +
       `Synthesize these concepts. Formulate 5 completely novel, unproven, but highly plausible Lean 4 theorems ` +
-      `inspired by this research. They must be syntactically valid Lean 4 and mathematically non-trivial.`;
+      `inspired by this research. They must be syntactically valid Lean 4 and mathematically non-trivial.\n\n` +
+      `Formalization Constraint:\n` +
+      `If you formulate a Lean 4 theorem for autonomous verification, it MUST be finitely computable by the native_decide tactic.\n` +
+      `Do NOT use existential quantifiers over infinite sets (∃ C : ℝ, ∃ N : ℕ).\n` +
+      `Do NOT use limits or asymptotics.\n` +
+      `Instead of general asymptotic bounds, formulate exact, finite combinatorial bounds for specific hardcoded values (e.g., theorem exact_count_N_1000 : ... = X).\n` +
+      `If the hypothesis is falsified, formulate a Lean 4 theorem that proves the counter-example (e.g., proving the count for $t^2$ is strictly greater than $2t^2$ at $N=500$).`;
 
     const response = await this.ai.models.generateContent({
       model: "gemini-3.1-pro-preview",

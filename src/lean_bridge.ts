@@ -28,10 +28,12 @@ export interface LeanResult {
 
 export class LeanBridge {
   private readonly leanBinary: string;
+  private readonly cwd?: string;
 
-  constructor(leanBinary?: string) {
+  constructor(leanBinary?: string, cwd?: string) {
     // Default: look in ~/.elan/bin first, then fall back to PATH
     this.leanBinary = leanBinary ?? `${process.env.HOME}/.elan/bin/lean`;
+    this.cwd = cwd;
   }
 
   /**
@@ -95,7 +97,13 @@ export class LeanBridge {
     source: string,
     timeoutMs: number = 30_000,
   ): Promise<LeanResult> {
-    const proc = Bun.spawn([this.leanBinary, "--stdin", "--run"], {
+    const lakeBinary = `${process.env.HOME}/.elan/bin/lake`;
+    const cmd = this.cwd 
+      ? [lakeBinary, "env", this.leanBinary, "--stdin", "--run"]
+      : [this.leanBinary, "--stdin", "--run"];
+
+    const proc = Bun.spawn(cmd, {
+      cwd: this.cwd,
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",

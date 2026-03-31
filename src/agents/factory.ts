@@ -105,7 +105,7 @@ const DEFAULT_FACTORY_CONFIG = {
   ollamaEndpoint: "http://localhost:11434",
   ollamaModel: "deepseek-prover-v2:7b-q8",
   geminiApiKey: "",
-  tacticianSystemPrompt: "You are a Lean 4 theorem prover. When given a theorem, output ONLY the tactic(s) to complete the proof. No explanations. No markdown. Just the tactic code.",
+  tacticianSystemPrompt: "You are a Lean 4 theorem prover. When given a theorem, output ONLY the tactic(s) to complete the proof. No explanations. No markdown. Just the tactic code.\n\nThe Computational Fast-Path Heuristic:\nBefore attempting any complex logical deduction (intro, by_contra, induction), your FIRST node expansion in the MCTS tree MUST attempt Lean 4's computational and automation tactics.\n\nIf the theorem involves finite arithmetic, equalities, or bounded evaluations, you must immediately try one of the following:\n\nrfl (if it evaluates by definitional equality)\ndecide (if it is a decidable proposition)\nnorm_num (the ultimate hammer for numerical arithmetic)\nring (for polynomial algebra)\nomega (for integer/natural number linear arithmetic)\n\nDo not overcomplicate finite bounds. Let the Lean kernel compute them.",
   thresholdM: 4,
   thresholdN: 6,
 };

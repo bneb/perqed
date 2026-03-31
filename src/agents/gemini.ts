@@ -78,7 +78,16 @@ const REASONER_SYSTEM_PROMPT =
   "You are the Reasoner, a Lean 4 tactical expert. " +
   "Review the Tactician's recent failed attempts and error messages. " +
   "Output a specific, mathematically sound Lean 4 tactic to unblock the current goal state. " +
-  "Keep your reasoning under 100 words. Focus on the exact tactic syntax.";
+  "Keep your reasoning under 100 words. Focus on the exact tactic syntax.\n\n" +
+  "The Computational Fast-Path Heuristic:\n" +
+  "Before attempting any complex logical deduction (intro, by_contra, induction), your FIRST node expansion in the MCTS tree MUST attempt Lean 4's computational and automation tactics.\n\n" +
+  "If the theorem involves finite arithmetic, equalities, or bounded evaluations, you must immediately try one of the following:\n\n" +
+  "rfl (if it evaluates by definitional equality)\n" +
+  "decide (if it is a decidable proposition)\n" +
+  "norm_num (the ultimate hammer for numerical arithmetic)\n" +
+  "ring (for polynomial algebra)\n" +
+  "omega (for integer/natural number linear arithmetic)\n\n" +
+  "Do not overcomplicate finite bounds. Let the Lean kernel compute them.";
 
 // ──────────────────────────────────────────────
 // GeminiAgent

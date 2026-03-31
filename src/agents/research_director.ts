@@ -25,7 +25,9 @@ import { ArxivLibrarian } from "../librarian/arxiv_librarian";
 import { ConjecturerAgent } from "./conjecturer";
 import { ExplorerAgent } from "./explorer";
 import { RedTeamAuditor } from "./red_team";
+import { ScribeAgent } from "./scribe";
 import type { ResearchPlan, EvidenceReport, RedTeamResult } from "./research_types";
+import { execSync } from "node:child_process";
 
 export interface ResearchDirectorConfig {
   apiKey: string;
@@ -174,6 +176,27 @@ export class ResearchDirector {
     const summary = this.buildSummary(plan, evidence, approvedConjecture, allRedTeamHistory, proofStatus);
     this.write(outputDir, "summary.md", summary);
 
+    // ── Step 7: Scribe paper generation ───────────────────────────────────
+    this.log("\nStep 7/7 — Scribe generating LaTeX research paper...");
+    const scribe = new ScribeAgent(this.cfg.apiKey);
+    const texSource = await scribe.draftResearchPaper({
+      plan,
+      evidence,
+      approvedConjecture,
+      redTeamHistory: allRedTeamHistory,
+      proofStatus,
+    });
+    this.write(outputDir, "paper.tex", texSource);
+    this.log(`         Wrote raw LaTeX to paper.tex`);
+
+    try {
+      this.log(`         Compiling PDF with tectonic...`);
+      execSync("tectonic paper.tex", { cwd: outputDir, stdio: "ignore" });
+      this.log(`         ✅ PDF Compiled successfully: paper.pdf`);
+    } catch (err: any) {
+      this.log(`         ⚠️ tectonic compilation failed or is not installed. (.tex is saved)`);
+    }
+
     this.log(`\n${"═".repeat(60)}`);
     this.log(`  Run complete. Results in: ${outputDir}`);
     this.log(`${"═".repeat(60)}\n`);
@@ -194,9 +217,6 @@ export class ResearchDirector {
    * and the top literature matches in LanceDB.
    */
   private async buildPlan(prompt: string, librarian: ArxivLibrarian): Promise<ResearchPlan> {
-    // Fetch a representative abstract from the DB to give Gemini context.
-    // We call the existing arxiv_librarian fetch logic via a search query.
-    // For now, use the raw prompt as the seed context (the DB is seeded above).
     const schema: Schema = {
       type: Type.OBJECT,
       properties: {
@@ -219,19 +239,40 @@ export class ResearchDirector {
       required: ["seed_paper", "extension_hypothesis", "domains_to_probe", "lean_target_sketch"],
     };
 
+    // 1. Actually query the Librarian's LanceDB for the seeded topic (pull top 10 for variety)
+    const searchResults = await librarian.searchDatabase(prompt, { limit: 10 });
+    // Randomly select one of the top matches to prevent hitting the exact same paper repeatedly
+    const randomIndex = Math.floor(Math.random() * Math.max(1, searchResults.length));
+    const realSeedPaper = searchResults[randomIndex];
+    
+    // Safety fallback just in case the database is completely empty
+    const arxivId = realSeedPaper?.id.replace("arxiv-", "") || "0000.00000";
+    const title = realSeedPaper?.paperTitle || realSeedPaper?.theoremSignature || "Fallback Title";
+    const abstract = realSeedPaper?.paperAbstract || realSeedPaper?.successfulTactic || "Fallback Abstract";
+
     const domainsInstruction = `Pick exactly ${this.cfg.domainDepth} distinct mathematical domains appropriate for empirically probing this hypothesis (e.g., "analytic_number_theory", "spectral_graph_theory", "algebraic_topology", "information_theory", "complex_analysis", "dynamical_systems", "probabilistic_combinatorics").`;
 
-    const p = `You are a mathematical research director. A user has given you this research prompt:
+    const p = `
+You are an elite mathematical architect. 
+Read the following abstract from a REAL, recently published arXiv paper:
 
-"${prompt}"
+Title: ${title}
+arXiv ID: ${arxivId}
+Abstract: ${abstract}
 
-Your task:
-1. Identify a specific, real, recent arXiv paper in this area. Use a plausible arXiv ID and a real-sounding title and abstract that fits the domain.
-2. Formulate a novel, interesting extension hypothesis inspired by that paper.
-3. ${domainsInstruction}
-4. Write a rough Lean 4 theorem sketch (the Conjecturer will refine it).
+YOUR TASK:
+Do not invent a new paper. Base your entire analysis strictly on the paper provided above.
+1. Identify a potential "jumping-off point" or a highly specific, finite extension related to this exact paper.
+2. Formulate a hypothesis that extends this work.
+3. Propose a computational experiment to test it.
+4. ${domainsInstruction}
 
-The hypothesis should be concrete and falsifiable — not vague. It should be the kind of thing a PhD mathematician would find surprising but plausible.`;
+CRITICAL FORMALIZATION CONSTRAINT:
+If you formulate a Lean 4 theorem sketch for autonomous verification, it MUST be finitely computable by the \`native_decide\` tactic. 
+- Do NOT use existential quantifiers over infinite sets (∃ C : ℝ).
+- Do NOT use limits or asymptotics.
+- Formulate exact, finite combinatorial bounds for specific hardcoded values that can be verified via \`norm_num\`, \`decide\`, or \`rfl\`.
+`;
 
     const response = await this.ai.models.generateContent({
       model: this.cfg.plannerModel,
@@ -239,7 +280,7 @@ The hypothesis should be concrete and falsifiable — not vague. It should be th
       config: {
         responseMimeType: "application/json",
         responseSchema: schema,
-        temperature: 0.7,
+        temperature: 0.1,
       },
     });
 
@@ -262,7 +303,9 @@ The hypothesis should be concrete and falsifiable — not vague. It should be th
       // Dynamically import the prover loop to avoid circular deps
       const { WorkspaceManager } = await import("../workspace");
       const { SolverBridge } = await import("../solver");
-      const { runProverLoop } = await import("../orchestrator");
+      const { runDynamicLoop } = await import("../orchestrator");
+      const { AgentFactory } = await import("./factory");
+      const { LeanBridge } = await import("../lean_bridge");
 
       const workspace = new WorkspaceManager(outputDir, "proof");
       await workspace.init();
@@ -270,11 +313,14 @@ The hypothesis should be concrete and falsifiable — not vague. It should be th
       await Bun.write(workspace.paths.objective, objectiveContent);
 
       const solver = new SolverBridge();
-      await runProverLoop(workspace, solver, {
-        maxLocalRetries: 3,
-        maxGlobalIterations: 50,
-        z3TimeoutMs: 30_000,
-        contextWindowTokens: 8000,
+      
+      // We must use runDynamicLoop to correctly route Lean tactics through Tactician/Reasoner
+      const result = await runDynamicLoop(workspace, solver, {
+        leanBridge: new LeanBridge(undefined, outputDir.split("/runs/")[0]!),
+        theoremName: "approved_conjecture",
+        theoremSignature: conjecture.signature,
+        agentFactory: new AgentFactory({ geminiApiKey: this.cfg.apiKey }),
+        maxGlobalIterations: 15,
       });
 
       // Check if a solution was produced

@@ -51,6 +51,7 @@ Perqed is a computational math pipeline: **prompt → ARCHITECT → auto-detect 
 | Skill | Use When |
 |-------|----------|
 | `graph-witness-search` | Formulating a new graph existence problem as SA search |
+| `latex-compilation` | Compiling LaTeX papers to PDF using Tectonic (do not use pdflatex) |
 | `lean-finite-graph` | Writing Lean 4 proofs for finite graph properties via `native_decide` |
 | `srg-parameters` | Looking up open SRG existence questions |
 

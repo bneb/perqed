@@ -59,15 +59,44 @@ export class WorkspaceManager {
     };
   }
 
-  /**
-   * Initialize the workspace hierarchy. Idempotent — safe to call multiple times.
-   */
   async init(): Promise<void> {
     await mkdir(this.paths.runDir, { recursive: true });
     await mkdir(this.paths.domainSkills, { recursive: true });
     await mkdir(this.paths.globalConfig, { recursive: true });
     await mkdir(this.paths.scratch, { recursive: true });
     await mkdir(this.paths.verifiedLib, { recursive: true });
+
+    // Auto-generate Lean 4 DevOps environment in baseDir
+    const lakefile = join(this.baseDir, "lakefile.lean");
+    const toolchain = join(this.baseDir, "lean-toolchain");
+    
+    if (!existsSync(lakefile)) {
+      const lakeContent = `import Lake
+open Lake DSL
+
+package «perqed_proofs» where
+  -- add package configuration options here
+
+@[default_target]
+lean_lib «PerqedProofs» where
+  -- add library configuration options here
+
+require mathlib from git
+  "https://github.com/leanprover-community/mathlib4.git"
+`;
+      await Bun.write(lakefile, lakeContent);
+      await Bun.write(toolchain, "leanprover/lean4:v4.6.0\n");
+      
+      console.log("   🪣 [DevOps] Bootstrapping Lean 4 Workspace and pulling Mathlib (this takes a moment)...");
+      try {
+        const { execSync } = await import("node:child_process");
+        execSync("~/.elan/bin/lake update", { cwd: this.baseDir, stdio: "ignore" });
+        execSync("~/.elan/bin/lake build", { cwd: this.baseDir, stdio: "ignore" });
+        console.log("   ✅ [DevOps] Mathlib environment ready.");
+      } catch (err: any) {
+        console.log(`   ⚠️ [DevOps] lake update/build failed: ${err.message}. Mathlib might not be fully available.`);
+      }
+    }
   }
 
   // ──────────────────────────────────────────────
