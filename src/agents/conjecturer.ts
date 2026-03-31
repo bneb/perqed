@@ -1,12 +1,13 @@
 /**
  * ConjecturerAgent — Gemini-Powered Mathematical Hypothesis Generator
  *
- * Consumes recent arXiv literature context and generates
- * novel, syntactically valid Lean 4 theorem signatures
- * via structured JSON output from Gemini.
+ * Consumes recent arXiv literature context (and optionally an EvidenceReport
+ * from the Explorer) to generate novel, syntactically valid Lean 4 theorem
+ * signatures via structured JSON output from Gemini.
  */
 
 import { GoogleGenAI, Type, type Schema } from "@google/genai";
+import type { EvidenceReport } from "./research_types";
 
 export interface Conjecture {
   name: string;
@@ -24,11 +25,16 @@ export class ConjecturerAgent {
   /**
    * Generates novel Lean 4 theorem signatures based on literature context.
    *
-   * @param literatureContext - arXiv abstract chunks from the vector DB
+   * @param literatureContext  - arXiv abstract chunks from the vector DB
+   * @param evidence           - Optional EvidenceReport from the Explorer agent.
+   *                            When provided, the empirical synthesis and anomalies
+   *                            are injected into the prompt so conjectures are grounded
+   *                            in actual computational findings.
    * @returns Array of structured conjectures
    */
   async generateConjectures(
     literatureContext: string,
+    evidence?: EvidenceReport,
   ): Promise<Conjecture[]> {
     const schema: Schema = {
       type: Type.ARRAY,
@@ -55,7 +61,21 @@ export class ConjecturerAgent {
       },
     };
 
-    const prompt = `You are an elite mathematical researcher. Review the following recent excerpts from arXiv:\n\n${literatureContext}\n\nSynthesize these concepts. Formulate 5 completely novel, unproven, but highly plausible Lean 4 theorems inspired by this edge-case research. They must be syntactically perfect Lean 4 and mathematically non-trivial.`;
+    // Build the evidence section only when provided
+    let evidenceSection = "";
+    if (evidence) {
+      evidenceSection = `\n\n## Empirical Investigation Results\n\n` +
+        `**Synthesis:** ${evidence.synthesis}\n\n` +
+        `**Domains with detected signal:** ${evidence.anomalies.join(", ") || "none"}\n\n` +
+        `**Domains falsified:** ${evidence.kills.join(", ") || "none"}\n\n` +
+        `Ground your conjectures in these empirical findings. Prefer theorems that explain or generalize the detected signals.`;
+    }
+
+    const prompt =
+      `You are an elite mathematical researcher. Review the following recent excerpts from arXiv:\n\n` +
+      `${literatureContext}${evidenceSection}\n\n` +
+      `Synthesize these concepts. Formulate 5 completely novel, unproven, but highly plausible Lean 4 theorems ` +
+      `inspired by this research. They must be syntactically valid Lean 4 and mathematically non-trivial.`;
 
     const response = await this.ai.models.generateContent({
       model: "gemini-3.1-pro-preview",

@@ -4,12 +4,13 @@
  * Usage:
  *   bun run src/cli.ts <run_name>                    # Mock mode (no LLM needed)
  *   bun run src/cli.ts <run_name> --live              # Live mode (requires Ollama)
+ *   bun run src/cli.ts prompt="<research prompt>"    # Autonomous research pipeline
  *
  * Environment variables:
  *   PERQED_WORKSPACE   Base workspace dir (default: ./agent_workspace)
  *   OLLAMA_ENDPOINT    Ollama API URL (default: http://localhost:11434/api/chat)
  *   OLLAMA_MODEL       Model name (default: qwen2.5-coder)
- *   GEMINI_API_KEY     Gemini API key for Architect escalation
+ *   GEMINI_API_KEY     Gemini API key (required for research pipeline + Architect)
  */
 
 import { WorkspaceManager } from "./workspace";
@@ -17,26 +18,79 @@ import { SolverBridge } from "./solver";
 import { LocalAgent, type LocalAgentConfig } from "./llm_client";
 import { ArchitectClient } from "./architect_client";
 import { runProverLoop } from "./orchestrator";
+import { ResearchDirector } from "./agents/research_director";
 import type { AgentResponse, ArchitectResponse } from "./schemas";
+
+// ── Argument parsing ─────────────────────────────────────────────────────────
+
+function parseArgs(): { prompt: string | null; runName: string; liveMode: boolean } {
+  const args = process.argv.slice(2);
+
+  // Look for prompt="..." or prompt=...
+  const promptArg = args.find((a) => a.startsWith("prompt="));
+  if (promptArg) {
+    const prompt = promptArg.slice("prompt=".length).replace(/^["']|["']$/g, "");
+    return { prompt, runName: "research", liveMode: true };
+  }
+
+  return {
+    prompt: null,
+    runName: args[0] ?? "default_run",
+    liveMode: args.includes("--live"),
+  };
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   const workspaceBase = process.env["PERQED_WORKSPACE"] ?? "./agent_workspace";
-  const runName = process.argv[2] ?? "default_run";
-  const liveMode = process.argv.includes("--live");
+  const { prompt, runName, liveMode } = parseArgs();
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║         🔬 Perqed Proof Engine           ║");
-  console.log("║    Neuro-Symbolic Orchestration v1.0.0   ║");
+  console.log("║    Neuro-Symbolic Orchestration v2.0.0   ║");
   console.log("╚══════════════════════════════════════════╝");
   console.log(`\n  Workspace: ${workspaceBase}`);
+
+  // ── Research pipeline mode ────────────────────────────────────────────────
+  if (prompt) {
+    console.log(`  Mode:      🤖 AUTONOMOUS RESEARCH PIPELINE\n`);
+
+    const geminiKey = process.env["GEMINI_API_KEY"];
+    if (!geminiKey) {
+      console.error("  ❌ GEMINI_API_KEY is required for the research pipeline.");
+      console.error("     Copy .env.example to .env and add your key.\n");
+      process.exit(1);
+    }
+
+    const director = new ResearchDirector({
+      apiKey: geminiKey,
+      workspaceDir: workspaceBase,
+      domainDepth: 7,
+      verbose: true,
+    });
+
+    const result = await director.run(prompt);
+
+    console.log("\n  📁 Artifacts written to:", result.outputDir);
+    console.log("     research_plan.json  — seed paper + domains");
+    console.log("     evidence_report.json — empirical investigation results");
+    console.log("     conjectures.json    — generated Lean 4 candidates");
+    console.log("     red_team_history.json — audit trail");
+    console.log("     summary.md          — human-readable summary");
+    if (result.proofStatus === "PROVED") {
+      console.log("     proof/              — verified Lean 4 proof ✅");
+    }
+    return;
+  }
+
+  // ── Classic proof search mode (backward compatible) ───────────────────────
   console.log(`  Run:       ${runName}`);
   console.log(`  Mode:      ${liveMode ? "🟢 LIVE (Ollama)" : "🟡 MOCK (no LLM)"}\n`);
 
-  // Initialize workspace (idempotent — preserves existing state)
   const workspace = new WorkspaceManager(workspaceBase, runName);
   await workspace.init();
 
-  // Write default objective if none exists
   const objectiveFile = Bun.file(workspace.paths.objective);
   if (!(await objectiveFile.exists())) {
     await Bun.write(
@@ -46,10 +100,8 @@ async function main() {
     console.log("  📝 Created default objective.md — edit this file to set your proof goal.\n");
   }
 
-  // Initialize solver bridge
   const solver = new SolverBridge();
 
-  // Configure LLM and Architect based on mode
   const config: Parameters<typeof runProverLoop>[2] = {
     maxLocalRetries: 3,
     maxGlobalIterations: liveMode ? 100 : 10,
@@ -58,7 +110,6 @@ async function main() {
   };
 
   if (liveMode) {
-    // Wire up live LocalAgent via Ollama
     const agentConfig: LocalAgentConfig = {
       endpoint: process.env["OLLAMA_ENDPOINT"] ?? "http://localhost:11434/api/chat",
       model: process.env["OLLAMA_MODEL"] ?? "qwen2.5-coder",
@@ -70,16 +121,11 @@ async function main() {
 
     config.localAgent = new LocalAgent(agentConfig);
 
-    // Wire Architect if API key is available
     const geminiKey = process.env["GEMINI_API_KEY"];
     if (geminiKey) {
-      const architect = new ArchitectClient({
-        apiKey: geminiKey,
-        model: "gemini-2.5-pro",
-      });
+      const architect = new ArchitectClient({ apiKey: geminiKey, model: "gemini-2.5-pro" });
       console.log("  🏛️  Architect:   Gemini 2.5 Pro (escalation enabled)\n");
 
-      // Run with live architect
       await runProverLoop(workspace, solver, config, undefined, async (labLog, progress) => {
         const context = `## LAB LOG\n${labLog}\n\n## CURRENT PROGRESS\n${progress}`;
         return architect.escalate(context);
@@ -89,11 +135,9 @@ async function main() {
       await runProverLoop(workspace, solver, config);
     }
   } else {
-    // Mock mode
     await runProverLoop(workspace, solver, config);
   }
 
-  // Graceful shutdown
   console.log("\n  Done. Inspect your workspace:");
   console.log(`    Lab log:   ${workspace.paths.labLog}`);
   console.log(`    Progress:  ${workspace.paths.progress}`);
@@ -104,7 +148,8 @@ async function main() {
   }
 }
 
-// Graceful SIGINT handler
+// ── Signals ───────────────────────────────────────────────────────────────────
+
 process.on("SIGINT", () => {
   console.log("\n\n⚠️  SIGINT received — shutting down gracefully...");
   console.log("  State has been flushed to disk. Run again with the same run_name to resume.");

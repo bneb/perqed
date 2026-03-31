@@ -6,6 +6,7 @@
 
 import { describe, test, expect, afterEach } from "bun:test";
 import { ConjecturerAgent, type Conjecture } from "../src/agents/conjecturer";
+import { geminiResponseMock } from "./helpers/fetch_mock";
 
 // Mock conjectures that Gemini would return
 const MOCK_CONJECTURES: Conjecture[] = [
@@ -29,21 +30,7 @@ describe("ConjecturerAgent", () => {
   });
 
   test("generateConjectures parses structured JSON from Gemini", async () => {
-    // Mock the Gemini API response
-    globalThis.fetch = async (_url: any, _opts: any) => {
-      return new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              content: {
-                parts: [{ text: JSON.stringify(MOCK_CONJECTURES) }],
-              },
-            },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    };
+    globalThis.fetch = geminiResponseMock(MOCK_CONJECTURES);
 
     const agent = new ConjecturerAgent("fake-api-key");
     const results = await agent.generateConjectures("Some arXiv literature context");
@@ -56,20 +43,7 @@ describe("ConjecturerAgent", () => {
   });
 
   test("generateConjectures returns all required fields", async () => {
-    globalThis.fetch = async (_url: any, _opts: any) => {
-      return new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              content: {
-                parts: [{ text: JSON.stringify(MOCK_CONJECTURES) }],
-              },
-            },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    };
+    globalThis.fetch = geminiResponseMock(MOCK_CONJECTURES);
 
     const agent = new ConjecturerAgent("fake-api-key");
     const results = await agent.generateConjectures("Literature context");
