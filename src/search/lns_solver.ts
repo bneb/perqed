@@ -52,8 +52,8 @@ export interface LNSOptions {
   extraFreePercent?: number;
   /** Z3 timeout in milliseconds (default 60s) */
   timeoutMs?: number;
-  /** Python executable (default "python3") */
-  pythonBinary?: string;
+  /** Z3 executable (default "z3") */
+  z3Binary?: string;
 }
 
 // ── Main API ──────────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ export async function runLNS(
   const {
     extraFreePercent = 0.05,
     timeoutMs = 60_000,
-    pythonBinary = "python3",
+    z3Binary = "z3",
   } = opts;
 
   const startTime = Date.now();
@@ -91,13 +91,13 @@ export async function runLNS(
 
   // 2. Generate Z3 script
   const script = generateLNSZ3Script(N, r, s, adj, freeEdges);
-  const tempFile = join(tmpdir(), `perqed_lns_${randomUUID()}.py`);
+  const tempFile = join(tmpdir(), `perqed_lns_${randomUUID()}.smt2`);
 
   try {
     await Bun.write(tempFile, script);
 
     // 3. Run Z3 with timeout
-    const proc = Bun.spawn([pythonBinary, tempFile], {
+    const proc = Bun.spawn([z3Binary, "-smt2", tempFile], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -130,7 +130,7 @@ export async function runLNS(
       return { status: "error", message: stderr || stdout || `exit ${exitCode}` };
     }
 
-    if (stdout === "UNSAT") {
+    if (stdout.startsWith("unsat") || stdout === "UNSAT") {
       return {
         status: "unsat",
         clue: `Z3 UNSAT: neighborhood of ${freeEdgeCount} edges has no valid coloring for R(${r},${s}) on K_${N}`,
@@ -138,33 +138,26 @@ export async function runLNS(
       };
     }
 
-    if (stdout.startsWith("ERROR:")) {
-      return { status: "error", message: stdout };
-    }
-
-    // Parse SAT:{json}
-    const satMatch = stdout.match(/^SAT:(\[[\s\S]+\])$/);
-    if (!satMatch) {
+    if (!stdout.startsWith("sat")) {
       return { status: "error", message: `Unexpected output: ${stdout.slice(0, 200)}` };
     }
 
-    // Reconstruct AdjacencyMatrix from 2D array (1=red edge, 0=no edge)
-    let matrix: number[][];
-    try {
-      matrix = JSON.parse(satMatch[1]!) as number[][];
-    } catch {
-      return { status: "error", message: "Failed to parse SAT adjacency JSON" };
-    }
-
-    if (matrix.length !== N) {
-      return { status: "error", message: `Matrix size ${matrix.length} != N=${N}` };
-    }
-
+    // 5. Parse SAT model
     const repairedAdj = new AdjacencyMatrix(N);
-    for (let i = 0; i < N; i++) {
-      for (let j = i + 1; j < N; j++) {
-        if (matrix[i]?.[j] === 1) repairedAdj.addEdge(i, j);
+    // Start with a clone of the original broken graph
+    for (let u = 0; u < N; u++) {
+      for (let v = u + 1; v < N; v++) {
+        if (adj.hasEdge(u, v)) repairedAdj.addEdge(u, v);
       }
+    }
+
+    // Apply Z3 patches via regex over SMT-LIB2 output
+    const valueMatches = stdout.matchAll(/\(e_(\d+)_(\d+)\s+(true|false)\)/g);
+    for (const match of valueMatches) {
+      const u = parseInt(match[1]!, 10);
+      const v = parseInt(match[2]!, 10);
+      if (match[3] === "true") repairedAdj.addEdge(u, v);
+      else repairedAdj.removeEdge(u, v);
     }
 
     console.log(`[LNS] SAT in ${solveTimeMs}ms — ${freeEdgeCount} free edges repaired`);

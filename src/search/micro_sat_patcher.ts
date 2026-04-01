@@ -50,8 +50,8 @@ export interface MicroSATPatchResult {
 export interface MicroSATPatchOptions {
   /** Z3 timeout in milliseconds (default 60s) */
   timeoutMs?: number;
-  /** Python executable (default "python3") */
-  pythonBinary?: string;
+  /** Z3 executable (default "z3") */
+  z3Binary?: string;
 }
 
 // ── Core: build free-edge set from hot zone ───────────────────────────────────
@@ -89,7 +89,7 @@ export async function runMicroSATPatch(
 ): Promise<MicroSATPatchResult> {
   const startTime = Date.now();
   const hotZoneSize = zone.hotVertices.size;
-  const { timeoutMs = 60_000, pythonBinary = "python3" } = opts;
+  const { timeoutMs = 60_000, z3Binary = "z3" } = opts;
 
   // ── Guard: too large for instant SMT ────────────────────────────────────
   if (!zone.isValidForSAT) {
@@ -116,13 +116,13 @@ export async function runMicroSATPatch(
 
   // ── Generate Z3 script ───────────────────────────────────────────────────
   const script = generateLNSZ3Script(N, r, s, adj, freeEdges);
-  const tempFile = join(tmpdir(), `perqed_micro_${randomUUID()}.py`);
+  const tempFile = join(tmpdir(), `perqed_micro_${randomUUID()}.smt2`);
 
   try {
     await Bun.write(tempFile, script);
 
     // ── Run Z3 ──────────────────────────────────────────────────────────
-    const proc = Bun.spawn([pythonBinary, tempFile], {
+    const proc = Bun.spawn([z3Binary, "-smt2", tempFile], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -160,7 +160,7 @@ export async function runMicroSATPatch(
     }
 
     // ── Parse UNSAT ──────────────────────────────────────────────────────
-    if (stdout === "UNSAT") {
+    if (stdout.startsWith("unsat") || stdout === "UNSAT") {
       return {
         status: "unsat",
         hotZoneSize,
@@ -169,32 +169,26 @@ export async function runMicroSATPatch(
       };
     }
 
-    if (stdout.startsWith("ERROR:")) {
-      return { status: "error", hotZoneSize, solveTimeMs, note: stdout };
+    if (!stdout.startsWith("sat")) {
+      return { status: "error", hotZoneSize, solveTimeMs, note: `Unexpected output: ${stdout.slice(0, 200)}` };
     }
 
     // ── Parse SAT ────────────────────────────────────────────────────────
-    const satMatch = stdout.match(/^SAT:(\[[\s\S]+\])$/);
-    if (!satMatch) {
-      return { status: "error", hotZoneSize, solveTimeMs, note: `Unexpected: ${stdout.slice(0, 200)}` };
-    }
-
-    let matrix: number[][];
-    try {
-      matrix = JSON.parse(satMatch[1]!) as number[][];
-    } catch {
-      return { status: "error", hotZoneSize, solveTimeMs, note: "JSON parse failed" };
-    }
-
-    if (matrix.length !== N) {
-      return { status: "error", hotZoneSize, solveTimeMs, note: `Matrix size ${matrix.length} != N=${N}` };
-    }
-
     const repairedAdj = new AdjacencyMatrix(N);
-    for (let i = 0; i < N; i++) {
-      for (let j = i + 1; j < N; j++) {
-        if (matrix[i]?.[j] === 1) repairedAdj.addEdge(i, j);
+    // Clone original broken graph
+    for (let u = 0; u < N; u++) {
+      for (let v = u + 1; v < N; v++) {
+        if (adj.hasEdge(u, v)) repairedAdj.addEdge(u, v);
       }
+    }
+
+    // Apply Z3 patches via regex over SMT-LIB2 output
+    const valueMatches = stdout.matchAll(/\(e_(\d+)_(\d+)\s+(true|false)\)/g);
+    for (const match of valueMatches) {
+      const u = parseInt(match[1]!, 10);
+      const v = parseInt(match[2]!, 10);
+      if (match[3] === "true") repairedAdj.addEdge(u, v);
+      else repairedAdj.removeEdge(u, v);
     }
 
     console.log(`[MicroSAT] ✅ SAT in ${solveTimeMs}ms — hot zone ${hotZoneSize}v, ${freeEdgeCount} free edges`);

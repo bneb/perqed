@@ -166,75 +166,43 @@ export function generateLNSZ3Script(
   const freeEdgeSet = new Set<string>(freeEdges.map(([u, v]) => ekey(u, v)));
   const { redClauses, blueClauses, preUnsat } = precomputeClauses(adj, N, r, s, freeEdgeSet);
 
-  // Build frozen adjacency matrix (NxN, 1=red edge present, 0=blue/no-edge)
-  const frozenAdj: number[][] = [];
-  for (let i = 0; i < N; i++) {
-    frozenAdj.push([]);
-    for (let j = 0; j < N; j++) {
-      frozenAdj[i]!.push(adj.hasEdge(i, j) ? 1 : 0);
-    }
+  if (preUnsat) {
+    return "(echo \"UNSAT\")";
   }
 
   const freeEdgeKeys = Array.from(freeEdgeSet);
+  let smtScript = "";
 
-  if (preUnsat) {
-    // Short-circuit: TypeScript already detected an irrecoverable frozen violation
-    return `from z3 import *
-
-N = ${N}
-# TypeScript pre-detected frozen violated clique — no Z3 call needed
-print("UNSAT")
-`;
+  // 1. Declare Booleans for the free edges
+  for (const k of freeEdgeKeys) {
+    smtScript += `(declare-const e_${k} Bool)\n`;
   }
 
-  return `from z3 import *
-import json
+  // 2. Add Assertions for Red Clauses (at least one blue, i.e., NOT Red)
+  for (const clause of redClauses) {
+    if (clause.length === 1) {
+      smtScript += `(assert (not e_${clause[0]}))\n`;
+    } else {
+      const orExpr = clause.map(k => `(not e_${k})`).join(" ");
+      smtScript += `(assert (or ${orExpr}))\n`;
+    }
+  }
 
-N = ${N}
-r = ${r}
-s = ${s}
+  // 3. Add Assertions for Blue Clauses (at least one red)
+  for (const clause of blueClauses) {
+    if (clause.length === 1) {
+      smtScript += `(assert e_${clause[0]})\n`;
+    } else {
+      const orExpr = clause.map(k => `e_${k}`).join(" ");
+      smtScript += `(assert (or ${orExpr}))\n`;
+    }
+  }
 
-# Free edge variables (precomputed by TypeScript — no itertools needed)
-free_edge_keys = ${JSON.stringify(freeEdgeKeys)}
-
-# Clauses (precomputed + deduplicated in TypeScript)
-# Red clauses: for each, at least one free edge must be NOT red (blue)
-red_clauses = ${JSON.stringify(redClauses)}
-
-# Blue clauses: for each, at least one free edge must be red
-blue_clauses = ${JSON.stringify(blueClauses)}
-
-# Frozen adjacency matrix (free edge slots may be overwritten by the model)
-frozen_adj = ${JSON.stringify(frozenAdj)}
-
-# Build Z3 boolean variables for free edges only
-e_vars = {k: Bool('e_' + k) for k in free_edge_keys}
-
-solver = Solver()
-
-# Red K_r constraints: Or([Not(e) for e in clause]) = at least one must be blue
-for clause in red_clauses:
-    solver.add(Or([Not(e_vars[k]) for k in clause]))
-
-# Blue K_s constraints: Or([e for e in clause]) = at least one must be red
-for clause in blue_clauses:
-    solver.add(Or([e_vars[k] for k in clause]))
-
-result = solver.check()
-
-if result == sat:
-    model = solver.model()
-    adj = [row[:] for row in frozen_adj]
-    for k, var in e_vars.items():
-        parts = k.split('_')
-        i, j = int(parts[0]), int(parts[1])
-        val = 1 if is_true(model[var]) else 0
-        adj[i][j] = val
-        adj[j][i] = val
-    print("SAT:" + json.dumps(adj))
-elif result == unsat:
-    print("UNSAT")
-else:
-    print(f"ERROR:{result}")
-`;
+  // 4. Check satisfiability and output values
+  smtScript += "(check-sat)\n";
+  if (freeEdgeKeys.length > 0) {
+    const vars = freeEdgeKeys.map(k => `e_${k}`).join(" ");
+    smtScript += `(get-value (${vars}))\n`;
+  }
+  return smtScript;
 }

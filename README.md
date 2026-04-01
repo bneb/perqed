@@ -1,6 +1,6 @@
 # Perqed
 
-**Automated theorem proving in Lean 4.** An open-source system that reads mathematical literature, generates conjectures, attempts proofs via MCTS-guided tactic search, and extracts training data from successful proofs.
+**Automated theorem proving in Lean 4.** An open-source neuro-symbolic research lab that reads mathematical literature, generates conjectures, attempts proofs via MCTS-guided tactic search, and extracts training data from successful proofs — orchestrated by a reactive XState v5 state machine.
 
 Runs locally on Apple Silicon.
 
@@ -26,7 +26,7 @@ graph TD
     end
 
     subgraph "MCTS Proof Engine"
-        QUEUE --> ORC["Orchestrator v3"]
+        QUEUE --> ORC["XState Research Machine"]
         ORC --> ROUTER["AgentRouter"]
         ROUTER -->|"default"| TACT["Tactician (DeepSeek Prover V2)"]
         ROUTER -->|"3+ failures"| REASON["Reasoner (Gemini Flash)"]
@@ -52,7 +52,7 @@ graph TD
 
 ## Autonomous Research Pipeline (Mathematician in a Box)
 
-Perqed now includes a fully autonomous research orchestration loop. By providing a single natural-language prompt, the top-level **Research Director** agent coordinates:
+Perqed includes a fully autonomous research orchestration loop powered by an **XState v5 reactive state machine**. By providing a single natural-language prompt, the machine coordinates 8 specialized actors through a 10-state DAG:
 
 1. **Literature Seeding**: The Librarian fetches relevant arXiv papers to ground the research.
 2. **Planning**: Formulates a concrete, plausible extension hypothesis inspired by the seed literature.
@@ -67,6 +67,8 @@ perqed prompt="find a recent arXiv paper on spectral graph theory and conjecture
 ```
 
 Use `--dry-run` to execute the entire pipeline up to the final proof stage (saves time and compute when evaluating the orchestrator).
+
+The machine will transition through: `Idle → Ideation → Validation → EmpiricalSandbox → FormalVerification → ScribeReport → Done`, with automatic error recovery, SMT resolution for plateaus, and falsification forks for counter-examples.
 
 ## How It Works
 
@@ -112,15 +114,82 @@ Perqed's underlying solvers have two continuous operational modes:
 cp .env.example .env
 # Edit .env and add your GEMINI_API_KEY
 
+# Link the CLI globally so you can use 'perqed' from anywhere
+npm link
+
 # Run the test suite
 bun test
 
 # Run a live autonomous mathematical research pipeline
-bun run src/cli.ts prompt="find a recent paper on algebraic topology..."
+perqed prompt="find a recent paper on algebraic topology..."
 
-# Run a specific local proof search mock
-bun run src/cli.ts my_experiment_run --live
+# Run a specific local proof search (backward compatible)
+perqed my_experiment_run --live
 ```
+
+## CLI Reference & Prompts
+
+The `perqed` CLI is the main entry point to the neuro-symbolic lab. It supports fully autonomous orchestration (via XState v5) as well as classic backward-compatible local proof modes.
+
+### Autonomous Research (XState v5)
+
+To start the autonomous research pipeline, simply pass a natural-language description of what you want to investigate. 
+
+**Basic Usage:**
+```bash
+perqed prompt="investigate Ramsey R(4, 6) upper bounds using Paley graphs"
+```
+
+**Literature-Grounded Discovery:**
+```bash
+perqed prompt="find a recent arXiv paper on spectral graph theory and conjecture an extension"
+```
+
+**Open-Ended Exploration:**
+```bash
+perqed prompt="is there a non-trivial relationship between the Riemann zeta function zeroes and random matrix theory that can be formally stated?"
+```
+
+#### CLI Flags for Autonomous Mode
+
+*   `--dry-run`
+    Executes the entire research pipeline—literature search, hypothesis generation, empirical sandboxing, and adversarial red-teaming—but **stops before attempting the formal Lean 4 proof**. Highly recommended for quickly evaluating the generated conjectures (usually completes in <1 minute) without burning MCTS compute time.
+    ```bash
+    perqed prompt="explore properties of strongly regular graphs" --dry-run
+    ```
+
+*   `--cross-pollinate`
+    Instructs the Architect agent to actively synthesize concepts from entirely distinct mathematical branches.
+    ```bash
+    perqed prompt="look at knot theory" --cross-pollinate
+    ```
+    If passed *without* a prompt, it defaults to a global discovery mission:
+    ```bash
+    perqed --cross-pollinate
+    ```
+
+### Classic Local Proof Engine (Backward Compatible)
+
+The classic mode bypasses the autonomous research front-end entirely. It sets up an empty workspace with an `objective.md` and attempts to prove it via the MCTS engine.
+
+*   **Mock Mode (No LLM, structural only):**
+    ```bash
+    perqed my_experiment_run
+    ```
+
+*   **Live Mode (Uses local Ollama models for tactics):**
+    ```bash
+    perqed my_experiment_run --live
+    ```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GEMINI_API_KEY` | **Required** for the autonomous pipeline and Architect escalation. | *None* |
+| `PERQED_WORKSPACE` | The root directory where research outputs and workspaces are saved. | `./agent_workspace` |
+| `OLLAMA_ENDPOINT` | The API endpoint for the local tactic generator. | `http://localhost:11434/api/chat` |
+| `OLLAMA_MODEL` | The model tag used by Ollama. | `qwen2.5-coder` |
 
 ## Model Stack
 
@@ -143,17 +212,25 @@ bun run src/cli.ts my_experiment_run --live
 ```
 perqed/
 ├── src/
-│   ├── orchestrator.ts           # Main proof loop (specialist routing + async batch)
-│   ├── tree.ts                   # ProofTree — AND/OR MCTS with value backpropagation
-│   ├── lean_bridge.ts            # Lean 4 subprocess + goal parsing
-│   ├── agents/                   # Router, formalist, conjecturer, scribe
-│   ├── math/optim/               # Shared SA framework (IState, SimulatedAnnealing)
-│   └── scripts/                  # CLI entry points
+│   ├── orchestration/              # XState v5 research state machine
+│   │   ├── machine.ts              # 10-state reactive machine
+│   │   ├── actors.ts               # 8 fromPromise actor wrappers
+│   │   ├── runner.ts               # Public API: runResearchMachine()
+│   │   └── types.ts                # Context, events, actor output types
+│   ├── orchestrator.ts             # MCTS proof loop (specialist routing + async batch)
+│   ├── tree.ts                     # ProofTree — AND/OR MCTS with value backpropagation
+│   ├── lean_bridge.ts              # Lean 4 subprocess + goal parsing
+│   ├── lean_ast_validator.ts       # Mathlib definition guardrail
+│   ├── solver.ts                   # Native SMT-LIB2 bridge (Z3)
+│   ├── agents/                     # Router, formalist, conjecturer, scribe, red_team
+│   ├── math/optim/                 # Shared SA framework (IState, SimulatedAnnealing)
+│   └── cli.ts                      # CLI entry point
 ├── projects/
-│   ├── torus-decomposition/      # Knuth m=4, m=6 — SA engine, Lean proofs, paper
-│   └── erdos-gyarfas/            # EG conjecture — graph search, Lean, Z3
-├── tests/                        # Core engine test suite (370 tests)
-└── website/                      # perqed.com (Astro)
+│   ├── torus-decomposition/        # Knuth m=4, m=6 — SA engine, Lean proofs, paper
+│   └── erdos-gyarfas/              # EG conjecture — graph search, Lean, Z3
+├── tests/
+│   └── orchestration/              # XState machine topology tests (8 tests)
+└── website/                        # perqed.com (Astro)
 ```
 
 

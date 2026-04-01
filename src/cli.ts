@@ -19,7 +19,7 @@ import { SolverBridge } from "./solver";
 import { LocalAgent, type LocalAgentConfig } from "./llm_client";
 import { ArchitectClient } from "./architect_client";
 import { runProverLoop } from "./orchestrator";
-import { ResearchDirector } from "./agents/research_director";
+import { runResearchMachine } from "./orchestration/runner";
 import type { AgentResponse, ArchitectResponse } from "./schemas";
 
 // ── Argument parsing ─────────────────────────────────────────────────────────
@@ -28,7 +28,6 @@ function parseArgs(): { prompt: string | null; runName: string; liveMode: boolea
   const args = process.argv.slice(2);
 
   const dryRun = args.includes("--dry-run");
-
   const crossPollinate = args.includes("--cross-pollinate");
 
   // Look for prompt="..." or prompt=...
@@ -60,13 +59,13 @@ async function main() {
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║         🔬 Perqed Proof Engine           ║");
-  console.log("║    Neuro-Symbolic Orchestration v2.0.0   ║");
+  console.log("║    Neuro-Symbolic Orchestration v3.0.0   ║");
   console.log("╚══════════════════════════════════════════╝");
   console.log(`\n  Workspace: ${workspaceBase}`);
 
-  // ── Research pipeline mode ────────────────────────────────────────────────
+  // ── Research pipeline mode (XState v5) ──────────────────────────────────
   if (prompt) {
-    console.log(`  Mode:      🤖 AUTONOMOUS RESEARCH PIPELINE\n`);
+    console.log(`  Mode:      🤖 AUTONOMOUS RESEARCH PIPELINE (XState v5)\n`);
 
     const geminiKey = process.env["GEMINI_API_KEY"];
     if (!geminiKey) {
@@ -75,23 +74,15 @@ async function main() {
       process.exit(1);
     }
 
-    const director = new ResearchDirector({
+    const result = await runResearchMachine(prompt, {
       apiKey: geminiKey,
       workspaceDir: workspaceBase,
-      domainDepth: 7,
-      attemptProof: !dryRun,
       verbose: true,
-      crossPollinate,
     });
 
-    const result = await director.run(prompt);
-
-    console.log("\n  📁 Artifacts written to:", result.outputDir);
-    console.log("     research_plan.json  — seed paper + domains");
-    console.log("     evidence_report.json — empirical investigation results");
-    console.log("     conjectures.json    — generated Lean 4 candidates");
-    console.log("     red_team_history.json — audit trail");
-    console.log("     summary.md          — human-readable summary");
+    console.log(`\n  📁 Artifacts written to: ${result.outputDir}`);
+    console.log(`  🏁 Final state: ${result.finalState}`);
+    console.log(`  📊 Proof status: ${result.proofStatus}`);
     if (result.proofStatus === "PROVED") {
       console.log("     proof/              — verified Lean 4 proof ✅");
     }

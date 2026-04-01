@@ -16,9 +16,31 @@ export interface SolverResult {
 
 export class SolverBridge {
   private readonly pythonBinary: string;
+  private readonly smtBinary: string;
 
-  constructor(pythonBinary: string = "python3") {
+  constructor(pythonBinary: string = "python3", smtBinary: string = "z3") {
     this.pythonBinary = pythonBinary;
+    this.smtBinary = smtBinary;
+  }
+
+  /**
+   * Execute a Z3 SMT-LIB2 script in an isolated subprocess natively.
+   */
+  async runZ3SMT(smtCode: string, timeoutMs: number = 30_000): Promise<SolverResult> {
+    const tempFile = join(tmpdir(), `perqed_z3_${randomUUID()}.smt2`);
+    await Bun.write(tempFile, smtCode);
+
+    try {
+      return await this.executeWithTimeout(this.smtBinary, ["-smt2", tempFile], timeoutMs);
+    } finally {
+      Bun.file(tempFile)
+        .exists()
+        .then((exists) => {
+          if (exists) {
+            import("node:fs/promises").then((fs) => fs.unlink(tempFile).catch(() => {}));
+          }
+        });
+    }
   }
 
   /**
@@ -35,7 +57,7 @@ export class SolverBridge {
     await Bun.write(tempFile, pythonCode);
 
     try {
-      return await this.executeWithTimeout(tempFile, timeoutMs);
+      return await this.executeWithTimeout(this.pythonBinary, [tempFile], timeoutMs);
     } finally {
       // Clean up temp file — fire and forget
       Bun.file(tempFile)
@@ -49,13 +71,14 @@ export class SolverBridge {
   }
 
   /**
-   * Spawn the Python process with timeout enforcement.
+   * Spawn the process with timeout enforcement.
    */
   private async executeWithTimeout(
-    scriptPath: string,
+    bin: string,
+    args: string[],
     timeoutMs: number,
   ): Promise<SolverResult> {
-    const proc = Bun.spawn([this.pythonBinary, scriptPath], {
+    const proc = Bun.spawn([bin, ...args], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -102,3 +125,4 @@ export class SolverBridge {
     };
   }
 }
+
