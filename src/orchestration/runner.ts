@@ -27,10 +27,16 @@ export async function runResearchMachine(
 
   const verbose = config.verbose ?? true;
 
+  if (verbose) {
+    console.log(`  Target: "${prompt}"`);
+    console.log(`  Output: ${outputDir}`);
+  }
+
   const actor = createActor(researchMachine);
 
   // Track visited states for diagnostics
   const visitedStates: string[] = [];
+  let currentState = "Idle";
 
   actor.subscribe((snapshot) => {
     const stateValue = snapshot.value as string;
@@ -38,22 +44,20 @@ export async function runResearchMachine(
       visitedStates.push(stateValue);
     }
 
-    if (verbose) {
+    if (verbose && stateValue !== currentState) {
+      currentState = stateValue;
       const ctx = snapshot.context;
       const prefix = getStateEmoji(stateValue);
-      console.log(`${prefix} [${stateValue}] retries: idea=${ctx.ideationRetries} proof=${ctx.proofRetries}`);
+      let retrySuffix = "";
+      if (ctx.ideationRetries > 0 || ctx.proofRetries > 0) {
+        retrySuffix = `  [Retries: idea=${ctx.ideationRetries} proof=${ctx.proofRetries}]`;
+      }
+      console.log(`\n\n  ${prefix} ${stateValue.toUpperCase()} ${retrySuffix}`);
+      console.log(`  ${"─".repeat(50)}\n`);
     }
   });
 
   actor.start();
-
-  if (verbose) {
-    console.log(`\n${"═".repeat(60)}`);
-    console.log(`  🔬 Perqed v3.0 — XState Research Machine`);
-    console.log(`  Prompt: "${prompt}"`);
-    console.log(`  Output: ${outputDir}`);
-    console.log(`${"═".repeat(60)}\n`);
-  }
 
   // Send the START event with runtime config
   actor.send({

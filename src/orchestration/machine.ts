@@ -260,9 +260,11 @@ export const researchMachine = setup({
       proofStatus: "FAILED" as const,
     }),
     logTransition: ({ context, event }) => {
-      console.log(
-        `🔄 [Machine] Event: ${event.type} | Retries: idea=${context.ideationRetries} proof=${context.proofRetries}`,
-      );
+      if (process.env.DEBUG) {
+        console.log(
+          `🔄 [Machine] Event: ${event.type} | Retries: idea=${context.ideationRetries} proof=${context.proofRetries}`,
+        );
+      }
     },
   },
 }).createMachine({
