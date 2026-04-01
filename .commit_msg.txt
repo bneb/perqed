@@ -1,9 +1,0 @@
-arch: upgrade research director to xstate v5 reactive machine
-
-- Replace procedural ResearchDirector pipeline with a robust 10-state DAG
-- Implement 8 strict type-safe fromPromise actors wrapping existing agents
-- Ensure full event & context type safety via ResearchEvent & ResearchContext
-- Add 8 topology tests covering happy path, red team retries, plateaus, and error forks (8/8 passing)
-- Remove `--xstate` CLI flag; making v3 the global default route
-- Hook up single entry point `perqed` via npm link bin
-- Overhaul README with v3.0 architecture, diagram, and exhaustive CLI documentation

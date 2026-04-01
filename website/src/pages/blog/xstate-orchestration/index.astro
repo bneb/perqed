@@ -1,0 +1,123 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>Procedural <code>await</code> chains are fine if you’re casually scripting a weekend project. But if you’re orchestrating an autonomous mathematical research lab, they’re a liability.</p>
+
+<p>The original orchestration layer of Perqed was a monolithic, 463-line class filled with deeply nested <code>while</code> loops, brittle prompt injection, and ad-hoc error recovery. Sure, it got the job done, but it was tedious to maintain and essentially impossible to formally verify. When you're running neuro-symbolic Monte Carlo Tree Search against the Lean 4 kernel, building your orchestration layer on top of spaghetti code shouldn't be the bottleneck.</p>
+
+<h2>The Obvious Solution: Reactive XState v5</h2>
+
+<p>The fix was trivial, really: we just ripped out the procedural logic entirely and replaced it with a strictly typed, 10-state reactive state machine using <strong>XState v5</strong>.</p>
+
+<p>Instead of a tangled web of asynchronous calls, the entire research lifecycle—from literature ideation to empirical sandboxing, SMT-LIB2 resolution, and formal verification—is now a clean, mathematical Directed Acyclic Graph (DAG).</p>
+
+<h2>Actor-Model Purity</h2>
+
+<p>We neatly wrapped the existing agents into 8 isolated <code>fromPromise</code> actors. The actors hold zero mutable state. They simply receive structured inputs and return typed outputs, letting the state machine handle the transition logic completely detached from the agents themselves.</p>
+
+<p>Need to handle a hallucinated Lean 4 syntax tree? Expected. The <code>Validation</code> actor throws, the machine catches it, increments a strongly-typed <code>ideaRetries</code> counter, and gracefully cycles back to the <code>Ideation</code> node. No sweat.</p>
+
+<p>If the Empirical Sandbox detects a structural plateau instead of a clean counter-example, the state machine effortlessly routes the context to the <code>SMT_Resolution</code> node to query Z3 before it even thinks about escalating back to Lean. It's fully deterministic by design.</p>
+
+<h2>TDD Topology Verification</h2>
+
+<p>Because the orchestration is now represented as pure state transitions, testing it was almost too easy. We spun up an 8-test suite using Bun and XState's <code>.provide()</code> API to inject mocked actors without spinning up expensive LLMs.</p>
+
+<p>We completely verified the 10-state topology—mapping the happy paths, falsification forks, plateaus, and terminal failure states—in exactly 95 milliseconds with zero API calls. 8 topology bounds checked. 8 tests green.</p>
+
+<p>The Mathematician is no longer just in the box. Now it’s running on a mathematically sound, self-healing track.</p>
+`;
+---
+
+<BaseLayout title="Reactive Math: Migrating Perqed to XState v5 — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>March 31, 2026</time>
+            <span class="sep">·</span>
+            <span>3 min read</span>
+          </div>
+          <h1>Reactive Math: Migrating Perqed's Core to XState v5</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    margin: 24px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .article :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+
+  .article :global(th) {
+    text-align: left;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+
+  .article :global(td) {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+  }
+
+  .article :global(tr:last-child td) {
+    border-bottom: none;
+  }
+
+  @media (max-width: 640px) {
+    .article { padding: 32px 0 48px; }
+
+    .article :global(table) {
+      font-size: 0.8rem;
+    }
+
+    .article :global(th),
+    .article :global(td) {
+      padding: 8px 10px;
+    }
+  }
+</style>
