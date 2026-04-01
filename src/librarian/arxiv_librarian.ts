@@ -170,7 +170,19 @@ export class ArxivLibrarian {
     const queryVector = await this.embedder.embed(query);
     if (queryVector.length === 0) return [];
     
-    return this.db.search(queryVector, options.limit ?? 5);
+    // Over-fetch to allow deduplication of repeated papers in the db
+    const rawResults = await this.db.search(queryVector, (options.limit ?? 5) * 5);
+    
+    const unique = [];
+    const seen = new Set<string>();
+    for (const r of rawResults) {
+      if (!seen.has(r.id)) {
+        seen.add(r.id);
+        unique.push(r);
+      }
+    }
+    
+    return unique.slice(0, options.limit ?? 5);
   }
 
   // ── Private ──────────────────────────────────────────────────────────────
