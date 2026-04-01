@@ -32,7 +32,8 @@ export class IdeatorAgent {
 
     // 2. Query top matches using the cleaned keyword
     const searchResults = await librarian.searchDatabase(parsedQuery, { limit: 10 });
-    const randomIndex = Math.floor(Math.random() * Math.max(1, searchResults.length));
+    const poolSize = Math.min(3, searchResults.length);
+    const randomIndex = Math.floor(Math.random() * Math.max(1, poolSize));
     const seedPaper = searchResults[randomIndex];
 
     const arxivId = seedPaper?.id?.replace("arxiv-", "") || "0000.00000";
