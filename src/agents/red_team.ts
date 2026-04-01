@@ -55,12 +55,16 @@ export class RedTeamAuditor {
 
       if (result.verdict === "APPROVE" || result.verdict === "REJECT") {
         console.log(`[RedTeam] Round ${round} verdict: ${result.verdict}`);
+        if (result.verdict === "REJECT") {
+          console.log(`[RedTeam] Rationale: ${result.rationale}`);
+        }
         return { final: result, history };
       }
 
       // WEAKEN: update conjecture with the suggested revision
       if (result.suggested_revision) {
         console.log(`[RedTeam] Round ${round} verdict: WEAKEN → revising conjecture...`);
+        console.log(`[RedTeam] Rationale: ${result.rationale}`);
         current = {
           signature: result.suggested_revision,
           description: `Revised (round ${round}): ${result.rationale}`,

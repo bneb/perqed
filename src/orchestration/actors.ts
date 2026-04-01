@@ -100,7 +100,6 @@ export const ideationActor = fromPromise<IdeationOutput, IdeationInput>(
       dbPath: `${input.workspaceDir}/lancedb`,
     });
     const libResult = await librarian.run();
-    console.log(`[Ideation] Ingested ${libResult.ingested} papers`);
 
     // 2. Query top matches
     const searchResults = await librarian.searchDatabase(input.prompt, { limit: 10 });
@@ -110,6 +109,19 @@ export const ideationActor = fromPromise<IdeationOutput, IdeationInput>(
     const arxivId = seedPaper?.id?.replace("arxiv-", "") || "0000.00000";
     const title = seedPaper?.paperTitle || "Fallback Title";
     const abstract = seedPaper?.paperAbstract || "Fallback Abstract";
+
+    if (searchResults.length > 0) {
+      console.log(`[Librarian] Top matches:`);
+      searchResults.slice(0, 3).forEach((p, idx) => {
+        const idStr = p.id?.replace("arxiv-", "") || "unknown";
+        console.log(`  ${idx + 1}. "${p.paperTitle || "No Title"}" (arxiv:${idStr})`);
+      });
+      console.log(`[Ideation] Selected Seed: "${title}"`);
+    } else {
+      console.log(`[Ideation] No literature matches found. Generating from scratch.`);
+    }
+
+    console.log(`[Ideation] Synthesizing strategy...`);
 
     // 3. Build plan via Gemini
     let historyFeedback = "";
@@ -180,6 +192,8 @@ ${historyFeedback}`;
       ? "KNOWN_THEOREM" as const
       : "NOVEL_DISCOVERY" as const;
 
+    console.log(`[Ideation] Strategy formulated: ${(raw.extension_hypothesis || "No hypothesis").split('\n')[0]?.substring(0, 100) ?? ""}...`);
+
     return {
       classification,
       hypothesis: raw.extension_hypothesis,
@@ -207,14 +221,18 @@ export const validationActor = fromPromise<ValidationOutput, ValidationInput>(
     const { LeanASTValidator } = await import("../lean_ast_validator");
     const validator = new LeanASTValidator();
 
+    console.log(`[Validation] Checking AST syntax for target: ${(input.hypothesis || "").split('\n')[0]?.substring(0, 100) ?? ""}`);
+
     // Build a minimal Lean source from the hypothesis
     const leanSource = `import Mathlib\n\n${input.hypothesis}\n`;
     const result = validator.validate(leanSource);
 
     if (!result.isValid) {
+      console.log(`[Validation] ERROR: Hypothesis contains invalid Lean 4 syntax or synthetic definitions.`);
       throw new Error(result.error);
     }
 
+    console.log(`[Validation] AST syntactically valid in Lean 4.`);
     return { isValid: true as const, ast: { hypothesis: input.hypothesis } };
   },
 );
@@ -234,11 +252,21 @@ export const sandboxActor = fromPromise<SandboxOutput, SandboxInput>(
     const { ConjecturerAgent } = await import("../agents/conjecturer");
     const { RedTeamAuditor } = await import("../agents/red_team");
 
+    console.log(`[Explorer] Probing domains: ${(input.domains || []).slice(0, 5).join(", ")}...`);
+
     const explorer = new ExplorerAgent({ apiKey: input.apiKey });
     const evidence = await explorer.investigate(
       input.hypothesis,
       input.domains,
     );
+
+    if (evidence.kills.length > 0) {
+      console.log(`[Explorer] Signal: COUNTER-EXAMPLE FOUND (${evidence.kills.length} counter-examples)`);
+      console.log(`[Explorer] Result: The hypothesized bound failed.`);
+    } else {
+      console.log(`[Explorer] Signal: NO COUNTER-EXAMPLES (Plateau/Witness)`);
+      console.log(`[Explorer] Anomalies found: ${evidence.anomalies.length}`);
+    }
 
     // Classify the signal
     if (evidence.kills.length > 0) {
