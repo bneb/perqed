@@ -1,0 +1,134 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>In our last update, we successfully purged 55GB of duplicate memory bloat by fundamentally re-architecting how our isolated execution agents access the Lean 4 <code>Mathlib</code> environment. By substituting local, per-run file cloning with global <strong>Bubblewrap (<code>bwrap</code>) read-only mounts</strong>, we built an engine that enjoys absolute filesystem zero-copy compilation without sacrificing a shred of sandbox containment.</p>
+
+<p>Immediately after deploying our new <code>agency.json</code> Registry topology (migrating our core reasoning to <code>deepseek-r1:8b</code> mapped alongside <code>qwen2.5-coder</code>), we pointed the <code>Librarian</code> directly at a tactical configuration hypothesis: <a href="https://arxiv.org/abs/2603.24439">arxiv:2603.24439</a> ("Distributionally balanced sampling designs via minimum tactical configurations").</p>
+
+<h2>The Autopilot Falsification Run</h2>
+
+<p>What unfolded was a spectacular display of automated neuro-symbolic resilience.</p>
+
+<p>Instead of naively assuming the paper's tactical configurations were globally solvable and immediately bashing its head against Lean 4, the <code>Explorer</code> agent intelligently synthesized Empirical Python Probes spanning 7 discrete mathematical domains (Probability Theory, Combinatorics, Mathematical Optimization, etc).</p>
+
+<p>These Python scripts executed asynchronously simultaneously inside the secure sandbox execution nodes. Within minutes, the <code>Explorer</code> reported a fatal result back to the orchestration bus: <strong>"Signal: COUNTER-EXAMPLE FOUND (6 counter-examples) — The hypothesized bound failed."</strong></p>
+
+<h2>Enter The Red Team</h2>
+
+<p>Instead of halting, the XState orchestration successfully caught the failure token and seamlessly pivoted down the Falsification Fork. The 6 counter-examples were routed into our <code>RedTeam</code> verification model, which essentially acts as our digital Reviewer 2.</p>
+
+<p>The <code>RedTeam</code> ruthlessly audited the scripts, confirmed the boundaries were unequivocally broken, and passed down an <code>APPROVE</code> verdict for formal submission.</p>
+
+<h2>Abstracting to Lean: The Push-Negation Tactic</h2>
+
+<p>This is where the true sophistication of the updated neuro-symbolic pipeline shined.</p>
+
+<p>The <code>ARCHITECT</code> (running high-latency <code>gemini-2.5-flash</code> logic) stepped in to command the Lean 4 synthesis. Rather than just asking the `FormalistAgent` to prove the falsification blindly, the <code>ARCHITECT</code> recognized the structural logic of what a computational counter-example represents: the explicit negation of an existential statement.</p>
+
+<p>The <code>ARCHITECT</code> generated profound strategic directives:</p>
+<blockquote>
+"The theorem is a negation of an existential statement. Applying <code>push_neg</code> will transform <code>¬(∃ x)</code> into a clean universal quantifier, enabling <code>rcases</code> structural destruction..."
+</blockquote>
+
+<p>Following orders, our <code>FormalistAgent</code> rapidly translated the strategy into valid Lean 4 tactics (<code>intro h; rcases h with ⟨F, _, _ ,_⟩ simp [Finset.card] at *</code>) and pumped them natively into the read-only Sandbox compile pipeline at zero-latency.</p>
+
+<h2>The Takeaway</h2>
+
+<p>The engine eventually stopped the search with a safe <code>SKIPPED</code> plateau marker (likely hitting the cyclic depth boundary during compilation tracking). But the fact remains: the neuro-symbolic pipeline can now ingest a raw ArXiv URL, heuristically determine it's unprovable, generate empirical adversarial sub-scripts to extract the failure manifold, route that through an independent `RedTeam` auditor, and generate high-level structural Lean 4 <code>push_neg</code> directives.</p>
+
+<p>The engine isn't just proving things anymore. It's defending itself.</p>
+`;
+---
+
+<BaseLayout title="Zero-Copy Tactical Reasoning: A Falsification Case Study — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>April 2, 2026</time>
+            <span class="sep">·</span>
+            <span>4 min read</span>
+          </div>
+          <h1>Zero-Copy Tactical Reasoning: A Falsification Case Study</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    margin: 24px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .article :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+
+  .article :global(th) {
+    text-align: left;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+
+  .article :global(td) {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+  }
+
+  .article :global(tr:last-child td) {
+    border-bottom: none;
+  }
+
+  @media (max-width: 640px) {
+    .article { padding: 32px 0 48px; }
+
+    .article :global(table) {
+      font-size: 0.8rem;
+    }
+
+    .article :global(th),
+    .article :global(td) {
+      padding: 8px 10px;
+    }
+  }
+</style>
