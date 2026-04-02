@@ -21,6 +21,8 @@ import type {
   ScribeOutput,
 } from "./types";
 import type { ResearchPlan, EvidenceReport, RedTeamResult } from "../agents/research_types";
+import type { AgentRole, AttemptLog } from "../types";
+import type { ProofTree } from "../tree";
 
 // ──────────────────────────────────────────────
 // Actor Input Types
@@ -32,6 +34,7 @@ export interface IdeationInput {
   apiKey: string;
   workspaceDir: string;
   lastValidationError: string | null;
+  publishableMode: boolean;
 }
 
 export interface ValidationInput {
@@ -60,6 +63,17 @@ export interface LeanInput {
   conjecture: { signature: string; description: string };
   outputDir: string;
   apiKey: string;
+  role: AgentRole;
+  attemptLogs: AttemptLog[];
+  lastTacticState: string;
+  proofTree: ProofTree | null;
+}
+
+export interface TacticExecutionInput {
+  tactic: string;
+  signature: string;
+  theoremName: string;
+  outputDir: string;
 }
 
 export interface ErrorCorrectionInput {
@@ -90,7 +104,7 @@ export const ideationActor = fromPromise<IdeationOutput, IdeationInput>(
   async ({ input }) => {
     const { IdeatorAgent } = await import("../agents/ideation");
     const ideator = new IdeatorAgent(input.apiKey, input.workspaceDir);
-    return await ideator.ideate(input.prompt, input.lastValidationError);
+    return await ideator.ideate(input.prompt, input.lastValidationError, input.publishableMode);
   },
 );
 
@@ -267,65 +281,64 @@ export const falsificationActor = fromPromise<FalsificationOutput, Falsification
   },
 );
 
-// ──────────────────────────────────────────────
-// 6. Lean Actor
-// ──────────────────────────────────────────────
+/**
+ * Tactic Generator Actor — specialized for the Specialist Roster.
+ */
+export const tacticGeneratorActor = fromPromise<any, LeanInput>(
+  async ({ input }) => {
+    const { AgentFactory } = await import("../agents/factory");
+    const { AgentRouter } = await import("../agents/router");
+    const { buildRoutingSignals, buildSlimContext } = await import("../orchestrator");
+
+    const factory = new AgentFactory({ geminiApiKey: input.apiKey });
+    
+    const signals = buildRoutingSignals(input.attemptLogs, input.lastTacticState, false); 
+    // Note: directive handling will be added to context
+    
+    // If we have a tree, use it for global signals
+    if (input.proofTree) {
+       // @ts-ignore (Accessing internal tree health)
+       signals.globalFailures = input.proofTree.getGlobalTreeFailures();
+    }
+
+    const role = AgentRouter.determineNextAgent(signals);
+    const agent = factory.getAgent(role, signals);
+
+    let context: string;
+    if (role === "TACTICIAN") {
+      context = buildSlimContext("approved_conjecture", input.conjecture.signature, input.attemptLogs.at(-1)?.error);
+    } else if (role === "ARCHITECT") {
+      context = (input.proofTree as any)?.buildFrontierDigest() ?? "";
+      context += `\n## Theorem: approved_conjecture ${input.conjecture.signature}`;
+    } else {
+      context = `## Theorem: approved_conjecture ${input.conjecture.signature}\n\n## Recent Failures:\n` + 
+                input.attemptLogs.filter(l => !l.success).slice(-3).map(l => `- ${l.error}`).join("\n");
+    }
+
+    const response = await agent.generateMove(context);
+    return { role, response };
+  }
+);
 
 /**
- * Wraps the existing runDynamicLoop() as a black-box sub-actor.
+ * Lean Verification Actor — runs the actual compiler.
  */
-export const leanActor = fromPromise<LeanOutput, LeanInput>(
+export const leanVerificationActor = fromPromise<any, TacticExecutionInput>(
   async ({ input }) => {
-    try {
-      const { WorkspaceManager } = await import("../workspace");
-      const { SolverBridge } = await import("../solver");
-      const { runDynamicLoop } = await import("../orchestrator");
-      const { AgentFactory } = await import("../agents/factory");
-      const { LeanBridge } = await import("../lean_bridge");
+    const { LeanBridge } = await import("../lean_bridge");
+    const { WorkspaceManager } = await import("../workspace");
 
-      const workspace = new WorkspaceManager(input.outputDir, "proof");
-      await workspace.init();
+    const bridge = new LeanBridge(undefined, input.outputDir);
+    
+    const result = await bridge.checkProof(
+      input.theoremName,
+      input.signature,
+      [input.tactic],
+      60_000
+    );
 
-      const objectiveContent = `# Research Director Objective\n\n${input.conjecture.description}\n\n## Lean 4 Target\n\n\`\`\`lean\n${input.conjecture.signature}\n\`\`\`\n`;
-      await Bun.write(workspace.paths.objective, objectiveContent);
-
-      const solver = new SolverBridge();
-      const leanProjectRoot = input.outputDir.split("/runs/")?.[0] ?? input.outputDir;
-
-      const result = await runDynamicLoop(workspace, solver, {
-        leanBridge: new LeanBridge(undefined, leanProjectRoot),
-        theoremName: "approved_conjecture",
-        theoremSignature: input.conjecture.signature,
-        agentFactory: new AgentFactory({ geminiApiKey: input.apiKey }),
-        maxGlobalIterations: 15,
-      });
-
-      if (result.status === "SOLVED") {
-        const solutionFile = Bun.file(workspace.paths.proofSolution);
-        const proof = (await solutionFile.exists())
-          ? await solutionFile.text()
-          : input.conjecture.signature;
-
-        return {
-          status: "PROOF_COMPLETE" as const,
-          proof,
-          error: null,
-        };
-      }
-
-      return {
-        status: "COMPILER_ERROR" as const,
-        proof: null,
-        error: "MCTS budget exhausted without proof",
-      };
-    } catch (err: any) {
-      return {
-        status: "COMPILER_ERROR" as const,
-        proof: null,
-        error: err.message,
-      };
-    }
-  },
+    return result;
+  }
 );
 
 // ──────────────────────────────────────────────
@@ -338,6 +351,7 @@ export const leanActor = fromPromise<LeanOutput, LeanInput>(
 export const errorCorrectionActor = fromPromise<ErrorCorrectionOutput, ErrorCorrectionInput>(
   async ({ input }) => {
     const { GoogleGenAI } = await import("@google/genai");
+    const { getAgencyRegistry } = await import("../agency");
     const ai = new GoogleGenAI({ apiKey: input.apiKey });
 
     const prompt = `The following Lean 4 theorem failed to compile:
@@ -350,7 +364,7 @@ ${input.compilerTrace}
 Suggest a corrected tactic sequence that fixes this specific error. Output ONLY the corrected tactic(s), no explanation.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: getAgencyRegistry().resolveProvider("formalization").model,
       contents: prompt,
       config: { temperature: 0.3 },
     });

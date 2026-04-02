@@ -1307,7 +1307,46 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 try {
                   const { runZ3Repair } = await import("../search/z3_partition_repair");
                   const solver = new (await import("../solver")).SolverBridge();
-                  const z3Result = await runZ3Repair(saResult.partition, domainSize, numPartitions, solver);
+                  
+                  // Generic conflict detector for Z3 repair
+                  const conflictDetector = (p: Int8Array, N: number) => {
+                    const conflicts: number[][] = [];
+                    if (energyTarget === "vdw") {
+                      const k = apLength || 3;
+                      for (let a = 1; a <= N; a++) {
+                        for (let d = 1; a + (k - 1) * d <= N; d++) {
+                          const ap = Array.from({ length: k }, (_, i) => a + i * d);
+                          if (p[a] === -1) {
+                            conflicts.push(ap);
+                          } else {
+                            const c = p[a];
+                            if (c !== -1 && ap.every(idx => p[idx] === c)) {
+                              conflicts.push(ap);
+                            }
+                          }
+                        }
+                      }
+                    } else {
+                      // Default to Schur (Sum-Free)
+                      for (let x = 1; x <= N; x++) {
+                        for (let y = x; y <= N; y++) {
+                          const z = x + y;
+                          if (z > N) break;
+                          if (p[x] === -1) {
+                            conflicts.push([x, y, z]);
+                          } else {
+                            const c = p[x];
+                            if (c !== -1 && p[y] === c && p[z] === c) {
+                              conflicts.push([x, y, z]);
+                            }
+                          }
+                        }
+                      }
+                    }
+                    return conflicts;
+                  };
+
+                  const z3Result = await runZ3Repair(saResult.partition, domainSize, numPartitions, solver, conflictDetector);
 
                   if (z3Result.solved && z3Result.partition) {
                     console.log(`   ✅ [Z3Repair] Z3 found a valid repair! E=0 witness.`);

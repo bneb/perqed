@@ -12,6 +12,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { existsSync } from "node:fs";
 import { orchestratedSearch, type OrchestratedSearchConfig } from "../search/ramsey_orchestrator";
+import { getAgencyRegistry } from "../agency";
 
 // ── Defaults ───────────────────────────────────────────────────────────────
 
@@ -113,7 +114,7 @@ export class AutoCurriculumDaemon {
   constructor(config: DaemonConfig) {
     this.config = {
       apiKey: config.apiKey,
-      model: config.model ?? "gemini-2.5-pro",
+      model: config.model ?? getAgencyRegistry().resolveProvider("reasoning").model,
       baseUrl: config.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta",
       verifiedLibDir: config.verifiedLibDir ?? "verified_lib",
       daemonSleepMs: config.daemonSleepMs ?? DAEMON_SLEEP_MS,

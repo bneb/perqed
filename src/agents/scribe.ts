@@ -8,12 +8,15 @@
 import { GoogleGenAI } from "@google/genai";
 import type { ProofNode } from "../tree";
 import type { ResearchPlan, EvidenceReport, RedTeamResult } from "./research_types";
+import { getAgencyRegistry } from "../agency";
 
 export class ScribeAgent {
   private ai: GoogleGenAI;
+  private model: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, model?: string) {
     this.ai = new GoogleGenAI({ apiKey });
+    this.model = model ?? getAgencyRegistry().resolveProvider("latex").model;
   }
 
   /**
@@ -79,7 +82,7 @@ Status: ${proofStatus}
 ${proofSection}`;
 
     const response = await this.ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: this.model,
       contents: prompt,
       config: {
         systemInstruction:

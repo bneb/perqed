@@ -21,25 +21,27 @@ import { ArchitectClient } from "./architect_client";
 import { runProverLoop } from "./orchestrator";
 import { runResearchMachine } from "./orchestration/runner";
 import type { AgentResponse, ArchitectResponse } from "./schemas";
+import { getAgencyRegistry } from "./agency";
 
 // ── Argument parsing ─────────────────────────────────────────────────────────
 
-function parseArgs(): { prompt: string | null; runName: string; liveMode: boolean; dryRun: boolean; crossPollinate: boolean } {
+function parseArgs(): { prompt: string | null; runName: string; liveMode: boolean; dryRun: boolean; crossPollinate: boolean; publishable: boolean } {
   const args = process.argv.slice(2);
 
   const dryRun = args.includes("--dry-run");
   const crossPollinate = args.includes("--cross-pollinate");
+  const publishable = args.includes("--publishable");
 
   // Look for prompt="..." or prompt=...
   const promptArg = args.find((a) => a.startsWith("prompt="));
   if (promptArg) {
     const prompt = promptArg.slice("prompt=".length).replace(/^["']|["']$/g, "");
-    return { prompt, runName: "research", liveMode: true, dryRun, crossPollinate };
+    return { prompt, runName: "research", liveMode: true, dryRun, crossPollinate, publishable };
   }
 
   // If the user just typed `perqed --cross-pollinate` without a prompt, supply a global discovery prompt
   if (crossPollinate && !promptArg) {
-    return { prompt: "Discover a profound, novel mathematical synthesis between distinct domains", runName: "research", liveMode: true, dryRun, crossPollinate };
+    return { prompt: "Discover a profound, novel mathematical synthesis between distinct domains", runName: "research", liveMode: true, dryRun, crossPollinate, publishable };
   }
 
   return {
@@ -48,6 +50,7 @@ function parseArgs(): { prompt: string | null; runName: string; liveMode: boolea
     liveMode: args.includes("--live"),
     dryRun,
     crossPollinate,
+    publishable,
   };
 }
 
@@ -55,7 +58,7 @@ function parseArgs(): { prompt: string | null; runName: string; liveMode: boolea
 
 async function main() {
   const workspaceBase = process.env["PERQED_WORKSPACE"] ?? "./agent_workspace";
-  const { prompt, runName, liveMode, dryRun, crossPollinate } = parseArgs();
+  const { prompt, runName, liveMode, dryRun, crossPollinate, publishable } = parseArgs();
 
   console.log("╔══════════════════════════════════════════╗");
   console.log("║         🔬 Perqed Proof Engine           ║");
@@ -78,6 +81,7 @@ async function main() {
       apiKey: geminiKey,
       workspaceDir: workspaceBase,
       verbose: true,
+      publishableMode: publishable,
     });
 
     console.log(`\n  📁 Artifacts written to: ${result.outputDir}`);
@@ -115,9 +119,10 @@ async function main() {
   };
 
   if (liveMode) {
+    const defaultLocal = getAgencyRegistry().resolveProvider("lean4", true);
     const agentConfig: LocalAgentConfig = {
-      endpoint: process.env["OLLAMA_ENDPOINT"] ?? "http://localhost:11434/api/chat",
-      model: process.env["OLLAMA_MODEL"] ?? "qwen2.5-coder",
+      endpoint: process.env["OLLAMA_ENDPOINT"] ?? defaultLocal.endpoint ?? "http://localhost:11434/api/chat",
+      model: process.env["OLLAMA_MODEL"] ?? defaultLocal.model,
       temperature: 0.2,
     };
 
@@ -128,8 +133,9 @@ async function main() {
 
     const geminiKey = process.env["GEMINI_API_KEY"];
     if (geminiKey) {
-      const architect = new ArchitectClient({ apiKey: geminiKey, model: "gemini-2.5-pro" });
-      console.log("  🏛️  Architect:   Gemini 2.5 Pro (escalation enabled)\n");
+      const architectModel = getAgencyRegistry().resolveProvider("reasoning").model;
+      const architect = new ArchitectClient({ apiKey: geminiKey, model: architectModel });
+      console.log(`  🏛️  Architect:   ${architectModel} (escalation enabled)\n`);
 
       await runProverLoop(workspace, solver, config, undefined, async (labLog, progress) => {
         const context = `## LAB LOG\n${labLog}\n\n## CURRENT PROGRESS\n${progress}`;

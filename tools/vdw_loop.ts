@@ -1,5 +1,5 @@
 import { writeFileSync, appendFileSync, existsSync, mkdirSync } from "fs";
-import { execSync } from "child_process";
+import { execFileSync } from "node:child_process";
 import {
   computeAPEnergy,
   computeAPDelta,
@@ -179,7 +179,7 @@ function tryZ3Repair(partition: Int8Array): Int8Array | null {
   const scriptPath = "/tmp/vdw_z3_repair.py";
   writeFileSync(scriptPath, script);
   try {
-    const out = execSync(`python3 ${scriptPath}`, { timeout: 60_000 }).toString();
+    const out = execFileSync("python3", [scriptPath], { timeout: 60_000 }).toString();
     if (out.includes("sat") && !out.includes("unsat")) {
       const repaired = new Int8Array(partition);
       for (const line of out.split("\n")) {

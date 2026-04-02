@@ -26,7 +26,7 @@ import { runSphericalGradientDescent } from "../src/search/spherical_relaxation"
 import { TheoremGraph } from "../src/proof_dag/theorem_graph";
 import { SurrogateClient } from "../src/search/surrogate_client";
 import { BridgeLearner, discreteSchurEnergy } from "../src/search/bridge_learner";
-import { execSync } from "child_process";
+import { execFileSync } from "node:child_process";
 import { writeFileSync, appendFileSync } from "fs";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -58,6 +58,33 @@ function computeEnergy(p: Int8Array): number {
     }
   return E;
 }
+
+function getSchurConflicts(p: Int8Array, domN: number): number[][] {
+  const conflicts: number[][] = [];
+  for (let x = 1; x <= domN; x++) {
+    for (let y = x; y <= domN; y++) {
+      const z = x + y;
+      if (z > domN) break;
+      if (p[x] === p[y] && p[y] === p[z]) {
+        conflicts.push([x, y, z]);
+      }
+    }
+  }
+  return conflicts;
+}
+
+function getAllSchurConflicts(domN: number): number[][] {
+  const conflicts: number[][] = [];
+  for (let x = 1; x <= domN; x++) {
+    for (let y = x; y <= domN; y++) {
+      const z = x + y;
+      if (z > domN) break;
+      conflicts.push([x, y, z]);
+    }
+  }
+  return conflicts;
+}
+
 
 function saveWitness(partition: Int8Array, round: number, label = "witness"): void {
   const colorClasses: number[][] = Array.from({ length: K }, () => []);
@@ -122,9 +149,10 @@ function emitSurrogateExperience(partition: Int8Array, energy: number): void {
 
 // Z3 repair
 function runZ3Repair(partition: Int8Array, round: number, label: string): Int8Array | null {
-  const { violatingTriples, repairElements } = findRepairWindow(partition, N);
+  const { violatingSets, repairElements } = findRepairWindow(partition, N, getSchurConflicts);
 
-  console.log(`  [${label}] 📐 ${violatingTriples.length} triples, ${repairElements.length} elements in repair window`);
+  console.log(`  [${label}] 📐 ${violatingSets.length} violating sets, ${repairElements.length} elements in repair window`);
+
 
   if (repairElements.length > 400) {
     console.log(`  [${label}] ⏭️  Window too large (${repairElements.length} > 400), skipping Z3`);
@@ -132,12 +160,12 @@ function runZ3Repair(partition: Int8Array, round: number, label: string): Int8Ar
   }
 
   console.log(`  [${label}] 🔧 Z3 SAT repair: ${repairElements.length} elements...`);
-  const z3Script = generateZ3RepairScript(partition, N, K, repairElements);
+  const z3Script = generateZ3RepairScript(partition, N, K, repairElements, getAllSchurConflicts(N));
   const scriptPath = "/tmp/schur_z3_repair.py";
   writeFileSync(scriptPath, z3Script);
 
   try {
-    const z3Output = execSync(`python3 ${scriptPath}`, { timeout: 180_000 }).toString();
+    const z3Output = execFileSync("python3", [scriptPath], { timeout: 180_000 }).toString();
     if (z3Output.includes("sat") && !z3Output.includes("unsat")) {
       const repaired = new Int8Array(partition);
       for (const line of z3Output.split("\n")) {

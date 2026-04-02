@@ -9,6 +9,7 @@
  * even during cold-start without network access.
  */
 import { STUB_CPP_RAMSEY } from "../search/dynamic_evaluator";
+import { getAgencyRegistry } from "../agency";
 
 export interface CompilerAgentConfig {
   apiKey: string;
@@ -77,7 +78,7 @@ export class CompilerAgent {
 
   constructor(config: CompilerAgentConfig) {
     this.apiKey = config.apiKey;
-    this.model = config.model ?? "gemini-2.5-pro";
+    this.model = config.model ?? getAgencyRegistry().resolveProvider("compilation").model;
     this.baseUrl = config.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta";
   }
 

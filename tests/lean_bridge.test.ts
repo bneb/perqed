@@ -10,8 +10,21 @@
  *   - Exit 1 + error message = tactic failure or syntax error
  */
 
-import { expect, test, describe } from "bun:test";
+import { expect, test, describe, beforeEach } from "bun:test";
 import { LeanBridge, type LeanResult } from "../src/lean_bridge";
+import { join } from "path";
+import { rmSync } from "fs";
+
+beforeEach(() => {
+  try {
+    rmSync(join(process.cwd(), ".lake", "lake.lock"), { force: true });
+  } catch (e) {}
+});
+
+// Mock bwrap on macOS for TDD red-to-green workflow
+if (process.platform !== "linux") {
+  process.env.BWRAP_BIN = join(process.cwd(), "tests/mock_bwrap.sh");
+}
 
 // ──────────────────────────────────────────────
 // Valid Proofs
@@ -24,6 +37,8 @@ describe("LeanBridge — Valid Proofs", () => {
       "test_omega",
       "(n m : Nat) : n + m = m + n",
       ["omega"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
     expect(result.success).toBe(true);
     expect(result.isComplete).toBe(true);
@@ -37,6 +52,8 @@ describe("LeanBridge — Valid Proofs", () => {
       "test_intro_omega",
       ": ∀ n : Nat, n + 1 > n",
       ["intro n", "omega"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
     expect(result.success).toBe(true);
     expect(result.isComplete).toBe(true);
@@ -48,6 +65,8 @@ describe("LeanBridge — Valid Proofs", () => {
       "test_simp",
       "(n : Nat) : n + 0 = n",
       ["simp"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
     expect(result.success).toBe(true);
     expect(result.isComplete).toBe(true);
@@ -65,6 +84,8 @@ describe("LeanBridge — Failed Tactics", () => {
       "test_false",
       "(n : Nat) : n + 1 = n",
       ["omega"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
     expect(result.success).toBe(false);
     expect(result.isComplete).toBe(false);
@@ -78,6 +99,8 @@ describe("LeanBridge — Failed Tactics", () => {
       "test_wrong_tactic",
       "(n m : Nat) : n + m = m + n",
       ["exact rfl"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
@@ -89,6 +112,8 @@ describe("LeanBridge — Failed Tactics", () => {
       "test_bogus",
       "(n : Nat) : n = n",
       ["blurrgghh_not_a_tactic"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
@@ -106,6 +131,8 @@ describe("LeanBridge — Sorry Detection", () => {
       "test_sorry",
       "(n : Nat) : n + 1 = n",
       ["sorry"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
     expect(result.success).toBe(false);
     expect(result.isComplete).toBe(false);
@@ -126,6 +153,7 @@ describe("LeanBridge — Timeout", () => {
       "(n m : Nat) : n + m = m + n",
       ["omega"],
       1, // 1ms timeout — impossibly short
+      "import Init\nopen Nat\n\n"
     );
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/timed?\s*out/i);
@@ -143,6 +171,7 @@ describe("LeanBridge — File Generation", () => {
       "my_theorem",
       "(n m : Nat) : n + m = m + n",
       ["intro", "omega"],
+      "import Init\nopen Nat\n\n"
     );
     expect(source).toContain("theorem my_theorem");
     expect(source).toContain("(n m : Nat) : n + m = m + n");
@@ -166,12 +195,16 @@ describe("LeanBridge — Isolation", () => {
       "theorem_a",
       "(n : Nat) : n + 0 = n",
       ["simp"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
 
     const resultB = await bridge.checkProof(
       "theorem_b",
       "(n : Nat) : n + 1 = n",
       ["omega"],
+      30_000,
+      "import Init\nopen Nat\n\n"
     );
 
     expect(resultA.success).toBe(true);

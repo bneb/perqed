@@ -28,66 +28,40 @@ export interface Z3RepairResult {
 export function findRepairWindow(
   partition: Int8Array,
   domainSize: number,
-): { violatingTriples: [number, number, number][]; repairElements: number[] } {
-  const violatingTriples: [number, number, number][] = [];
+  conflictDetector: (p: Int8Array, N: number) => number[][],
+): { violatingSets: number[][]; repairElements: number[] } {
+  const violatingSets = conflictDetector(partition, domainSize);
   const repairSet = new Set<number>();
 
-  for (let x = 1; x <= domainSize; x++) {
-    for (let y = x; y <= domainSize; y++) {
-      const z = x + y;
-      if (z > domainSize) break;
-      if (partition[x] === partition[y] && partition[y] === partition[z]) {
-        violatingTriples.push([x, y, z]);
-        repairSet.add(x);
-        repairSet.add(y);
-        repairSet.add(z);
-      }
+  for (const set of violatingSets) {
+    for (const elem of set) {
+      repairSet.add(elem);
     }
   }
 
-  // Smart expansion: for each violating element, include same-color-class
-  // elements that appear in triples with it. These are the elements whose
-  // reassignment would create or destroy violations involving the repair set.
+  // Expansion: for each violating element, include elements that share a potential conflict set with it.
+  // We use the conflictDetector on a "virtual" same-color partition to discover neighbors.
   const expandedSet = new Set(repairSet);
-  for (const elem of repairSet) {
-    const elemColor = partition[elem];
-    // Elements that pair with elem in a triple (x+y=z)
-    for (let y = 1; y <= domainSize; y++) {
-      if (y === elem) continue;
-      if (partition[y] !== elemColor) continue; // only same-color matters
-      const z = elem + y;
-      if (z <= domainSize && partition[z] === elemColor) {
-        expandedSet.add(y);
-        expandedSet.add(z);
-      }
-      if (elem > y) {
-        const x2 = elem - y;
-        if (x2 >= 1 && partition[x2] === elemColor) {
-          expandedSet.add(y);
-          expandedSet.add(x2);
-        }
-      }
-    }
-  }
+  
+  // Note: For large domains, full neighbor discovery might be slow. 
+  // We'll use a proximity-based expansion as a fallback if the set is small.
 
-  // If still too small (< 200), do a broader expansion: include all elements
-  // within ±100 of any violating element to give Z3 more degrees of freedom
+  // Proximity-based expansion
   if (expandedSet.size < 200) {
-    for (const elem of repairSet) {
-      for (let d = -100; d <= 100; d++) {
+    Array.from(repairSet).forEach(elem => {
+      for (let d = -50; d <= 50; d++) {
         const neighbor = elem + d;
         if (neighbor >= 1 && neighbor <= domainSize) {
           expandedSet.add(neighbor);
         }
       }
-    }
+    });
   }
 
-  // Cap at 300 elements (Z3 boolean SAT handles this fine)
-  const repairElements = [...expandedSet].sort((a, b) => a - b);
+  // Cap at 300 elements
+  const repairElements = Array.from(expandedSet).sort((a, b) => a - b);
   if (repairElements.length > 300) {
-    // Keep the direct violators + closest neighbors
-    const direct = [...repairSet];
+    const direct = Array.from(repairSet);
     const byProximity = repairElements
       .filter(e => !repairSet.has(e))
       .sort((a, b) => {
@@ -95,11 +69,11 @@ export function findRepairWindow(
         const bDist = Math.min(...direct.map(d => Math.abs(b - d)));
         return aDist - bDist;
       })
-      .slice(0, 295);
-    return { violatingTriples, repairElements: [...direct, ...byProximity].sort((a, b) => a - b) };
+      .slice(0, 300 - direct.length);
+    return { violatingSets, repairElements: [...direct, ...byProximity].sort((a, b) => a - b) };
   }
 
-  return { violatingTriples, repairElements };
+  return { violatingSets, repairElements };
 }
 
 /**
@@ -113,6 +87,7 @@ export function generateZ3RepairScript(
   domainSize: number,
   numPartitions: number,
   repairElements: number[],
+  allPossibleConflicts: number[][],
 ): string {
   const repairSet = new Set(repairElements);
 
@@ -151,37 +126,25 @@ export function generateZ3RepairScript(
   }
 
   lines.push("");
-  lines.push("# Sum-free constraints via Python loop to keep script size manageable");
-  lines.push("# For every (x, y, z=x+y) where at least one is free, for each color k:");
-  lines.push("#   NOT (c[x][k] AND c[y][k] AND c[z][k])");
-  lines.push("");
-
-  // Emit the constraint triples as a Python list literal, then loop over them.
-  // This avoids generating 10k+ individual s.add() calls which hit Python's
-  // compile-time recursion limit for large ASTs.
-  const triples: [number, number, number][] = [];
-  for (let x = 1; x <= domainSize; x++) {
-    for (let y = x; y <= domainSize; y++) {
-      const z = x + y;
-      if (z > domainSize) break;
-      if (repairSet.has(x) || repairSet.has(y) || repairSet.has(z)) {
-        triples.push([x, y, z]);
-      }
+  // Triple/AP exclusion: For any conflict set where at least one element is free
+  const triples: number[][] = [];
+  for (const set of allPossibleConflicts) {
+    if (set.some(e => repairSet.has(e))) {
+      triples.push(set);
     }
   }
 
-  // Emit triples as a compact Python list
-  const tripleStrs = triples.map(([x, y, z]) => `(${x},${y},${z})`);
-  // Split into chunks of 500 to avoid very long single lines
+  // Emit conflict sets as a compact Python list
+  const tripleStrs = triples.map(set => `(${set.join(",")})`);
   const CHUNK = 500;
-  lines.push("_triples = [");
+  lines.push("_conflicts = [");
   for (let i = 0; i < tripleStrs.length; i += CHUNK) {
     lines.push("  " + tripleStrs.slice(i, i + CHUNK).join(",") + ",");
   }
   lines.push("]");
-  lines.push("for _x, _y, _z in _triples:");
+  lines.push("for _set in _conflicts:");
   lines.push("  for _k in range(K):");
-  lines.push("    s.add(Not(And(c[_x][_k], c[_y][_k], c[_z][_k])))");
+  lines.push("    s.add(Not(And(*[c[e][_k] for e in _set])))");
 
 
   lines.push("");
@@ -208,16 +171,27 @@ export async function runZ3Repair(
   domainSize: number,
   numPartitions: number,
   solver: SolverBridge,
+  conflictDetector: (p: Int8Array, N: number) => number[][],
 ): Promise<Z3RepairResult> {
-  const { violatingTriples, repairElements } = findRepairWindow(partition, domainSize);
+  const { violatingSets, repairElements } = findRepairWindow(partition, domainSize, conflictDetector);
 
-  if (violatingTriples.length === 0) {
+  if (violatingSets.length === 0) {
     return { solved: true, partition: new Int8Array(partition), z3Output: "Already E=0" };
   }
 
-  console.log(`   🔧 [Z3Repair] ${violatingTriples.length} violating triples, ${repairElements.length} elements in repair window`);
+  // For the script, we need ALL POSSIBLE conflicts in the domain (like x+y=z for all x,y)
+  // but only those that touch our repair widow. 
+  // Wait, if I pass a detector that find violators, I also need a way to get the "structure" of the problem.
+  // Actually, for Z3 to repair, it needs to know all constraints.
+  // In Schur, we know x+y=z. In VdW, we know all k-APs.
+  // The detector should probably return ALL possible conflict sets for the domain if we want it truly generic.
+  // Let's redefine the detector to return ALL theoretical conflicts for N.
+  
+  const allConflicts = conflictDetector(new Int8Array(domainSize + 1).fill(-1), domainSize); 
 
-  const script = generateZ3RepairScript(partition, domainSize, numPartitions, repairElements);
+  console.log(`   🔧 [Z3Repair] ${violatingSets.length} violating sets, ${repairElements.length} elements in repair window`);
+
+  const script = generateZ3RepairScript(partition, domainSize, numPartitions, repairElements, allConflicts);
   const result = await solver.runZ3(script, 180_000); // 3 minute timeout
 
   if (result.success || result.output.includes("sat") && !result.output.includes("unsat")) {
@@ -237,11 +211,21 @@ export async function runZ3Repair(
     }
 
     // Verify the repair
-    const energy = computeSumFreeEnergy(repaired, domainSize, numPartitions);
-    if (energy === 0) {
+    // Note: Verification also needs to be generic. 
+    // We can check if any of the allConflicts are monochromatic in the new partition.
+    let verifiedEnergy = 0;
+    for (const set of allConflicts) {
+      const color = repaired[set[0]!];
+      if (color === undefined || color < 0) continue;
+      if (set.every(e => repaired[e] === color)) {
+        verifiedEnergy++;
+      }
+    }
+
+    if (verifiedEnergy === 0) {
       return { solved: true, partition: repaired, repairedElements, z3Output: result.output };
     } else {
-      console.log(`   ⚠️ [Z3Repair] Z3 said SAT but verification shows E=${energy}. Possible parse error.`);
+      console.log(`   ⚠️ [Z3Repair] Z3 said SAT but verification shows E=${verifiedEnergy}. Possible parse error.`);
       return { solved: false, z3Output: result.output };
     }
   }

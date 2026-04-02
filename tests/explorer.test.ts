@@ -53,8 +53,8 @@ const C_SIMPLE: InvestigationScript = {
     "#include <stdio.h>",
     "int main() {",
     "    int V = 4, E = 6, F = 4;",
-    "    printf(\"Euler: %d\\n\", V - E + F);",
-    "    printf(\"HYPOTHESIS FALSIFIED IN THIS DOMAIN\\n\");",
+    "    printf(\"Euler: %d%c\", V - E + F, 10);",
+    "    printf(\"HYPOTHESIS FALSIFIED IN THIS DOMAIN%c\", 10);",
     "    return 0;",
     "}",
   ].join("\n"),
@@ -64,7 +64,12 @@ const C_COMPILE_ERROR: InvestigationScript = {
   domain: "broken_domain",
   language: "c",
   purpose: "This has a compile error.",
-  code: "#include <stdio.h>\nint main( {\n    printf(\"hello\\n\");\n}\n",
+  code: [
+    "#include <stdio.h>",
+    "int main( {",
+    "    printf(\"hello%c\", 10);",
+    "}",
+  ].join("\n"),
 };
 
 const PYTHON_INSTANT: InvestigationScript = {

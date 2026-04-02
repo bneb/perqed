@@ -1,14 +1,5 @@
 /**
  * orchestration/runner.ts — Public API for the Research State Machine
- *
- * Creates an XState actor, subscribes to state transitions for logging,
- * and returns a Promise<ResearchResult> when the machine reaches a final state.
- *
- * Usage:
- *   const result = await runResearchMachine("find bounds for R(4,6)", {
- *     apiKey: process.env.GEMINI_API_KEY!,
- *     workspaceDir: "./workspace",
- *   });
  */
 
 import { createActor } from "xstate";
@@ -22,7 +13,7 @@ export async function runResearchMachine(
   config: ResearchMachineConfig,
 ): Promise<ResearchResult> {
   const runId = `run_${Date.now()}`;
-  const outputDir = join(config.workspaceDir, runId);
+  const outputDir = join(config.workspaceDir, "runs", runId);
   mkdirSync(outputDir, { recursive: true });
 
   const verbose = config.verbose ?? true;
@@ -34,75 +25,89 @@ export async function runResearchMachine(
 
   const actor = createActor(researchMachine);
 
-  // Track visited states for diagnostics
-  const visitedStates: string[] = [];
-  let currentState = "Idle";
-
   actor.subscribe((snapshot) => {
     const stateValue = snapshot.value as string;
-    if (!visitedStates.includes(stateValue)) {
-      visitedStates.push(stateValue);
-    }
-
-    if (verbose && stateValue !== currentState) {
-      currentState = stateValue;
-      const ctx = snapshot.context;
-      const prefix = getStateEmoji(stateValue);
-      let retrySuffix = "";
-      if (ctx.ideationRetries > 0 || ctx.proofRetries > 0) {
-        retrySuffix = `  [Retries: idea=${ctx.ideationRetries} proof=${ctx.proofRetries}]`;
-      }
-      console.log(`\n\n  ${prefix} ${stateValue.toUpperCase()} ${retrySuffix}`);
-      console.log(`  ${"─".repeat(50)}\n`);
+    if (verbose && (snapshot as any).changed) {
+       console.log(`\n  [XState] Transitioned to: ${stateValue.toUpperCase()}`);
     }
   });
 
   actor.start();
 
-  // Send the START event with runtime config
   actor.send({
     type: "START",
     prompt,
     apiKey: config.apiKey,
     workspaceDir: config.workspaceDir,
     outputDir,
+    publishableMode: config.publishableMode ?? false,
   });
 
-  // Wait for the machine to reach a final state
   return new Promise<ResearchResult>((resolve) => {
     actor.subscribe((snapshot) => {
       if (snapshot.status === "done") {
         const ctx = snapshot.context;
-        const finalState = snapshot.value as string;
-
         resolve({
           plan: ctx.plan,
           evidence: ctx.evidence,
           approvedConjecture: ctx.approvedConjecture,
           redTeamHistory: ctx.redTeamHistory,
           proofStatus: ctx.proofStatus ?? "SKIPPED",
+          proofTree: ctx.proofTree,
           outputDir,
-          finalState,
+          finalState: String(snapshot.value),
         });
       }
     });
   });
 }
 
-function getStateEmoji(state: string): string {
-  const emojis: Record<string, string> = {
-    Idle: "⏸️ ",
-    Ideation: "💡",
-    Validation: "🔍",
-    EmpiricalSandbox: "🧪",
-    SMT_Resolution: "⚡",
-    FalsificationFork: "⚔️ ",
-    FormalVerification: "🧬",
-    ErrorCorrection: "🔧",
-    ScribeReport: "📝",
-    Done: "✅",
-    ExitGracefully: "👋",
-    TerminalFailure: "💀",
-  };
-  return emojis[state] ?? "❓";
+/**
+ * runFormalVerificationOnly — Shim for legacy loop redirection.
+ * Skips ideation/sandbox and starts the machine at FormalVerification.
+ */
+export async function runFormalVerificationOnly(
+  prompt: string,
+  config: ResearchMachineConfig & {
+    signature: string;
+    objective?: string;
+    maxIterations?: number;
+  }
+): Promise<ResearchResult> {
+  const runId = `run_${Date.now()}_formal`;
+  const outputDir = join(config.workspaceDir, "runs", runId);
+  mkdirSync(outputDir, { recursive: true });
+
+  const actor = createActor(researchMachine);
+
+  actor.start();
+
+  actor.send({
+    type: "WAKE_AT_FORMAL",
+    prompt,
+    apiKey: config.apiKey,
+    workspaceDir: config.workspaceDir,
+    outputDir,
+    signature: config.signature,
+    objective: config.objective,
+    maxIterations: config.maxIterations,
+  });
+
+  return new Promise<ResearchResult>((resolve) => {
+    actor.subscribe((snapshot) => {
+      if (snapshot.status === "done") {
+        const ctx = snapshot.context;
+        resolve({
+          plan: ctx.plan,
+          evidence: ctx.evidence,
+          approvedConjecture: ctx.approvedConjecture,
+          redTeamHistory: ctx.redTeamHistory,
+          proofStatus: ctx.proofStatus ?? "SKIPPED",
+          proofTree: ctx.proofTree,
+          outputDir,
+          finalState: String(snapshot.value),
+        });
+      }
+    });
+  });
 }

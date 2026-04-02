@@ -14,6 +14,7 @@
 
 import { GoogleGenAI, Type, type Schema } from "@google/genai";
 import type { EvidenceReport, RedTeamResult, RedTeamVerdict } from "./research_types";
+import { getAgencyRegistry } from "../agency";
 
 const MAX_ROUNDS = 3;
 
@@ -28,7 +29,7 @@ export class RedTeamAuditor {
 
   constructor(cfg: RedTeamConfig) {
     this.ai = new GoogleGenAI({ apiKey: cfg.apiKey });
-    this.model = cfg.model ?? "gemini-2.5-flash";
+    this.model = cfg.model ?? getAgencyRegistry().resolveProvider("red_team").model;
   }
 
   /**

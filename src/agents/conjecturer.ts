@@ -8,6 +8,7 @@
 
 import { GoogleGenAI, Type, type Schema } from "@google/genai";
 import type { EvidenceReport } from "./research_types";
+import { getAgencyRegistry } from "../agency";
 
 export interface Conjecture {
   name: string;
@@ -17,9 +18,11 @@ export interface Conjecture {
 
 export class ConjecturerAgent {
   private ai: GoogleGenAI;
+  private model: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, model?: string) {
     this.ai = new GoogleGenAI({ apiKey });
+    this.model = model ?? getAgencyRegistry().resolveProvider("conjecture").model;
   }
 
   /**
@@ -86,7 +89,7 @@ export class ConjecturerAgent {
       `Do NOT invent new mathematical functions or synthetic definitions. Every function referenced in your Lean 4 theorem signature MUST correspond to a standard mathematical definition that exists in Mathlib or could be trivially defined from Mathlib primitives (e.g., Nat.card, SimpleGraph.chromaticNumber, Finset.filter, List.length). Do NOT define ad-hoc scoring functions, heuristic metrics, or proxy measures. You are formalizing relationships between EXISTING mathematical concepts, not inventing new ones.`;
 
     const response = await this.ai.models.generateContent({
-      model: "gemini-3.1-pro-preview",
+      model: this.model,
       contents: prompt,
       config: {
         responseMimeType: "application/json",

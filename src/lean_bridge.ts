@@ -85,8 +85,9 @@ export class LeanBridge {
     signature: string,
     tactics: string[],
     timeoutMs: number = 30_000,
+    preamble: string = "import Mathlib\nopen Nat\n\n",
   ): Promise<LeanResult> {
-    const source = this.buildLeanSource(theoremName, signature, tactics);
+    const source = this.buildLeanSource(theoremName, signature, tactics, preamble);
     return this.executeLean(source, timeoutMs);
   }
 
@@ -98,9 +99,28 @@ export class LeanBridge {
     timeoutMs: number = 30_000,
   ): Promise<LeanResult> {
     const lakeBinary = `${process.env.HOME}/.elan/bin/lake`;
-    const cmd = this.cwd 
+    const sandboxDir = this.cwd ?? process.cwd();
+    const leanProjectRoot = sandboxDir.split("/runs/")[0] ?? sandboxDir;
+    const bwrapBin = process.env.BWRAP_BIN ?? "bwrap";
+
+    const leanCmdArgs = this.cwd 
       ? [lakeBinary, "env", this.leanBinary, "--stdin", "--run"]
       : [this.leanBinary, "--stdin", "--run"];
+
+    // Required bwrap arguments for strict unprivileged isolation
+    const cmd = [
+      bwrapBin,
+      "--ro-bind", "/", "/",                  // Read-only access to the entire root filesystem
+      "--dev", "/dev",                        // Required for standard device nodes
+      "--proc", "/proc",                      // Required for standard process info
+      "--bind", sandboxDir, sandboxDir,       // Read-Write access ONLY to the specific Lean workspace
+      "--ro-bind-try", `${leanProjectRoot}/.lake`, `${sandboxDir}/.lake`,         // Share massive Mathlib build globally readonly
+      "--ro-bind-try", `${leanProjectRoot}/lakefile.lean`, `${sandboxDir}/lakefile.lean`,
+      "--unshare-all",                        // Unshare all namespaces (network, pid, ipc, uts)
+      "--die-with-parent",                    // Prevent zombie processes if the orchestrator crashes
+      ...leanCmdArgs
+    ];
+
 
     const proc = Bun.spawn(cmd, {
       cwd: this.cwd,
@@ -113,23 +133,54 @@ export class LeanBridge {
     proc.stdin.write(source);
     proc.stdin.end();
 
+    console.log(`  [LeanBridge] Executing Lean subprocess (timeout: ${timeoutMs}ms)`);
+
     // Race: process completion vs. timeout
     const timeoutPromise = new Promise<"timeout">((resolve) =>
       setTimeout(() => resolve("timeout"), timeoutMs),
     );
 
     const processPromise = (async () => {
-      const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-        proc.exited,
-      ]);
+      let stdout = "";
+      let stderr = "";
+      const decoder = new TextDecoder();
+
+      // Read continuously without awaiting the stream's end
+      const readStream = async (stream: ReadableStream, isStdErr: boolean) => {
+        const reader = stream.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (isStdErr) {
+              stderr += decoder.decode(value, { stream: true });
+            } else {
+              stdout += decoder.decode(value, { stream: true });
+            }
+          }
+        } catch (e) {}
+      };
+
+      readStream(proc.stdout, false);
+      readStream(proc.stderr, true);
+
+      const exitCode = await proc.exited;
+      
+      // Forcefully cancel streams to prevent hanging on orphaned file descriptors
+      try { await proc.stdout.cancel(); } catch (e) {}
+      try { await proc.stderr.cancel(); } catch (e) {}
+      
+      // Get the last decoded chunks
+      stdout += decoder.decode();
+      stderr += decoder.decode();
+
       return { stdout, stderr, exitCode } as const;
     })();
 
     const raceResult = await Promise.race([processPromise, timeoutPromise]);
 
     if (raceResult === "timeout") {
+      console.warn(`  [LeanBridge] ⚠️ Lean execution TIMED OUT after ${timeoutMs}ms`);
       proc.kill();
       return {
         success: false,
@@ -141,6 +192,7 @@ export class LeanBridge {
     }
 
     const { stdout, stderr, exitCode } = raceResult;
+    console.log(`  [LeanBridge] Lean execution completed with exit code ${exitCode}`);
     const combinedOutput = (stdout + "\n" + stderr).trim();
 
     // Check for sorry usage (Lean compiles but with warning)

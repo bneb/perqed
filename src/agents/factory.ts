@@ -6,16 +6,16 @@
  *   REASONER  (Gemini cloud)  → tactical unblocking
  *   ARCHITECT (Gemini cloud)  → structural planning
  *
- * Gemini model tiers selected by RoutingSignals:
- *   < M (4) failures: gemini-2.5-flash (free tier)
- *   ≥ M failures:     gemini-3.1-flash-lite-preview (paid flash)
- *   ≥ N (6) failures: gemini-3.1-pro-preview (break glass)
+ * Model tiers are resolved from the AgencyRegistry (agency.json).
+ * When no registry is provided, falls back to hardcoded defaults
+ * for backward compatibility.
  */
 
 import type { AgentRole, RoutingSignals } from "../types";
 import type { FormalistResponse } from "../schemas";
 import { FormalistAgent, type FormalistConfig } from "./formalist";
 import { GeminiAgent, type GeminiModelTier } from "./gemini";
+import type { AgencyRegistry } from "../agency/registry";
 
 // ──────────────────────────────────────────────
 // Specialist Agent Interface
@@ -116,14 +116,25 @@ const DEFAULT_FACTORY_CONFIG = {
 
 export class AgentFactory {
   private readonly config: Required<FactoryConfig>;
+  private readonly registry: AgencyRegistry | null;
 
   /** Escalation threshold: advance to paid Flash-Lite. */
   readonly THRESHOLD_M: number;
   /** Escalation threshold: break glass to Pro. */
   readonly THRESHOLD_N: number;
 
-  constructor(config: FactoryConfig = {}) {
-    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config } as Required<FactoryConfig>;
+  constructor(config: FactoryConfig = {}, registry?: AgencyRegistry) {
+    this.registry = registry ?? null;
+
+    // When a registry is present, derive defaults from it
+    const registryDefaults = registry
+      ? {
+          ollamaEndpoint: registry.getEndpoint("L0_thinker"),
+          ollamaModel: registry.getModel("L0_thinker"),
+        }
+      : {};
+
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...registryDefaults, ...config } as Required<FactoryConfig>;
     this.THRESHOLD_M = this.config.thresholdM;
     this.THRESHOLD_N = this.config.thresholdN;
   }
@@ -162,8 +173,8 @@ export class AgentFactory {
         }
 
         const reasonerTier: GeminiModelTier = signals.consecutiveFailures >= this.THRESHOLD_M
-          ? "gemini-3.1-flash-lite-preview"
-          : "gemini-2.5-flash";
+          ? this.resolveEscalatedModel("reasoning", 1)
+          : this.resolveBaseCloudModel("reasoning");
 
         return new GeminiSpecialist("REASONER", reasonerTier, apiKey);
       }
@@ -177,8 +188,8 @@ export class AgentFactory {
         }
 
         const architectTier: GeminiModelTier = signals.globalFailures >= this.THRESHOLD_N
-          ? "gemini-3.1-pro-preview"
-          : "gemini-2.5-flash";
+          ? this.resolveEscalatedModel("reasoning", 3)
+          : this.resolveBaseCloudModel("reasoning");
 
         return new GeminiSpecialist("ARCHITECT", architectTier, apiKey);
       }
@@ -186,5 +197,39 @@ export class AgentFactory {
       default:
         throw new Error(`Unknown agent role: ${role}`);
     }
+  }
+
+  // ── Registry-Aware Model Resolution ──────────────────────────────────
+
+  /**
+   * Resolve the base (non-escalated) cloud model for a capability.
+   * Falls back to hardcoded defaults if no registry is present.
+   */
+  private resolveBaseCloudModel(capability: string): GeminiModelTier {
+    if (this.registry) {
+      try {
+        return this.registry.resolveProvider(capability as any, false, 0).model as GeminiModelTier;
+      } catch {
+        // Fall through to default
+      }
+    }
+    return "gemini-2.5-flash";
+  }
+
+  /**
+   * Resolve an escalated cloud model for a capability.
+   * escalationLevel=1 skips the base tier, =2 skips the next, etc.
+   * Falls back to hardcoded defaults if no registry is present.
+   */
+  private resolveEscalatedModel(capability: string, escalationLevel: number): GeminiModelTier {
+    if (this.registry) {
+      try {
+        return this.registry.resolveProvider(capability as any, false, escalationLevel).model as GeminiModelTier;
+      } catch {
+        // Fall through to default
+      }
+    }
+    // Hardcoded fallbacks (backward compat)
+    return escalationLevel >= 3 ? "gemini-3.1-pro-preview" : "gemini-3.1-flash-lite-preview";
   }
 }

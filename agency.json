@@ -1,0 +1,53 @@
+{
+  "agency_topology": {
+    "default_tier": "L0",
+    "escalation_policy": "sequential_chain",
+    "max_parse_retries": 2,
+    "providers": {
+      "L0_thinker": {
+        "engine": "ollama",
+        "model": "deepseek-r1:8b",
+        "endpoint": "http://localhost:11434",
+        "capabilities": ["reasoning", "lean4", "chat", "conjecture", "red_team", "formalization"],
+        "ollama_mode": "chat",
+        "temperature": 0.3
+      },
+      "L0_typist": {
+        "engine": "ollama",
+        "model": "qwen2.5-coder",
+        "endpoint": "http://localhost:11434",
+        "capabilities": ["bash", "file_edit", "python", "compilation"],
+        "ollama_mode": "completion",
+        "temperature": 0.2
+      },
+      "L1_micro": {
+        "engine": "gemini",
+        "model": "gemini-2.5-flash",
+        "api_env_var": "GEMINI_API_KEY",
+        "capabilities": ["reasoning", "lean4", "chat", "python", "conjecture", "red_team", "formalization", "latex", "compilation"],
+        "fallback_for": ["L0_thinker", "L0_typist"]
+      },
+      "L2_standard": {
+        "engine": "gemini",
+        "model": "gemini-3.1-flash-lite-preview",
+        "api_env_var": "GEMINI_API_KEY",
+        "capabilities": ["reasoning", "lean4", "chat", "python", "conjecture", "red_team", "formalization", "latex", "compilation"],
+        "fallback_for": ["L1_micro"]
+      },
+      "L3_complex": {
+        "engine": "gemini",
+        "model": "gemini-2.5-pro",
+        "api_env_var": "GEMINI_API_KEY",
+        "capabilities": ["reasoning", "lean4", "chat", "conjecture", "latex", "compilation", "formalization"],
+        "fallback_for": ["L2_standard"]
+      },
+      "L4_frontier": {
+        "engine": "gemini",
+        "model": "gemini-3.1-pro-preview",
+        "api_env_var": "GEMINI_API_KEY",
+        "capabilities": ["reasoning", "lean4", "chat", "conjecture", "latex", "compilation", "formalization"],
+        "fallback_for": ["L3_complex"]
+      }
+    }
+  }
+}

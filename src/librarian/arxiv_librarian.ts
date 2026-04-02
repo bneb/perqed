@@ -167,6 +167,26 @@ export class ArxivLibrarian {
       return [];
     }
 
+    // Direct ID bypass: if query is an arXiv ID, find it syntactically
+    if (query.startsWith("id:")) {
+      try {
+        const papers = await this.fetchPapers(query, 1);
+        if (papers.length > 0) {
+          const p = papers[0]!;
+          return [{
+            id: `arxiv-${p.arxivId}`,
+            theoremSignature: p.title,
+            successfulTactic: p.abstract.slice(0, 500),
+            paperTitle: p.title,
+            paperAbstract: p.abstract.slice(0, 800),
+            type: "ARXIV" as const
+          }];
+        }
+      } catch (e) {
+        console.warn(`[Librarian] Bypass fetch failed for exact ID ${query}`);
+      }
+    }
+
     const queryVector = await this.embedder.embed(query);
     if (queryVector.length === 0) return [];
     
@@ -188,8 +208,14 @@ export class ArxivLibrarian {
   // ── Private ──────────────────────────────────────────────────────────────
 
   private async fetchPapers(query: string, maxResults: number): Promise<ArxivPaper[]> {
-    const encoded = encodeURIComponent(query);
-    const url = `${this.baseUrl}?search_query=all:${encoded}&max_results=${maxResults}&sortBy=relevance`;
+    let url: string;
+    if (query.startsWith("id:")) {
+      const id = encodeURIComponent(query.slice(3));
+      url = `${this.baseUrl}?id_list=${id}`;
+    } else {
+      const encoded = encodeURIComponent(query);
+      url = `${this.baseUrl}?search_query=all:${encoded}&max_results=${maxResults}&sortBy=relevance`;
+    }
     const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) {
       throw new Error(`arXiv API returned ${response.status}`);

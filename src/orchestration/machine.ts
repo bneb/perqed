@@ -37,6 +37,7 @@ import type {
   LeanInput,
   ErrorCorrectionInput,
   ScribeInput,
+  TacticExecutionInput,
 } from "./actors";
 
 // Re-export the actor implementations for the default (non-test) machine
@@ -46,10 +47,13 @@ import {
   sandboxActor as defaultSandboxActor,
   smtActor as defaultSmtActor,
   falsificationActor as defaultFalsificationActor,
-  leanActor as defaultLeanActor,
+  tacticGeneratorActor as defaultTacticGeneratorActor,
+  leanVerificationActor as defaultLeanVerificationActor,
   errorCorrectionActor as defaultErrorCorrectionActor,
   scribeActor as defaultScribeActor,
 } from "./actors";
+import { ProofTree } from "../tree";
+import type { AttemptLog, AgentRole } from "../types";
 
 // ──────────────────────────────────────────────
 // Initial Context Factory
@@ -60,6 +64,7 @@ const INITIAL_CONTEXT: ResearchContext = {
   apiKey: "",
   workspaceDir: "",
   outputDir: "",
+  publishableMode: false,
   literature: [],
   plan: null,
   hypothesis: null,
@@ -77,6 +82,12 @@ const INITIAL_CONTEXT: ResearchContext = {
   leanProof: null,
   proofRetries: 0,
   lastCompilerError: null,
+  proofTree: null,
+  attemptLogs: [],
+  lastTacticState: "",
+  currentAgentRole: null,
+  globalIteration: 0,
+  maxGlobalIterations: 15,
   proofStatus: null,
   reportPath: null,
 };
@@ -89,12 +100,14 @@ export const researchMachine = setup({
   types: {
     context: {} as ResearchContext,
     events: {} as
-      | { type: "START"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string }
+      | { type: "START"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string; publishableMode: boolean }
+      | { type: "WAKE_AT_FORMAL"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string; signature: string; objective?: string; maxIterations?: number }
       | { type: "xstate.done.actor.ideation"; output: IdeationOutput }
       | { type: "xstate.done.actor.validation"; output: ValidationOutput }
       | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
       | { type: "xstate.done.actor.smt"; output: SMTOutput }
       | { type: "xstate.done.actor.falsification"; output: FalsificationOutput }
+      | { type: "xstate.done.actor.tacticGenerator"; output: { role: AgentRole; response: any } }
       | { type: "xstate.done.actor.lean"; output: LeanOutput }
       | { type: "xstate.done.actor.errorCorrection"; output: ErrorCorrectionOutput }
       | { type: "xstate.done.actor.scribe"; output: ScribeOutput },
@@ -106,7 +119,8 @@ export const researchMachine = setup({
     sandboxActor: defaultSandboxActor,
     smtActor: defaultSmtActor,
     falsificationActor: defaultFalsificationActor,
-    leanActor: defaultLeanActor,
+    tacticGeneratorActor: defaultTacticGeneratorActor,
+    leanVerificationActor: defaultLeanVerificationActor,
     errorCorrectionActor: defaultErrorCorrectionActor,
     scribeActor: defaultScribeActor,
   },
@@ -115,68 +129,68 @@ export const researchMachine = setup({
     canRetryIdeation: ({ context }) => context.ideationRetries < 3,
     canRetryProof: ({ context }) => context.proofRetries < 3,
     isKnownTheorem: ({ event }) => {
-      if ("output" in event && "classification" in (event as any).output) {
-        return (event as any).output.classification === "KNOWN_THEOREM";
+      if (event.type === "xstate.done.actor.ideation") {
+        return event.output.classification === "KNOWN_THEOREM";
       }
       return false;
     },
     isKnownAndCanRetry: ({ context, event }) => {
-      if ("output" in event && "classification" in (event as any).output) {
+      if (event.type === "xstate.done.actor.ideation") {
         return (
-          (event as any).output.classification === "KNOWN_THEOREM" &&
+          event.output.classification === "KNOWN_THEOREM" &&
           context.ideationRetries < 2  // will be incremented to < 3
         );
       }
       return false;
     },
     isKnownAndExhausted: ({ context, event }) => {
-      if ("output" in event && "classification" in (event as any).output) {
+      if (event.type === "xstate.done.actor.ideation") {
         return (
-          (event as any).output.classification === "KNOWN_THEOREM" &&
+          event.output.classification === "KNOWN_THEOREM" &&
           context.ideationRetries >= 2
         );
       }
       return false;
     },
     isWitness: ({ event }) => {
-      if ("output" in event && "signal" in (event as any).output) {
-        return (event as any).output.signal === "WITNESS_FOUND";
+      if (event.type === "xstate.done.actor.sandbox") {
+        return event.output.signal === "WITNESS_FOUND";
       }
       return false;
     },
     isPlateau: ({ event }) => {
-      if ("output" in event && "signal" in (event as any).output) {
-        return (event as any).output.signal === "PLATEAU_DETECTED";
+      if (event.type === "xstate.done.actor.sandbox") {
+        return event.output.signal === "PLATEAU_DETECTED";
       }
       return false;
     },
     isCleanKill: ({ event }) => {
-      if ("output" in event && "signal" in (event as any).output) {
-        return (event as any).output.signal === "CLEAN_KILL";
+      if (event.type === "xstate.done.actor.sandbox") {
+        return event.output.signal === "CLEAN_KILL";
       }
       return false;
     },
     isSAT: ({ event }) => {
-      if ("output" in event && "status" in (event as any).output) {
-        return (event as any).output.status === "SAT";
+      if (event.type === "xstate.done.actor.smt") {
+        return event.output.status === "SAT";
       }
       return false;
     },
     isProofComplete: ({ event }) => {
-      if ("output" in event && "status" in (event as any).output) {
-        return (event as any).output.status === "PROOF_COMPLETE";
+      if (event.type === "xstate.done.actor.lean") {
+        return event.output.status === "PROOF_COMPLETE";
       }
       return false;
     },
     isCompilerError: ({ event }) => {
-      if ("output" in event && "status" in (event as any).output) {
-        return (event as any).output.status === "COMPILER_ERROR";
+      if (event.type === "xstate.done.actor.lean") {
+        return event.output.status === "COMPILER_ERROR";
       }
       return false;
     },
     isFixed: ({ event }) => {
-      if ("output" in event && "status" in (event as any).output) {
-        return (event as any).output.status === "FIXED";
+      if (event.type === "xstate.done.actor.errorCorrection") {
+        return event.output.status === "FIXED";
       }
       return false;
     },
@@ -184,24 +198,39 @@ export const researchMachine = setup({
 
   actions: {
     setPrompt: assign(({ event }) => {
-      if (event.type === "START") {
+      if (event.type === "START" || event.type === "WAKE_AT_FORMAL") {
         return {
           prompt: event.prompt,
           apiKey: event.apiKey,
           workspaceDir: event.workspaceDir,
           outputDir: event.outputDir,
+          publishableMode: (event as any).publishableMode ?? false,
+        };
+      }
+      return {};
+    }),
+    setLegacyTheorem: assign(({ event }) => {
+      if (event.type === "WAKE_AT_FORMAL") {
+        return {
+          approvedConjecture: {
+            signature: event.signature,
+            description: event.objective || "Legacy theorem",
+          },
+          maxGlobalIterations: event.maxIterations || 15,
         };
       }
       return {};
     }),
     setIdeationResult: assign(({ event }) => {
-      const output = (event as any).output as IdeationOutput;
-      return {
-        hypothesis: output.hypothesis,
-        noveltyClassification: output.classification,
-        plan: output.plan,
-        literature: output.literature,
-      };
+      if (event.type === "xstate.done.actor.ideation") {
+        return {
+          hypothesis: event.output.hypothesis,
+          noveltyClassification: event.output.classification,
+          plan: event.output.plan,
+          literature: event.output.literature,
+        };
+      }
+      return {};
     }),
     incrementIdeationRetry: assign({
       ideationRetries: ({ context }) => context.ideationRetries + 1,
@@ -212,49 +241,69 @@ export const researchMachine = setup({
         return "Unknown validation error";
       },
     }),
-    setValidatedAST: assign({
-      leanAst: ({ event }) => (event as any).output?.ast ?? null,
+    setValidatedAST: assign(({ event }) => {
+      if (event.type === "xstate.done.actor.validation") {
+        return { leanAst: event.output.ast };
+      }
+      return {};
     }),
     setSandboxResult: assign(({ event }) => {
-      const output = (event as any).output as SandboxOutput;
-      return {
-        evidence: output.evidence,
-        sandboxSignal: output.signal,
-        currentEnergy: output.energy,
-        counterExample: output.data,
-        approvedConjecture: output.approvedConjecture ?? null,
-        redTeamHistory: output.redTeamHistory ?? [],
-      };
+      if (event.type === "xstate.done.actor.sandbox") {
+        return {
+          evidence: event.output.evidence,
+          sandboxSignal: event.output.signal,
+          currentEnergy: event.output.energy,
+          counterExample: event.output.data,
+          approvedConjecture: event.output.approvedConjecture ?? null,
+          redTeamHistory: event.output.redTeamHistory ?? [],
+        };
+      }
+      return {};
     }),
-    setSMTResult: assign({
-      smtModel: ({ event }) => (event as any).output?.model ?? null,
+    setSMTResult: assign(({ event }) => {
+      if (event.type === "xstate.done.actor.smt") {
+        return { smtModel: event.output.model };
+      }
+      return {};
     }),
     setFalsificationResult: assign(({ event }) => {
-      const output = (event as any).output as FalsificationOutput;
-      return {
-        approvedConjecture: output.approvedConjecture,
-        redTeamHistory: output.redTeamHistory,
-      };
+      if (event.type === "xstate.done.actor.falsification") {
+        return {
+          approvedConjecture: event.output.approvedConjecture,
+          redTeamHistory: event.output.redTeamHistory,
+        };
+      }
+      return {};
     }),
     setProofComplete: assign(({ event }) => {
-      const output = (event as any).output as LeanOutput;
-      return {
-        proofStatus: "PROVED" as const,
-        leanProof: output.proof,
-      };
+      if (event.type === "xstate.done.actor.lean") {
+        return {
+          proofStatus: "PROVED" as const,
+          leanProof: event.output.proof,
+        };
+      }
+      return {};
     }),
     setCompilerError: assign(({ context, event }) => {
-      const output = (event as any).output as LeanOutput;
-      return {
-        lastCompilerError: output.error,
-        proofRetries: context.proofRetries + 1,
-      };
+      if (event.type === "xstate.done.actor.lean") {
+        return {
+          lastCompilerError: event.output.error,
+          proofRetries: context.proofRetries + 1,
+        };
+      }
+      return {};
     }),
-    setFixedProof: assign({
-      leanProof: ({ event }) => (event as any).output?.proof ?? null,
+    setFixedProof: assign(({ event }) => {
+      if (event.type === "xstate.done.actor.errorCorrection") {
+        return { leanProof: event.output.proof };
+      }
+      return {};
     }),
-    setReportPath: assign({
-      reportPath: ({ event }) => (event as any).output?.reportPath ?? null,
+    setReportPath: assign(({ event }) => {
+      if (event.type === "xstate.done.actor.scribe") {
+        return { reportPath: event.output.reportPath };
+      }
+      return {};
     }),
     markFailed: assign({
       proofStatus: "FAILED" as const,
@@ -262,10 +311,67 @@ export const researchMachine = setup({
     logTransition: ({ context, event }) => {
       if (process.env.DEBUG) {
         console.log(
-          `🔄 [Machine] Event: ${event.type} | Retries: idea=${context.ideationRetries} proof=${context.proofRetries}`,
+          `🔄 [Machine] Event: ${event.type} | Retries: idea=${context.ideationRetries} proof=${context.proofRetries} iter=${context.globalIteration}`,
         );
       }
     },
+    initProofTree: assign({
+      proofTree: ({ context }) => {
+        const signature = context.approvedConjecture?.signature ?? context.hypothesis ?? "";
+        return new ProofTree(`⊢ ${signature}`);
+      },
+      globalIteration: 0,
+      attemptLogs: [],
+    }),
+    updateIteration: assign({
+      globalIteration: ({ context }) => context.globalIteration + 1,
+    }),
+    setTacticMove: assign(({ event }) => {
+      if (event.type === "xstate.done.actor.tacticGenerator") {
+         return {
+           currentAgentRole: event.output.role,
+         };
+      }
+      return {};
+    }),
+    logAttemptSuccess: assign(({ context, event }) => {
+      const output = (event as any).output;
+      const newLog = {
+        agent: context.currentAgentRole!,
+        action: "PROPOSE_LEAN_TACTICS",
+        success: output.isComplete,
+        error: output.isComplete ? undefined : (output.error ?? "Lean rejected tactic"),
+        timestamp: Date.now(),
+      };
+      
+      // Update ProofTree 
+      if (context.proofTree) {
+         const activeNode = context.proofTree.getActiveNode();
+         const tactic = (context as any).currentTactic ?? "unknown";
+         const child = context.proofTree.addChild(activeNode.id, tactic, output.isComplete ? "no goals" : (output.error ?? "still goals"));
+         if (output.isComplete) {
+            child.status = "SOLVED";
+            context.proofTree.setActiveNode(child.id);
+         }
+      }
+
+      return {
+        attemptLogs: [...context.attemptLogs, newLog],
+        lastTacticState: output.rawOutput ?? "",
+      };
+    }),
+    logAttemptFailure: assign(({ context, event }) => {
+       const newLog = {
+        agent: context.currentAgentRole!,
+        action: "PROPOSE_LEAN_TACTICS",
+        success: false,
+        error: String((event as any).error),
+        timestamp: Date.now(),
+      };
+      return {
+        attemptLogs: [...context.attemptLogs, newLog],
+      };
+    }),
   },
 }).createMachine({
   id: "perqedResearch",
@@ -273,17 +379,19 @@ export const researchMachine = setup({
   context: INITIAL_CONTEXT,
 
   states: {
-    // ── Idle ──────────────────────────────────────────────────────────────
     Idle: {
       on: {
         START: {
           target: "Ideation",
           actions: "setPrompt",
         },
+        WAKE_AT_FORMAL: {
+          target: "FormalVerification",
+          actions: ["setPrompt", "setLegacyTheorem"],
+        },
       },
     },
 
-    // ── Ideation ─────────────────────────────────────────────────────────
     Ideation: {
       invoke: {
         id: "ideation",
@@ -294,22 +402,20 @@ export const researchMachine = setup({
           apiKey: context.apiKey,
           workspaceDir: context.workspaceDir,
           lastValidationError: context.lastValidationError,
+          publishableMode: context.publishableMode,
         }),
         onDone: [
-          // KNOWN_THEOREM + can retry → self-loop
           {
             guard: "isKnownAndCanRetry",
             target: "Ideation",
             reenter: true,
             actions: ["setIdeationResult", "incrementIdeationRetry", "logTransition"],
           },
-          // KNOWN_THEOREM + exhausted → exit
           {
             guard: "isKnownAndExhausted",
             target: "ExitGracefully",
             actions: ["setIdeationResult", "incrementIdeationRetry"],
           },
-          // Novel → proceed to validation
           {
             target: "Validation",
             actions: ["setIdeationResult", "logTransition"],
@@ -322,7 +428,6 @@ export const researchMachine = setup({
       },
     },
 
-    // ── Validation ───────────────────────────────────────────────────────
     Validation: {
       invoke: {
         id: "validation",
@@ -335,13 +440,11 @@ export const researchMachine = setup({
           actions: ["setValidatedAST", "logTransition"],
         },
         onError: [
-          // Hallucination + can retry → back to ideation
           {
             guard: "canRetryIdeation",
             target: "Ideation",
             actions: ["setValidationError", "incrementIdeationRetry", "logTransition"],
           },
-          // Exhausted
           {
             target: "TerminalFailure",
             actions: ["setValidationError", "logTransition"],
@@ -350,7 +453,6 @@ export const researchMachine = setup({
       },
     },
 
-    // ── EmpiricalSandbox ─────────────────────────────────────────────────
     EmpiricalSandbox: {
       invoke: {
         id: "sandbox",
@@ -363,25 +465,21 @@ export const researchMachine = setup({
           evidence: context.evidence,
         }),
         onDone: [
-          // WITNESS_FOUND → FormalVerification
           {
             guard: "isWitness",
             target: "FormalVerification",
             actions: ["setSandboxResult", "logTransition"],
           },
-          // PLATEAU_DETECTED → SMT_Resolution
           {
             guard: "isPlateau",
             target: "SMT_Resolution",
             actions: ["setSandboxResult", "logTransition"],
           },
-          // CLEAN_KILL → FalsificationFork
           {
             guard: "isCleanKill",
             target: "FalsificationFork",
             actions: ["setSandboxResult", "logTransition"],
           },
-          // Fallback → FormalVerification
           {
             target: "FormalVerification",
             actions: ["setSandboxResult", "logTransition"],
@@ -394,7 +492,6 @@ export const researchMachine = setup({
       },
     },
 
-    // ── SMT_Resolution ───────────────────────────────────────────────────
     SMT_Resolution: {
       invoke: {
         id: "smt",
@@ -403,13 +500,11 @@ export const researchMachine = setup({
           smtScript: context.smtModel ?? "(check-sat)",
         }),
         onDone: [
-          // SAT → FormalVerification
           {
             guard: "isSAT",
             target: "FormalVerification",
             actions: ["setSMTResult", "logTransition"],
           },
-          // UNSAT → resume SA
           {
             target: "EmpiricalSandbox",
             actions: ["setSMTResult", "logTransition"],
@@ -422,7 +517,6 @@ export const researchMachine = setup({
       },
     },
 
-    // ── FalsificationFork ────────────────────────────────────────────────
     FalsificationFork: {
       invoke: {
         id: "falsification",
@@ -443,46 +537,90 @@ export const researchMachine = setup({
       },
     },
 
-    // ── FormalVerification ────────────────────────────────────────────────
     FormalVerification: {
-      invoke: {
-        id: "lean",
-        src: "leanActor",
-        input: ({ context }) => ({
-          conjecture: context.approvedConjecture ?? {
-            signature: context.hypothesis ?? "",
-            description: context.plan?.extension_hypothesis ?? "",
-          },
-          outputDir: context.outputDir || context.workspaceDir,
-          apiKey: context.apiKey,
-        }),
-        onDone: [
-          // PROOF_COMPLETE → ScribeReport
-          {
-            guard: "isProofComplete",
-            target: "ScribeReport",
-            actions: ["setProofComplete", "logTransition"],
-          },
-          // COMPILER_ERROR + can retry → ErrorCorrection
-          {
-            guard: ({ context }) => context.proofRetries < 2,
-            target: "ErrorCorrection",
-            actions: ["setCompilerError", "logTransition"],
-          },
-          // COMPILER_ERROR + exhausted → TerminalFailure
-          {
-            target: "TerminalFailure",
-            actions: ["setCompilerError", "markFailed", "logTransition"],
-          },
-        ],
-        onError: {
-          target: "TerminalFailure",
-          actions: ["markFailed", "logTransition"],
+      initial: "Initialize",
+      states: {
+        Initialize: {
+          entry: "initProofTree",
+          after: { 0: "Routing" },
         },
+        Routing: {
+          always: [
+            { guard: ({ context }) => context.globalIteration >= context.maxGlobalIterations, target: "Exhausted" },
+            { target: "Inference" }
+          ],
+        },
+        Inference: {
+          entry: "updateIteration",
+          invoke: {
+            id: "tacticGenerator",
+            src: "tacticGeneratorActor",
+            input: ({ context }) => ({
+              conjecture: context.approvedConjecture!,
+              outputDir: context.outputDir || context.workspaceDir,
+              apiKey: context.apiKey,
+              attemptLogs: context.attemptLogs,
+              lastTacticState: context.lastTacticState,
+              proofTree: context.proofTree,
+              role: "TACTICIAN",
+            }),
+            onDone: {
+              target: "Execution",
+              actions: "setTacticMove",
+            },
+            onError: {
+              target: "#perqedResearch.ErrorCorrection",
+              actions: ["logAttemptFailure", "setCompilerError"]
+            },
+          },
+        },
+        Execution: {
+          invoke: {
+            id: "leanVerification",
+            src: "leanVerificationActor",
+            input: ({ context, event }) => {
+               const response = (event as any).output.response;
+               const tactic = response.lean_tactics?.[0]?.tactic ?? response.tactics ?? "skip";
+               (context as any).currentTactic = tactic;
+               return {
+                tactic,
+                signature: context.approvedConjecture!.signature,
+                theoremName: "approved_conjecture",
+                outputDir: context.outputDir || context.workspaceDir,
+              };
+            },
+            onDone: [
+              {
+                guard: ({ event }) => (event as any).output.isComplete,
+                target: "Complete",
+                actions: "logAttemptSuccess"
+              },
+              {
+                target: "Routing",
+                actions: "logAttemptSuccess"
+              }
+            ],
+            onError: {
+              target: "Routing",
+              actions: "logAttemptFailure"
+            }
+          }
+        },
+        Complete: {
+          type: "final",
+        },
+        Exhausted: {
+          type: "final",
+        }
       },
+      onDone: [
+        {
+          target: "ScribeReport",
+          actions: ["setProofComplete", "logTransition"],
+        }
+      ]
     },
 
-    // ── ErrorCorrection ──────────────────────────────────────────────────
     ErrorCorrection: {
       invoke: {
         id: "errorCorrection",
@@ -496,13 +634,11 @@ export const researchMachine = setup({
           apiKey: context.apiKey,
         }),
         onDone: [
-          // FIXED → back to FormalVerification
           {
             guard: "isFixed",
             target: "FormalVerification",
             actions: ["setFixedProof", "logTransition"],
           },
-          // UNFIXABLE → TerminalFailure
           {
             target: "TerminalFailure",
             actions: ["markFailed", "logTransition"],
@@ -515,7 +651,6 @@ export const researchMachine = setup({
       },
     },
 
-    // ── ScribeReport ─────────────────────────────────────────────────────
     ScribeReport: {
       invoke: {
         id: "scribe",
@@ -534,14 +669,12 @@ export const researchMachine = setup({
           actions: ["setReportPath", "logTransition"],
         },
         onError: {
-          // Scribe failure is non-fatal — still mark as done
           target: "Done",
           actions: "logTransition",
         },
       },
     },
 
-    // ── Terminal States ──────────────────────────────────────────────────
     Done: { type: "final" },
     ExitGracefully: { type: "final" },
     TerminalFailure: { type: "final" },

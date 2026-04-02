@@ -12,6 +12,8 @@
  */
 
 import type { ResearchPlan, EvidenceReport, RedTeamResult } from "../agents/research_types";
+import type { ProofTree } from "../tree";
+import type { AttemptLog, AgentRole } from "../types";
 
 // ──────────────────────────────────────────────
 // Novelty Classification
@@ -40,6 +42,8 @@ export interface ResearchContext {
   prompt: string;
   /** API key for Gemini agents. */
   apiKey: string;
+  /** Whether to bypass native_decide constraints for publishable targets. */
+  publishableMode: boolean;
   /** Workspace root directory for output artifacts. */
   workspaceDir: string;
   /** Output directory for this specific run. */
@@ -84,6 +88,20 @@ export interface ResearchContext {
   proofRetries: number;
   /** Last compiler error trace. */
   lastCompilerError: string | null;
+
+  /** ── Proof Loop State (port from runDynamicLoop) ── */
+  /** The MCTS proof tree for formal verification. */
+  proofTree: ProofTree | null;
+  /** Cumulative attempt logs for the AgentRouter. */
+  attemptLogs: AttemptLog[];
+  /** Last seen Lean tactic state (goal string). */
+  lastTacticState: string;
+  /** The currently selected specialist role. */
+  currentAgentRole: AgentRole | null;
+  /** Total global iterations in the proof loop. */
+  globalIteration: number;
+  /** Maximum global iterations (default 15). */
+  maxGlobalIterations: number;
 
   /** Proof status at termination. */
   proofStatus: "PROVED" | "FAILED" | "SKIPPED" | null;
@@ -149,7 +167,7 @@ export interface ScribeOutput {
 
 /** Events are NOT sent manually — they are synthesized by actors via onDone/onError. */
 export type ResearchEvent =
-  | { type: "START"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string }
+  | { type: "START"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string; publishableMode: boolean }
   | { type: "xstate.done.actor.ideation"; output: IdeationOutput }
   | { type: "xstate.done.actor.validation"; output: ValidationOutput }
   | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
@@ -173,6 +191,8 @@ export interface ResearchMachineConfig {
   maxProofRetries?: number;
   /** Verbose logging (default: true). */
   verbose?: boolean;
+  /** Activate generalized publishable logic. */
+  publishableMode?: boolean;
 }
 
 // ──────────────────────────────────────────────
@@ -185,6 +205,7 @@ export interface ResearchResult {
   approvedConjecture: { signature: string; description: string } | null;
   redTeamHistory: RedTeamResult[];
   proofStatus: "PROVED" | "FAILED" | "SKIPPED";
+  proofTree: ProofTree | null;
   outputDir: string;
   finalState: string;
 }

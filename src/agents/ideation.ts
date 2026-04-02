@@ -1,10 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ArxivLibrarian } from "../librarian/arxiv_librarian";
 import type { IdeationOutput } from "../orchestration/types";
+import { getAgencyRegistry } from "../agency";
 
 export class IdeatorAgent {
   private readonly ai: GoogleGenAI;
   private readonly workspaceDir: string;
+  private readonly model: string;
 
   constructor(apiKey?: string, workspaceDir: string = ".") {
     const key = apiKey || process.env.GEMINI_API_KEY || "";
@@ -13,12 +15,13 @@ export class IdeatorAgent {
     }
     this.ai = new GoogleGenAI({ apiKey: key });
     this.workspaceDir = workspaceDir;
+    this.model = getAgencyRegistry().resolveProvider("reasoning").model;
   }
 
   /**
    * Orchestrates the entire cognitive flow for Ideation.
    */
-  async ideate(prompt: string, lastValidationError?: string | null): Promise<IdeationOutput> {
+  async ideate(prompt: string, lastValidationError?: string | null, publishableMode: boolean = false): Promise<IdeationOutput> {
     const parsedQuery = await this.extractSearchQuery(prompt);
     console.log(`[Librarian] Extracted arXiv query: "${parsedQuery}"`);
 
@@ -31,10 +34,25 @@ export class IdeatorAgent {
     await librarian.run();
 
     // 2. Query top matches using the cleaned keyword
-    const searchResults = await librarian.searchDatabase(parsedQuery, { limit: 10 });
-    const poolSize = Math.min(3, searchResults.length);
-    const randomIndex = Math.floor(Math.random() * Math.max(1, poolSize));
-    const seedPaper = searchResults[randomIndex];
+    let seedPaper;
+    let searchResults = await librarian.searchDatabase(parsedQuery, { limit: 10 });
+    
+    const explicitIdMatch = parsedQuery.startsWith("id:") ? `arxiv-${parsedQuery.slice(3)}` : null;
+    let poolSize = Math.min(3, searchResults.length);
+    let randomIndex = Math.floor(Math.random() * Math.max(1, poolSize));
+    
+    // If we have an explicit ID requested, enforce picking exactly that paper.
+    // The librarian.searchDatabase handles exact ID extraction now.
+    if (explicitIdMatch) {
+      const perfectMatch = searchResults.find(r => r.id.startsWith(explicitIdMatch));
+      if (perfectMatch) {
+        seedPaper = perfectMatch;
+      }
+    }
+    
+    if (!seedPaper) {
+      seedPaper = searchResults[randomIndex];
+    }
 
     const arxivId = seedPaper?.id?.replace("arxiv-", "") || "0000.00000";
     const title = seedPaper?.paperTitle || "Fallback Title";
@@ -51,16 +69,21 @@ export class IdeatorAgent {
       console.log(`[Ideation] No literature matches found. Generating from scratch.`);
     }
 
-    console.log(`[Ideation] Synthesizing strategy...`);
+    console.log(`[Ideation] Synthesizing strategy... (${publishableMode ? "Generalized Publishable Mode" : "Finite Computable Mode"})`);
 
     // 3. Build strategy
-    return await this.generateStrategy(prompt, title, arxivId, abstract, lastValidationError);
+    return await this.generateStrategy(prompt, title, arxivId, abstract, lastValidationError, publishableMode);
   }
 
   private async extractSearchQuery(prompt: string): Promise<string> {
+    const arxivIdMatch = prompt.match(/(?:arxiv\.org\/(?:abs|pdf)\/|arxiv:)(\d{4}\.\d{4,5}(?:v\d+)?)/i);
+    if (arxivIdMatch) {
+      return `id:${arxivIdMatch[1]}`;
+    }
+
     try {
       const queryResponse = await this.ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: this.model,
         contents: `Extract the core mathematical topic from this prompt as a targeted 2-4 word keyword query for the arXiv API. 
 Exclude words like "find", "arxiv", "paper", "recent", "random", "proof", "conjecture", "extension".
 Only output the raw search phrase.
@@ -78,7 +101,8 @@ Prompt: "${prompt}"`,
     title: string,
     arxivId: string,
     abstract: string,
-    lastValidationError?: string | null
+    lastValidationError?: string | null,
+    publishableMode: boolean = false
   ): Promise<IdeationOutput> {
     let historyFeedback = "";
     if (lastValidationError) {
@@ -121,11 +145,14 @@ YOUR TASK:
 3. Classify novelty: "NOVEL_DISCOVERY" if this is genuinely new, "KNOWN_THEOREM" if this is already established.
 4. Pick 7 distinct mathematical domains to probe.
 
-CRITICAL: The hypothesis MUST be finitely computable by native_decide. Do NOT invent new functions.
+${publishableMode 
+  ? `CRITICAL: Formulate a generalized structural theorem (e.g., asymptotic bounds, generalized property across all N). Do NOT artificially shrink the hypothesis to a specific toy computation or finite edge case. Assume it will be formally verified using standard algebraic and logic tactics (simp, omega, linarith, induction). The theorem MUST be formulated using standard Mathlib definitions without inventing new functions.`
+  : `CRITICAL: The hypothesis MUST be finitely computable by native_decide. Do NOT invent new functions.`
+}
 ${historyFeedback}`;
 
     const response = await this.ai.models.generateContent({
-      model: "gemini-2.5-pro",
+      model: this.model,
       contents: systemPrompt,
       config: {
         responseMimeType: "application/json",

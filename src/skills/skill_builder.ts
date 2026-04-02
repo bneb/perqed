@@ -14,6 +14,7 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { validateSkillFile } from "./skill_validator";
+import { getAgencyRegistry } from "../agency";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Types
@@ -99,7 +100,7 @@ Return ONLY the raw markdown content (no prose wrapping, no explanation), starti
 export class SkillBuilder {
   constructor(
     private readonly apiKey: string,
-    private readonly model = "gemini-2.5-flash",
+    private readonly model = getAgencyRegistry().resolveProvider("reasoning").model,
     private readonly skillsRoot = ".agents/skills",
   ) {}
 

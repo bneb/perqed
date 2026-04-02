@@ -21,6 +21,7 @@ import type {
   ScriptResult,
   EvidenceReport,
 } from "./research_types";
+import { getAgencyRegistry } from "../agency";
 
 const DEFAULT_SANDBOX_TIMEOUT_MS = 30_000;
 const MAX_STDOUT_BYTES = 8_000;
@@ -43,7 +44,7 @@ export class ExplorerAgent {
   constructor(cfg: ExplorerConfig) {
     this.ai = new GoogleGenAI({ apiKey: cfg.apiKey });
     this.domainDepth = cfg.domainDepth ?? 7;
-    this.model = cfg.model ?? "gemini-2.5-flash";
+    this.model = cfg.model ?? getAgencyRegistry().resolveProvider("python").model;
     this.sandboxTimeoutMs = cfg.sandboxTimeoutMs ?? DEFAULT_SANDBOX_TIMEOUT_MS;
   }
 

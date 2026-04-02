@@ -1,0 +1,121 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>As the Perqed research pipeline shifted from single-agent proof runs to a full XState neuro-symbolic multi-agent orchestrator, a silent infrastructure problem surfaced: <strong>55 gigabytes of disk exhaustion</strong>.</p>
+
+<h2>The 525MB Mathlib Storage Leak</h2>
+
+<p>Every time the XState machine spawned a new sandbox directory (<code>run_xxxx</code>) to let an agent propose and compile Lean 4 tactics, it required an active environment. By design, Lean's package manager (<code>lake</code>) built an isolated, independent clone of the entire <code>Mathlib</code> library natively in the sandbox.</p>
+
+<p>At <strong>525 MB</strong> per run, and with hundreds of autonomous loops executing over the last week, the local SSD was rapidly crippled.</p>
+
+<p>The fix wasn't to disable the strict isolation sandboxing. Instead, we re-architected the <code>LeanBridge</code> execution layer to leverage strict <strong>Bubblewrap (<code>bwrap</code>) Read-Only Binds</strong>.</p>
+
+<p>We fixed a path-routing segment bug in the orchestrator so the execution engine correctly extracts the true global project root. From there, we explicitly pass <code>--ro-bind-try /global/.lake /sandbox/.lake</code> to dynamically graft the global Mathlib cache straight into the isolated <code>run_xxxx</code> sandbox at runtime.</p>
+
+<p>The executing agents get sub-millisecond, zero-latency access to the compiled Mathlib abstractions, but because the filesystem overlay is mounted strictly as read-only, they remain physically unable to corrupt the shared cache. Isolation is perfectly preserved. Memory duplication overhead drops to exactly zero.</p>
+
+<h2>Centralized Agency Topologies</h2>
+
+<p>Simultaneously, we realized our typescript codebase was littered with hardcoded model targets—<code>gemma:4b</code> here, <code>deepseek-prover-v2:7b</code> there. If a model was dynamically uninstalled to free up system memory, the pipeline would crash inexplicably deep in the graph execution trace.</p>
+
+<p>We introduced a centralized, authoritative <code>agency.json</code> Registry. Now, the <code>FormalistAgent</code>, <code>IdeatorAgent</code>, <code>ScribeAgent</code>, and every node in the DAG graph resolves its neural reasoning and compilation capabilities strictly through the cohesive <code>AgencyRegistry</code>.</p>
+
+<p>In one swift command, we deleted the obsolete Prover weights (freeing massive disk space), migrated our <code>L0_thinker</code> topology natively to <code>deepseek-r1:8b</code>, and introduced <code>qwen2.5-coder</code> as the high-fidelity <code>L0_typist</code> without changing a single line of application source code.</p>
+
+<p>A resilient neuro-symbolic engine doesn't just need mathematics—it needs robust, zero-toil DevOps.</p>
+`;
+---
+
+<BaseLayout title="The 55GB Leak: Zero-Copy Sandboxes and Agency Topologies — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>April 2, 2026</time>
+            <span class="sep">·</span>
+            <span>3 min read</span>
+          </div>
+          <h1>The 55GB Leak: Zero-Copy Sandboxes and Agency Topologies</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    margin: 24px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .article :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+
+  .article :global(th) {
+    text-align: left;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+  }
+
+  .article :global(td) {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: top;
+  }
+
+  .article :global(tr:last-child td) {
+    border-bottom: none;
+  }
+
+  @media (max-width: 640px) {
+    .article { padding: 32px 0 48px; }
+
+    .article :global(table) {
+      font-size: 0.8rem;
+    }
+
+    .article :global(th),
+    .article :global(td) {
+      padding: 8px 10px;
+    }
+  }
+</style>

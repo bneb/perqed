@@ -78,10 +78,33 @@ export class SolverBridge {
     args: string[],
     timeoutMs: number,
   ): Promise<SolverResult> {
-    const proc = Bun.spawn([bin, ...args], {
+    const useSandbox = process.env.PERQED_USE_DOCKER_SANDBOX === "1" || process.env.PERQED_USE_DOCKER_SANDBOX === "true";
+    
+    let finalBin = bin;
+    let finalArgs = [...args];
+
+    if (useSandbox) {
+      // Extract the file path, assuming the last argument is the temp file path we want to mount
+      const tempFilePath = args[args.length - 1]; 
+      if (tempFilePath && typeof tempFilePath === "string" && tempFilePath.includes("perqed_z3_")) {
+        finalBin = "docker";
+        finalArgs = [
+          "run", "--rm", 
+          "--network", "none", // Forbid network access
+          "-v", `${tempFilePath}:${tempFilePath}:ro`, // Mount only the isolated temp file read-only
+          "z3prover/z3", // Standard Z3 image
+          bin === "python3" ? "python3" : "z3",
+          ...args
+        ];
+      }
+    }
+
+    const proc = Bun.spawn([finalBin, ...finalArgs], {
       stdout: "pipe",
       stderr: "pipe",
     });
+
+    console.log(`  [SolverBridge] Executing ${bin} (timeout: ${timeoutMs}ms)`);
 
     // Race: process completion vs. timeout
     const timeoutPromise = new Promise<"timeout">((resolve) =>
@@ -100,6 +123,7 @@ export class SolverBridge {
     const raceResult = await Promise.race([processPromise, timeoutPromise]);
 
     if (raceResult === "timeout") {
+      console.warn(`  [SolverBridge] ⚠️ Execution of ${bin} TIMED OUT after ${timeoutMs}ms`);
       // Kill the runaway process
       proc.kill();
       return {
@@ -109,6 +133,7 @@ export class SolverBridge {
     }
 
     const { stdout, stderr, exitCode } = raceResult;
+    console.log(`  [SolverBridge] ${bin} completed with exit code ${exitCode}`);
 
     if (exitCode !== 0) {
       return {

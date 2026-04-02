@@ -13,15 +13,16 @@
 
 import { z } from "zod";
 import { FormalistResponseSchema, type FormalistResponse } from "../schemas";
+import { getAgencyRegistry } from "../agency";
 
 // ──────────────────────────────────────────────
 // Configuration
 // ──────────────────────────────────────────────
 
 export interface FormalistConfig {
-  /** Ollama API endpoint base. Default: http://localhost:11434 */
+  /** Ollama API endpoint base. */
   endpoint: string;
-  /** Model name. Default: deepseek-prover-v2:7b-q8 */
+  /** Model name. */
   model: string;
   /** Sampling temperature (0.0–1.0). */
   temperature: number;
@@ -35,9 +36,7 @@ export interface FormalistConfig {
   numCtx?: number;
 }
 
-const DEFAULT_CONFIG: FormalistConfig = {
-  endpoint: "http://localhost:11434",
-  model: "deepseek-prover-v2:7b-q8",
+const DEFAULT_CONFIG: Omit<FormalistConfig, "endpoint" | "model"> = {
   temperature: 0.6,
   systemPrompt: "",
   mode: "chat",
@@ -109,7 +108,12 @@ export class FormalistAgent {
   public lastThinking: string = "";
 
   constructor(config: Partial<FormalistConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = {
+      endpoint: config.endpoint ?? getAgencyRegistry().getEndpoint("L0_thinker"),
+      model: config.model ?? getAgencyRegistry().getModel("L0_thinker"),
+      ...DEFAULT_CONFIG,
+      ...config,
+    } as FormalistConfig;
   }
 
   /**
@@ -173,14 +177,7 @@ export class FormalistAgent {
     // All retries exhausted — return a graceful GIVE_UP instead of crashing.
     // This prevents the orchestrator from dying when the LLM recognizes it
     // cannot synthesize a 537-element partition via Lean tactics.
-    console.warn(
-      `   ⚠️ [FormalistAgent] All ${retries} attempts exhausted. Returning GIVE_UP instead of crashing.`
-    );
-    return {
-      thoughts: `LLM failed after ${retries} attempts. Last error: ${lastError}`,
-      action: "PROPOSE_LEAN_TACTICS" as const,
-      lean_tactics: [],
-    } as FormalistResponse;
+    throw new Error(`LLM Backend Exhaustion: Failed after ${retries} attempts. Last error: ${lastError}`);
   }
 
   /**

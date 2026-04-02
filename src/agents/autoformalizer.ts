@@ -1,4 +1,5 @@
 import { LeanBridge } from "../lean_bridge";
+import { getAgencyRegistry } from "../agency";
 
 export interface AutoformalizerConfig {
   apiKey?: string;
@@ -26,7 +27,7 @@ export class AutoformalizerAgent {
   constructor(config: AutoformalizerConfig) {
     this.config = {
       apiKey: config.apiKey ?? process.env.GEMINI_API_KEY ?? "",
-      model: config.model ?? "gemini-2.5-flash",
+      model: config.model ?? getAgencyRegistry().resolveProvider("formalization").model,
       baseUrl: config.baseUrl ?? "https://generativelanguage.googleapis.com/v1beta/models",
       leanBridge: config.leanBridge,
       maxRetries: config.maxRetries ?? 5,

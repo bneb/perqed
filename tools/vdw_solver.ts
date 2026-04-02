@@ -17,7 +17,7 @@
  */
 
 import { writeFileSync, existsSync, mkdirSync } from "fs";
-import { execSync } from "child_process";
+import { execFileSync } from "node:child_process";
 import {
   computeAPEnergy,
   findViolatingAPs,
@@ -178,7 +178,7 @@ function tryZ3Repair(partition: Int8Array): Int8Array | null {
   const scriptPath = "/tmp/vdw_z3_repair.py";
   writeFileSync(scriptPath, script);
   try {
-    const out = execSync(`python3 ${scriptPath}`, { timeout: 45_000 }).toString();
+    const out = execFileSync("python3", [scriptPath], { timeout: 45_000 }).toString();
     if (out.startsWith("sat")) {
       const repaired = new Int8Array(partition);
       for (const line of out.split("\n")) {
