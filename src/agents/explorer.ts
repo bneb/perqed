@@ -22,6 +22,7 @@ import type {
   EvidenceReport,
 } from "./research_types";
 import { getAgencyRegistry } from "../agency";
+import { loadSkillsIndex } from "./skills_loader";
 
 const DEFAULT_SANDBOX_TIMEOUT_MS = 30_000;
 const MAX_STDOUT_BYTES = 8_000;
@@ -33,6 +34,8 @@ export interface ExplorerConfig {
   model?: string;
   /** Subprocess timeout in ms (default: 30000). Override in tests for speed. */
   sandboxTimeoutMs?: number;
+  /** Optional root path to load skills from (default: ".agents/skills") */
+  skillsRoot?: string;
 }
 
 export class ExplorerAgent {
@@ -40,12 +43,14 @@ export class ExplorerAgent {
   private domainDepth: number;
   private model: string;
   private sandboxTimeoutMs: number;
+  private skillsRoot?: string;
 
   constructor(cfg: ExplorerConfig) {
     this.ai = new GoogleGenAI({ apiKey: cfg.apiKey });
     this.domainDepth = cfg.domainDepth ?? 7;
     this.model = cfg.model ?? getAgencyRegistry().resolveProvider("python").model;
     this.sandboxTimeoutMs = cfg.sandboxTimeoutMs ?? DEFAULT_SANDBOX_TIMEOUT_MS;
+    this.skillsRoot = cfg.skillsRoot;
   }
 
   /**
@@ -90,6 +95,12 @@ export class ExplorerAgent {
       },
     };
 
+    const matchedSkills = this.matchSkillsByDomains(domains);
+    const skillIndex = loadSkillsIndex(this.skillsRoot, matchedSkills);
+    const skillInjection = skillIndex
+      ? `\nYou are aware of the following advanced mathematical capabilities and scripts within our local agentic codebase that can be leveraged during your exploration framework:\n${skillIndex}\n\nUse this knowledge appropriately to wield complex computational paradigms (for instance, structuring your script to load our local SMT solver, or explicitly writing a simulated annealing search loop for a combinatorial space). \nCRITICAL: Do not let this list serve as a crutch or limit your novel exploration. If a domain is best probed through pure linear algebra or brute-force code, do so instead of shoehorning a skill.\n`
+      : "";
+
     const prompt = `You are an elite computational mathematician designing empirical tests.
 
 HYPOTHESIS: ${hypothesis}
@@ -99,15 +110,16 @@ DOMAINS TO PROBE: ${domainList}
 For each domain, write a self-contained empirical investigation script that:
 1. Tests whether the hypothesis has hidden structure in that domain.
 2. Outputs clear numerical or boolean results to stdout.
-3. Is COMPLETELY SELF-CONTAINED — no external libraries beyond <math.h> for C or standard library for Python.
-4. Runs in under 20 seconds on a modern machine.
-5. Ends with a one-line verdict: "SIGNAL DETECTED" or "HYPOTHESIS FALSIFIED IN THIS DOMAIN".
+3. Is COMPLETELY SELF-CONTAINED for C (only <math.h>). For Python, you are strictly ENCOURAGED to use robust scientific libraries: numpy, scipy, networkx, sympy, and z3.
+4. Uses a "Robustness Wrapper": Python scripts should wrap their core logic in a try/except block to catch and report specific mathematical or runtime errors cleanly.
+5. Runs in under 20 seconds on a modern machine.
+6. Ends with a one-line verdict: "SIGNAL DETECTED" or "HYPOTHESIS FALSIFIED IN THIS DOMAIN".
 
 Do not cut any corners. Use a test driven approach with red-to-green workflows.
 
 For C: include all necessary #includes, a main() function, compile with: cc -O2 file.c -lm
-For Python: use only the standard library.
-
+For Python: you may import numpy, scipy, networkx, sympy, and z3 to ensure mathematical accuracy. Do NOT write your own graph/algebra algorithms if a robust library can do it perfectly.
+${skillIndex ? skillInjection : ""}
 DEFINITION GUARDRAIL (CRITICAL):
 Do NOT invent synthetic scoring functions, heuristic metrics, or proxy measures. Your scripts must compute standard, well-defined mathematical quantities (e.g., chromatic number, clique number, independence number, graph diameter, group order, number of solutions to an equation, partition counts). If a concept cannot be directly computed using standard definitions, state that the domain is not applicable rather than inventing an approximation.
 
@@ -203,7 +215,19 @@ Generate exactly one script per domain. Keep scripts under 150 lines.`;
     const srcPath = join(tmpdir(), `${id}.py`);
     writeFileSync(srcPath, script.code, "utf8");
 
-    const result = await this.exec("python3", [srcPath]);
+    const pythonPath = this.getPythonPath();
+    let result = await this.exec(pythonPath, [srcPath]);
+
+    // --- REPAIR LOOP ---
+    if (result.exitCode !== 0 && !result.timedOut) {
+      console.warn(`[Explorer] Script failed for ${script.domain}. Attempting automated repair...`);
+      const repairedCode = await this.repairPythonScript(script.code, result.stderr);
+      if (repairedCode) {
+        writeFileSync(srcPath, repairedCode, "utf8");
+        result = await this.exec(pythonPath, [srcPath]);
+      }
+    }
+
     this.cleanup([srcPath]);
 
     return {
@@ -250,10 +274,74 @@ Generate exactly one script per domain. Keep scripts under 150 lines.`;
     });
   }
 
+  private getPythonPath(): string {
+    const venvPath = join(process.cwd(), "venv", "bin", "python3");
+    if (existsSync(venvPath)) {
+      return venvPath;
+    }
+    return "python3"; // Fallback to system
+  }
+
+  /** Attempt a one-time repair of a failing research script by feeding the error back to Gemini. */
+  private async repairPythonScript(code: string, error: string): Promise<string | null> {
+    const prompt = `Your previous empirical investigation script failed with the following error:
+    
+    ERROR:
+    ${error}
+    
+    CODE:
+    ${code}
+    
+    TASK: Focus strictly on fixing the error (e.g., missing imports, syntax, defined variables). 
+    Ensure you use standard scientific libraries (numpy, scipy, networkx, sympy, z3).
+    Output ONLY the corrected code. Do not apologize or explain.`;
+
+    try {
+      const response = await this.ai.models.generateContent({
+        model: this.model,
+        contents: prompt,
+        config: { temperature: 0.1 },
+      });
+      return response.text?.trim()?.replace(/^```python\n|```$/g, "") || null;
+    } catch {
+      return null;
+    }
+  }
+
   private cleanup(paths: string[]): void {
     for (const p of paths) {
       try { if (existsSync(p)) unlinkSync(p); } catch {}
     }
+  }
+
+  private matchSkillsByDomains(domains: string[]): string[] {
+    const alwaysOn = ["proof_by_contradiction", "direct_proof", "proof_by_contraposition", "mathematical_induction"];
+    const matched = new Set<string>(alwaysOn);
+    const domainStr = domains.join(" ").toLowerCase();
+
+    const mapping: Record<string, string[]> = {
+      graph: ["graph-witness-search", "spectral_graph_bounds", "razborov_flag_algebras", "algebraic_graph_construction", "lean-finite-graph"],
+      ramsey: ["graph-witness-search", "spectral_graph_bounds", "razborov_flag_algebras"],
+      combinatorial: ["schur-partition-search", "pigeonhole_principle", "double_counting"],
+      partition: ["schur-partition-search", "generating_functions"],
+      sat: ["z3-constraint-solver", "lns-z3-hybrid", "micro_sat_patch"],
+      smt: ["z3-constraint-solver", "lns-z3-hybrid"],
+      algebraic: ["local_to_global_hasse_principle", "fixed_point_arguments", "generating_functions"],
+      arithmetic: ["local_to_global_hasse_principle", "epsilon_delta_bounding"],
+      prime: ["local_to_global_hasse_principle", "epsilon_delta_bounding"],
+      analysis: ["epsilon_delta_bounding", "analytic_continuation", "compactness_arguments"],
+      topology: ["homological_cohomological_arguments", "geometric_flow_homotopy", "invariants_and_monovariants", "compactness_arguments"],
+      logic: ["forcing_set_theory_independence", "maximality_zorns_lemma"],
+      complexity: ["polynomial_time_reductions"]
+    };
+
+    for (const [key, skills] of Object.entries(mapping)) {
+      if (domainStr.includes(key)) {
+        skills.forEach(s => matched.add(s));
+      }
+    }
+
+    return Array.from(matched);
   }
 
   /**

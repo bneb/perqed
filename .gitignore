@@ -43,6 +43,7 @@ temp_proof*.py
 agent_workspace/runs/
 agent_workspace/run_*/
 agent_workspace/lancedb/
+lancedb/
 agent_workspace/program_database.jsonl
 
 # Perqed — live search journal (runtime state, regenerated each run)

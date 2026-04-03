@@ -22,8 +22,9 @@ import type {
   IdeationOutput,
   ValidationOutput,
   SandboxOutput,
+  RefinementOutput,
   SMTOutput,
-  FalsificationOutput,
+  RedTeamOutput,
   LeanOutput,
   ErrorCorrectionOutput,
   ScribeOutput,
@@ -33,10 +34,11 @@ import type {
   ValidationInput,
   SandboxInput,
   SMTInput,
-  FalsificationInput,
+  RefinementInput,
   LeanInput,
   ErrorCorrectionInput,
   ScribeInput,
+  RedTeamInput,
   TacticExecutionInput,
 } from "./actors";
 
@@ -46,11 +48,12 @@ import {
   validationActor as defaultValidationActor,
   sandboxActor as defaultSandboxActor,
   smtActor as defaultSmtActor,
-  falsificationActor as defaultFalsificationActor,
+  refinementActor as defaultRefinementActor,
   tacticGeneratorActor as defaultTacticGeneratorActor,
   leanVerificationActor as defaultLeanVerificationActor,
   errorCorrectionActor as defaultErrorCorrectionActor,
   scribeActor as defaultScribeActor,
+  redTeamActor as defaultRedTeamActor,
 } from "./actors";
 import { ProofTree } from "../tree";
 import type { AttemptLog, AgentRole } from "../types";
@@ -65,11 +68,14 @@ const INITIAL_CONTEXT: ResearchContext = {
   workspaceDir: "",
   outputDir: "",
   publishableMode: false,
+  crossPollinate: false,
   literature: [],
   plan: null,
   hypothesis: null,
   noveltyClassification: "UNCLASSIFIED",
   ideationRetries: 0,
+  refinementRetries: 0,
+  refinementHistory: [],
   lastValidationError: null,
   evidence: null,
   sandboxSignal: null,
@@ -77,6 +83,7 @@ const INITIAL_CONTEXT: ResearchContext = {
   currentEnergy: null,
   smtModel: null,
   approvedConjecture: null,
+  lakatosianHistory: [],
   redTeamHistory: [],
   leanAst: null,
   leanProof: null,
@@ -106,7 +113,8 @@ export const researchMachine = setup({
       | { type: "xstate.done.actor.validation"; output: ValidationOutput }
       | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
       | { type: "xstate.done.actor.smt"; output: SMTOutput }
-      | { type: "xstate.done.actor.falsification"; output: FalsificationOutput }
+      | { type: "xstate.done.actor.refinement"; output: RefinementOutput }
+      | { type: "xstate.done.actor.redTeamActor"; output: RedTeamOutput }
       | { type: "xstate.done.actor.tacticGenerator"; output: { role: AgentRole; response: any } }
       | { type: "xstate.done.actor.lean"; output: LeanOutput }
       | { type: "xstate.done.actor.errorCorrection"; output: ErrorCorrectionOutput }
@@ -118,11 +126,12 @@ export const researchMachine = setup({
     validationActor: defaultValidationActor,
     sandboxActor: defaultSandboxActor,
     smtActor: defaultSmtActor,
-    falsificationActor: defaultFalsificationActor,
+    refinementActor: defaultRefinementActor,
     tacticGeneratorActor: defaultTacticGeneratorActor,
     leanVerificationActor: defaultLeanVerificationActor,
     errorCorrectionActor: defaultErrorCorrectionActor,
     scribeActor: defaultScribeActor,
+    redTeamActor: defaultRedTeamActor,
   },
 
   guards: {
@@ -201,10 +210,12 @@ export const researchMachine = setup({
       if (event.type === "START" || event.type === "WAKE_AT_FORMAL") {
         return {
           prompt: event.prompt,
-          apiKey: event.apiKey,
-          workspaceDir: event.workspaceDir,
-          outputDir: event.outputDir,
+          apiKey: (event as any).apiKey,
+          workspaceDir: (event as any).workspaceDir,
+          outputDir: (event as any).outputDir,
           publishableMode: (event as any).publishableMode ?? false,
+          crossPollinate: (event as any).crossPollinate ?? false,
+          plan: undefined,
         };
       }
       return {};
@@ -266,23 +277,25 @@ export const researchMachine = setup({
       }
       return {};
     }),
-    setFalsificationResult: assign(({ event }) => {
-      if (event.type === "xstate.done.actor.falsification") {
+    setRefinementResult: assign(({ context, event }) => {
+      if (event.type === "xstate.done.actor.refinement") {
         return {
-          approvedConjecture: event.output.approvedConjecture,
-          redTeamHistory: event.output.redTeamHistory,
+          hypothesis: event.output.hypothesis,
+          noveltyClassification: event.output.classification,
+          plan: event.output.plan,
+          refinementHistory: [
+             ...context.refinementHistory,
+             `FAILED: ${context.hypothesis}\nREFINED TO: ${event.output.hypothesis}`
+          ]
         };
       }
       return {};
     }),
     setProofComplete: assign(({ event }) => {
-      if (event.type === "xstate.done.actor.lean") {
-        return {
-          proofStatus: "PROVED" as const,
-          leanProof: event.output.proof,
-        };
-      }
-      return {};
+      // Triggered by onDone transition of FormalVerification compound node
+      return {
+        proofStatus: "PROVED" as const,
+      };
     }),
     setCompilerError: assign(({ context, event }) => {
       if (event.type === "xstate.done.actor.lean") {
@@ -403,6 +416,8 @@ export const researchMachine = setup({
           workspaceDir: context.workspaceDir,
           lastValidationError: context.lastValidationError,
           publishableMode: context.publishableMode,
+          crossPollinate: context.crossPollinate,
+          lakatosianHistory: context.lakatosianHistory,
         }),
         onDone: [
           {
@@ -467,7 +482,7 @@ export const researchMachine = setup({
         onDone: [
           {
             guard: "isWitness",
-            target: "FormalVerification",
+            target: "FalsificationFork",
             actions: ["setSandboxResult", "logTransition"],
           },
           {
@@ -477,11 +492,11 @@ export const researchMachine = setup({
           },
           {
             guard: "isCleanKill",
-            target: "FalsificationFork",
+            target: "HypothesisRefinement",
             actions: ["setSandboxResult", "logTransition"],
           },
           {
-            target: "FormalVerification",
+            target: "FalsificationFork",
             actions: ["setSandboxResult", "logTransition"],
           },
         ],
@@ -502,13 +517,13 @@ export const researchMachine = setup({
         onDone: [
           {
             guard: "isSAT",
-            target: "FormalVerification",
+            target: "FalsificationFork",
             actions: ["setSMTResult", "logTransition"],
           },
           {
-            target: "EmpiricalSandbox",
+            target: "HypothesisRefinement",
             actions: ["setSMTResult", "logTransition"],
-          },
+          }
         ],
         onError: {
           target: "EmpiricalSandbox",
@@ -517,24 +532,68 @@ export const researchMachine = setup({
       },
     },
 
-    FalsificationFork: {
+    HypothesisRefinement: {
       invoke: {
-        id: "falsification",
-        src: "falsificationActor",
+        id: "refinement",
+        src: "refinementActor",
         input: ({ context }) => ({
           counterExample: context.counterExample,
+          hypothesis: context.hypothesis ?? "",
+          plan: context.plan!,
           literature: context.literature,
           apiKey: context.apiKey,
         }),
-        onDone: {
-          target: "FormalVerification",
-          actions: ["setFalsificationResult", "logTransition"],
-        },
+        onDone: [
+          {
+            guard: ({ context }) => context.refinementRetries >= 2,
+            target: "ScribeReport",
+            actions: [
+               "setRefinementResult",
+               assign({ refinementRetries: ({ context }) => context.refinementRetries + 1 }),
+               "logTransition"
+            ],
+          },
+          {
+            target: "Validation",
+            actions: [
+              "setRefinementResult", 
+              assign({ refinementRetries: ({ context }) => context.refinementRetries + 1 }),
+              "logTransition"
+            ],
+          }
+        ],
         onError: {
           target: "TerminalFailure",
           actions: "logTransition",
-        },
+        }
       },
+    },
+
+    FalsificationFork: {
+      invoke: {
+        id: "redTeamActor",
+        src: "redTeamActor",
+        input: ({ context }: { context: ResearchContext }) => ({ conjecture: context.approvedConjecture?.signature ?? context.hypothesis ?? "" }),
+        onDone: [
+          {
+            guard: ({ event }: { event: any }) => event.output.status === "COUNTER_EXAMPLE_FOUND",
+            target: "Ideation",
+            actions: assign({
+              lakatosianHistory: ({ context, event }: { context: ResearchContext; event: any }) => [
+                ...context.lakatosianHistory,
+                { 
+                  failedConjecture: context.approvedConjecture?.signature ?? context.hypothesis ?? "", 
+                  killerEdgeCase: event.output.counterExamplePayload 
+                }
+              ]
+            })
+          },
+          {
+            target: "FormalVerification",
+          }
+        ],
+        onError: { target: "ErrorCorrection" }
+      }
     },
 
     FormalVerification: {
@@ -556,7 +615,10 @@ export const researchMachine = setup({
             id: "tacticGenerator",
             src: "tacticGeneratorActor",
             input: ({ context }) => ({
-              conjecture: context.approvedConjecture!,
+              conjecture: context.approvedConjecture ?? {
+                 signature: context.hypothesis ?? "unknown",
+                 description: "",
+              },
               outputDir: context.outputDir || context.workspaceDir,
               apiKey: context.apiKey,
               attemptLogs: context.attemptLogs,
@@ -584,7 +646,7 @@ export const researchMachine = setup({
                (context as any).currentTactic = tactic;
                return {
                 tactic,
-                signature: context.approvedConjecture!.signature,
+                signature: context.approvedConjecture?.signature ?? context.hypothesis ?? "unknown",
                 theoremName: "approved_conjecture",
                 outputDir: context.outputDir || context.workspaceDir,
               };
@@ -663,6 +725,7 @@ export const researchMachine = setup({
           outputDir: context.outputDir || context.workspaceDir,
           apiKey: context.apiKey,
           redTeamHistory: context.redTeamHistory,
+          refinementHistory: context.refinementHistory,
         }),
         onDone: {
           target: "Done",

@@ -82,6 +82,7 @@ async function main() {
       workspaceDir: workspaceBase,
       verbose: true,
       publishableMode: publishable,
+      crossPollinate: crossPollinate,
     });
 
     console.log(`\n  📁 Artifacts written to: ${result.outputDir}`);

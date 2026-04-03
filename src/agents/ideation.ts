@@ -15,13 +15,14 @@ export class IdeatorAgent {
     }
     this.ai = new GoogleGenAI({ apiKey: key });
     this.workspaceDir = workspaceDir;
-    this.model = getAgencyRegistry().resolveProvider("reasoning").model;
+    // Escalate to Tier 3 (L3_complex) which maps to gemini-2.5-pro for deep reasoning
+    this.model = getAgencyRegistry().resolveProvider("reasoning", false, 2).model;
   }
 
   /**
    * Orchestrates the entire cognitive flow for Ideation.
    */
-  async ideate(prompt: string, lastValidationError?: string | null, publishableMode: boolean = false): Promise<IdeationOutput> {
+  async ideate(prompt: string, lastValidationError?: string | null, publishableMode: boolean = false, refinementContext?: string, crossPollinate: boolean = false): Promise<IdeationOutput> {
     const parsedQuery = await this.extractSearchQuery(prompt);
     console.log(`[Librarian] Extracted arXiv query: "${parsedQuery}"`);
 
@@ -68,11 +69,26 @@ export class IdeatorAgent {
     } else {
       console.log(`[Ideation] No literature matches found. Generating from scratch.`);
     }
+    
+    let secondPaper = null;
+    if (crossPollinate) {
+      console.log(`[Ideation] Cross-Pollination Crucible ACTIVE. Searching for orthogonal paper...`);
+      let pool = await librarian.searchDatabase("algebraic structure topology isomorphism graph combinatorial", { limit: 20 });
+      let distinctPool = pool.filter(p => p.id !== seedPaper?.id);
+      if (distinctPool.length > 0) {
+        secondPaper = distinctPool[Math.floor(Math.random() * Math.min(5, distinctPool.length))];
+        console.log(`[Ideation] Selected Secondary Crucible Seed: "${secondPaper.paperTitle}"`);
+      }
+    }
 
     console.log(`[Ideation] Synthesizing strategy... (${publishableMode ? "Generalized Publishable Mode" : "Finite Computable Mode"})`);
 
     // 3. Build strategy
-    return await this.generateStrategy(prompt, title, arxivId, abstract, lastValidationError, publishableMode);
+    return await this.generateStrategy(
+      prompt, title, arxivId, abstract, 
+      lastValidationError, publishableMode, refinementContext, 
+      crossPollinate, secondPaper?.paperTitle, secondPaper?.id?.replace("arxiv-", ""), secondPaper?.paperAbstract
+    );
   }
 
   private async extractSearchQuery(prompt: string): Promise<string> {
@@ -102,9 +118,14 @@ Prompt: "${prompt}"`,
     arxivId: string,
     abstract: string,
     lastValidationError?: string | null,
-    publishableMode: boolean = false
+    publishableMode: boolean = false,
+    refinementContext?: string,
+    crossPollinate: boolean = false,
+    title2?: string | null,
+    arxivId2?: string | null,
+    abstract2?: string | null
   ): Promise<IdeationOutput> {
-    let historyFeedback = "";
+    let historyFeedback = refinementContext ? `\n\n${refinementContext}` : "";
     if (lastValidationError) {
       historyFeedback = `\n\nPREVIOUS ATTEMPT FAILED VALIDATION:\n${lastValidationError}\nPlease formulate a DIFFERENT hypothesis using only standard Mathlib definitions.`;
     }
@@ -138,10 +159,22 @@ Read the following abstract from a real arXiv paper:
 Title: ${title}
 arXiv ID: ${arxivId}
 Abstract: ${abstract}
+${crossPollinate && title2 ? `
+---
+CRUCIBLE CROSS-POLLINATION ACTIVE:
+You must also read this secondary paper from an orthogonal domain:
+
+Title: ${title2}
+arXiv ID: ${arxivId2}
+Abstract: ${abstract2}
+
+ORTHOGONALITY DIRECTIVE ("THINK BIG & AUTONOMOUS"):
+Groundbreaking PhD-level mathematics happens by importing the algebraic machinery of Domain A into the topological landscape of Domain B (Functorial Translation). 
+You must synthesize these TWO completely distinct papers. Find the structural isomorphism between them, and formulate a novel hypothesis that uses the secondary paper's machinery to shatter constraints or generalize mechanisms in the primary paper.` : ""}
 
 YOUR TASK:
-1. Identify a potential extension related to this exact paper.
-2. Formulate a hypothesis that extends this work.
+1. Identify a potential extension related to this exact paper(s).
+2. Formulate a hypothesis that extends this work. If cross-pollinating, explicitly synthesize both domains.
 3. Classify novelty: "NOVEL_DISCOVERY" if this is genuinely new, "KNOWN_THEOREM" if this is already established.
 4. Pick 7 distinct mathematical domains to probe.
 
@@ -187,7 +220,7 @@ ${historyFeedback}`;
         domains_to_probe: raw.domains_to_probe,
         lean_target_sketch: raw.lean_target_sketch,
       },
-      literature: [title],
+      literature: [title, ...(title2 ? [title2] : [])],
     };
   }
 }

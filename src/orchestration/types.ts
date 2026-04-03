@@ -48,6 +48,8 @@ export interface ResearchContext {
   workspaceDir: string;
   /** Output directory for this specific run. */
   outputDir: string;
+  /** Whether we are using the PhD level Cross Pollination engine. */
+  crossPollinate: boolean;
 
   /** Literature references fetched by the Librarian. */
   literature: string[];
@@ -60,6 +62,10 @@ export interface ResearchContext {
   noveltyClassification: NoveltyClassification;
   /** Number of ideation retries (max 3). */
   ideationRetries: number;
+  /** Number of refinement retries (max 3). */
+  refinementRetries: number;
+  /** History of refinement steps. */
+  refinementHistory: string[];
   /** Last validation error (passed back to ideation on hallucination). */
   lastValidationError: string | null;
 
@@ -75,9 +81,11 @@ export interface ResearchContext {
   /** Z3 SMT model (SAT result). */
   smtModel: string | null;
 
-  /** Approved conjecture signature + description from RedTeam. */
+  /** Approved conjecture signature + description from empirical checks. */
   approvedConjecture: { signature: string; description: string } | null;
-  /** Full red team audit history. */
+  /** History of Lakatosian counter-examples breaking earlier conjectures. */
+  lakatosianHistory: { failedConjecture: string; killerEdgeCase: any }[];
+  /** Full red team audit history (legacy). */
   redTeamHistory: RedTeamResult[];
 
   /** Lean AST (validated). */
@@ -146,6 +154,17 @@ export interface FalsificationOutput {
   redTeamHistory: RedTeamResult[];
 }
 
+export interface RedTeamOutput {
+  status: "VERIFIED_BULLETPROOF" | "COUNTER_EXAMPLE_FOUND";
+  counterExamplePayload?: any;
+}
+
+export interface RefinementOutput {
+  hypothesis: string;
+  classification: NoveltyClassification;
+  plan: ResearchPlan;
+}
+
 export interface LeanOutput {
   status: "PROOF_COMPLETE" | "COMPILER_ERROR";
   proof: string | null;
@@ -167,12 +186,13 @@ export interface ScribeOutput {
 
 /** Events are NOT sent manually — they are synthesized by actors via onDone/onError. */
 export type ResearchEvent =
-  | { type: "START"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string; publishableMode: boolean }
+  | { type: "START"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string; publishableMode: boolean; crossPollinate: boolean }
   | { type: "xstate.done.actor.ideation"; output: IdeationOutput }
   | { type: "xstate.done.actor.validation"; output: ValidationOutput }
   | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
   | { type: "xstate.done.actor.smt"; output: SMTOutput }
   | { type: "xstate.done.actor.falsification"; output: FalsificationOutput }
+  | { type: "xstate.done.actor.redTeamActor"; output: RedTeamOutput }
   | { type: "xstate.done.actor.lean"; output: LeanOutput }
   | { type: "xstate.done.actor.errorCorrection"; output: ErrorCorrectionOutput }
   | { type: "xstate.done.actor.scribe"; output: ScribeOutput }
@@ -193,6 +213,8 @@ export interface ResearchMachineConfig {
   verbose?: boolean;
   /** Activate generalized publishable logic. */
   publishableMode?: boolean;
+  /** Activate the PhD Level Cross-Pollination Engine. */
+  crossPollinate?: boolean;
 }
 
 // ──────────────────────────────────────────────

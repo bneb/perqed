@@ -14,6 +14,7 @@ import type {
   IdeationOutput,
   ValidationOutput,
   SandboxOutput,
+  RefinementOutput,
   SMTOutput,
   FalsificationOutput,
   LeanOutput,
@@ -35,6 +36,8 @@ export interface IdeationInput {
   workspaceDir: string;
   lastValidationError: string | null;
   publishableMode: boolean;
+  crossPollinate: boolean;
+  lakatosianHistory?: { failedConjecture: string; killerEdgeCase: any }[];
 }
 
 export interface ValidationInput {
@@ -53,8 +56,14 @@ export interface SMTInput {
   smtScript: string;
 }
 
-export interface FalsificationInput {
+export interface RedTeamInput {
+  conjecture: string;
+}
+
+export interface RefinementInput {
   counterExample: unknown;
+  hypothesis: string;
+  plan: ResearchPlan;
   literature: string[];
   apiKey: string;
 }
@@ -103,8 +112,21 @@ export interface ScribeInput {
 export const ideationActor = fromPromise<IdeationOutput, IdeationInput>(
   async ({ input }) => {
     const { IdeatorAgent } = await import("../agents/ideation");
+    
+    let refinementContext: string | undefined = undefined;
+    if (input.lakatosianHistory && input.lakatosianHistory.length > 0) {
+      refinementContext = "🔥 LAKATOSIAN ADVERSARIAL FEEDBACK 🔥\n\nThe Red Team systematically broke your previous conjectures by finding strict mathematical counter-examples.\n\n" + 
+        input.lakatosianHistory.map(h => `[BROKEN CONJECTURE]\n${h.failedConjecture}\n\n[KILLER TOPOLOGY FOUND]\n${JSON.stringify(h.killerEdgeCase, null, 2)}`).join("\n\n") + 
+        "\n\nYOUR TASK: You must NOT attempt to prove the broken conjectures. Analyze the 'KILLER TOPOLOGY' deeply. Mutate your axioms to structurally exclude or account for this counter-example while maintaining the generalized bound.";
+    }
+
     const ideator = new IdeatorAgent(input.apiKey, input.workspaceDir);
-    return await ideator.ideate(input.prompt, input.lastValidationError, input.publishableMode);
+    try {
+      return await ideator.ideate(input.prompt, input.lastValidationError, input.publishableMode, refinementContext, input.crossPollinate);
+    } catch (e: any) {
+      console.error(`\n[IdeationActor] FATAL ERROR:`, e.stack || e);
+      throw e;
+    }
   },
 );
 
@@ -149,7 +171,6 @@ export const sandboxActor = fromPromise<SandboxOutput, SandboxInput>(
   async ({ input }) => {
     const { ExplorerAgent } = await import("../agents/explorer");
     const { ConjecturerAgent } = await import("../agents/conjecturer");
-    const { RedTeamAuditor } = await import("../agents/red_team");
 
     console.log(`[Explorer] Probing domains: ${(input.domains || []).slice(0, 5).join(", ")}...`);
 
@@ -179,24 +200,13 @@ export const sandboxActor = fromPromise<SandboxOutput, SandboxInput>(
       };
     }
 
-    // Generate conjectures + RedTeam audit
+    // Generate conjectures
     const conjecturer = new ConjecturerAgent(input.apiKey);
     const literatureContext = `Paper: ${input.plan.seed_paper.title}\n\nAbstract: ${input.plan.seed_paper.abstract}\n\nEvidence Synthesis: ${evidence.synthesis}`;
     const conjectures = await conjecturer.generateConjectures(literatureContext, evidence);
 
-    const redTeam = new RedTeamAuditor({ apiKey: input.apiKey });
-    let approvedConjecture: { signature: string; description: string } | null = null;
-    const allHistory: RedTeamResult[] = [];
-
-    for (const conjecture of conjectures) {
-      const { final, history } = await redTeam.audit(conjecture, evidence);
-      allHistory.push(...history);
-      if (final.verdict === "APPROVE") {
-        const finalSig = history.findLast((r) => r.suggested_revision)?.suggested_revision ?? conjecture.signature;
-        approvedConjecture = { signature: finalSig, description: conjecture.description };
-        break;
-      }
-    }
+    const firstConjecture = conjectures[0] ?? { signature: input.hypothesis, description: "Fallback conjecture" };
+    const approvedConjecture = { signature: firstConjecture.signature, description: firstConjecture.description };
 
     if (evidence.anomalies.length > 0 && approvedConjecture) {
       return {
@@ -205,7 +215,7 @@ export const sandboxActor = fromPromise<SandboxOutput, SandboxInput>(
         evidence,
         data: { anomalies: evidence.anomalies },
         approvedConjecture,
-        redTeamHistory: allHistory,
+        redTeamHistory: [],
       };
     }
 
@@ -215,7 +225,7 @@ export const sandboxActor = fromPromise<SandboxOutput, SandboxInput>(
       evidence,
       data: {},
       approvedConjecture,
-      redTeamHistory: allHistory,
+      redTeamHistory: [],
     };
   },
 );
@@ -241,42 +251,53 @@ export const smtActor = fromPromise<SMTOutput, SMTInput>(
 );
 
 // ──────────────────────────────────────────────
+// 4b. Red Team Actor (Falsification Fork)
+// ──────────────────────────────────────────────
+
+export const redTeamActor = fromPromise<any, RedTeamInput>(
+  async ({ input }) => {
+    // Dynamically loaded to prevent circular agent dependencies
+    const { RedTeamAuditor } = await import("../agents/red_team");
+    
+    const auditor = new RedTeamAuditor({ apiKey: process.env.GEMINI_API_KEY || "" });
+    return await auditor.runAdversarialRedTeam(input.conjecture);
+  }
+);
+
+// ──────────────────────────────────────────────
 // 5. Falsification Actor
 // ──────────────────────────────────────────────
 
 /**
  * Wraps ConjecturerAgent to formalize a CLEAN_KILL counter-example.
  */
-export const falsificationActor = fromPromise<FalsificationOutput, FalsificationInput>(
+export const refinementActor = fromPromise<RefinementOutput, RefinementInput>(
   async ({ input }) => {
-    const { ConjecturerAgent } = await import("../agents/conjecturer");
-    const { RedTeamAuditor } = await import("../agents/red_team");
+    const { IdeatorAgent } = await import("../agents/ideation");
+    
+    // We repurpose Ideator to systematically refine the hypothesis based on failure evidence
+    const ideator = new IdeatorAgent(input.apiKey);
 
-    const conjecturer = new ConjecturerAgent(input.apiKey);
-    const literatureContext = `[FALSIFICATION FORK]\nCounter-example discovered: ${JSON.stringify(input.counterExample)}\n\nFormulate a Lean 4 theorem proving WHY the original hypothesis fails.`;
-    const conjectures = await conjecturer.generateConjectures(literatureContext);
+    const refinementContext = `
+[HYPOTHESIS REFINEMENT REQUIRED]
+Our original hypothesis completely failed empirical testing.
+Original Hypothesis: ${input.hypothesis}
+Counter-Example Discovered: ${JSON.stringify(input.counterExample, null, 2)}
 
-    if (conjectures.length === 0) {
-      throw new Error("Falsification actor: no conjectures generated");
-    }
+Your directive: You MUST NOT attempt to prove the failure. Instead, you must structurally modify to the original hypothesis. Restrict its boundaries, weaken the claim, or introduce a natural parameter extension so that the revised hypothesis dodges this counter-example and represents a novel, publishable result.`;
 
-    // RedTeam audit the best candidate
-    const redTeam = new RedTeamAuditor({ apiKey: input.apiKey });
-    const best = conjectures[0]!;
-    const { final, history } = await redTeam.audit(best, {
-      hypothesis: "falsification",
-      results: [],
-      synthesis: "Counter-example proof",
-      anomalies: [],
-      kills: [],
-    });
-
-    const finalSig = history.findLast((r) => r.suggested_revision)?.suggested_revision ?? best.signature;
+    const plan = JSON.parse(JSON.stringify(input.plan));
+    const result = await ideator.ideate(
+      plan.prompt || input.hypothesis,
+      null, // no validation error yet
+      true, // publishableMode enabled for natural extensions
+      refinementContext
+    );
 
     return {
-      proof: finalSig,
-      approvedConjecture: { signature: finalSig, description: best.description },
-      redTeamHistory: history,
+      hypothesis: result.plan.extension_hypothesis,
+      classification: result.classification,
+      plan: result.plan,
     };
   },
 );

@@ -41,6 +41,7 @@ export async function runResearchMachine(
     workspaceDir: config.workspaceDir,
     outputDir,
     publishableMode: config.publishableMode ?? false,
+    crossPollinate: config.crossPollinate ?? false,
   });
 
   return new Promise<ResearchResult>((resolve) => {

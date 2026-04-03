@@ -13,6 +13,7 @@ import { XMLParser } from "fast-xml-parser";
 import { join } from "node:path";
 import { LocalEmbedder } from "../embeddings/embedder";
 import { VectorDatabase, type Premise } from "../embeddings/vector_store";
+import { arxivRateLimiter } from "../net/atb_client";
 
 export interface LibrarianConfig {
   /** Free-text arXiv search queries (e.g. "Ramsey number lower bound Exoo") */
@@ -160,13 +161,6 @@ export class ArxivLibrarian {
   async searchDatabase(query: string, options: { limit?: number } = {}): Promise<Omit<Premise, "vector">[]> {
     await this.db.initialize();
     
-    // Safety check: is Ollama alive?
-    const available = await this.embedder.isAvailable();
-    if (!available) {
-      console.warn("[Librarian] Ollama not available — falling back to empty search results");
-      return [];
-    }
-
     // Direct ID bypass: if query is an arXiv ID, find it syntactically
     if (query.startsWith("id:")) {
       try {
@@ -185,6 +179,13 @@ export class ArxivLibrarian {
       } catch (e) {
         console.warn(`[Librarian] Bypass fetch failed for exact ID ${query}`);
       }
+    }
+
+    // Safety check: is Ollama alive?
+    const available = await this.embedder.isAvailable();
+    if (!available) {
+      console.warn("[Librarian] Ollama not available — falling back to empty search results");
+      return [];
     }
 
     const queryVector = await this.embedder.embed(query);
@@ -216,7 +217,7 @@ export class ArxivLibrarian {
       const encoded = encodeURIComponent(query);
       url = `${this.baseUrl}?search_query=all:${encoded}&max_results=${maxResults}&sortBy=relevance`;
     }
-    const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    const response = await arxivRateLimiter.fetch(url, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) {
       throw new Error(`arXiv API returned ${response.status}`);
     }

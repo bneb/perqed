@@ -36,6 +36,11 @@ async function main() {
       ap_length: AP,
       sa_iterations: 10_000_000,
       initial_temperature: 3.0,
+      enable_reheats: true,
+      stagnation_threshold: 1_000_000,
+      enable_rl: true,
+      epsilon: 0.1,
+      alpha: 0.05,
       seed_strategy: strat,
       description: `Worker ${idx} (${strat})`,
     };
@@ -59,9 +64,9 @@ async function main() {
 
   const results = await Promise.all(promises);
 
-  const best = results.reduce((min, r) => (r.energy < min.energy ? r : min), results[0]);
+  const best = results.reduce((min, r) => (r.energy < min!.energy ? r : min), results[0]!);
   
-  if (best.energy > 0) {
+  if (best!.energy > 0) {
     console.log(`\n======================================================`);
     console.log(`⚠️ Search Complete. Best energy found was ${best.energy}`);
     console.log(`Attempting to push through local minima might require more iterations or crossovers.`);

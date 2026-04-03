@@ -15,7 +15,7 @@ import type {
   ValidationOutput,
   SandboxOutput,
   SMTOutput,
-  FalsificationOutput,
+  RefinementOutput,
   LeanOutput,
   ErrorCorrectionOutput,
   ScribeOutput,
@@ -84,7 +84,7 @@ function waitForFinal(actor: ReturnType<typeof createActor>, timeoutMs = 5000): 
 // ──────────────────────────────────────────────
 
 function mockIdeation(output: IdeationOutput) {
-  return fromPromise<IdeationOutput, { prompt: string; retries: number; apiKey: string; workspaceDir: string; lastValidationError: string | null }>(
+  return fromPromise<IdeationOutput, { prompt: string; retries: number; apiKey: string; workspaceDir: string; lastValidationError: string | null; publishableMode: boolean }>(
     async () => output,
   );
 }
@@ -106,16 +106,23 @@ function mockSMT(output: SMTOutput) {
   return fromPromise<SMTOutput, { smtScript: string }>(async () => output);
 }
 
-function mockFalsification(output: FalsificationOutput) {
-  return fromPromise<FalsificationOutput, { counterExample: unknown; literature: string[]; apiKey: string }>(
+function mockRefinement(output: RefinementOutput) {
+  return fromPromise<RefinementOutput, { hypothesis: string; counterExample: unknown; literature: string[]; apiKey: string; plan: any }>(
     async () => output,
   );
 }
 
-function mockLean(output: LeanOutput) {
-  return fromPromise<LeanOutput, { conjecture: any; outputDir: string; apiKey: string }>(
+function mockLeanVerification(output: any) {
+  return fromPromise<any, { tactic: string; signature: string; theoremName: string; outputDir: string }>(
     async () => output,
   );
+}
+
+function mockTacticGenerator() {
+  return fromPromise<any, any>(async () => ({
+    role: "TACTICIAN",
+    response: { lean_tactics: [{ tactic: "skip" }] }
+  }));
 }
 
 function mockErrorCorrection(output: ErrorCorrectionOutput) {
@@ -182,15 +189,14 @@ const CLEAN_KILL_SANDBOX: SandboxOutput = {
   approvedConjecture: null,
 };
 
-const PROOF_COMPLETE: LeanOutput = {
-  status: "PROOF_COMPLETE",
-  proof: "theorem foo : 1 + 1 = 2 := by norm_num",
+const PROOF_COMPLETE = {
+  isComplete: true,
+  tactic: "norm_num",
   error: null,
 };
 
-const COMPILER_ERROR: LeanOutput = {
-  status: "COMPILER_ERROR",
-  proof: null,
+const COMPILER_ERROR = {
+  isComplete: false,
   error: "unknown identifier 'foo'",
 };
 
@@ -209,7 +215,8 @@ describe("Research State Machine", () => {
         ideationActor: mockIdeation(NOVEL_IDEATION),
         validationActor: mockValidation(true),
         sandboxActor: mockSandbox(WITNESS_SANDBOX),
-        leanActor: mockLean(PROOF_COMPLETE),
+        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
+        tacticGeneratorActor: mockTacticGenerator(),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -218,7 +225,7 @@ describe("Research State Machine", () => {
     actor.start();
 
     expect(actor.getSnapshot().value).toBe("Idle");
-    actor.send({ type: "START", prompt: "test prompt", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test" });
+    actor.send({ type: "START", prompt: "test prompt", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
 
     await waitForFinal(actor);
     expect(actor.getSnapshot().context.prompt).toBe("test prompt");
@@ -230,7 +237,8 @@ describe("Research State Machine", () => {
         ideationActor: mockIdeation(NOVEL_IDEATION),
         validationActor: mockValidation(true),
         sandboxActor: mockSandbox(WITNESS_SANDBOX),
-        leanActor: mockLean(PROOF_COMPLETE),
+        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
+        tacticGeneratorActor: mockTacticGenerator(),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -238,18 +246,18 @@ describe("Research State Machine", () => {
     const actor = createActor(testMachine);
     const visited: string[] = [];
     actor.subscribe((s) => {
-      const v = s.value as string;
-      if (!visited.includes(v)) visited.push(v);
+      const v = s.value;
+      const stateName = typeof v === "object" && v !== null ? (Object.keys(v)[0] || "unknown") : String(v);
+      if (!visited.includes(stateName)) visited.push(stateName);
     });
 
     actor.start();
-    actor.send({ type: "START", prompt: "find bounds", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test" });
+    actor.send({ type: "START", prompt: "find bounds", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
 
     await waitForFinal(actor);
 
     const ctx = actor.getSnapshot().context;
     expect(ctx.proofStatus).toBe("PROVED");
-    expect(ctx.leanProof).toBe("theorem foo : 1 + 1 = 2 := by norm_num");
     expect(visited).toContain("Ideation");
     expect(visited).toContain("Validation");
     expect(visited).toContain("EmpiricalSandbox");
@@ -271,7 +279,7 @@ describe("Research State Machine", () => {
 
     const actor = createActor(testMachine);
     actor.start();
-    actor.send({ type: "START", prompt: "known theorem", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test" });
+    actor.send({ type: "START", prompt: "known theorem", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
 
     await waitForFinal(actor);
 
@@ -299,14 +307,15 @@ describe("Research State Machine", () => {
           return { isValid: true as const, ast: { validated: true } };
         }),
         sandboxActor: mockSandbox(WITNESS_SANDBOX),
-        leanActor: mockLean(PROOF_COMPLETE),
+        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
+        tacticGeneratorActor: mockTacticGenerator(),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
 
     const actor = createActor(testMachine);
     actor.start();
-    actor.send({ type: "START", prompt: "hallucinating LLM", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test" });
+    actor.send({ type: "START", prompt: "hallucinating LLM", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
 
     await waitForFinal(actor);
 
@@ -326,19 +335,21 @@ describe("Research State Machine", () => {
         validationActor: mockValidation(true),
         sandboxActor: mockSandbox(PLATEAU_SANDBOX),
         smtActor: mockSMT({ status: "SAT", model: "e_0_1=true" }),
-        leanActor: mockLean(PROOF_COMPLETE),
+        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
+        tacticGeneratorActor: mockTacticGenerator(),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
 
     const actor = createActor(testMachine);
     actor.subscribe((s) => {
-      const v = s.value as string;
-      if (!visited.includes(v)) visited.push(v);
+      const v = s.value;
+      const stateName = typeof v === "object" && v !== null ? (Object.keys(v)[0] || "unknown") : String(v);
+      if (!visited.includes(stateName)) visited.push(stateName);
     });
 
     actor.start();
-    actor.send({ type: "START", prompt: "plateau test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test" });
+    actor.send({ type: "START", prompt: "plateau test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
 
     await waitForFinal(actor);
 
@@ -348,68 +359,123 @@ describe("Research State Machine", () => {
     expect(actor.getSnapshot().context.smtModel).toBe("e_0_1=true");
   });
 
-  it("routes CLEAN_KILL through FalsificationFork to FormalVerification", async () => {
+  it("routes CLEAN_KILL through HypothesisRefinement back out to Validation", async () => {
+    let refinementCalls = 0;
+    let validationCalls = 0;
     const visited: string[] = [];
 
     const testMachine = researchMachine.provide({
       actors: {
         ideationActor: mockIdeation(NOVEL_IDEATION),
-        validationActor: mockValidation(true),
-        sandboxActor: mockSandbox(CLEAN_KILL_SANDBOX),
-        falsificationActor: mockFalsification({
-          proof: "theorem counter : ¬ P",
-          approvedConjecture: { signature: "theorem counter : ¬ P", description: "counter" },
-          redTeamHistory: [],
+        validationActor: fromPromise<ValidationOutput, any>(async () => {
+          validationCalls++;
+          return { isValid: true as const, ast: { validated: true } };
         }),
-        leanActor: mockLean(PROOF_COMPLETE),
+        sandboxActor: fromPromise<SandboxOutput, any>(async () => {
+          if (refinementCalls === 0) return CLEAN_KILL_SANDBOX;
+          return WITNESS_SANDBOX; // succeed after first refinement
+        }),
+        refinementActor: fromPromise<RefinementOutput, any>(async () => {
+          refinementCalls++;
+          return {
+            hypothesis: "theorem bounded : 1 + 1 = 2",
+            classification: "NOVEL_DISCOVERY",
+            plan: NOVEL_IDEATION.plan
+          };
+        }),
+        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
+        tacticGeneratorActor: mockTacticGenerator(),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
 
     const actor = createActor(testMachine);
     actor.subscribe((s) => {
-      const v = s.value as string;
-      if (!visited.includes(v)) visited.push(v);
+      const v = s.value;
+      const stateName = typeof v === "object" && v !== null ? (Object.keys(v)[0] || "unknown") : String(v);
+      if (!visited.includes(stateName)) visited.push(stateName);
     });
 
     actor.start();
-    actor.send({ type: "START", prompt: "falsification test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test" });
+    actor.send({ type: "START", prompt: "refinement test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
 
     await waitForFinal(actor);
 
+    expect(refinementCalls).toBe(1);
+    expect(validationCalls).toBe(2);
     expect(visited).toContain("EmpiricalSandbox");
-    expect(visited).toContain("FalsificationFork");
+    expect(visited).toContain("HypothesisRefinement");
+    expect(visited).toContain("Validation");
     expect(visited).toContain("FormalVerification");
   });
 
-  it("retries ErrorCorrection up to 3 times then reaches TerminalFailure", async () => {
+  it("exits gracefully to ScribeReport after 3 refinements fail", async () => {
+    let refinementCalls = 0;
+    let validationCalls = 0;
+
+    const testMachine = researchMachine.provide({
+      actors: {
+        ideationActor: mockIdeation(NOVEL_IDEATION),
+        validationActor: fromPromise<ValidationOutput, any>(async () => {
+          validationCalls++;
+          return { isValid: true as const, ast: { validated: true } };
+        }),
+        sandboxActor: mockSandbox(CLEAN_KILL_SANDBOX), // always fails
+        refinementActor: fromPromise<RefinementOutput, any>(async () => {
+          refinementCalls++;
+          return {
+            hypothesis: `ver_${refinementCalls}`,
+            classification: "NOVEL_DISCOVERY",
+            plan: NOVEL_IDEATION.plan
+          };
+        }),
+        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
+        tacticGeneratorActor: mockTacticGenerator(),
+        scribeActor: mockScribe(SCRIBE_DONE),
+      },
+    });
+
+    const actor = createActor(testMachine);
+    
+    actor.start();
+    actor.send({ type: "START", prompt: "limit test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
+
+    await waitForFinal(actor);
+
+    // It will be called exactly 3 times, loop back to validation 3 times, fail sandbox 3 times.
+    // The 3rd failure enters HypothesisRefinement, fails guard, jumps to ScribeReport.
+    expect(refinementCalls).toBe(3);
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.refinementRetries).toBe(3);
+    expect(actor.getSnapshot().value).toBe("Done"); // Reaches done via ScribeReport
+  });
+
+  it("exhausts FormalVerification loop after 15 retries and reaches Done via ScribeReport", async () => {
     let leanCalls = 0;
-    let ecCalls = 0;
 
     const testMachine = researchMachine.provide({
       actors: {
         ideationActor: mockIdeation(NOVEL_IDEATION),
         validationActor: mockValidation(true),
         sandboxActor: mockSandbox(WITNESS_SANDBOX),
-        leanActor: fromPromise<LeanOutput, any>(async () => {
+        leanVerificationActor: fromPromise<any, any>(async () => {
           leanCalls++;
-          return COMPILER_ERROR;
+          return COMPILER_ERROR; // triggers another Inference loop
         }),
-        errorCorrectionActor: fromPromise<ErrorCorrectionOutput, any>(async () => {
-          ecCalls++;
-          return { status: "FIXED" as const, proof: "omega" };
-        }),
+        tacticGeneratorActor: mockTacticGenerator(),
+        scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
 
     const actor = createActor(testMachine);
     actor.start();
-    actor.send({ type: "START", prompt: "error correction test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test" });
+    actor.send({ type: "START", prompt: "exhaustion test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
 
     await waitForFinal(actor);
 
-    expect(actor.getSnapshot().value).toBe("TerminalFailure");
-    expect(actor.getSnapshot().context.proofRetries).toBe(3);
+    // Initial inference creates 1 loop. Then fails 15 times before Exhaustion catches it.
+    expect(actor.getSnapshot().value).toBe("Done");
+    expect(leanCalls).toBe(15);
   });
 
   it("routes SMT UNSAT back to EmpiricalSandbox", async () => {
@@ -427,7 +493,8 @@ describe("Research State Machine", () => {
           return WITNESS_SANDBOX;
         }),
         smtActor: mockSMT({ status: "UNSAT", model: null }),
-        leanActor: mockLean(PROOF_COMPLETE),
+        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
+        tacticGeneratorActor: mockTacticGenerator(),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -439,7 +506,7 @@ describe("Research State Machine", () => {
     });
 
     actor.start();
-    actor.send({ type: "START", prompt: "smt unsat test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test" });
+    actor.send({ type: "START", prompt: "smt unsat test", apiKey: "test", workspaceDir: "/tmp", outputDir: "/tmp/test", publishableMode: false });
 
     await waitForFinal(actor);
 

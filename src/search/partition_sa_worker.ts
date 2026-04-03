@@ -44,6 +44,11 @@ export interface PartitionSAConfig {
   sa_iterations?: number;       // default 10_000_000
   initial_temperature?: number; // default 5.0
   cooling_rate?: number;        // default computed to reach ~0.01 by end
+  enable_reheats?: boolean;     // whether to overheat when stagnating
+  stagnation_threshold?: number; // iterations without bestEnergy improving
+  enable_rl?: boolean;          // use tabular Q-learning inside mutation loop
+  epsilon?: number;             // epsilon-greedy parameter (e.g. 0.1)
+  alpha?: number;               // Q-learning rate (e.g. 0.05)
   warmStart?: Int8Array;        // 1-indexed; takes priority over seed_strategy
   seed_strategy?: SeedStrategy; // default "modular"
   seed_offset?: number;         // for "lookup_shift": shifts the LUT start
@@ -188,6 +193,9 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
   // Cooling: reach T~0.01 by end of run
   const cooling_rate = config.cooling_rate ?? Math.pow(0.01 / initial_temperature, 1 / sa_iterations);
 
+  // Q-Learning Memory Matrix Allocation
+  const qTensor = config.enable_rl ? new Float32Array((domain_size + 1) * num_partitions) : null;
+
   // Initialize partition via configured seed strategy (warmStart wins if provided)
   let current: Int8Array = initializePartition(config);
 
@@ -198,6 +206,7 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
   let bestEnergy = currentEnergy;
 
   let T = initial_temperature;
+  let lastImprovement = 0;
 
   for (let iter = 0; iter < sa_iterations; iter++) {
     if (bestEnergy === 0) break;
@@ -205,10 +214,39 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
     // Pick random element
     const elem = 1 + Math.floor(Math.random() * domain_size);
     const oldClass = current[elem]!;
-    let newClass = Math.floor(Math.random() * (num_partitions - 1));
-    if (newClass >= oldClass) newClass++;
+    
+    let newClass = 0;
+    if (config.enable_rl && qTensor && Math.random() >= (config.epsilon ?? 0.1)) {
+        // Exploitation (Greedy $O(K)$ lookup)
+        const baseIdx = elem * num_partitions;
+        let bestQ = -Infinity;
+        let bestOpts: number[] = [];
+        for (let c = 0; c < num_partitions; c++) {
+            if (c === oldClass) continue;
+            const q = qTensor[baseIdx + c]!;
+            if (q > bestQ) {
+                bestQ = q;
+                bestOpts = [c];
+            } else if (q === bestQ) {
+                bestOpts.push(c);
+            }
+        }
+        newClass = bestOpts[Math.floor(Math.random() * bestOpts.length)]!;
+    } else {
+        // Random Exploration
+        newClass = Math.floor(Math.random() * (num_partitions - 1));
+        if (newClass >= oldClass) newClass++;
+    }
 
     const dE = getDeltaE(current, elem, oldClass, newClass);
+
+    // Q-Learning Scalar Update Logic
+    if (config.enable_rl && qTensor) {
+        const reward = -dE;
+        const idx = elem * num_partitions + newClass;
+        const val = qTensor[idx] as number;
+        qTensor[idx] = val + (config.alpha ?? 0.05) * (reward - val);
+    }
 
     if (dE <= 0 || Math.random() < Math.exp(-dE / T)) {
       current[elem] = newClass;
@@ -217,10 +255,16 @@ export async function runPartitionSA(config: PartitionSAConfig): Promise<Partiti
       if (currentEnergy < bestEnergy) {
         bestEnergy = currentEnergy;
         bestPartition = new Int8Array(current);
+        lastImprovement = iter;
       }
     }
 
-    T *= cooling_rate;
+    if (config.enable_reheats && iter - lastImprovement > (config.stagnation_threshold ?? 500_000)) {
+      T = Math.max(1.0, Math.pow(bestEnergy, 0.4));
+      lastImprovement = iter; // Reset trigger to prevent chain overheating
+    } else {
+      T *= cooling_rate;
+    }
   }
 
   // Final exact energy check on bestPartition
