@@ -1,0 +1,83 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p><em>An overview of our update shifting Perqed from a formal verification wrapper into an autonomous hypothesis engine backed by native empirical validation.</em></p>
+
+<h2>The Crucible: Intersecting Orthogonal Domains</h2>
+<p>Our previous orchestrator (v2.0) excelled at confirming known combinatorial bounds via targeted simulated annealing. To move into generating unmapped mathematical conjectures, we implemented a cross-pollination mechanism.</p>
+
+<p>Rather than running a linear literature search, the <code>IdeatorAgent</code> now queries a local LanceDB vector store to ingest a primary paper and intentionally pairs it with a structurally sound but conceptually distant domain. </p>
+
+<p>In a recent execution probing maximal graph clique bounds, the system ingested a fractional matching paper and bridged it with a secondary retrieval on Hopf Algebras in Quantum Field Theory. By forcing the abstraction into orthogonal domains, the agent bypassed standard textbook replication and yielded a mathematically novel synthesis structure.</p>
+
+<h2>The Falsification Loop: Enforcing Rigor</h2>
+<p>LLMs natively struggle with empirical constraints and prefer hallucinating plausible logic over failing. We implemented a strict execution boundary to correct this.</p>
+
+<ol>
+<li><strong>Sandboxed Execution</strong>: The engine now writes and executes its probing scripts within a heavily isolated local Python environment pre-configured with <code>sympy</code>, <code>scipy</code>, <code>networkx</code>, and <code>z3-solver</code>.</li>
+<li><strong>Automated Error Correction</strong>: When an agent's code fails due to syntax or strict dependency issues, the <code>ExplorerAgent</code> drops into a <code>try/catch</code> repair loop. It reads the local traceback and patches its own implementation before returning execution output.</li>
+<li><strong>Selective Skill Injection</strong>: We mapped 38 specialized mathematical tools (from homological techniques to specific SMT encodings) to their relevant domains. A Domain Affinity Mapper now filters and injects only the necessary techniques into the context window, avoiding JSON truncation and keeping the execution tightly focused on the relevant algebra.</li>
+</ol>
+
+<h2>Empirical Rejection</h2>
+<p>The engine is intentionally designed to falsify its own work. If a generated hypothesis contradicts the established transcendence of an even zeta value, the pipeline doesn't force a hallucinated formal proof. The Sympy script simply flags the counter-example in the empirical pass, and the system discards the hypothesis.</p>
+
+<p>During a recent run analyzing Quandle colorings mapped to Torus knots, the engine correctly identified a combinatorial explosion in its test logic. Unwilling to assert an uncomputable result, the orchestrator analyzed its finite-field computations and yielded an unexpected integer-partition constraint as a clean, open Number Theory conjecture. </p>
+
+<p>It fails fast, proves its failures empirically, and narrows the scope to what is actually solvable.</p>
+`;
+---
+
+<BaseLayout title="Perqed v3.0: Autonomous Falsification and Interdisciplinary Synthesis — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>April 3, 2026</time>
+            <span class="sep">·</span>
+            <span>4 min read</span>
+          </div>
+          <h1>Perqed v3.0: Autonomous Falsification and Interdisciplinary Synthesis</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    margin: 24px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+</style>

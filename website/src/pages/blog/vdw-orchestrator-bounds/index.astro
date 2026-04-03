@@ -1,0 +1,80 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p><em>We implemented dynamic CLI-driven orchestration to decompose and execute search strategies for Van der Waerden partition boundaries natively.</em></p>
+
+<h2>Overview</h2>
+<p>Extremal combinatorics resists standard heuristic testing. While basic graph bounds operate on standard adjacency matrices, locating monochromatic-free partitions for arithmetic sequences (such as $W(5, 3) > 170$) requires a unique topology. </p>
+
+<p>Our goal was to eliminate rigid, hardcoded search environments and establish a generalized local optimizer. From a single terminal command, the system needed to structurally map out the mathematics and independently execute a proof search:</p>
+<blockquote>
+<p><code>bun run src/cli/perqed.ts --prompt="Hunt for the Van Der Waerden boundary W(5, 3) > 170"</code></p>
+</blockquote>
+
+<h2>Implementation Mechanics</h2>
+<p>We adapted the Perqed orchestrator to autonomously handle 1D integer-partition networks by extending the <code>ARCHITECT</code> node.</p>
+
+<ol>
+<li><strong>Topological Extraction</strong>: The <code>ARCHITECT</code> processes the terminal target and isolates the constraints. The problem is contextualized as a defined parameterization: <code>domain_size=171</code>, <code>num_partitions=5</code>, and a monochromatic sequence target of <code>vdw_length=3</code>. </li>
+<li><strong>Algebraic Skeletonization</strong>: Instead of random generation, the system creates declarative JavaScript rules reflecting fundamental algebraic symmetries (e.g., periodic modular constraints). This initializes the search grid with a high-density, mathematical baseline.</li>
+<li><strong>Local Search Cascade</strong>: Using the algebraic skeleton as a structural warm-start, the pipeline acknowledges the limitations of pure symmetry and immediately hands off the setup to a parallel Simulated Annealing engine. The optimizer is then free to aggressively mutate constraints until confirming the Energy = 0 witness.</li>
+<li><strong>Resilient Validation</strong>: Because formal verification in Lean 4 frequently halts due to index arithmetic abstractions, the orchestrator automatically degrades to relaxed type signatures and empirical verification constraints to maintain the core hunt without locking the background thread.</li>
+</ol>
+
+<p>The orchestrator now algorithmically extracts combinatorial targets, layers algebraic scaffolding, and converges on localized optimization pipelines—quietly running in the background without manual scripting overrides. It maps abstract constraints into bounded searches, and it works.</p>
+`;
+---
+
+<BaseLayout title="Orchestrating Combinatorial Searches for Van der Waerden Bounds — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>April 2, 2026</time>
+            <span class="sep">·</span>
+            <span>4 min read</span>
+          </div>
+          <h1>Orchestrating Combinatorial Searches for Van der Waerden Bounds</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    margin: 24px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+</style>
