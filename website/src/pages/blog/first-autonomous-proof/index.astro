@@ -44,7 +44,7 @@ It took 7 iterations to land on <code>all_goals omega</code>, but at 32.7s total
 <h2>The Quantization Trap</h2>
 
 <p>We nearly shipped a broken model. When we first pulled Prover-V2, we tried Q4_K_M to save
-VRAM. It was a disaster:</p>
+VRAM. It caused significant execution errors:</p>
 
 <table>
 <thead>
@@ -56,7 +56,7 @@ VRAM. It was a disaster:</p>
 </tbody>
 </table>
 
-<p>Q4_K_M destroyed the weights responsible for Lean 4 syntax and structured output. The model
+<p>Q4_K_M degraded the weights responsible for Lean 4 syntax and structured output. The model
 would hallucinate emoji-laden prose instead of valid tactics. Q8_0 preserved the critical
 weights — the 2.9 GB overhead is non-negotiable for this use case.</p>
 

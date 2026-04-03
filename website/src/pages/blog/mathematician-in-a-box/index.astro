@@ -4,9 +4,9 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 const blogContent = `
 <p>When you build an AI research lab, the first major hurdle isn't getting it to write math—it's getting it to <em>stop inventing it</em>.</p>
 
-<p>Our initial autonomous pipeline was brilliant but structurally flawed. When given a prompt like "Find a recent arXiv paper on random graphs and extend it," the Architect (a Gemini inference engine) would hallucinate a magnificent, plausible paper—complete with a fake arXiv ID, a beautifully formatted abstract, and a profound-sounding hypothesis.</p>
+<p>Our initial autonomous pipeline was brilliant but structurally flawed. When given a prompt like "Find a recent arXiv paper on random graphs and extend it," the Architect (a Gemini inference engine) would hallucinate a structurally complete paper—complete with a fake arXiv ID, an abstract, and a plausible-sounding hypothesis.</p>
 
-<p>It was executing the scientific method perfectly in a completely parallel, fictional universe. To build a true <strong>Mathematician in the Box</strong>—a system that contributes to human mathematical literature—we had to sever the hallucination.</p>
+<p>It was executing the scientific method in a completely ungrounded universe. To build a system that contributes to actual mathematical literature, we had to sever the hallucination.</p>
 
 <h2>The Fix: The RAG Bridge</h2>
 
@@ -28,7 +28,7 @@ const blogContent = `
 
 <p>The <strong>Explorer</strong> sub-agent spun up Python scripts across 7 domains (computational statistics, random matrix theory, etc.) and empirically found the quantitative predictions to be flawed. The hypothesis was asymptotically false.</p>
 
-<p>Here is where the magic happened. LLMs notoriously struggle to formally prove infinite limits or asymptotic bounds in Lean 4. To solve this, we injected a <strong>Computational Fast-Path Heuristic</strong>: a strict <code>native_decide</code> constraint forcing the Architect to target <em>finite, computable failing bounds</em> instead of general uncomputable limits.</p>
+<p>This is where the heuristic applies. LLMs notoriously struggle to formally prove infinite limits or asymptotic bounds in Lean 4. To solve this, we injected a <strong>Computational Fast-Path Heuristic</strong>: a strict <code>native_decide</code> constraint forcing the Architect to target <em>finite, computable failing bounds</em> instead of general uncomputable limits.</p>
 
 <p>In response to the empirical Python failure, the AI dropped this exact theorem onto the Lean 4 MCTS Prover:</p>
 
@@ -42,7 +42,7 @@ const blogContent = `
 
 <p>Because it retreated to a finite bound, the MCTS Prover could immediately leverage the <code>norm_num</code> and <code>decide</code> tactics to computationally smash the threshold without needing complex logical induction.</p>
 
-<h2>The Best Part: Meeting "Reviewer 2"</h2>
+<h2>The Red Team Audit</h2>
 
 <p>We ran the pipeline again on a new topic: <em>"Template-Based Graph Clustering"</em> (arXiv:2107.019994). The hypothesis was robustly confirmed empirically by 8 different Python tests.</p>
 
@@ -55,17 +55,17 @@ const blogContent = `
   <li>It rejected a technically correct theorem because the <em>description</em> oversold the implications of the bound.</li>
 </ul>
 
-<p>The pipeline killed its own run because the output wasn't novel, true, and properly scoped.</p>
+<p>The pipeline successfully terminated its own run because the output was not novel, true, and properly scoped.</p>
 
 <h2>The Road Ahead</h2>
 
-<p>Perqed is no longer just a code generator. It is an autonomous, verifiable, neuro-symbolic research lab executing the Scientific Method.</p>
+<p>Perqed is essentially functioning as an autonomous, verifiable, neuro-symbolic pipeline applying the Scientific Method.</p>
 
 <p>It reads live literature, writes empirical C/Python tests, falsifies its own hypotheses, and translates those exact failing boundaries into formally verified Lean 4 mathematics.</p>
 
 <p>We've added a 30-second DevOps patch so the pipeline automatically generates its own <code>lakefile.lean</code>, runs <code>lake update</code> to pull <code>Mathlib</code>, and bootstraps its environment with zero configuration.</p>
 
-<p>The Mathematician is in the Box. Now we just let it run.</p>
+<p>The system is isolated and ready. Now we let it run.</p>
 `;
 ---
 
