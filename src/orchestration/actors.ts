@@ -112,6 +112,7 @@ export interface ScribeInput {
 export const ideationActor = fromPromise<IdeationOutput, IdeationInput>(
   async ({ input }) => {
     const { IdeatorAgent } = await import("../agents/ideation");
+    const { NoveltyChecker } = await import("../librarian/novelty_checker");
     
     let refinementContext: string | undefined = undefined;
     if (input.lakatosianHistory && input.lakatosianHistory.length > 0) {
@@ -122,7 +123,30 @@ export const ideationActor = fromPromise<IdeationOutput, IdeationInput>(
 
     const ideator = new IdeatorAgent(input.apiKey, input.workspaceDir);
     try {
-      return await ideator.ideate(input.prompt, input.lastValidationError, input.publishableMode, refinementContext, input.crossPollinate);
+      const result = await ideator.ideate(input.prompt, input.lastValidationError, input.publishableMode, refinementContext, input.crossPollinate);
+
+      // ── Independent Novelty Verification ────────────────────────────
+      // The LLM self-classifies, but we don't trust it blindly.
+      // If it claims NOVEL_DISCOVERY, we run an embedding-based check
+      // against the local LanceDB corpus. If the hypothesis is too
+      // similar to a known theorem/paper, we override to KNOWN_THEOREM.
+      if (result.classification === "NOVEL_DISCOVERY" && result.hypothesis) {
+        const checker = new NoveltyChecker(`${input.workspaceDir}/lancedb`);
+        const noveltyResult = await checker.check(result.hypothesis);
+
+        if (noveltyResult.classification === "KNOWN_THEOREM") {
+          console.warn(
+            `[IdeationActor] LLM claimed NOVEL_DISCOVERY but NoveltyChecker overrode to KNOWN_THEOREM ` +
+            `(matched: "${noveltyResult.matchedSource}", sim=${noveltyResult.topSimilarity.toFixed(3)})`
+          );
+          return {
+            ...result,
+            classification: "KNOWN_THEOREM",
+          };
+        }
+      }
+
+      return result;
     } catch (e: any) {
       console.error(`\n[IdeationActor] FATAL ERROR:`, e.stack || e);
       throw e;
