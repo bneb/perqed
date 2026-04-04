@@ -77,7 +77,7 @@ export class IdeatorAgent {
       let distinctPool = pool.filter(p => p.id !== seedPaper?.id);
       if (distinctPool.length > 0) {
         secondPaper = distinctPool[Math.floor(Math.random() * Math.min(5, distinctPool.length))];
-        console.log(`[Ideation] Selected Secondary Crucible Seed: "${secondPaper.paperTitle}"`);
+        console.log(`[Ideation] Selected Secondary Crucible Seed: "${secondPaper?.paperTitle || 'Unknown'}"`);
       }
     }
 
@@ -176,7 +176,7 @@ YOUR TASK:
 1. Identify a potential extension related to this exact paper(s).
 2. Formulate a hypothesis that extends this work. If cross-pollinating, explicitly synthesize both domains.
 3. Classify novelty: "NOVEL_DISCOVERY" if this is genuinely new, "KNOWN_THEOREM" if this is already established.
-4. Pick 7 distinct mathematical domains to probe.
+4. Pick 2 distinct mathematical domains to probe.
 
 ${publishableMode 
   ? `CRITICAL: Formulate a generalized structural theorem (e.g., asymptotic bounds, generalized property across all N). Do NOT artificially shrink the hypothesis to a specific toy computation or finite edge case. Assume it will be formally verified using standard algebraic and logic tactics (simp, omega, linarith, induction). The theorem MUST be formulated using standard Mathlib definitions without inventing new functions.`
