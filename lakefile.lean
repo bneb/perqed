@@ -6,6 +6,8 @@ package perqed where
     ⟨`autoImplicit, false⟩
   ]
 
+require repl from git "https://github.com/leanprover-community/repl"
+
 @[default_target]
 lean_lib KnuthTorusM4 where
   srcDir := "src/lean"

@@ -154,14 +154,9 @@ describe("NoveltyChecker integration with XState machine", () => {
         redTeamActor: fromPromise<any, any>(async () => ({
           status: "VERIFIED_BULLETPROOF",
         })),
-        leanVerificationActor: fromPromise<any, any>(async () => ({
-          isComplete: true,
-          tactic: "omega",
-          error: null,
-        })),
-        tacticGeneratorActor: fromPromise<any, any>(async () => ({
-          role: "TACTICIAN",
-          response: { lean_tactics: [{ tactic: "omega" }] },
+        leanDynamicActor: fromPromise<any, any>(async () => ({
+          status: "PROVED",
+          finalTree: {} as any,
         })),
         scribeActor: fromPromise<any, any>(async () => ({
           reportPath: "/tmp/test/paper.tex",

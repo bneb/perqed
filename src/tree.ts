@@ -32,6 +32,7 @@ export interface ProofNode {
   errorHistory: string[];         // Failed tactics at THIS node only
   splitType: "OR" | "AND";        // Sprint 19: OR = alternative tactics, AND = all subgoals required
   value: number;                  // Sprint 20: Propagated win probability (0.0 to 1.0)
+  envId?: number;                 // Sprint 21: Persistent REPL environment ID for state restoration
 }
 
 // ──────────────────────────────────────────────
@@ -56,6 +57,7 @@ export class ProofTree {
       errorHistory: [],
       splitType: "OR",
       value: 0.5,
+      envId: undefined,
     };
     this.nodes.set(root.id, root);
     this.rootId = root.id;
@@ -101,6 +103,7 @@ export class ProofTree {
       errorHistory: [],
       splitType: "OR",
       value: 0.5,
+      envId: undefined,
     };
 
     parent.childrenIds.push(child.id);
@@ -191,10 +194,23 @@ export class ProofTree {
     const openNodes = Array.from(this.nodes.values())
       .filter(n => n.status === "OPEN");
 
-    // Sort descending by value. Tie-break by fewest errors.
+    const EXPLORATION_CONSTANT = 1.414;
+
+    // Use UCT (Upper Confidence bound applied to Trees) for sorting
     openNodes.sort((a, b) => {
-      if (b.value !== a.value) return b.value - a.value;
-      return a.errorHistory.length - b.errorHistory.length;
+      const parentA = a.parentId ? this.nodes.get(a.parentId) : null;
+      const parentB = b.parentId ? this.nodes.get(b.parentId) : null;
+
+      const visitsA = a.visits || 1; // avoid division by zero
+      const visitsB = b.visits || 1;
+
+      const parentVisitsA = parentA ? Math.max(1, parentA.visits) : visitsA;
+      const parentVisitsB = parentB ? Math.max(1, parentB.visits) : visitsB;
+
+      const uctA = a.value + EXPLORATION_CONSTANT * Math.sqrt(Math.log(parentVisitsA) / visitsA);
+      const uctB = b.value + EXPLORATION_CONSTANT * Math.sqrt(Math.log(parentVisitsB) / visitsB);
+
+      return uctB - uctA; // sort descending
     });
 
     const selected = openNodes.slice(0, batchSize);
@@ -203,6 +219,41 @@ export class ProofTree {
     });
 
     return selected;
+  }
+
+  // ──────────────────────────────────────────────
+  // MCTS Algorithms
+  // ──────────────────────────────────────────────
+
+  /**
+   * MCTS Backpropagation: Updates node values and visit counts up to the root.
+   * Uses incremental moving average for the Q-value.
+   */
+  public backpropagate(nodeId: string, score: number): void {
+    let current: ProofNode | undefined = this.nodes.get(nodeId);
+    while (current) {
+      current.visits += 1;
+      current.value += (score - current.value) / current.visits;
+
+      if (!current.parentId) break;
+      current = this.nodes.get(current.parentId);
+    }
+  }
+
+  /**
+   * MCTS Node Expansion: Spawns multiple children from LLM tactic generation.
+   * Can accept an optional envId from the interactive REPL.
+   */
+  public expand(parentId: string, candidates: Array<{ tactic: string, state: string, envId?: number }>): ProofNode[] {
+    const children: ProofNode[] = [];
+    for (const c of candidates) {
+      const child = this.addChild(parentId, c.tactic, c.state);
+      if (c.envId !== undefined) {
+          child.envId = c.envId;
+      }
+      children.push(child);
+    }
+    return children;
   }
 
   // ──────────────────────────────────────────────
@@ -236,6 +287,7 @@ export class ProofTree {
       errorHistory: [],
       splitType: "AND",
       value: 0.5,
+      envId: undefined,
     };
     this.nodes.set(andNode.id, andNode);
     parent.childrenIds.push(andNode.id);
@@ -255,6 +307,7 @@ export class ProofTree {
         errorHistory: [],
         splitType: "OR",
         value: 0.5,
+        envId: undefined,
       };
       this.nodes.set(childNode.id, childNode);
       andNode.childrenIds.push(childNode.id);

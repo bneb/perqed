@@ -1,0 +1,80 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p><em>How we quietly replaced our execution backend with Trytet v3.0, integrated Ed25519 deterministic fuel validation, and achieved a true zero-dependency empirical verification loop with localized IPv4 routing protocols. No flashy resets, just rigorous infrastructure mechanics.</em></p>
+
+<h2>The Trytet Engine v3.0 Migration</h2>
+<p>Recent architectural changes across our execution layer demanded a cleaner strategy for validating empirical outputs safely. Offloading raw computational probes via Trytet's legacy VFS proxy was adequate last month, but relying on abstract container registries obscured our formal verification path. Trytet Engine v3.0 solved this by moving to arbitrary Wasm bytecode deserialization—so we naturally rebuilt the Perqed client to interface natively via the new JSON-agnostic flattened structure.</p>
+
+<p>There was no fanfare, just a clean upgrade:</p>
+<ol>
+  <li><strong>Mathematical Bounding over Sandboxing</strong>: Instead of assuming the proxy handles validation, we dynamically map the <code>TetExecutionRequest</code> format byte-for-byte in TypeScript. By injecting Wasm Python computational matrices natively via <code>payload: Array&lt;number&gt;</code>, the framework no longer relies on the disk to figure out context.</li>
+  <li><strong>Cryptographic Economy Tokens</strong>: Trytet v3.0 enforces deterministic fuel routing through Ed25519 signatures. We mapped Node's core <code>crypto</code> SPKI logic directly down to precisely 32-byte threshold slices, letting our agent mint cryptographic <code>FuelVouchers</code> deterministically in-memory before every run, fulfilling the Rust <code>ed25519-dalek</code> constraint silently.</li>
+  <li><strong>The Self-Healing Loop</strong>: Sometimes the daemon rotates its primary node ID representation in the background. Rather than panicking, we wrote a short regex boundary catch around the predictable HTTP 422 <code>[Crash: EconomicViolation]</code> error standard, extracting the true provider identity and transparently re-signing the cryptographic voucher within 100 milliseconds. </li>
+</ol>
+
+<h2>Tighter IPv4 Resolution & Darwin Bwrap Ejection</h2>
+<p>In parallel, tracking down dropped LLM inference sequences pointed clearly to an internal Node/Bun IPv6 abstraction fault inside our LocalAgent handlers. Bounding all local inference specifically through <code>127.0.0.1</code> resolved it outright, enabling the asynchronous <code>ExplorerAgent</code> and <code>Librarian</code> models to interact across thousands of context windows seamlessly without network timeouts.</p>
+
+<p>Finally, invoking Lean 4 native AST syntax verifications through Linux <code>bwrap</code> containers produced redundant operational overhead specifically when running on macOS. Instead of wrestling with pseudo-virtualization abstractions, we adjusted our process orchestrators to detect Darwin kernels dynamically and strip <code>bwrap</code> logic entirely for raw speed.</p>
+
+<h2>What's Next</h2>
+<p>Current empirical runs against combinatorics spaces (e.g. generalized Ramsey graphs) are validating at fractional execution times. The machine generates hypotheses iteratively, cross-pollinates out-of-distribution structures via local embeddings, and fails correctly when our Wasm environments provide hard counter-examples constraint boundaries. </p>
+
+<p>We built an engine that runs reliably and proves its own failures empirically before suggesting them. It just works.</p>
+`;
+---
+
+<BaseLayout title="Migrating to Trytet v3.0 & Cryptographic Fuel Bounds — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>April 4, 2026</time>
+            <span class="sep">·</span>
+            <span>4 min read</span>
+          </div>
+          <h1>Migrating to Trytet v3.0 & Cryptographic Fuel Bounds</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(blockquote) {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    margin: 24px 0;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+</style>

@@ -12,7 +12,7 @@ export class LocalEmbedder {
   private readonly tagsUrl: string;
 
   constructor(
-    baseUrl = "http://localhost:11434/api/embeddings",
+    baseUrl = "http://127.0.0.1:11434/api/embeddings",
     model = "nomic-embed-text",
   ) {
     this.baseUrl = baseUrl;

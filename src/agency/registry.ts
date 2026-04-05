@@ -22,14 +22,14 @@ const BUILTIN_TOPOLOGY: AgencyTopology = {
       L0_thinker: {
         engine: "ollama",
         model: "deepseek-prover-v2:7b-q8",
-        endpoint: "http://localhost:11434",
+        endpoint: "http://127.0.0.1:11434",
         capabilities: ["reasoning", "lean4", "chat", "conjecture", "red_team", "formalization"],
         fallback_for: [],
       },
       L0_typist: {
         engine: "ollama",
         model: "qwen2.5-coder",
-        endpoint: "http://localhost:11434",
+        endpoint: "http://127.0.0.1:11434",
         capabilities: ["bash", "file_edit", "python", "compilation"],
         fallback_for: [],
       },
@@ -250,7 +250,7 @@ export class AgencyRegistry {
    */
   getEndpoint(id: string): string {
     const provider = this.getProvider(id);
-    return provider.endpoint ?? "http://localhost:11434";
+    return provider.endpoint ?? "http://127.0.0.1:11434";
   }
 
   /**

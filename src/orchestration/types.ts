@@ -98,6 +98,8 @@ export interface ResearchContext {
   lastCompilerError: string | null;
 
   /** ── Proof Loop State (port from runDynamicLoop) ── */
+  /** Recursively stacks Active Tree Contexts when decomposing goals (Architectural Lemmatization). */
+  lemmaStack: { conjecture: { signature: string; description: string }; treeSnapshot: ProofTree }[];
   /** The MCTS proof tree for formal verification. */
   proofTree: ProofTree | null;
   /** Cumulative attempt logs for the AgentRouter. */
@@ -141,6 +143,10 @@ export interface SandboxOutput {
   /** Approved conjecture from RedTeam (only set on WITNESS_FOUND / CLEAN_KILL). */
   approvedConjecture: { signature: string; description: string } | null;
   redTeamHistory: RedTeamResult[];
+}
+
+export interface SketcherOutput {
+  compiledSkeleton: string;
 }
 
 export interface SMTOutput {
@@ -190,6 +196,7 @@ export type ResearchEvent =
   | { type: "xstate.done.actor.ideation"; output: IdeationOutput }
   | { type: "xstate.done.actor.validation"; output: ValidationOutput }
   | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
+  | { type: "xstate.done.actor.sketcher"; output: SketcherOutput }
   | { type: "xstate.done.actor.smt"; output: SMTOutput }
   | { type: "xstate.done.actor.falsification"; output: FalsificationOutput }
   | { type: "xstate.done.actor.redTeamActor"; output: RedTeamOutput }

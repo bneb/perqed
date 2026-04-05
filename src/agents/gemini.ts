@@ -27,25 +27,7 @@ export type GeminiModelTier =
 // Response Schemas (for structured output)
 // ──────────────────────────────────────────────
 
-const ARCHITECT_SCHEMA = {
-  type: SchemaType.OBJECT as const,
-  properties: {
-    action: {
-      type: SchemaType.STRING as const,
-      enum: ["DIRECTIVE", "BACKTRACK", "GIVE_UP"],
-    },
-    target_node_id: {
-      type: SchemaType.STRING as const,
-      description: "The ID of the ProofNode to apply this action to, chosen from the frontier digest.",
-    },
-    reasoning: { type: SchemaType.STRING as const },
-    tactics: {
-      type: SchemaType.STRING as const,
-      description: "If DIRECTIVE, the specific Lean 4 tactics to apply (e.g., 'omega', 'induction n').",
-    },
-  },
-  required: ["action", "target_node_id", "reasoning"] as const,
-};
+import { ARCHITECT_SCHEMA, ARCHITECT_SYSTEM_PROMPT } from "./architect";
 
 const REASONER_SCHEMA = {
   type: SchemaType.OBJECT as const,
@@ -64,15 +46,6 @@ const REASONER_SCHEMA = {
 // ──────────────────────────────────────────────
 // System Prompts
 // ──────────────────────────────────────────────
-
-const ARCHITECT_SYSTEM_PROMPT =
-  "You are the Architect, an elite Lean 4 proof strategist. " +
-  "Review the Proof Tree Frontier Digest. " +
-  "Determine which branch is making mathematical progress (low goal counts, clean states) " +
-  "and provide a DIRECTIVE with the specific tactic to apply. " +
-  "If a branch is a dead-end based on repeated failures, issue a BACKTRACK for that specific target_node_id. " +
-  "The system will abandon it and activate a different branch. " +
-  "Always provide the target_node_id from the digest.";;
 
 const REASONER_SYSTEM_PROMPT =
   "You are the Reasoner, a Lean 4 tactical expert. " +

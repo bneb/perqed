@@ -17,6 +17,7 @@ import type {
   RefinementOutput,
   SMTOutput,
   FalsificationOutput,
+  SketcherOutput,
   LeanOutput,
   ErrorCorrectionOutput,
   ScribeOutput,
@@ -42,6 +43,12 @@ export interface IdeationInput {
 
 export interface ValidationInput {
   hypothesis: string;
+}
+
+export interface SketcherInput {
+  informalMath: string;
+  apiKey: string;
+  workspaceDir: string;
 }
 
 export interface SandboxInput {
@@ -78,11 +85,13 @@ export interface LeanInput {
   proofTree: ProofTree | null;
 }
 
-export interface TacticExecutionInput {
-  tactic: string;
-  signature: string;
-  theoremName: string;
+export interface LeanDynamicInput {
+  conjecture: { signature: string; description: string };
   outputDir: string;
+  apiKey: string;
+  proofTree: ProofTree;
+  maxIterations?: number;
+  prunedContext: string;
 }
 
 export interface ErrorCorrectionInput {
@@ -179,6 +188,31 @@ export const validationActor = fromPromise<ValidationOutput, ValidationInput>(
 
     console.log(`[Validation] AST syntactically valid in Lean 4.`);
     return { isValid: true as const, ast: { hypothesis: input.hypothesis } };
+  },
+);
+
+// ──────────────────────────────────────────────
+// 2b. Sketcher Actor (Draft-Sketch-Prove Translation Layer)
+// ──────────────────────────────────────────────
+
+/**
+ * Wraps SketcherAgent. Drafts a fully verified structural Skeleton (only "sorry"s allowed).
+ */
+export const sketcherActor = fromPromise<SketcherOutput, SketcherInput>(
+  async ({ input }) => {
+    try {
+      // Dynamic import to avoid circular dependencies
+      const { SketcherAgent } = await import("../agents/sketcher");
+      const sketcher = new SketcherAgent(input.apiKey, input.workspaceDir);
+
+      console.log(`[Sketcher] Drafting structural Lean 4 skeleton for hypothesis...`);
+      const compiledSkeleton = await sketcher.sketchFormalOutline(input.informalMath);
+
+      return { compiledSkeleton };
+    } catch (err: any) {
+      console.error(`\n[SketcherActor] FATAL ERROR:`, err.stack || err);
+      throw err;
+    }
   },
 );
 
@@ -327,62 +361,30 @@ Your directive: You MUST NOT attempt to prove the failure. Instead, you must str
 );
 
 /**
- * Tactic Generator Actor — specialized for the Specialist Roster.
+ * Lean Dynamic Actor — MCTS State Search via REPL
  */
-export const tacticGeneratorActor = fromPromise<any, LeanInput>(
+export const leanDynamicActor = fromPromise<any, LeanDynamicInput>(
   async ({ input }) => {
-    const { AgentFactory } = await import("../agents/factory");
-    const { AgentRouter } = await import("../agents/router");
-    const { buildRoutingSignals, buildSlimContext } = await import("../orchestrator");
+    const { LeanDynamicEvaluator } = await import("../search/lean_dynamic_evaluator");
 
-    const factory = new AgentFactory({ geminiApiKey: input.apiKey });
+    console.log(`[MCTS] Initiating dynamic proof evaluation for: ${input.conjecture.signature}`);
     
-    const signals = buildRoutingSignals(input.attemptLogs, input.lastTacticState, false); 
-    // Note: directive handling will be added to context
-    
-    // If we have a tree, use it for global signals
-    if (input.proofTree) {
-       // @ts-ignore (Accessing internal tree health)
-       signals.globalFailures = input.proofTree.getGlobalTreeFailures();
-    }
-
-    const role = AgentRouter.determineNextAgent(signals);
-    const agent = factory.getAgent(role, signals);
-
-    let context: string;
-    if (role === "TACTICIAN") {
-      context = buildSlimContext("approved_conjecture", input.conjecture.signature, input.attemptLogs.at(-1)?.error);
-    } else if (role === "ARCHITECT") {
-      context = (input.proofTree as any)?.buildFrontierDigest() ?? "";
-      context += `\n## Theorem: approved_conjecture ${input.conjecture.signature}`;
-    } else {
-      context = `## Theorem: approved_conjecture ${input.conjecture.signature}\n\n## Recent Failures:\n` + 
-                input.attemptLogs.filter(l => !l.success).slice(-3).map(l => `- ${l.error}`).join("\n");
-    }
-
-    const response = await agent.generateMove(context);
-    return { role, response };
-  }
-);
-
-/**
- * Lean Verification Actor — runs the actual compiler.
- */
-export const leanVerificationActor = fromPromise<any, TacticExecutionInput>(
-  async ({ input }) => {
-    const { LeanBridge } = await import("../lean_bridge");
-    const { WorkspaceManager } = await import("../workspace");
-
-    const bridge = new LeanBridge(undefined, input.outputDir);
-    
-    const result = await bridge.checkProof(
-      input.theoremName,
-      input.signature,
-      [input.tactic],
-      60_000
+    // Instantiates the REPL and PRM Scorer under the hood
+    const evaluator = new LeanDynamicEvaluator(
+        input.outputDir, 
+        input.apiKey
     );
-
-    return result;
+    
+    try {
+        const res = await evaluator.runMCTSSearch(
+            input.conjecture,
+            input.proofTree,
+            input.prunedContext
+        );
+        return res;
+    } finally {
+        evaluator.kill();
+    }
   }
 );
 

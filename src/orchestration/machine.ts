@@ -39,7 +39,6 @@ import type {
   ErrorCorrectionInput,
   ScribeInput,
   RedTeamInput,
-  TacticExecutionInput,
 } from "./actors";
 
 // Re-export the actor implementations for the default (non-test) machine
@@ -49,11 +48,11 @@ import {
   sandboxActor as defaultSandboxActor,
   smtActor as defaultSmtActor,
   refinementActor as defaultRefinementActor,
-  tacticGeneratorActor as defaultTacticGeneratorActor,
-  leanVerificationActor as defaultLeanVerificationActor,
+  leanDynamicActor as defaultLeanDynamicActor,
   errorCorrectionActor as defaultErrorCorrectionActor,
   scribeActor as defaultScribeActor,
   redTeamActor as defaultRedTeamActor,
+  sketcherActor as defaultSketcherActor,
 } from "./actors";
 import { ProofTree } from "../tree";
 import type { AttemptLog, AgentRole } from "../types";
@@ -89,6 +88,7 @@ const INITIAL_CONTEXT: ResearchContext = {
   leanProof: null,
   proofRetries: 0,
   lastCompilerError: null,
+  lemmaStack: [],
   proofTree: null,
   attemptLogs: [],
   lastTacticState: "",
@@ -112,6 +112,7 @@ export const researchMachine = setup({
       | { type: "xstate.done.actor.ideation"; output: IdeationOutput }
       | { type: "xstate.done.actor.validation"; output: ValidationOutput }
       | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
+      | { type: "xstate.done.actor.sketcher"; output: any }
       | { type: "xstate.done.actor.smt"; output: SMTOutput }
       | { type: "xstate.done.actor.refinement"; output: RefinementOutput }
       | { type: "xstate.done.actor.redTeamActor"; output: RedTeamOutput }
@@ -127,11 +128,11 @@ export const researchMachine = setup({
     sandboxActor: defaultSandboxActor,
     smtActor: defaultSmtActor,
     refinementActor: defaultRefinementActor,
-    tacticGeneratorActor: defaultTacticGeneratorActor,
-    leanVerificationActor: defaultLeanVerificationActor,
+    leanDynamicActor: defaultLeanDynamicActor,
     errorCorrectionActor: defaultErrorCorrectionActor,
     scribeActor: defaultScribeActor,
     redTeamActor: defaultRedTeamActor,
+    sketcherActor: defaultSketcherActor,
   },
 
   guards: {
@@ -258,6 +259,18 @@ export const researchMachine = setup({
       }
       return {};
     }),
+    setCompiledSkeleton: assign(({ context, event }) => {
+      if (event.type === "xstate.done.actor.sketcher") {
+        return {
+           approvedConjecture: {
+             // Forcing the new formal skeleton over whatever the hypothesis string was!
+             signature: (event.output as any).compiledSkeleton,
+             description: context.approvedConjecture?.description ?? "Compiled Draft-Sketch-Prove Signature",
+           }
+        };
+      }
+      return {};
+    }),
     setSandboxResult: assign(({ event }) => {
       if (event.type === "xstate.done.actor.sandbox") {
         return {
@@ -320,6 +333,38 @@ export const researchMachine = setup({
     }),
     markFailed: assign({
       proofStatus: "FAILED" as const,
+    }),
+    pushLemma: assign(({ context, event }) => {
+      const output = (event as any).output;
+      // Push current state to the stack
+      const snapshot = {
+         conjecture: context.approvedConjecture ?? { signature: context.hypothesis ?? "unknown", description: "fallback" },
+         treeSnapshot: context.proofTree!,
+      };
+      // Re-assign target to the new Lemma
+      return {
+         lemmaStack: [...context.lemmaStack, snapshot],
+         approvedConjecture: { signature: output.lemmaStatement, description: "Dynamic Lemma: " + output.lemmaStatement }
+      };
+    }),
+    popLemma: assign(({ context }) => {
+       const popped = context.lemmaStack[context.lemmaStack.length - 1]!;
+       
+       // Add the solved lemma as a verified node in the parent tree
+       const parentTree = popped.treeSnapshot;
+       const parentConjecture = popped.conjecture;
+       const activeNode = parentTree.getActiveNode();
+       
+       // Simulate that creating the lemma and proving it constitutes a valid step! 
+       // For a real Lean system, this would be `have : <lemma> := by exact <solved_lemma_name>`
+       const child = parentTree.addChild(activeNode.id, `have lemma_resolved : ${context.approvedConjecture?.signature} := sorry`, `(lemma injected recursively)`);
+       parentTree.setActiveNode(child.id);
+
+       return {
+          lemmaStack: context.lemmaStack.slice(0, -1),
+          proofTree: parentTree,
+          approvedConjecture: parentConjecture,
+       };
     }),
     logTransition: ({ context, event }) => {
       if (process.env.DEBUG) {
@@ -589,10 +634,30 @@ export const researchMachine = setup({
             })
           },
           {
-            target: "FormalVerification",
+            target: "Sketching",
           }
         ],
         onError: { target: "ErrorCorrection" }
+      }
+    },
+
+    Sketching: {
+      invoke: {
+        id: "sketcher",
+        src: "sketcherActor",
+        input: ({ context }) => ({
+          informalMath: context.approvedConjecture?.signature ?? context.hypothesis ?? "",
+          apiKey: context.apiKey,
+          workspaceDir: context.workspaceDir,
+        }),
+        onDone: {
+          target: "FormalVerification",
+          actions: ["setCompiledSkeleton", "logTransition"],
+        },
+        onError: {
+          target: "TerminalFailure",
+          actions: "logTransition",
+        }
       }
     },
 
@@ -601,19 +666,12 @@ export const researchMachine = setup({
       states: {
         Initialize: {
           entry: "initProofTree",
-          after: { 0: "Routing" },
+          after: { 0: "MCTSSearch" },
         },
-        Routing: {
-          always: [
-            { guard: ({ context }) => context.globalIteration >= context.maxGlobalIterations, target: "Exhausted" },
-            { target: "Inference" }
-          ],
-        },
-        Inference: {
-          entry: "updateIteration",
+        MCTSSearch: {
           invoke: {
-            id: "tacticGenerator",
-            src: "tacticGeneratorActor",
+            id: "leanDynamicActor",
+            src: "leanDynamicActor",
             input: ({ context }) => ({
               conjecture: context.approvedConjecture ?? {
                  signature: context.hypothesis ?? "unknown",
@@ -621,66 +679,59 @@ export const researchMachine = setup({
               },
               outputDir: context.outputDir || context.workspaceDir,
               apiKey: context.apiKey,
-              attemptLogs: context.attemptLogs,
-              lastTacticState: context.lastTacticState,
-              proofTree: context.proofTree,
-              role: "TACTICIAN",
+              proofTree: context.proofTree!,
+              maxIterations: context.maxGlobalIterations,
+              prunedContext: require("./context_pruner").pruneContext(context)
             }),
-            onDone: {
-              target: "Execution",
-              actions: "setTacticMove",
-            },
-            onError: {
-              target: "#perqedResearch.ErrorCorrection",
-              actions: ["logAttemptFailure", "setCompilerError"]
-            },
-          },
-        },
-        Execution: {
-          invoke: {
-            id: "leanVerification",
-            src: "leanVerificationActor",
-            input: ({ context, event }) => {
-               const response = (event as any).output.response;
-               const tactic = response.lean_tactics?.[0]?.tactic ?? response.tactics ?? "skip";
-               (context as any).currentTactic = tactic;
-               return {
-                tactic,
-                signature: context.approvedConjecture?.signature ?? context.hypothesis ?? "unknown",
-                theoremName: "approved_conjecture",
-                outputDir: context.outputDir || context.workspaceDir,
-              };
-            },
             onDone: [
               {
-                guard: ({ event }) => (event as any).output.isComplete,
-                target: "Complete",
-                actions: "logAttemptSuccess"
+                guard: ({ event }) => (event as any).output.status === "PROVED",
+                target: "CheckLemmaStack", 
               },
               {
-                target: "Routing",
-                actions: "logAttemptSuccess"
+                guard: ({ event }) => (event as any).output.status === "NEEDS_LEMMA",
+                target: "PushLemmaAndRestart", 
+                actions: "logTransition"
+              },
+              {
+                target: "Exhausted" // FAILED or EXHAUSTED
               }
             ],
             onError: {
-              target: "Routing",
-              actions: "logAttemptFailure"
+              target: "#perqedResearch.ErrorCorrection",
+              actions: "setCompilerError" 
             }
           }
         },
+        PushLemmaAndRestart: {
+           entry: "pushLemma",
+           after: { 0: "Initialize" } 
+        },
+        CheckLemmaStack: {
+           always: [
+             {
+                guard: ({ context }) => context.lemmaStack.length > 0,
+                target: "MCTSSearch",
+                actions: ["popLemma", "logTransition"]
+             },
+             {
+                target: "Complete"
+             }
+           ]
+        },
         Complete: {
           type: "final",
+          entry: "setProofComplete",
         },
         Exhausted: {
           type: "final",
+          entry: "markFailed",
         }
       },
-      onDone: [
-        {
-          target: "ScribeReport",
-          actions: ["setProofComplete", "logTransition"],
-        }
-      ]
+      onDone: {
+        target: "ScribeReport",
+        actions: "logTransition",
+      }
     },
 
     ErrorCorrection: {

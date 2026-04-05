@@ -32,6 +32,11 @@ export class AgentRouter {
       return "ARCHITECT";
     }
 
+    // ── Priority 1.5: Lemmatization — Formalist requested a decoupled subgoal ──
+    if (signals.hasSubgoalProposal) {
+      return "ARCHITECT";
+    }
+
     // ── Priority 2: Middle-Out Tripwires — deterministic forced escalation ──
     if (signals.totalTacticianCalls >= MAX_TACTIC_ATTEMPTS) {
       return "ARCHITECT";

@@ -9,7 +9,7 @@
  *
  * Environment variables:
  *   PERQED_WORKSPACE   Base workspace dir (default: ./agent_workspace)
- *   OLLAMA_ENDPOINT    Ollama API URL (default: http://localhost:11434/api/chat)
+ *   OLLAMA_ENDPOINT    Ollama API URL (default: http://127.0.0.1:11434/api/chat)
  *   OLLAMA_MODEL       Model name (default: qwen2.5-coder)
  *   GEMINI_API_KEY     Gemini API key (required for research pipeline + Architect)
  */
@@ -122,7 +122,7 @@ async function main() {
   if (liveMode) {
     const defaultLocal = getAgencyRegistry().resolveProvider("lean4", true);
     const agentConfig: LocalAgentConfig = {
-      endpoint: process.env["OLLAMA_ENDPOINT"] ?? defaultLocal.endpoint ?? "http://localhost:11434/api/chat",
+      endpoint: process.env["OLLAMA_ENDPOINT"] ?? defaultLocal.endpoint ?? "http://127.0.0.1:11434/api/chat",
       model: process.env["OLLAMA_MODEL"] ?? defaultLocal.model,
       temperature: 0.2,
     };

@@ -39,6 +39,8 @@ export interface RoutingSignals {
   identicalErrorCount: number;
   /** Middle-Out: cumulative TACTICIAN invocations in this run. */
   totalTacticianCalls: number;
+  /** Lemmatization: indicates if the LLM explicitly requested a subgoal. */
+  hasSubgoalProposal: boolean;
 }
 
 // ──────────────────────────────────────────────

@@ -107,20 +107,22 @@ export class LeanBridge {
       ? [lakeBinary, "env", this.leanBinary, "--stdin", "--run"]
       : [this.leanBinary, "--stdin", "--run"];
 
-    // Required bwrap arguments for strict unprivileged isolation
-    const cmd = [
-      bwrapBin,
-      "--ro-bind", "/", "/",                  // Read-only access to the entire root filesystem
-      "--dev", "/dev",                        // Required for standard device nodes
-      "--proc", "/proc",                      // Required for standard process info
-      "--bind", sandboxDir, sandboxDir,       // Read-Write access ONLY to the specific Lean workspace
-      "--ro-bind-try", `${leanProjectRoot}/.lake`, `${sandboxDir}/.lake`,         // Share massive Mathlib build globally readonly
-      "--ro-bind-try", `${leanProjectRoot}/lakefile.lean`, `${sandboxDir}/lakefile.lean`,
-      "--unshare-all",                        // Unshare all namespaces (network, pid, ipc, uts)
-      "--die-with-parent",                    // Prevent zombie processes if the orchestrator crashes
-      ...leanCmdArgs
-    ];
-
+    // Required bwrap arguments for strict unprivileged isolation (Linux Only)
+    // On macOS, bypass bwrap isolation since namespaces are unsupported.
+    const cmd = process.platform === 'darwin' 
+      ? leanCmdArgs 
+      : [
+          bwrapBin,
+          "--ro-bind", "/", "/",                  // Read-only access to the entire root filesystem
+          "--dev", "/dev",                        // Required for standard device nodes
+          "--proc", "/proc",                      // Required for standard process info
+          "--bind", sandboxDir, sandboxDir,       // Read-Write access ONLY to the specific Lean workspace
+          "--ro-bind-try", `${leanProjectRoot}/.lake`, `${sandboxDir}/.lake`,         // Share massive Mathlib build globally readonly
+          "--ro-bind-try", `${leanProjectRoot}/lakefile.lean`, `${sandboxDir}/lakefile.lean`,
+          "--unshare-all",                        // Unshare all namespaces (network, pid, ipc, uts)
+          "--die-with-parent",                    // Prevent zombie processes if the orchestrator crashes
+          ...leanCmdArgs
+        ];
 
     const proc = Bun.spawn(cmd, {
       cwd: this.cwd,

@@ -49,6 +49,7 @@ export type Tactic = z.infer<typeof TacticSchema>;
 export const AgentAction = z.enum([
   "FALSIFY_FIRST",
   "PROPOSE_TACTICS",
+  "PROPOSE_SUBGOAL",
   "GIVE_UP",
   "SOLVED",
 ]);
@@ -63,6 +64,9 @@ export const AgentResponseSchema = z.object({
   ),
   tactics: z.array(TacticSchema).max(5).optional().describe(
     "Array of 1–5 independent tactics for parallel execution — required for PROPOSE_TACTICS.",
+  ),
+  subgoal_statement: z.string().optional().describe(
+    "Explicit Lean 4 signature of the proposed lemma — required for PROPOSE_SUBGOAL.",
   ),
 });
 
@@ -105,6 +109,7 @@ export type LeanTactic = z.infer<typeof LeanTacticSchema>;
 export const FormalistAction = z.enum([
   "PROPOSE_LEAN_TACTICS",
   "SEARCH_LEMMA",
+  "PROPOSE_SUBGOAL",
   "GIVE_UP",
   "SOLVED",
 ]);
@@ -119,6 +124,9 @@ export const FormalistResponseSchema = z.object({
   ),
   search_query: z.string().optional().describe(
     "Natural language or Lean name query for Mathlib search — required for SEARCH_LEMMA.",
+  ),
+  subgoal_statement: z.string().optional().describe(
+    "Lean 4 signature of the new target lemma — required for PROPOSE_SUBGOAL.",
   ),
 });
 

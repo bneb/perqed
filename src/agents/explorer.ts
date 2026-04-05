@@ -23,6 +23,7 @@ import type {
 } from "./research_types";
 import { getAgencyRegistry } from "../agency";
 import { loadSkillsIndex } from "./skills_loader";
+import { TrytetClient } from "../execution/trytet_client";
 
 const DEFAULT_SANDBOX_TIMEOUT_MS = 30_000;
 const MAX_STDOUT_BYTES = 8_000;
@@ -44,6 +45,7 @@ export class ExplorerAgent {
   private model: string;
   private sandboxTimeoutMs: number;
   private skillsRoot?: string;
+  private trytet: TrytetClient;
 
   constructor(cfg: ExplorerConfig) {
     this.ai = new GoogleGenAI({ apiKey: cfg.apiKey });
@@ -51,6 +53,7 @@ export class ExplorerAgent {
     this.model = cfg.model ?? getAgencyRegistry().resolveProvider("python").model;
     this.sandboxTimeoutMs = cfg.sandboxTimeoutMs ?? DEFAULT_SANDBOX_TIMEOUT_MS;
     this.skillsRoot = cfg.skillsRoot;
+    this.trytet = new TrytetClient();
   }
 
   /**
@@ -110,7 +113,7 @@ DOMAINS TO PROBE: ${domainList}
 For each domain, write a self-contained empirical investigation script that:
 1. Tests whether the hypothesis has hidden structure in that domain.
 2. Outputs clear numerical or boolean results to stdout.
-3. Is COMPLETELY SELF-CONTAINED for C (only <math.h>). For Python, you are strictly ENCOURAGED to use robust scientific libraries: numpy, scipy, networkx, sympy, and z3.
+3. Is COMPLETELY SELF-CONTAINED. For C (only <math.h>). For Python, you are strictly ENCOURAGED to use robust scientific libraries: SymPy, NumPy, SciPy, or plain logic. DO NOT IMPLORE HEAVY NATIVE LIBRARIES (e.g., Z3) OR SAGEMATH. The Python code runs in a highly restricted WebAssembly WASI Sandbox; avoid C-extensions where possible.
 4. Uses a "Robustness Wrapper": Python scripts should wrap their core logic in a try/except block to catch and report specific mathematical or runtime errors cleanly.
 5. Runs in under 20 seconds on a modern machine.
 6. Ends with a one-line verdict: "SIGNAL DETECTED" or "HYPOTHESIS FALSIFIED IN THIS DOMAIN".
@@ -118,7 +121,7 @@ For each domain, write a self-contained empirical investigation script that:
 Do not cut any corners. Use a test driven approach with red-to-green workflows.
 
 For C: include all necessary #includes, a main() function, compile with: cc -O2 file.c -lm
-For Python: you may import numpy, scipy, networkx, sympy, and z3 to ensure mathematical accuracy. Do NOT write your own graph/algebra algorithms if a robust library can do it perfectly.
+For Python: you may import numpy, sympy, and math to ensure mathematical accuracy. Do NOT write your own graph/algebra algorithms if a robust library can do it perfectly. Under no circumstances should you generate SageMath code, as the runtime strictly does not support native Fortran dependencies.
 ${skillIndex ? skillInjection : ""}
 DEFINITION GUARDRAIL (CRITICAL):
 Do NOT invent synthetic scoring functions, heuristic metrics, or proxy measures. Your scripts must compute standard, well-defined mathematical quantities (e.g., chromatic number, clique number, independence number, graph diameter, group order, number of solutions to an equation, partition counts). If a concept cannot be directly computed using standard definitions, state that the domain is not applicable rather than inventing an approximation.
@@ -212,23 +215,24 @@ Generate exactly one script per domain. Keep scripts under 150 lines.`;
     id: string,
     start: number,
   ): Promise<ScriptResult> {
-    const srcPath = join(tmpdir(), `${id}.py`);
-    writeFileSync(srcPath, script.code, "utf8");
-
-    const pythonPath = this.getPythonPath();
-    let result = await this.exec(pythonPath, [srcPath]);
+    let result = await this.trytet.executeWasm({
+        code: script.code,
+        image: "python-3.11.wasm",
+        timeoutMs: this.sandboxTimeoutMs
+    });
 
     // --- REPAIR LOOP ---
     if (result.exitCode !== 0 && !result.timedOut) {
       console.warn(`[Explorer] Script failed for ${script.domain}. Attempting automated repair...`);
       const repairedCode = await this.repairPythonScript(script.code, result.stderr);
       if (repairedCode) {
-        writeFileSync(srcPath, repairedCode, "utf8");
-        result = await this.exec(pythonPath, [srcPath]);
+        result = await this.trytet.executeWasm({
+            code: repairedCode,
+            image: "python-3.11.wasm",
+            timeoutMs: this.sandboxTimeoutMs
+        });
       }
     }
-
-    this.cleanup([srcPath]);
 
     return {
       domain: script.domain,
@@ -293,7 +297,7 @@ Generate exactly one script per domain. Keep scripts under 150 lines.`;
     ${code}
     
     TASK: Focus strictly on fixing the error (e.g., missing imports, syntax, defined variables). 
-    Ensure you use standard scientific libraries (numpy, scipy, networkx, sympy, z3).
+    Ensure you use standard scientific libraries (numpy, sympy). NO SAGEMATH OR Z3 NATIVE BINARIES ALLOWED.
     Output ONLY the corrected code. Do not apologize or explain.`;
 
     try {
