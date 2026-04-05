@@ -56,10 +56,10 @@ Perqed includes a fully autonomous research orchestration loop powered by an **X
 
 1. **Literature Seeding**: The Librarian fetches relevant arXiv papers to ground the research.
 2. **Planning**: Formulates a concrete, plausible extension hypothesis inspired by the seed literature.
-3. **Empirical Investigation**: The Explorer agent synthesizes C/Python scripts and runs them across safe, timeout-enforced subprocess sandboxes across multiple mathematical domains to seek empirical signal or counterexamples.
+3. **Empirical Investigation**: The Explorer agent synthesizes Python scripts and analyzes them explicitly within the **Trytet Engine v3.0** WebAssembly sandbox. This completely replaces classical OS subprocess models with a mathematically constrained, verifiable virtual file system (gated via Ed25519 Cryptographic Fuel Vouchers), empirically resolving constraints before any formal pathing.
 4. **Conjecture Generation**: Synthesizes the literature context and empirical evidence into precise Lean 4 theorem signatures.
 5. **Adversarial Red-Teaming**: An independent Red Team auditor attempts to poke holes in the conjecture. Conjectures that are too broad or easily falsified are either rejected or forcefully weakened (up to 3 rounds of iterative revision).
-6. **Formal Verification**: Approved conjectures are sent to the MCTS proof engine to attempt formal Lean 4 verification.
+6. **Formal Verification**: Approved conjectures are sent to the MCTS proof engine to attempt formal Lean 4 verification using zero-copy `bwrap` Linux namespace caching (or dynamically failing back to native compilation on Darwin macOS environments to bypass virtualization overhead).
 
 To run the pipeline:
 ```bash
@@ -188,7 +188,7 @@ The classic mode bypasses the autonomous research front-end entirely. It sets up
 |----------|-------------|---------|
 | `GEMINI_API_KEY` | **Required** for the autonomous pipeline and Architect escalation. | *None* |
 | `PERQED_WORKSPACE` | The root directory where research outputs and workspaces are saved. | `./agent_workspace` |
-| `OLLAMA_ENDPOINT` | The API endpoint for the local tactic generator. | `http://localhost:11434/api/chat` |
+| `OLLAMA_ENDPOINT` | The API endpoint for the local tactic generator. | `http://127.0.0.1:11434/api/chat` |
 | `OLLAMA_MODEL` | The model tag used by Ollama. | `qwen2.5-coder` |
 
 ## Model Stack
@@ -219,7 +219,8 @@ perqed/
 │   │   └── types.ts                # Context, events, actor output types
 │   ├── orchestrator.ts             # MCTS proof loop (specialist routing + async batch)
 │   ├── tree.ts                     # ProofTree — AND/OR MCTS with value backpropagation
-│   ├── lean_bridge.ts              # Lean 4 subprocess + goal parsing
+│   ├── lean_bridge.ts              # Lean 4 subprocess (Zero-copy Bwrap/Native)
+│   ├── execution/                  # Trytet Engine v3.0 Cryptographic Wasm Sandboxing
 │   ├── lean_ast_validator.ts       # Mathlib definition guardrail
 │   ├── solver.ts                   # Native SMT-LIB2 bridge (Z3)
 │   ├── agents/                     # Router, formalist, conjecturer, scribe, red_team
