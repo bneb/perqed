@@ -1,6 +1,6 @@
 # Perqed
 
-**Automated theorem proving in Lean 4.** An open-source neuro-symbolic research lab that reads mathematical literature, generates conjectures, attempts proofs via MCTS-guided tactic search, and extracts training data from successful proofs — orchestrated by a reactive XState v5 state machine.
+**Automated theorem proving in Lean 4.** An open-source neuro-symbolic research lab that reads mathematical literature, generates conjectures, attempts proofs via MCTS-guided tactic search, and extracts training data from successful proofs. The framework is orchestrated by a reactive XState v5 state machine, with all empirical computational probes securely verifiable via the mathematically metered **Trytet Engine v3.0** WebAssembly sandbox.
 
 Runs locally on Apple Silicon.
 
@@ -190,11 +190,13 @@ The classic mode bypasses the autonomous research front-end entirely. It sets up
 | `PERQED_WORKSPACE` | The root directory where research outputs and workspaces are saved. | `./agent_workspace` |
 | `OLLAMA_ENDPOINT` | The API endpoint for the local tactic generator. | `http://127.0.0.1:11434/api/chat` |
 | `OLLAMA_MODEL` | The model tag used by Ollama. | `qwen2.5-coder` |
+| `TRYTET_ENDPOINT` | The API endpoint for the Trytet Engine v3.0 Wasm sandbox execution. | `http://127.0.0.1:3000` |
 
-## Model Stack
+## Execution & Model Stack
 
-| Role | Model | Tier | Purpose |
-|------|-------|------|---------| 
+| Role | Engine / Model | Tier | Purpose |
+|------|----------------|------|---------| 
+| **Sandbox** | `Trytet Engine v3.0` | Local (Wasm) | Deterministic execution of empirical probes (Voucher metered) |
 | **Tactician** | `deepseek-prover-v2:7b-q8` | Local | Lean 4 tactic generation |
 | **Reasoner** | `gemini-2.5-flash` | Cloud (free) | Strategic unblock after tactic failures |
 | **Architect** | `gemini-2.5-flash` → `gemini-3.1-pro-preview` | Cloud | Proof planning, directives (escalates on failure) |
