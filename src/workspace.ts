@@ -90,8 +90,9 @@ require mathlib from git
       console.log("   🪣 [DevOps] Bootstrapping Lean 4 Workspace and pulling Mathlib (this takes a moment)...");
       try {
         const { execSync } = await import("node:child_process");
-        execSync("~/.elan/bin/lake update", { cwd: this.baseDir, stdio: "ignore" });
-        execSync("~/.elan/bin/lake build", { cwd: this.baseDir, stdio: "ignore" });
+        const lakeBin = `${process.env.HOME}/.elan/bin/lake`;
+        execSync(`${lakeBin} update`, { cwd: this.baseDir, stdio: "ignore" });
+        execSync(`${lakeBin} build`, { cwd: this.baseDir, stdio: "ignore" });
         console.log("   ✅ [DevOps] Mathlib environment ready.");
       } catch (err: any) {
         console.log(`   ⚠️ [DevOps] lake update/build failed: ${err.message}. Mathlib might not be fully available.`);

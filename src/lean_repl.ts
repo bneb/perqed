@@ -18,8 +18,9 @@ export class LeanREPLBridge {
 
   constructor(workspaceDir: string) {
     const absPath = path.resolve(workspaceDir);
+    const lakeBin = `${process.env.HOME}/.elan/bin/lake`;
     console.log(`[LeanREPL] Initializing Lake inside absolute CWD: ${absPath}`);
-    this.proc = spawn("lake", ["exe", "repl"], {
+    this.proc = spawn(lakeBin, ["exe", "repl"], {
       cwd: absPath,
     });
 

@@ -5,6 +5,7 @@
  *   TACTICIAN (local Ollama)  → default tactic spray
  *   REASONER  (Gemini cloud)  → tactical unblocking
  *   ARCHITECT (Gemini cloud)  → structural planning
+ *   HUMAN     (manual input)  → human-in-the-loop
  *
  * Model tiers are resolved from the AgencyRegistry (agency.json).
  * When no registry is provided, falls back to hardcoded defaults
@@ -15,6 +16,7 @@ import type { AgentRole, RoutingSignals } from "../types";
 import type { FormalistResponse } from "../schemas";
 import { FormalistAgent, type FormalistConfig } from "./formalist";
 import { GeminiAgent, type GeminiModelTier } from "./gemini";
+import { HumanAgent } from "./human";
 import type { AgencyRegistry } from "../agency/registry";
 
 // ──────────────────────────────────────────────
@@ -154,6 +156,9 @@ export class AgentFactory {
    */
   getAgent(role: AgentRole, signals: RoutingSignals): SpecialistAgent {
     switch (role) {
+      case "HUMAN":
+        return new HumanAgent();
+
       case "TACTICIAN":
         return new FormalistSpecialist("TACTICIAN", {
           endpoint: this.config.ollamaEndpoint,

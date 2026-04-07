@@ -1,0 +1,14 @@
+[
+  {
+    "hypothesisSignature": "theorem circle_pseudo_randomness_F13 : let F := ZMod 13; let V : Finset (F × F) := { (x, y) | x, y : F, x*x + y*y = 1 }; let Q_val (u v : F × F) : F := (u.fst - v.fst)^2 + (u.snd - v.snd)^2; let S : Finset F := { Q_val u v | u ∈ V, v ∈ V, u ≠ v, Q_val u v ≠ 0 }; let Residues : Finset F := S.filter (fun x => IsQuadraticResidue x); Nat.card Residues * 2 = Nat.card S",
+    "failureReason": "COUNTER_EXAMPLE_FOUND",
+    "killerEdgeCase": "unsat\n",
+    "timestamp": "2026-04-07T15:01:33.765Z"
+  },
+  {
+    "hypothesisSignature": "def specificGraph14 : SimpleGraph (Fin 14) := { adj := fun i j => i ≠ j ∧ i.val < 4 ∧ j.val < 4, symm := by { intros i j h, simp at h, rcases h with ⟨h_ne, h_i_lt_4, h_j_lt_4⟩, simp [h_ne.symm, h_j_lt_4, h_i_lt_4] } } theorem specific_graph_14_has_4_clique : (specificGraph14).cliqueSet 4 ≠ ∅",
+    "failureReason": "COUNTER_EXAMPLE_FOUND",
+    "killerEdgeCase": "unsat\n",
+    "timestamp": "2026-04-07T15:06:08.600Z"
+  }
+]

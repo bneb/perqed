@@ -53,9 +53,14 @@ import {
   scribeActor as defaultScribeActor,
   redTeamActor as defaultRedTeamActor,
   sketcherActor as defaultSketcherActor,
+  saResolutionActor as defaultSaResolutionActor,
 } from "./actors";
+import { flagAlgebraActor } from "./actors/flag_algebra_actor";
 import { ProofTree } from "../tree";
 import type { AttemptLog, AgentRole } from "../types";
+import { VerifiedVault } from "../vault";
+import { LakatosianVault } from "../vault/lakatosian_vault";
+import { TransitionBuffer } from "../ml/replay_buffer";
 
 // ──────────────────────────────────────────────
 // Initial Context Factory
@@ -72,6 +77,7 @@ const INITIAL_CONTEXT: ResearchContext = {
   plan: null,
   hypothesis: null,
   noveltyClassification: "UNCLASSIFIED",
+  saPlateauCount: 0,
   ideationRetries: 0,
   refinementRetries: 0,
   refinementHistory: [],
@@ -81,6 +87,8 @@ const INITIAL_CONTEXT: ResearchContext = {
   counterExample: null,
   currentEnergy: null,
   smtModel: null,
+  saModel: null,
+  saEnergy: null,
   approvedConjecture: null,
   lakatosianHistory: [],
   redTeamHistory: [],
@@ -114,6 +122,8 @@ export const researchMachine = setup({
       | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
       | { type: "xstate.done.actor.sketcher"; output: any }
       | { type: "xstate.done.actor.smt"; output: SMTOutput }
+      | { type: "xstate.done.actor.sa"; output: import("./types").SAOutput }
+      | { type: "xstate.done.actor.flagAlgebraActor"; output: import("./types").FlagAlgebraOutput }
       | { type: "xstate.done.actor.refinement"; output: RefinementOutput }
       | { type: "xstate.done.actor.redTeamActor"; output: RedTeamOutput }
       | { type: "xstate.done.actor.tacticGenerator"; output: { role: AgentRole; response: any } }
@@ -133,11 +143,14 @@ export const researchMachine = setup({
     scribeActor: defaultScribeActor,
     redTeamActor: defaultRedTeamActor,
     sketcherActor: defaultSketcherActor,
+    saResolutionActor: defaultSaResolutionActor,
+    flagAlgebraActor: flagAlgebraActor,
   },
 
   guards: {
     canRetryIdeation: ({ context }) => context.ideationRetries < 3,
     canRetryProof: ({ context }) => context.proofRetries < 3,
+    isRepeatedPlateau: ({ context }) => context.saPlateauCount >= 3,
     isKnownTheorem: ({ event }) => {
       if (event.type === "xstate.done.actor.ideation") {
         return event.output.classification === "KNOWN_THEOREM";
@@ -181,8 +194,14 @@ export const researchMachine = setup({
       return false;
     },
     isSAT: ({ event }) => {
-      if (event.type === "xstate.done.actor.smt") {
+      if (event.type === "xstate.done.actor.smt" || event.type === "xstate.done.actor.sa") {
         return event.output.status === "SAT";
+      }
+      return false;
+    },
+    isTimeout: ({ event }) => {
+      if (event.type === "xstate.done.actor.smt") {
+        return event.output.status === "TIMEOUT";
       }
       return false;
     },
@@ -247,6 +266,12 @@ export const researchMachine = setup({
     incrementIdeationRetry: assign({
       ideationRetries: ({ context }) => context.ideationRetries + 1,
     }),
+    incrementSaPlateau: assign({
+      saPlateauCount: ({ context }) => context.saPlateauCount + 1,
+    }),
+    resetSaPlateau: assign({
+      saPlateauCount: 0,
+    }),
     setValidationError: assign({
       lastValidationError: ({ event }) => {
         if ("error" in event) return String((event as any).error);
@@ -287,6 +312,15 @@ export const researchMachine = setup({
     setSMTResult: assign(({ event }) => {
       if (event.type === "xstate.done.actor.smt") {
         return { smtModel: event.output.model };
+      }
+      return {};
+    }),
+    setSAResult: assign(({ event }) => {
+      if (event.type === "xstate.done.actor.sa") {
+        return { 
+          saModel: event.output.model,
+          saEnergy: event.output.bestEnergy 
+        };
       }
       return {};
     }),
@@ -334,6 +368,20 @@ export const researchMachine = setup({
     markFailed: assign({
       proofStatus: "FAILED" as const,
     }),
+    recordToGraveyard: ({ context, event }) => {
+      const killer = (event as any).output?.counterExamplePayload;
+      const signature = context.approvedConjecture?.signature ?? context.hypothesis ?? "";
+      LakatosianVault.recordFailure(context.workspaceDir, signature, killer);
+    },
+    recordPyTorchTrace: ({ context, event }) => {
+      const output = (event as any).output;
+      // Depending on if it's SA or Sandbox, the model/data structure differs slightly
+      const modelMatrix = output.model ?? output.data;
+      const energy = output.bestEnergy ?? output.energy ?? 0;
+      
+      const sig = context.approvedConjecture?.signature ?? context.hypothesis ?? "";
+      TransitionBuffer.recordPlay(context.workspaceDir, sig, modelMatrix, energy);
+    },
     pushLemma: assign(({ context, event }) => {
       const output = (event as any).output;
       // Push current state to the stack
@@ -347,6 +395,12 @@ export const researchMachine = setup({
          approvedConjecture: { signature: output.lemmaStatement, description: "Dynamic Lemma: " + output.lemmaStatement }
       };
     }),
+    persistToVault: ({ context }) => {
+       const popped = context.lemmaStack[context.lemmaStack.length - 1]!;
+       const resolvedSignature = context.approvedConjecture?.signature ?? "";
+       const resolvedTreePath = context.proofTree!.getWinningPath(context.proofTree!.getActiveNode().id).map(n => n.tacticApplied!).filter(Boolean);
+       VerifiedVault.appendLemma(context.workspaceDir, resolvedSignature, resolvedTreePath);
+    },
     popLemma: assign(({ context }) => {
        const popped = context.lemmaStack[context.lemmaStack.length - 1]!;
        
@@ -355,9 +409,9 @@ export const researchMachine = setup({
        const parentConjecture = popped.conjecture;
        const activeNode = parentTree.getActiveNode();
        
-       // Simulate that creating the lemma and proving it constitutes a valid step! 
-       // For a real Lean system, this would be `have : <lemma> := by exact <solved_lemma_name>`
-       const child = parentTree.addChild(activeNode.id, `have lemma_resolved : ${context.approvedConjecture?.signature} := sorry`, `(lemma injected recursively)`);
+       // Simulate that creating the lemma and proving it constitutes a valid step
+       const resolvedSignature = context.approvedConjecture?.signature ?? "";
+       const child = parentTree.addChild(activeNode.id, `have lemma_resolved : ${resolvedSignature} := sorry`, `(lemma injected recursively)`);
        parentTree.setActiveNode(child.id);
 
        return {
@@ -528,12 +582,12 @@ export const researchMachine = setup({
           {
             guard: "isWitness",
             target: "FalsificationFork",
-            actions: ["setSandboxResult", "logTransition"],
+            actions: ["setSandboxResult", "recordPyTorchTrace", "logTransition"],
           },
           {
             guard: "isPlateau",
             target: "SMT_Resolution",
-            actions: ["setSandboxResult", "logTransition"],
+            actions: ["setSandboxResult", "recordPyTorchTrace", "logTransition"],
           },
           {
             guard: "isCleanKill",
@@ -566,15 +620,89 @@ export const researchMachine = setup({
             actions: ["setSMTResult", "logTransition"],
           },
           {
+            guard: "isTimeout",
+            target: "SA_Resolution",
+            actions: ["setSMTResult", "logTransition"],
+          },
+          {
             target: "HypothesisRefinement",
             actions: ["setSMTResult", "logTransition"],
           }
         ],
         onError: {
-          target: "EmpiricalSandbox",
+          target: "SA_Resolution",
           actions: "logTransition",
         },
       },
+    },
+
+    SA_Resolution: {
+      invoke: {
+        id: "sa",
+        src: "saResolutionActor",
+        input: ({ context }) => {
+          const h = (context.hypothesis || context.plan?.prompt || "N >= 36");
+          const mN = h.match(/N\s*[=>]\s*(\d+)/i);
+          const vertices = mN && mN[1] ? parseInt(mN[1]) : 36;
+          const mR = h.match(/R\((\d+)\s*,\s*\d+\)/i);
+          const r = mR && mR[1] ? parseInt(mR[1]) : 4;
+          const mS = h.match(/R\(\d+\s*,\s*(\d+)\)/i);
+          const s = mS && mS[1] ? parseInt(mS[1]) : 6;
+          return { hypothesis: h, vertices, r, s };
+        },
+        onDone: [
+           {
+             guard: "isSAT",
+             target: "FalsificationFork",
+             actions: ["setSAResult", "recordPyTorchTrace", "resetSaPlateau", "logTransition"],
+           },
+           {
+             guard: "isRepeatedPlateau",
+             target: "FlagAlgebra_Escalation",
+             actions: ["setSAResult", "recordPyTorchTrace", "incrementSaPlateau", "logTransition"],
+           },
+           {
+             target: "HypothesisRefinement",
+             actions: ["setSAResult", "recordPyTorchTrace", "incrementSaPlateau", "logTransition"],
+           }
+        ],
+        onError: {
+           target: "HypothesisRefinement",
+           actions: "logTransition",
+        }
+      }
+    },
+
+    FlagAlgebra_Escalation: {
+      invoke: {
+        id: "flagAlgebra",
+        src: "flagAlgebraActor",
+        input: ({ context }) => {
+          const h = (context.hypothesis || "N >= 36");
+          const mR = h.match(/R\((\d+)\s*,\s*\d+\)/i);
+          const r = mR && mR[1] ? parseInt(mR[1]) : 5;
+          const mS = h.match(/R\(\d+\s*,\s*(\d+)\)/i);
+          const s = mS && mS[1] ? parseInt(mS[1]) : 5;
+          return { target_r: r, target_s: s };
+        },
+        onDone: {
+          target: "FalsificationFork",
+          actions: [
+            assign({
+              approvedConjecture: ({ context, event }) => ({
+                signature: context.hypothesis ?? "Flag Limit Reached",
+                description: `SDP ASYMPTOTIC DENSITY LIMIT: [${(event.output as any).lowerBound} to ${(event.output as any).upperBound}]`
+              }),
+              saPlateauCount: 0
+            }),
+            "logTransition"
+          ],
+        },
+        onError: {
+          target: "HypothesisRefinement",
+          actions: "logTransition"
+        }
+      }
     },
 
     HypothesisRefinement: {
@@ -623,15 +751,18 @@ export const researchMachine = setup({
           {
             guard: ({ event }: { event: any }) => event.output.status === "COUNTER_EXAMPLE_FOUND",
             target: "Ideation",
-            actions: assign({
-              lakatosianHistory: ({ context, event }: { context: ResearchContext; event: any }) => [
-                ...context.lakatosianHistory,
-                { 
-                  failedConjecture: context.approvedConjecture?.signature ?? context.hypothesis ?? "", 
-                  killerEdgeCase: event.output.counterExamplePayload 
-                }
-              ]
-            })
+            actions: [
+              "recordToGraveyard",
+              assign({
+                lakatosianHistory: ({ context, event }: { context: ResearchContext; event: any }) => [
+                  ...context.lakatosianHistory,
+                  { 
+                    failedConjecture: context.approvedConjecture?.signature ?? context.hypothesis ?? "", 
+                    killerEdgeCase: event.output.counterExamplePayload 
+                  }
+                ]
+              })
+            ]
           },
           {
             target: "Sketching",
@@ -712,7 +843,7 @@ export const researchMachine = setup({
              {
                 guard: ({ context }) => context.lemmaStack.length > 0,
                 target: "MCTSSearch",
-                actions: ["popLemma", "logTransition"]
+                actions: ["persistToVault", "popLemma", "logTransition"]
              },
              {
                 target: "Complete"
@@ -769,14 +900,14 @@ export const researchMachine = setup({
         id: "scribe",
         src: "scribeActor",
         input: ({ context }) => ({
-          plan: context.plan!,
-          evidence: context.evidence!,
-          conjecture: context.approvedConjecture,
-          proofStatus: context.proofStatus ?? "SKIPPED",
-          outputDir: context.outputDir || context.workspaceDir,
-          apiKey: context.apiKey,
-          redTeamHistory: context.redTeamHistory,
-          refinementHistory: context.refinementHistory,
+          workspaceDir: context.workspaceDir,
+          approvedConjecture: context.approvedConjecture,
+          hypothesis: context.hypothesis,
+          saEnergy: context.saEnergy,
+          flagAlgebraLimits: undefined, // Add if added to context later
+          leanAst: context.leanAst,
+          leanProof: context.leanProof,
+          proofStatus: context.proofStatus,
         }),
         onDone: {
           target: "Done",

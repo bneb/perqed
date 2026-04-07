@@ -5,6 +5,8 @@ import { AgentFactory } from "../agents/factory";
 import { AgentRouter } from "../agents/router";
 import type { AttemptLog } from "../types";
 
+import { VerifiedVault } from "../vault";
+
 export interface MCTSEvaluationResult {
   status: "PROVED" | "FAILED" | "EXHAUSTED" | "NEEDS_LEMMA";
   proofPath?: string[];
@@ -18,8 +20,10 @@ export class LeanDynamicEvaluator {
   private factory: AgentFactory;
   private maxIterations: number;
   private apiKey: string;
+  private workspaceDir: string;
 
   constructor(workspaceDir: string, apiKey: string, maxIterations: number = 30) {
+    this.workspaceDir = workspaceDir;
     this.repl = new LeanREPLBridge(workspaceDir);
     this.prm = new LeanPRMScorer();
     this.factory = new AgentFactory({ geminiApiKey: apiKey });
@@ -34,7 +38,8 @@ export class LeanDynamicEvaluator {
   ): Promise<MCTSEvaluationResult> {
     
     // Initialize root in REPL
-    const preamble = `import Mathlib\nopen Nat\n\ntheorem approved_conjecture ${conjecture.signature} := by\n`;
+    const vaultPreamble = VerifiedVault.getVaultPreamble(this.workspaceDir);
+    const preamble = `import Mathlib\n${vaultPreamble}open Nat\n\ntheorem approved_conjecture ${conjecture.signature} := by\n`;
     const initRes = await this.repl.sendCmd({ cmd: preamble });
     if (!initRes.env) {
       console.error("[MCTS] Failed to initialize theorem in REPL. Environment ID missing.");
@@ -79,9 +84,18 @@ export class LeanDynamicEvaluator {
       const role = AgentRouter.determineNextAgent(signals);
       const agent = this.factory.getAgent(role, signals);
 
+      const escalationContext = role !== "TACTICIAN" 
+        ? `\n\n[SYSTEM ESCALATION METADATA]
+You have been invoked because the previous fast-tactic modeling failed.
+- Consecutive Failures: ${signals.consecutiveFailures}
+- Identical Errors Detected: ${signals.identicalErrorCount > 0 ? 'Yes' : 'No'}
+- Current Goal Count: ${signals.goalCount}
+Please step back and provide a higher-level structural Lean 4 tactic sequence (like 'induction' or 'by_cases') to unblock the tree.` 
+        : "";
+
       const contextStr = role === "ARCHITECT"
-         ? `${prunedContext}\n\n## Theorem: approved_conjecture ${conjecture.signature}\n\n## Current Goals:\n${currentGoals}`
-         : `## Theorem: approved_conjecture ${conjecture.signature}\n\n## Current Goals:\n${currentGoals}`;
+         ? `${prunedContext}\n\n## Theorem: approved_conjecture ${conjecture.signature}\n\n## Current Goals:\n${currentGoals}${escalationContext}`
+         : `## Theorem: approved_conjecture ${conjecture.signature}\n\n## Current Goals:\n${currentGoals}${escalationContext}`;
 
       let generatedTactics: string[] = [];
       try {

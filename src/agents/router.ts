@@ -45,6 +45,14 @@ export class AgentRouter {
       return "ARCHITECT";
     }
 
+    // ── Priority 2.5: Terminal Override — Human-In-The-Loop intercepts exhaustion ──
+    if (
+      (global as any).INTERACTIVE_MODE &&
+      (signals.globalFailures >= 8 || signals.totalAttempts >= 20 || signals.identicalErrorCount >= 5)
+    ) {
+      return "HUMAN";
+    }
+
     // ── Priority 3: Global tree failure (N=6+) — Architect must intervene structurally ──
     // Requires BOTH global tree health to be poor AND an active local crisis
     // (consecutive failures >= 6). Prevents infinite ARCHITECT loops when

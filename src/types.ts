@@ -10,7 +10,7 @@
 // ──────────────────────────────────────────────
 
 /** The three specialist roles in the roster. */
-export type AgentRole = "TACTICIAN" | "REASONER" | "ARCHITECT";
+export type AgentRole = "TACTICIAN" | "REASONER" | "ARCHITECT" | "HUMAN";
 
 // ──────────────────────────────────────────────
 // Routing Signals

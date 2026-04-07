@@ -31,6 +31,8 @@ function parseArgs(): { prompt: string | null; runName: string; liveMode: boolea
   const dryRun = args.includes("--dry-run");
   const crossPollinate = args.includes("--cross-pollinate");
   const publishable = args.includes("--publishable");
+  const interactive = args.includes("--interactive");
+  (global as any).INTERACTIVE_MODE = interactive;
 
   // Look for prompt="..." or prompt=...
   const promptArg = args.find((a) => a.startsWith("prompt="));

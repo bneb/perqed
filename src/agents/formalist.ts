@@ -14,6 +14,7 @@
 import { z } from "zod";
 import { FormalistResponseSchema, type FormalistResponse } from "../schemas";
 import { getAgencyRegistry } from "../agency";
+import { LocalProverClient } from "../agency/local_prover_client";
 
 // ──────────────────────────────────────────────
 // Configuration
@@ -182,8 +183,14 @@ export class FormalistAgent {
 
   /**
    * Route to the appropriate Ollama API based on mode.
+   * Intercepts execution down to Native UNIX Sockets if local prover enabled natively.
    */
   private async callOllama(context: string): Promise<string> {
+    if (process.env.USE_LOCAL_PROVER === "true") {
+       console.log(`[FormalistAgent] Intercepting REST request -> Routing directly to UNIX SOcket VRAM...`);
+       return await LocalProverClient.queryTacticDaemon(context, "generation");
+    }
+  
     if (this.config.mode === "completion") {
       return this.callCompletion(context);
     }

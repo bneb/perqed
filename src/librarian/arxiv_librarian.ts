@@ -194,6 +194,11 @@ export class ArxivLibrarian {
     // Over-fetch to allow deduplication of repeated papers in the db
     const rawResults = await this.db.search(queryVector, (options.limit ?? 5) * 5);
     
+    if (rawResults.length === 0) {
+      console.warn("\n⚠️ [Librarian] CRITICAL WARNING: Local arXiv LanceDB returned 0 results.");
+      console.warn("⚠️ [Librarian] The Ideator is running blind! Please run `bun run src/scripts/seed_arxiv_math.ts` to populate the offline semantic cache.\n");
+    }
+    
     const unique = [];
     const seen = new Set<string>();
     for (const r of rawResults) {

@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ArxivLibrarian } from "../librarian/arxiv_librarian";
 import type { IdeationOutput } from "../orchestration/types";
 import { getAgencyRegistry } from "../agency";
+import { LakatosianVault, type GraveyardEntry } from "../vault/lakatosian_vault";
 
 export class IdeatorAgent {
   private readonly ai: GoogleGenAI;
@@ -26,15 +27,14 @@ export class IdeatorAgent {
     const parsedQuery = await this.extractSearchQuery(prompt);
     console.log(`[Librarian] Extracted arXiv query: "${parsedQuery}"`);
 
-    // 1. Seed the literature DB
+    // 1. Initialize the semantic Librarian proxy (offline local DB fetching)
     const librarian = new ArxivLibrarian({
       queries: [parsedQuery],
       maxPerQuery: 10,
       dbPath: `${this.workspaceDir}/lancedb`,
     });
-    await librarian.run();
 
-    // 2. Query top matches using the cleaned keyword
+    // 2. Query top matches using the cleaned keyword against the pre-seeded LanceDB
     let seedPaper;
     let searchResults = await librarian.searchDatabase(parsedQuery, { limit: 10 });
     
@@ -83,11 +83,13 @@ export class IdeatorAgent {
 
     console.log(`[Ideation] Synthesizing strategy... (${publishableMode ? "Generalized Publishable Mode" : "Finite Computable Mode"})`);
 
+    const failures = LakatosianVault.getAllFailures(this.workspaceDir, 20);
+
     // 3. Build strategy
     return await this.generateStrategy(
       prompt, title, arxivId, abstract, 
       lastValidationError, publishableMode, refinementContext, 
-      crossPollinate, secondPaper?.paperTitle, secondPaper?.id?.replace("arxiv-", ""), secondPaper?.paperAbstract
+      crossPollinate, failures, secondPaper?.paperTitle, secondPaper?.id?.replace("arxiv-", ""), secondPaper?.paperAbstract
     );
   }
 
@@ -121,6 +123,7 @@ Prompt: "${prompt}"`,
     publishableMode: boolean = false,
     refinementContext?: string,
     crossPollinate: boolean = false,
+    failures: GraveyardEntry[] = [],
     title2?: string | null,
     arxivId2?: string | null,
     abstract2?: string | null
@@ -128,6 +131,12 @@ Prompt: "${prompt}"`,
     let historyFeedback = refinementContext ? `\n\n${refinementContext}` : "";
     if (lastValidationError) {
       historyFeedback = `\n\nPREVIOUS ATTEMPT FAILED VALIDATION:\n${lastValidationError}\nPlease formulate a DIFFERENT hypothesis using only standard Mathlib definitions.`;
+    }
+
+    let graveyardWarning = "";
+    if (failures.length > 0) {
+      const formattedFailures = failures.map(f => `- ${f.failureReason}: ${f.hypothesisSignature}`).join("\n");
+      graveyardWarning = `\n\n### ⚠️ GRAVEYARD CONTEXT ⚠️\nThe following hypotheses have already been rigorously proven UNSAT or mathematically bankrupt by the Z3 exact solver. YOU ARE STRICTLY PROHIBITED from proposing any exact boundary overlapping with these trajectories. If a previous bounding assumption failed, you MUST natively pivot your structural approach (e.g., transition from Circulant symmetries to Paley architectures, or escalate N).\n${formattedFailures}`;
     }
 
     const schema = {
@@ -154,7 +163,12 @@ Prompt: "${prompt}"`,
     };
 
     const systemPrompt = `You are an elite mathematical architect.
-Read the following abstract from a real arXiv paper:
+THE USER HAS ISSUED THE FOLLOWING ORCHESTRATION DIRECTIVE:
+"${prompt}"
+
+You MUST prioritize this directive above all else. Use the following fetched literature strictly as supplementary context. If the literature conflicts with or drifts from the user's directive, IGNORE the literature and strictly synthesize a mathematical hypothesis satisfying the user's directive exactly as requested.
+
+Read the following supplementary abstract from a real arXiv paper:
 
 Title: ${title}
 arXiv ID: ${arxivId}
@@ -182,19 +196,35 @@ ${publishableMode
   ? `CRITICAL: Formulate a generalized structural theorem (e.g., asymptotic bounds, generalized property across all N). Do NOT artificially shrink the hypothesis to a specific toy computation or finite edge case. Assume it will be formally verified using standard algebraic and logic tactics (simp, omega, linarith, induction). The theorem MUST be formulated using standard Mathlib definitions without inventing new functions.`
   : `CRITICAL: The hypothesis MUST be finitely computable by native_decide. Do NOT invent new functions.`
 }
-${historyFeedback}`;
+${historyFeedback}${graveyardWarning}`;
 
-    const response = await this.ai.models.generateContent({
-      model: this.model,
-      contents: systemPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: schema,
-        temperature: 0.1,
-      },
-    });
+    let response: any;
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        response = await this.ai.models.generateContent({
+          model: this.model,
+          contents: systemPrompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
+            temperature: 0.1,
+          },
+        });
+        break;
+      } catch (err: any) {
+        if (err?.message?.includes("503") || err?.message?.includes("429") || err?.status === 503) {
+          console.warn(`[Ideation] Gemini API capacity spike detected. Retries left: ${retries - 1}. Sleeping 5 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          retries--;
+          if (retries === 0) throw err;
+        } else {
+          throw err;
+        }
+      }
+    }
 
-    if (!response.text) throw new Error("[Ideation] Plan generation failed");
+    if (!response || !response.text) throw new Error("[Ideation] Plan generation failed");
 
     const raw = JSON.parse(response.text) as {
       seed_paper: { arxivId: string; title: string; abstract: string };

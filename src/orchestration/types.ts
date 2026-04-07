@@ -60,6 +60,8 @@ export interface ResearchContext {
   hypothesis: string | null;
   /** Novelty classification of the current hypothesis. */
   noveltyClassification: NoveltyClassification;
+  /** Counter tracking persistent topological SA dead ends. */
+  saPlateauCount: number;
   /** Number of ideation retries (max 3). */
   ideationRetries: number;
   /** Number of refinement retries (max 3). */
@@ -80,6 +82,11 @@ export interface ResearchContext {
 
   /** Z3 SMT model (SAT result). */
   smtModel: string | null;
+
+  /** Best SA model (matrix string representation) if SMT fails to cleanly solve. */
+  saModel: string | null;
+  /** Best SA energy achieved before surrender. */
+  saEnergy: number | null;
 
   /** Approved conjecture signature + description from empirical checks. */
   approvedConjecture: { signature: string; description: string } | null;
@@ -150,8 +157,20 @@ export interface SketcherOutput {
 }
 
 export interface SMTOutput {
-  status: "SAT" | "UNSAT";
+  status: "SAT" | "UNSAT" | "TIMEOUT";
   model: string | null;
+}
+
+export interface SAOutput {
+  status: "SAT" | "PLATEAU" | "UNSAT";
+  bestEnergy: number;
+  model: string | null;
+}
+
+export interface FlagAlgebraOutput {
+  status: "SDP_LIMIT_REACHED" | "SDP_ERROR";
+  lowerBound: number;
+  upperBound: number;
 }
 
 export interface FalsificationOutput {
@@ -198,6 +217,8 @@ export type ResearchEvent =
   | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
   | { type: "xstate.done.actor.sketcher"; output: SketcherOutput }
   | { type: "xstate.done.actor.smt"; output: SMTOutput }
+  | { type: "xstate.done.actor.sa"; output: SAOutput }
+  | { type: "xstate.done.actor.flagAlgebraActor"; output: FlagAlgebraOutput }
   | { type: "xstate.done.actor.falsification"; output: FalsificationOutput }
   | { type: "xstate.done.actor.redTeamActor"; output: RedTeamOutput }
   | { type: "xstate.done.actor.lean"; output: LeanOutput }

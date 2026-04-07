@@ -28,6 +28,20 @@ export function flattenMatrix(adj: AdjacencyMatrix): string {
   return chars.join("");
 }
 
+export function unflattenMatrix(flat: string, n: number): AdjacencyMatrix {
+  const adj = new AdjacencyMatrix(n);
+  let idx = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (flat[idx] === "1") {
+        adj.addEdge(i, j);
+      }
+      idx++;
+    }
+  }
+  return adj;
+}
+
 // ── Neighbourhood Generation ──────────────────────────────────────────────────
 
 /**

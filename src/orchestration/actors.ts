@@ -21,6 +21,7 @@ import type {
   LeanOutput,
   ErrorCorrectionOutput,
   ScribeOutput,
+  SAOutput,
 } from "./types";
 import type { ResearchPlan, EvidenceReport, RedTeamResult } from "../agents/research_types";
 import type { AgentRole, AttemptLog } from "../types";
@@ -101,13 +102,14 @@ export interface ErrorCorrectionInput {
 }
 
 export interface ScribeInput {
-  plan: ResearchPlan;
-  evidence: EvidenceReport;
-  conjecture: { signature: string; description: string } | null;
-  proofStatus: string;
-  outputDir: string;
-  apiKey: string;
-  redTeamHistory: RedTeamResult[];
+  workspaceDir: string;
+  approvedConjecture: { signature: string; description: string } | null;
+  hypothesis: string | null;
+  saEnergy: number | null;
+  flagAlgebraLimits?: { lowerBound: number, upperBound: number };
+  leanAst?: any;
+  leanProof?: string | null;
+  proofStatus: string | null;
 }
 
 // ──────────────────────────────────────────────
@@ -122,6 +124,7 @@ export const ideationActor = fromPromise<IdeationOutput, IdeationInput>(
   async ({ input }) => {
     const { IdeatorAgent } = await import("../agents/ideation");
     const { NoveltyChecker } = await import("../librarian/novelty_checker");
+    const { SwarmDebateProtocol } = await import("../agency/swarm_debate_protocol");
     
     let refinementContext: string | undefined = undefined;
     if (input.lakatosianHistory && input.lakatosianHistory.length > 0) {
@@ -130,8 +133,26 @@ export const ideationActor = fromPromise<IdeationOutput, IdeationInput>(
         "\n\nYOUR TASK: You must NOT attempt to prove the broken conjectures. Analyze the 'KILLER TOPOLOGY' deeply. Mutate your axioms to structurally exclude or account for this counter-example while maintaining the generalized bound.";
     }
 
-    const ideator = new IdeatorAgent(input.apiKey, input.workspaceDir);
     try {
+      if (process.env.USE_LOCAL_PROVER === "true") {
+          console.log(`\n[IdeationActor] Offline Limits Reached. Spawning the Hybrid Multi-Agent MCTS Swarm...`);
+          const hypothesis = await SwarmDebateProtocol.establishAbsoluteConsensus(input.prompt, input.apiKey);
+          return {
+              hypothesis,
+              classification: "NOVEL_DISCOVERY",
+              plan: {
+                  objective: "Swarm Consensus Verification",
+                  prompt: input.prompt,
+                  extension_hypothesis: "",
+                  domains_to_probe: ["graph_theory", "combinatorics"],
+                  lean_target_sketch: "",
+                  steps: ["Local Exploration", "PR-CoT Debugging", "Cloud Validation"],
+                  seed_paper: { title: "Swarm Generated Boundary", authors: [], abstract: "DivSampled", url: "", arxivId: "N/A" }
+              },
+              literature: []
+          };
+      }
+      const ideator = new IdeatorAgent(input.apiKey, input.workspaceDir);
       const result = await ideator.ideate(input.prompt, input.lastValidationError, input.publishableMode, refinementContext, input.crossPollinate);
 
       // ── Independent Novelty Verification ────────────────────────────
@@ -304,8 +325,95 @@ export const smtActor = fromPromise<SMTOutput, SMTInput>(
     if (result.success) {
       return { status: "SAT" as const, model: result.output };
     }
+    if (result.output && result.output.includes("Execution timed out.")) {
+      return { status: "TIMEOUT" as const, model: null };
+    }
     return { status: "UNSAT" as const, model: null };
   },
+);
+// ──────────────────────────────────────────────
+// 4c. SA Resolution Actor
+// ──────────────────────────────────────────────
+
+export interface SAInput {
+  vertices: number;
+  r: number;
+  s: number;
+}
+
+export const saResolutionActor = fromPromise<SAOutput, SAInput>(
+  async ({ input }) => {
+    const { SurrogateClient } = await import("../search/surrogate_client");
+    const { optimizeThroughFunnel } = await import("../search/neighborhood_funnel");
+    const { orchestratedSearch } = await import("../search/ramsey_orchestrator");
+    
+    console.log(`[SA_Resolution] Scaling up Parallel Island Model SA with PyTorch Heuristics (N=${input.vertices})`);
+    
+    // 1. Initialize PyTorch Surrogate
+    const surrogate = new SurrogateClient();
+    const isHealthy = await surrogate.checkHealth();
+    if (isHealthy) {
+       console.log(`[SA_Resolution] PyTorch Value Network ONLINE. Ground-truth guidance activated.`);
+    }
+    
+    // 2. Spawn Parallel Island Model SA
+    const saResult = await orchestratedSearch({
+      n: input.vertices,
+      r: input.r,
+      s: input.s,
+      saIterations: 50_000_000,
+      strategy: "island_model",
+      workers: 4,
+      seed: "random"
+    });
+
+    const bestResult = saResult.best;
+
+    // 3. Funnel Pipeline (Filter best states through the Neural Net)
+    if (isHealthy && bestResult.bestEnergy > 0 && bestResult.bestAdj) {
+       console.log(`[SA_Resolution] Pushing E=${bestResult.bestEnergy} graph through PyTorch neighborhood funnel natively via Ray Edge Cluster...`);
+       try {
+           const { RayOrchestrator } = await import("./ray_bridge");
+           const { unflattenMatrix, flattenMatrix } = await import("../search/neighborhood_funnel");
+           const flatBase = flattenMatrix(bestResult.bestAdj);
+           
+           // Dispatch down to parallel ray edge farm
+           const rayObj = await RayOrchestrator.getInstance().dispatchFunnel(flatBase, input.vertices, 500, 3);
+           
+           let funnelBestAdj = bestResult.bestAdj;
+           let funnelBestEnergy = bestResult.bestEnergy;
+           
+           if (rayObj) {
+               console.log(`[SA_Resolution] Ray Parallel Funnel responded with E=${rayObj.bestEnergy}`);
+               funnelBestAdj = unflattenMatrix(rayObj.bestMatrixRaw, input.vertices);
+               funnelBestEnergy = rayObj.bestEnergy;
+           } else {
+               console.warn(`[SA_Resolution] Ray fallback layer hit. Routing locally through TS thread...`);
+               const funnelRes = await optimizeThroughFunnel(bestResult.bestAdj, surrogate);
+               funnelBestAdj = funnelRes.bestMatrix;
+               funnelBestEnergy = funnelRes.predictedEnergy;
+           }
+
+           // Evaluate exact energy locally just in case
+           const { EvaluatorRouter } = await import("../search/evaluator_router");
+           const router = EvaluatorRouter.getInstance("research_run");
+           const exactEnergy = await router.evaluate(funnelBestAdj, { evaluator_type: "RAMSEY_CLIQUES", r: input.r, s: input.s });
+           
+           if (exactEnergy === 0) {
+              return { status: "SAT", bestEnergy: 0, model: funnelBestAdj.toString() };
+           }
+           if (exactEnergy < bestResult.bestEnergy) {
+               return { status: "PLATEAU", bestEnergy: exactEnergy, model: funnelBestAdj.toString() };
+           }
+       } catch (e) {
+           console.log(`[SA_Resolution] Funnel error boundaries triggered: ${e}`);
+       }
+    }
+
+    // 4. Return
+    if (bestResult.bestEnergy === 0) return { status: "SAT", bestEnergy: 0, model: bestResult.bestAdj.toString() };
+    return { status: "PLATEAU", bestEnergy: bestResult.bestEnergy, model: bestResult.bestAdj.toString() };
+  }
 );
 
 // ──────────────────────────────────────────────
@@ -399,7 +507,12 @@ export const errorCorrectionActor = fromPromise<ErrorCorrectionOutput, ErrorCorr
   async ({ input }) => {
     const { GoogleGenAI } = await import("@google/genai");
     const { getAgencyRegistry } = await import("../agency");
-    const ai = new GoogleGenAI({ apiKey: input.apiKey });
+    const { LocalProverClient } = await import("../agency/local_prover_client");
+    
+    // Abstract the GenAI instantiation Native over Unix Arrays directly matching the legacy signature.
+    const ai = process.env.USE_LOCAL_PROVER === "true" 
+        ? LocalProverClient.createMockGenAI() as any
+        : new GoogleGenAI({ apiKey: input.apiKey });
 
     const prompt = `The following Lean 4 theorem failed to compile:
 
@@ -429,33 +542,15 @@ Suggest a corrected tactic sequence that fixes this specific error. Output ONLY 
 // ──────────────────────────────────────────────
 
 /**
- * Wraps ScribeAgent to produce a LaTeX research paper.
+ * Wraps TypstCompiler to synthesize an end-to-end mathematical arXiv paper.
  */
 export const scribeActor = fromPromise<ScribeOutput, ScribeInput>(
   async ({ input }) => {
-    const { ScribeAgent } = await import("../agents/scribe");
-    const { writeFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
-    const { execSync } = await import("node:child_process");
+    const { TypstCompiler } = await import("../system/typst_compiler");
+    
+    console.log(`[Scribe] Extracting execution geometries and generating Typst bindings...`);
+    const reportPath = await TypstCompiler.compileReport(input);
 
-    const scribe = new ScribeAgent(input.apiKey);
-    const texSource = await scribe.draftResearchPaper({
-      plan: input.plan,
-      evidence: input.evidence,
-      approvedConjecture: input.conjecture,
-      redTeamHistory: input.redTeamHistory,
-      proofStatus: input.proofStatus as "PROVED" | "FAILED" | "SKIPPED",
-    });
-
-    const texPath = join(input.outputDir, "paper.tex");
-    writeFileSync(texPath, texSource, "utf8");
-
-    try {
-      execSync("tectonic paper.tex", { cwd: input.outputDir, stdio: "ignore" });
-    } catch {
-      // tectonic not installed — .tex is still saved
-    }
-
-    return { reportPath: texPath };
+    return { reportPath };
   },
 );

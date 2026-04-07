@@ -49,7 +49,7 @@ const BUILTIN_TOPOLOGY: AgencyTopology = {
       },
       L3_complex: {
         engine: "gemini",
-        model: "gemini-2.5-pro",
+        model: "gemini-3.1-flash",
         api_env_var: "GEMINI_API_KEY",
         capabilities: ["reasoning", "lean4", "chat", "conjecture", "latex", "compilation", "formalization"],
         fallback_for: ["L2_standard"],
