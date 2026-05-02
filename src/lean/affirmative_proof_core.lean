@@ -4,28 +4,27 @@ import «verified_growth»
 import «verified_convergence»
 import «verified_patch»
 
-/-!
-# Erdős Problem #265: Affirmative Proof Capstone
-This file documents the verification of the Kovac-Tao \"CS Flex\" construction.
-All constitutive pillars are now 100% formally verified in Lean 4.
--/
-
 open Filter Topology Metric Finset
 
 /-- 
-Verification Milestone: 
-The foundational lemmas for Erdős #265 are 100% verified and integrated.
-The mathematical core of the affirmative proof is now sorry-free.
+The 2D Patch Lemma (The Final Bridge):
+Using the 1D patch lemma and the O(1/n²) step bounds, there exists a finite 
+BLOCK of integers in the Twilight Zone that halves the 2D error vector.
 -/
-theorem erdos_265_pillars_verified : 
-  (∀ (n : ℕ), n ≥ 2 → |(1 / (n : ℝ)) - (1 / (n + 1 : ℝ))| ≤ 2 / (n : ℝ)^2 ∧ |(1 / ((n : ℝ) - 1)) - (1 / (n : ℝ))| ≤ 2 / (n : ℝ)^2) ∧ 
-  (∀ (a : ℕ → ℕ), a 0 ≥ 10 → (∀ n, a (n + 1) ≥ a n ^ 2 - 2 * a n) → ∀ n, a n ≥ 7 ^ (2 ^ n) + 3) ∧
-  (∀ (E : ℝ × ℝ) (a : ℕ → ℝ × ℝ), (∀ n, ‖E - ∑ i ∈ range (n + 1), a i‖ ≤ (1 / 2 : ℝ) * ‖E - ∑ i ∈ range n, a i‖) → HasSum a E) ∧
-  (∀ (e : ℝ), e > 0 → e ≤ 1/10 → ∃ a : ℕ, a ≥ 10 ∧ |e - 1 / (a : ℝ)| ≤ (1 / 2 : ℝ) * e) := by
-  constructor
-  · intro n hn; exact phi_step_bound n hn
-  · constructor
-    · intro a h0 hg; exact growth_floor a h0 hg
-    · constructor
-      · intro E a h_decay; exact algorithmic_convergence h_decay
-      · intro e h_small h_bound; exact combinatorial_patch_lemma e h_small h_bound
+lemma combinatorial_patch_lemma_2d (E : ℝ × ℝ) (last_a : ℕ) (h_pos : last_a ≥ 10) :
+  ∃ (B : Finset ℕ), 
+    (∀ n ∈ B, n > last_a) ∧ 
+    ‖E - ∑ n ∈ B, ((1 / (n : ℝ)), (1 / ((n : ℝ) - 1) : ℝ))‖ ≤ (1 / 2 : ℝ) * ‖E‖ := by
+  sorry
+
+/--
+Erdős Problem #265: Affirmative Resolution.
+There exists a strictly increasing double-exponential integer sequence 
+such that both reciprocal sums converge to the target rational coordinates.
+-/
+theorem erdos_265_affirmative_resolution (Target : ℝ × ℝ) : 
+  ∃ (a : ℕ → ℕ), 
+    (∀ n, a n < a (n + 1)) ∧ 
+    (limsup (fun n => (a n : ℝ) ^ ((1 : ℝ) / (2 ^ n : ℝ))) atTop > 1) ∧ 
+    HasSum (fun n => ((1 : ℝ) / (a n : ℝ), (1 : ℝ) / ((a n : ℝ) - 1))) Target := by
+  sorry
