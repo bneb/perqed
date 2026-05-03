@@ -56,7 +56,24 @@ theorem combinatorial_patch_lemma_2d_proved (E : ℝ × ℝ) (lower_bound : ℕ)
   
   -- Step 1: Force L to be massively large so vector size is microscopic.
   have h_norm_phi : Tendsto (fun L : ℕ => 2 * ‖φ L‖) atTop (𝓝 0) := by
-    sorry
+    -- Coordinates of φ L go to 0.
+    have h_nat : Tendsto (fun L : ℕ => (L : ℝ)) atTop atTop := tendsto_natCast_atTop_atTop
+    have h1 : Tendsto (fun L : ℕ => (L : ℝ)⁻¹) atTop (𝓝 0) := tendsto_inv_atTop_zero.comp h_nat
+    have h2 : Tendsto (fun L : ℕ => ((L : ℝ) - 1)⁻¹) atTop (𝓝 0) := by
+       apply tendsto_inv_atTop_zero.comp
+       exact tendsto_atTop_add_const_right _ (-1 : ℝ) h_nat
+    
+    have h_phi : Tendsto (fun L : ℕ => φ L) atTop (𝓝 0) := by
+       rw [nhds_prod_eq]
+       apply Filter.tendsto_prod_iff'.mpr
+       constructor
+       · convert h1 using 1; funext n; dsimp [φ]; rw [one_div]
+       · convert h2 using 1; funext n; dsimp [φ]; rw [one_div]
+    
+    have h_norm := h_phi.norm
+    simp at h_norm
+    convert h_norm.const_mul 2
+    simp
 
   have h_target_pos : 0 < (1 / 2 : ℝ) * ‖E‖ := mul_pos (by norm_num) hE
   obtain ⟨N, hN⟩ := Metric.tendsto_atTop.mp h_norm_phi ((1 / 2 : ℝ) * ‖E‖) h_target_pos
@@ -90,8 +107,7 @@ theorem combinatorial_patch_lemma_2d_proved (E : ℝ × ℝ) (lower_bound : ℕ)
   · constructor
     · intro n hn
       have h1 : n ≥ L := (Finset.mem_Ico.mp (hB_sub n hn)).1
-      linarith [h1, hL_bound]
-      
+      linarith
     · calc ‖E - ∑ n ∈ B, φ n‖
         _ = ‖continuous_sum L R t - ∑ n ∈ B, φ n‖ := by rw [h_exact_hit]
         _ ≤ 2 * ‖φ L‖ := h_err

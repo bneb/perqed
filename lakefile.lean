@@ -1,27 +1,25 @@
 import Lake
 open Lake DSL
 
-package perqed where
-  leanOptions := #[
-    ⟨`autoImplicit, false⟩
-  ]
+package «perqed» {
+  -- add package configuration options here
+}
 
-require repl from git "https://github.com/leanprover-community/repl"
-require mathlib from git "https://github.com/leanprover-community/mathlib4"
+require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "v4.30.0-rc2"
+
+lean_lib «VerifiedConstruction» {
+  srcDir := "src/lean"
+  roots := #[
+    `verified_analytic,
+    `verified_growth,
+    `verified_convergence,
+    `verified_patch,
+    `kt_combinatorics,
+    `affirmative_proof_core
+  ]
+}
 
 @[default_target]
-lean_lib VerifiedConstruction where
-  srcDir := "src/lean"
-  roots := #[`verified_analytic, `verified_growth, `verified_convergence, `verified_patch, `affirmative_proof_core]
-
-lean_lib KnuthTorusM4 where
-  srcDir := "src/lean"
-  roots := #[`KnuthTorusM4]
-
-lean_lib TorusTopology where
-  srcDir := "src/lean"
-  roots := #[`TorusTopology]
-
-lean_lib TorusTopologyM6 where
-  srcDir := "src/lean"
-  roots := #[`TorusTopologyM6]
+lean_exe «perqed» {
+  root := `src.Main
+}
