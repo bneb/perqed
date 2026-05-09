@@ -16,6 +16,7 @@ import { ProofDAGSchema, type ProofDAG } from "./proof_dag/schemas";
 import { buildTabuHashBlock, type JournalEntry, type ResearchJournal } from "./search/research_journal";
 import { renderToSVG, svgToBase64 } from "./search/chalkboard";
 import type { AdjacencyMatrix } from "./math/graph/AdjacencyMatrix";
+import { getAgencyRegistry } from "./agency";
 
 // ──────────────────────────────────────────────
 // Configuration
@@ -24,8 +25,8 @@ import type { AdjacencyMatrix } from "./math/graph/AdjacencyMatrix";
 export interface ArchitectClientConfig {
   /** Gemini API key. */
   apiKey: string;
-  /** Model name (e.g., "gemini-2.5-pro"). */
-  model: string;
+  /** Model name (e.g., "gemini-3.1-pro"). Optional, resolved from registry if missing. */
+  model?: string;
   /** Gemini REST API base URL. Override for testing. */
   baseUrl?: string;
 }
@@ -295,12 +296,22 @@ Broaden your search. Query the Librarian for analogies in different fields. Cons
 export class ArchitectClient {
   private readonly config: ArchitectClientConfig;
   private readonly baseUrl: string;
+  private readonly modelName: string;
 
   constructor(config: ArchitectClientConfig) {
     this.config = config;
     this.baseUrl =
       config.baseUrl ??
       "https://generativelanguage.googleapis.com/v1beta/models";
+
+    if (config.model) {
+      this.modelName = config.model;
+    } else {
+      // Resolve a high-tier reasoning provider for the Architect role
+      const registry = getAgencyRegistry();
+      const provider = registry.resolveProvider("reasoning");
+      this.modelName = provider.model;
+    }
   }
 
   /**
@@ -310,7 +321,7 @@ export class ArchitectClient {
    * @returns Validated ArchitectResponse with diagnosis, backtrack count, and new directive.
    */
   async escalate(context: string, retries: number = 3): Promise<ArchitectResponse> {
-    const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+    const url = `${this.baseUrl}/${this.modelName}:generateContent?key=${this.config.apiKey}`;
 
     const payload = {
       contents: [
@@ -348,7 +359,7 @@ export class ArchitectClient {
         const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         
         try {
-          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.config.model, prompt: payload.contents[0]?.parts[0]?.text, response: rawText }) + "\n");
+          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.modelName, prompt: payload.contents[0]?.parts[0]?.text, response: rawText }) + "\n");
         } catch (e) {}
         
         if (!rawText) {
@@ -406,7 +417,7 @@ export class ArchitectClient {
     journal?: ResearchJournal,
     forceWilesMode: boolean = false,
   ): Promise<ProofDAG> {
-    const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+    const url = `${this.baseUrl}/${this.modelName}:generateContent?key=${this.config.apiKey}`;
 
     // ── Failure streak → escalation tier ────────────────────────────────
     const consecutiveFailures = journal
@@ -516,7 +527,7 @@ export class ArchitectClient {
         const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         
         try {
-          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.config.model, prompt: dagSystemPrompt, response: rawText }) + "\n");
+          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.modelName, prompt: dagSystemPrompt, response: rawText }) + "\n");
         } catch (e) {}
 
         if (!rawText) throw new Error("Empty Gemini response");
@@ -547,7 +558,7 @@ export class ArchitectClient {
     runName?: string,
     fewShotBlock?: string,
   ): Promise<any> {
-    const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+    const url = `${this.baseUrl}/${this.modelName}:generateContent?key=${this.config.apiKey}`;
 
     const exploitationPrompt = cognitiveMode === "EXPLOITATION"
       ? "\n\nSYSTEM STATE: EXPLOITATION MODE. You are sitting on a massive mathematical breakthrough (E < 300). DO NOT invent a new paradigm. Retrieve the construction rule (edge_rule_js for graphs, partition_rule_js for partitions) of your absolute best attempt from the Empirical Findings. Perform an ATOMIC MUTATION on that exact rule (e.g., swap one integer in the connection set, shift the period by ±1). Keep the domain size constant."
@@ -567,21 +578,23 @@ export class ArchitectClient {
     // ── Phase 4: Chalkboard Vision attachment ───────────────────────────────
     // When the system is stuck (EXPLOITATION) and an adj matrix is provided,
     // render it to SVG and attach it as a Gemini Vision inlineData part.
-    let chalkboardPart: { inlineData: { mimeType: string; data: string } } | null = null;
+    let chalkboardPart: { text: string } | null = null;
     if (stuckAdj && runName) {
       try {
         const svgPath = `agent_workspace/runs/${runName}/scratch/stuck_state.svg`;
         await renderToSVG(stuckAdj, svgPath);
-        const base64 = await svgToBase64(svgPath);
-        chalkboardPart = { inlineData: { mimeType: "image/svg+xml", data: base64 } };
-        console.log(`   🖼️  [Chalkboard] SVG rendered → ${svgPath}`);
+        // Rather than using inlineData with 'image/svg+xml' (which Gemini currently rejects with 400),
+        // we extract the SVG text and pass it directly to the model as a text string.
+        const svgContent = fs.readFileSync(svgPath, 'utf8');
+        chalkboardPart = { text: `\n\n[CHALKBOARD SVG DATA]\n\`\`\`xml\n${svgContent}\n\`\`\`\n` };
+        console.log(`   🖼️  [Chalkboard] SVG rendered and attached as text → ${svgPath}`);
       } catch (err) {
         console.warn(`   ⚠️  [Chalkboard] SVG render failed (non-fatal): ${err}`);
       }
     }
 
     const chalkboardPromptAddendum = chalkboardPart
-      ? `\n\nCHALKBOARD: An SVG image of the current stuck state has been attached. ` +
+      ? `\n\nCHALKBOARD: An SVG representation of the current stuck state has been attached as an XML text block. ` +
         `Visually analyze the symmetry breaks, clusters, and bottlenecks. ` +
         `Propose a new construction rule (edge_rule_js for graphs, partition_rule_js for partitions) ` +
         `that algebraically bypasses this structural trap.`
@@ -620,7 +633,7 @@ export class ArchitectClient {
         const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
         try {
-          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.config.model, prompt: "Wiles Direct Formulation", response: rawText }) + "\n");
+          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.modelName, prompt: "Wiles Direct Formulation", response: rawText }) + "\n");
         } catch (e) {}
 
         if (!rawText) throw new Error("Empty Gemini response");
@@ -650,7 +663,7 @@ export class ArchitectClient {
     cognitiveMode: "EXPLOITATION" | "EXPLORATION" = "EXPLORATION",
     availableSkills: string[] = []
   ): Promise<ProofDAG> {
-    const url = `${this.baseUrl}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
+    const url = `${this.baseUrl}/${this.modelName}:generateContent?key=${this.config.apiKey}`;
 
     const explorationConstraints = `SYSTEM STATE: EXPLORATION MODE.
 You are currently exploring barren space or stuck on a plateau. 
@@ -751,7 +764,7 @@ DO NOT wrap your JSON in markdown.`;
         const rawText = body?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
         
         try {
-          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.config.model, prompt: "replanDAG", response: rawText }) + "\n");
+          fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: this.modelName, prompt: "replanDAG", response: rawText }) + "\n");
         } catch (e) {}
 
         if (!rawText) throw new Error("Empty Gemini response");

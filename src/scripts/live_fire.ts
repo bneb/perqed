@@ -135,6 +135,9 @@ async function main() {
   const result = await runDynamicLoop(workspace, solver, {
     maxGlobalIterations: MAX_ITERATIONS,
     maxLocalRetries: 3,
+    z3TimeoutMs: 30000,
+    leanTimeoutMs: 60000,
+    contextWindowTokens: 4096,
     leanBridge: lean,
     theoremName: THEOREM_NAME,
     theoremSignature: THEOREM_SIGNATURE,

@@ -1,191 +1,90 @@
-/**
- * program_database.test.ts — RED-to-GREEN tests for the FunSearch Program Database.
- *
- * Tests:
- *   1. record + topK: insert programs, retrieve sorted by energy
- *   2. classifyIsland: modular, logarithmic, lookup, digit_sum, bitwise, hybrid
- *   3. topKDiverse: returns best-per-island, not N from the same family
- *   4. formatFewShot: output contains energy, rule, and description
- *   5. Deduplication: same rule text is not stored twice
- *   6. JSONL persistence: write, reload, data survives
- */
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { ProgramDatabase, type ProgramEntry } from "../src/search/program_database";
-import { existsSync, unlinkSync } from "node:fs";
+import { expect, test, describe } from "bun:test";
+import { ProgramDatabase, type HeuristicProgram } from "../src/agents/program_database";
 
-const TEST_DB_PATH = "/tmp/test_program_database.jsonl";
+describe("ProgramDatabase — Evolutionary Heuristic Pool", () => {
+  test("maintains a maximum pool capacity and evicts lowest scores", () => {
+    const db = new ProgramDatabase({ capacity: 5 });
+    
+    // Insert 6 programs
+    for (let i = 0; i < 6; i++) {
+        db.registerProgram({ code: `test_${i}`, score: i * 10 });
+    }
 
-function cleanup() {
-  if (existsSync(TEST_DB_PATH)) unlinkSync(TEST_DB_PATH);
-}
-
-// ── Test data ──
-
-const PROGRAMS: Omit<ProgramEntry, "timestamp" | "island">[] = [
-  { rule_js: "return (i - 1) % 6;", energy: 1980, description: "Simple mod-6", domain_size: 537, num_partitions: 6 },
-  { rule_js: "return Math.floor(Math.log2(i)) % 6;", energy: 1432, description: "Log2 mod 6", domain_size: 537, num_partitions: 6 },
-  { rule_js: "return Math.log2(i & -i) % 6;", energy: 1093, description: "2-adic valuation", domain_size: 537, num_partitions: 6 },
-  { rule_js: "return [0,1,2,3,4,5,0,1,2,4,5,3,0,2,1,4,5,3][(i-1) % 18];", energy: 407, description: "Period-18 lookup", domain_size: 537, num_partitions: 6 },
-  { rule_js: "let s=0,t=i;while(t>0){s+=t%3;t=Math.floor(t/3);}return s%6;", energy: 1980, description: "Digit-sum base 3", domain_size: 537, num_partitions: 6 },
-];
-
-// ── 1. record + topK ──
-
-describe("ProgramDatabase — record + topK", () => {
-  beforeEach(cleanup);
-  afterEach(cleanup);
-
-  it("returns programs sorted by energy (ascending)", () => {
-    const db = new ProgramDatabase(TEST_DB_PATH);
-    for (const p of PROGRAMS) db.record(p);
-
-    const top3 = db.topK(3);
-    expect(top3).toHaveLength(3);
-    expect(top3[0]!.energy).toBe(407);      // Period-18 lookup
-    expect(top3[1]!.energy).toBe(1093);     // 2-adic
-    expect(top3[2]!.energy).toBe(1432);     // Log2
+    const programs = db.getPrograms();
+    expect(programs.length).toBe(5);
+    
+    // The lowest score (test_0 with score 0) should have been evicted
+    expect(programs.map((p: HeuristicProgram) => p.code)).not.toContain("test_0");
+    expect(programs.map((p: HeuristicProgram) => p.code)).toContain("test_5"); // score 50
   });
 
-  it("topK returns all entries when k > total entries", () => {
-    const db = new ProgramDatabase(TEST_DB_PATH);
-    for (const p of PROGRAMS) db.record(p);
-    const all = db.topK(100);
-    expect(all.length).toBe(PROGRAMS.length);
-  });
-});
+  test("tournament selection returns higher scoring programs on average", () => {
+    const db = new ProgramDatabase({ capacity: 10 });
+    for (let i = 0; i < 10; i++) {
+        db.registerProgram({ code: `test_${i}`, score: i });
+    }
 
-// ── 2. classifyIsland ──
-
-describe("ProgramDatabase — classifyIsland", () => {
-  it("classifies modular rules", () => {
-    expect(ProgramDatabase.classifyIsland("return (i - 1) % 6;")).toBe("modular");
+    const { parentA, parentB } = db.sampleParents(3);
+    
+    expect(parentA).toBeDefined();
+    expect(parentB).toBeDefined();
+    expect(parentA.code).not.toEqual(parentB.code);
   });
 
-  it("classifies logarithmic rules", () => {
-    expect(ProgramDatabase.classifyIsland("return Math.floor(Math.log2(i)) % 6;")).toBe("logarithmic");
+  test("does not accept duplicate code", () => {
+    const db = new ProgramDatabase({ capacity: 5 });
+    db.registerProgram({ code: "duplicate()", score: 10 });
+    db.registerProgram({ code: "duplicate()", score: 20 });
+    
+    expect(db.getPrograms().length).toBe(1);
+    // Overwrites or ignores, length must be 1
   });
 
-  it("classifies lookup table rules", () => {
-    expect(ProgramDatabase.classifyIsland("return [0,1,2,3,4,5][(i-1) % 6];")).toBe("lookup_table");
+  test("classifies programs into topological islands", () => {
+    const db = new ProgramDatabase({ capacity: 10 });
+    db.registerProgram({ code: "import numpy as np\nvals, vecs = np.linalg.eig(M)", score: 10 });
+    db.registerProgram({ code: "from sympy import GaloisField\nF = GaloisField(17)", score: 15 });
+    db.registerProgram({ code: "import itertools\nperms = itertools.permutations([1,2,3])", score: 20 });
+    
+    const programs = db.getPrograms();
+    expect(programs.find(p => p.score === 10)?.island).toBe("spectral");
+    expect(programs.find(p => p.score === 15)?.island).toBe("algebraic");
+    expect(programs.find(p => p.score === 20)?.island).toBe("combinatorial");
   });
 
-  it("classifies digit-sum (while + % pattern) rules", () => {
-    expect(ProgramDatabase.classifyIsland("let s=0,t=i;while(t>0){s+=t%3;t=Math.floor(t/3);}return s%6;")).toBe("digit_sum");
+  test("sampleParents prefers topological diversity", () => {
+    const db = new ProgramDatabase({ capacity: 10 });
+    db.registerProgram({ code: "from sympy import Group", score: 100 }); // algebraic
+    db.registerProgram({ code: "import scipy.optimize", score: 99 }); // analytic
+    db.registerProgram({ code: "import numpy.linalg", score: 98 }); // spectral
+    
+    const { parentA, parentB } = db.sampleParents(1); // Tournament size 1 = random uniform
+    expect(parentA.island).not.toBe(parentB.island);
   });
 
-  it("classifies bitwise rules", () => {
-    expect(ProgramDatabase.classifyIsland("return (i & 0xFF) >> 2;")).toBe("bitwise");
-  });
-
-  it("classifies unknown patterns as hybrid", () => {
-    expect(ProgramDatabase.classifyIsland("if (i < 100) return 0; return 5;")).toBe("hybrid");
-  });
-});
-
-// ── 3. topKDiverse ──
-
-describe("ProgramDatabase — topKDiverse", () => {
-  beforeEach(cleanup);
-  afterEach(cleanup);
-
-  it("returns at most one program per island", () => {
-    const db = new ProgramDatabase(TEST_DB_PATH);
-    for (const p of PROGRAMS) db.record(p);
-
-    const diverse = db.topKDiverse(10);
-    const islands = diverse.map((p: ProgramEntry) => p.island);
-    const uniqueIslands = new Set(islands);
-    expect(uniqueIslands.size).toBe(islands.length); // no duplicates
-  });
-
-  it("selects the best energy from each island", () => {
-    const db = new ProgramDatabase(TEST_DB_PATH);
-    // Two modular rules with different energies
-    db.record({ rule_js: "return i % 6;", energy: 2000, description: "mod 6a", domain_size: 537, num_partitions: 6 });
-    db.record({ rule_js: "return (i - 1) % 6;", energy: 1980, description: "mod 6b", domain_size: 537, num_partitions: 6 });
-
-    const diverse = db.topKDiverse(10);
-    const modular = diverse.find((p: ProgramEntry) => p.island === "modular");
-    expect(modular).toBeDefined();
-    expect(modular!.energy).toBe(1980); // the better one
-  });
-});
-
-// ── 4. formatFewShot ──
-
-describe("ProgramDatabase — formatFewShot", () => {
-  beforeEach(cleanup);
-  afterEach(cleanup);
-
-  it("includes energy, rule, and description in few-shot block", () => {
-    const db = new ProgramDatabase(TEST_DB_PATH);
-    for (const p of PROGRAMS) db.record(p);
-
-    const block = db.formatFewShot(3);
-    expect(block).toContain("E=407");
-    expect(block).toContain("Period-18 lookup");
-    expect(block).toContain("[0,1,2,3,4,5,0,1,2,4,5,3,0,2,1,4,5,3]");
-  });
-
-  it("returns empty string when database is empty", () => {
-    const db = new ProgramDatabase(TEST_DB_PATH);
-    expect(db.formatFewShot(5)).toBe("");
-  });
-});
-
-// ── 5. Deduplication ──
-
-describe("ProgramDatabase — deduplication", () => {
-  beforeEach(cleanup);
-  afterEach(cleanup);
-
-  it("does not store the same rule twice", () => {
-    const db = new ProgramDatabase(TEST_DB_PATH);
-    db.record({ rule_js: "return i % 6;", energy: 2000, description: "first", domain_size: 537, num_partitions: 6 });
-    db.record({ rule_js: "return i % 6;", energy: 1500, description: "second", domain_size: 537, num_partitions: 6 });
-
-    const all = db.topK(100);
-    expect(all).toHaveLength(1);
-  });
-
-  it("keeps the lower energy when a duplicate has better score", () => {
-    const db = new ProgramDatabase(TEST_DB_PATH);
-    db.record({ rule_js: "return i % 6;", energy: 2000, description: "first", domain_size: 537, num_partitions: 6 });
-    db.record({ rule_js: "return i % 6;", energy: 1500, description: "improved", domain_size: 537, num_partitions: 6 });
-
-    const all = db.topK(100);
-    expect(all[0]!.energy).toBe(1500);
-  });
-});
-
-// ── 6. JSONL Persistence ──
-
-describe("ProgramDatabase — JSONL persistence", () => {
-  beforeEach(cleanup);
-  afterEach(cleanup);
-
-  it("survives destruction and reconstruction", () => {
-    // Write
-    const db1 = new ProgramDatabase(TEST_DB_PATH);
-    for (const p of PROGRAMS) db1.record(p);
-
-    // Reload
-    const db2 = new ProgramDatabase(TEST_DB_PATH);
-    const top = db2.topK(3);
-    expect(top).toHaveLength(3);
-    expect(top[0]!.energy).toBe(407);
-  });
-
-  it("appends to existing file on subsequent records", () => {
-    const db1 = new ProgramDatabase(TEST_DB_PATH);
-    db1.record(PROGRAMS[0]!);
-
-    // Separate instance appends
-    const db2 = new ProgramDatabase(TEST_DB_PATH);
-    db2.record(PROGRAMS[1]!);
-
-    // Third instance reads all
-    const db3 = new ProgramDatabase(TEST_DB_PATH);
-    expect(db3.topK(100)).toHaveLength(2);
+  test("uses semantic trace for behavioral deduplication and Occam's Razor", () => {
+    const db = new ProgramDatabase({ capacity: 10 });
+    
+    const programA = { code: "def f(x):\n  return x + 1\n# some extra useless comments to make it long", score: 10 };
+    const trace = "OUTPUT_TRACE_123";
+    
+    // Register the first program
+    db.registerProgram(programA, trace);
+    expect(db.getPrograms().length).toBe(1);
+    
+    // Register a functionally identical, but syntactically different AND shorter program
+    const programB = { code: "def f(x): return x+1", score: 10 };
+    db.registerProgram(programB, trace);
+    
+    // The shorter one should overwrite the longer one, keeping pool size at 1
+    const programs = db.getPrograms();
+    expect(programs.length).toBe(1);
+    expect(programs[0]!.code).toBe(programB.code);
+    
+    // Register a longer one, it should be rejected because it's not strictly < 90%
+    const programC = { code: "def f(x): return x + 1 # wait no", score: 10 };
+    db.registerProgram(programC, trace);
+    
+    expect(db.getPrograms()[0]!.code).toBe(programB.code);
   });
 });

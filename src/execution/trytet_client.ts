@@ -21,7 +21,7 @@ export class TrytetClient {
   private endpoint: string;
   private publicKeyHex: string;
   private privateKey: crypto.KeyObject;
-  private nodeProviderId: string = "local_daemon"; // Default expected by local Tet engine tests
+  private static nodeProviderId: string = "local_daemon"; // Default expected by local Tet engine tests
 
   constructor(endpoint: string = "http://localhost:3000") {
     this.endpoint = endpoint;
@@ -40,7 +40,7 @@ export class TrytetClient {
 
     // Reconstruct exact Rust signed bytes structure: agent_id + provider_id + fuel(u64) + expiry(u64) + nonce
     const agentBuffer = Buffer.from(this.publicKeyHex, "utf8");
-    const providerBuffer = Buffer.from(this.nodeProviderId, "utf8");
+    const providerBuffer = Buffer.from(TrytetClient.nodeProviderId, "utf8");
     const fuelBuffer = Buffer.alloc(8);
     fuelBuffer.writeBigUInt64BE(BigInt(fuelLimit));
     const expiryBuffer = Buffer.alloc(8);
@@ -52,7 +52,7 @@ export class TrytetClient {
 
     return {
       agent_id: this.publicKeyHex,
-      provider_id: this.nodeProviderId,
+      provider_id: TrytetClient.nodeProviderId,
       fuel_limit: fuelLimit,
       expiry_timestamp: expiryTimestamp,
       nonce: nonce,
@@ -90,6 +90,7 @@ export class TrytetClient {
   }
 
   private async executeWithVoucherRefresh(req: TrytetExecutionRequest, payloadArray: number[], attemptsLeft: number): Promise<TrytetExecutionResponse> {
+    const startTime = Date.now();
     // 1. Map to Trytet V3 `TetExecutionRequest` with current known Provider ID
     const fuelVoucher = this.generateFuelVoucher(10_000_000_000);
     const executeReq = {
@@ -138,13 +139,14 @@ export class TrytetClient {
       } else if (typeof statusObj === "object" && statusObj.Crash) {
          exitCode = 1;
          stderrObj = `[Crash: ${statusObj.Crash.error_type}] ${statusObj.Crash.message}`;
-         
-         // --- SELF-HEALING PROVIDER DISCOVERY ---
+
+         // Restricted Provider Discovery (SSRF patched via strict regex)
          if (statusObj.Crash.error_type === "EconomicViolation" && attemptsLeft > 1) {
-            const match = stderrObj.match(/but this node is ([\w-]+)/);
+            // Regex strictly matches only standard UUIDv4 to prevent spoofing
+            const match = stderrObj.match(/but this node is ([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
             if (match && match[1]) {
                 console.warn(`[TrytetClient] Daemon node ID changed to ${match[1]}. Re-signing Fuel Voucher...`);
-                this.nodeProviderId = match[1];
+                TrytetClient.nodeProviderId = match[1]!;
                 return this.executeWithVoucherRefresh(req, payloadArray, attemptsLeft - 1);
             }
          }
@@ -161,6 +163,23 @@ export class TrytetClient {
       const stdoutLines = telemetry.stdout_lines || [];
       const stderrLines = telemetry.stderr_lines || [];
 
+      // Zero-config Aacyn telemetry (fire-and-forget)
+      const durationMs = Date.now() - startTime;
+      const isError = exitCode !== 0;
+      fetch(process.env.AACYN_URL || "http://localhost:4000/ingest/batch", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+            events: [{
+               traceId: crypto.randomUUID(),
+               service: "trytet_client",
+               durationMs,
+               isError,
+               timestamp: Date.now()
+            }]
+         })
+      }).catch(() => { /* Silent fail */ });
+
       return {
         exitCode,
         stdout: stdoutLines.join("\n"),
@@ -169,6 +188,22 @@ export class TrytetClient {
       };
     } catch (e: any) {
       clearTimeout(timeout);
+      
+      const durationMs = Date.now() - startTime;
+      fetch(process.env.AACYN_URL || "http://localhost:4000/ingest/batch", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+            events: [{
+               traceId: crypto.randomUUID(),
+               service: "trytet_client",
+               durationMs,
+               isError: true,
+               timestamp: Date.now()
+            }]
+         })
+      }).catch(() => {});
+
       if (e.name === "AbortError") {
          return { exitCode: 1, stdout: "", stderr: "", timedOut: true };
       }

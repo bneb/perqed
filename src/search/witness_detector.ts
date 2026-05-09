@@ -67,7 +67,7 @@ export type ArchitectSearchConfig =
 // ──────────────────────────────────────────────
 
 export interface SearchConfig {
-  type: string;
+  type: "ramsey_sa";
   n: number;
   r: number;
   s: number;
@@ -142,11 +142,20 @@ export function extractSearchConfig(cfg: ArchitectSearchConfig): SearchConfig | 
         strategy = "island_model";
       } else {
         saIterations = 500_000_000;
-        workers = 8;
+        workers = 4;
         strategy = "island_model";
       }
 
-      return { type: "ramsey_sa", n, r, s, saIterations, workers, strategy, symmetry: cfg.symmetry };
+      return { 
+        type: "ramsey_sa", 
+        n, 
+        r, 
+        s, 
+        saIterations, 
+        workers, 
+        strategy, 
+        symmetry: cfg.symmetry
+      };
     }
 
     case "unknown":

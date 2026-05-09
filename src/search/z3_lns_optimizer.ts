@@ -20,7 +20,7 @@ export async function adaptiveZ3Solve(
 ): Promise<AdjacencyMatrix | null> {
   let currentHalo = 10;
   const MAX_HALO = 100;
-  const TIMEOUT_MS = 5000;
+  const TIMEOUT_MS = 300_000;
 
   while (currentHalo <= MAX_HALO) {
     // 1. Get the free variables (The Adaptive Window)

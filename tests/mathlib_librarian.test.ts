@@ -11,7 +11,7 @@
 
 import { describe, test, expect, afterAll } from "bun:test";
 import { rm } from "node:fs/promises";
-import { MathlibLibrarian, type LeanTheorem } from "../src/librarian/mathlib_librarian";
+import { MathlibLibrarian, type MathlibPremise } from "../src/librarian/mathlib_librarian";
 import { VectorDatabase, TABLE_MATHLIB } from "../src/embeddings/vector_store";
 
 const TEST_DB = "/tmp/perqed_test_mathlib_lib.lancedb";
@@ -22,15 +22,19 @@ afterAll(async () => {
   await rm(TEST_DB, { recursive: true, force: true });
 });
 
-const SAMPLE_THEOREMS: LeanTheorem[] = [
+const SAMPLE_THEOREMS: MathlibPremise[] = [
   {
-    theorem: "Nat.add_comm",
+    name: "Nat.add_comm",
     signature: "theorem Nat.add_comm (n m : ℕ) : n + m = m + n",
+    dependencies: [],
+    ast_hash: "",
     docstring: "Addition is commutative for natural numbers",
   },
   {
-    theorem: "SimpleGraph.IsClique.mono",
+    name: "SimpleGraph.IsClique.mono",
     signature: "theorem SimpleGraph.IsClique.mono : G.IsClique s → G ≤ H → H.IsClique s",
+    dependencies: [],
+    ast_hash: "",
     docstring: "Cliques are monotone in subgraph relation",
   },
 ];
@@ -147,14 +151,18 @@ describe("MathlibLibrarian — happy path", () => {
       return new Response("not found", { status: 404 });
     }) as unknown as typeof fetch;
 
-    const withDocstring: LeanTheorem = {
-      theorem: "test_theorem",
+    const withDocstring: MathlibPremise = {
+      name: "test_theorem",
       signature: "theorem test_theorem : True",
-      docstring: "This is the docstring",
+      dependencies: [],
+    ast_hash: "",
+    docstring: "This is the docstring",
     };
-    const withoutDocstring: LeanTheorem = {
-      theorem: "no_docstring",
-      signature: "theorem no_docstring : False",
+    const withoutDocstring: MathlibPremise = {
+      name: "no_docstring",
+      dependencies: [],
+    ast_hash: "",
+    signature: "theorem no_docstring : False",
     };
 
     const lib = new MathlibLibrarian({ dbPath: TEST_DB + "_prompt" });

@@ -57,6 +57,7 @@ self.onmessage = (event: MessageEvent) => {
       // ── MicroSAT synchronization ─────────────────────────────────────────
       microSatThreshold: config.microSatThreshold,
       microSatPatch: activePatch,
+      replicaExchangeBuffer: config.replicaExchangeBuffer,
     };
 
     if (config.microSatThreshold !== undefined) {
@@ -106,9 +107,18 @@ self.onmessage = (event: MessageEvent) => {
       saConfig.initialGraph = g;
     }
 
-    const result = ramseySearch(saConfig, (iter, energy, best, temp) => {
-      if (iter % 10_000_000 === 0) {
-        self.postMessage({ type: "progress", worker: workerIndex, iter, energy, best, temp });
+    // Track the current adjacency matrix inside the callback to send it for replica exchange
+    const result = ramseySearch(saConfig, (iter, energy, best, temp, currentAdj) => {
+      if (iter % 500_000 === 0) {
+        self.postMessage({ 
+          type: "progress", 
+          worker: workerIndex, 
+          iter, 
+          energy, 
+          best, 
+          temp,
+          adjRaw: currentAdj ? Array.from(currentAdj.raw) : undefined 
+        });
       }
     });
 

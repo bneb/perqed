@@ -66,6 +66,7 @@ export interface SMTInput {
 
 export interface RedTeamInput {
   conjecture: string;
+  domain: string;
 }
 
 export interface RefinementInput {
@@ -92,7 +93,10 @@ export interface LeanDynamicInput {
   apiKey: string;
   proofTree: ProofTree;
   maxIterations?: number;
-  prunedContext: string;
+  prunedContext?: string;
+  isEmpiricalWitness?: boolean;
+  problemDifficulty?: 'normal' | 'hard';
+  agentFactory?: any;
 }
 
 export interface ErrorCorrectionInput {
@@ -205,6 +209,15 @@ export const validationActor = fromPromise<ValidationOutput, ValidationInput>(
     if (!result.isValid) {
       console.log(`[Validation] ERROR: Hypothesis contains invalid Lean 4 syntax or synthetic definitions.`);
       throw new Error(result.error);
+    }
+
+    // Pass the hypothesis to Lean natively to catch plain English hallucinations
+    const { LeanBridge } = await import("../lean_bridge");
+    const bridge = new LeanBridge();
+    const isSyntacticallyValid = await bridge.checkSyntax(input.hypothesis);
+    
+    if (!isSyntacticallyValid) {
+       throw new Error("HALLUCINATION_DETECTED: Lean 4 compiler fundamentally rejected the syntax. Your hypothesis was likely written in informal English rather than a valid typed theorem signature.");
     }
 
     console.log(`[Validation] AST syntactically valid in Lean 4.`);
@@ -361,10 +374,10 @@ export const saResolutionActor = fromPromise<SAOutput, SAInput>(
       n: input.vertices,
       r: input.r,
       s: input.s,
-      saIterations: 50_000_000,
+      saIterations: 50_000,
       strategy: "island_model",
-      workers: 4,
-      seed: "random"
+      workers: 8,
+      seed: "paley"
     });
 
     const bestResult = saResult.best;
@@ -422,14 +435,18 @@ export const saResolutionActor = fromPromise<SAOutput, SAInput>(
 
 export const redTeamActor = fromPromise<any, RedTeamInput>(
   async ({ input }) => {
+    const { shouldAttemptZ3Falsification } = await import("../solver");
+    if (!shouldAttemptZ3Falsification(input.domain)) {
+      return { status: "VERIFIED_BULLETPROOF" };
+    }
+
     // Dynamically loaded to prevent circular agent dependencies
     const { RedTeamAuditor } = await import("../agents/red_team");
-    
+
     const auditor = new RedTeamAuditor({ apiKey: process.env.GEMINI_API_KEY || "" });
     return await auditor.runAdversarialRedTeam(input.conjecture);
   }
 );
-
 // ──────────────────────────────────────────────
 // 5. Falsification Actor
 // ──────────────────────────────────────────────
@@ -480,18 +497,22 @@ export const leanDynamicActor = fromPromise<any, LeanDynamicInput>(
     // Instantiates the REPL and PRM Scorer under the hood
     const evaluator = new LeanDynamicEvaluator(
         input.outputDir, 
-        input.apiKey
+        input.apiKey,
+        undefined,  // maxIterations (use default)
+        input.problemDifficulty ?? 'normal',
+        input.agentFactory
     );
     
     try {
         const res = await evaluator.runMCTSSearch(
             input.conjecture,
             input.proofTree,
-            input.prunedContext
+            input.prunedContext,
+            input.isEmpiricalWitness
         );
         return res;
     } finally {
-        evaluator.kill();
+        evaluator.close();
     }
   }
 );
@@ -505,14 +526,14 @@ export const leanDynamicActor = fromPromise<any, LeanDynamicInput>(
  */
 export const errorCorrectionActor = fromPromise<ErrorCorrectionOutput, ErrorCorrectionInput>(
   async ({ input }) => {
-    const { GoogleGenAI } = await import("@google/genai");
+    const { PerqedLLM } = await import("../agency/llm_client");
     const { getAgencyRegistry } = await import("../agency");
     const { LocalProverClient } = await import("../agency/local_prover_client");
     
     // Abstract the GenAI instantiation Native over Unix Arrays directly matching the legacy signature.
     const ai = process.env.USE_LOCAL_PROVER === "true" 
         ? LocalProverClient.createMockGenAI() as any
-        : new GoogleGenAI({ apiKey: input.apiKey });
+        : new PerqedLLM({ apiKey: input.apiKey });
 
     const prompt = `The following Lean 4 theorem failed to compile:
 
@@ -554,3 +575,62 @@ export const scribeActor = fromPromise<ScribeOutput, ScribeInput>(
     return { reportPath };
   },
 );
+
+// ──────────────────────────────────────────────
+// 9. Provisioner Actor
+// ──────────────────────────────────────────────
+
+/**
+ * Ensures the target output directory has the necessary Lean infrastructure (lakefile, toolchain, .lake)
+ * so that 'lake exe repl' can be spawned successfully.
+ */
+export async function provisionerLogic({ input }: { input: { workspaceDir: string; outputDir: string } }) {
+    const { mkdir, symlink } = await import("node:fs/promises");
+    const { existsSync } = await import("node:fs");
+    const { resolve, join } = await import("node:path");
+
+    const targetDir = input.outputDir || input.workspaceDir;
+
+    await mkdir(targetDir, { recursive: true });
+
+    // 1. Project Root Infrastructure (from absolute root)
+    // We assume the project root is where the machine started, or we use a fallback to CWD
+    const projectRoot = resolve("."); 
+    const leanFiles = ["lakefile.lean", "lake-manifest.json", "lean-toolchain", ".lake"];
+    for (const file of leanFiles) {
+      const src = resolve(projectRoot, file);
+      const dest = join(targetDir, file);
+      
+      if (existsSync(src) && !existsSync(dest)) {
+        try {
+          console.log(`[Provisioner] Symlinking ${file} -> ${dest}`);
+          await symlink(src, dest, file === ".lake" ? "dir" : "file");
+        } catch (e: any) {
+          if (e.code !== "EEXIST") {
+            console.warn(`[Provisioner] Unable to symlink '${file}': ${e.message}`);
+          }
+        }
+      }
+    }
+
+    // 2. Problem-Specific Libraries (from workspaceDir)
+    // In Perqed, workspaceDir is often the run-specific directory (e.g. agent_workspace/runs/XYZ)
+    const libs = ["verified_lib", "domain_skills"];
+    for (const lib of libs) {
+      const src = resolve(input.workspaceDir, lib);
+      const dest = join(targetDir, lib);
+      
+      if (existsSync(src) && !existsSync(dest)) {
+        try {
+          console.log(`[Provisioner] Symlinking ${lib} -> ${dest}`);
+          await symlink(src, dest, "dir");
+        } catch (e: any) {
+          if (e.code !== "EEXIST") {
+            console.warn(`[Provisioner] Unable to symlink '${lib}': ${e.message}`);
+          }
+        }
+      }
+    }
+}
+
+export const provisionerActor = fromPromise(provisionerLogic);

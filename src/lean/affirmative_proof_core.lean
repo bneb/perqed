@@ -1,5 +1,7 @@
 import Mathlib
 import «verified_growth»
+import «kt_combinatorics»
+import «kt_proof_d2»
 
 open Filter Topology Metric Set
 
@@ -9,90 +11,208 @@ Final Capstone Theorem.
 The core functional, algebraic, and analytic components are 100% verified.
 The combinatorial synthesis is mapped modulo the Kovač-Tao Interior Axiom.
 -/
+-- ============================================================================
+-- Phase 2 Convergence Sub-Lemmas
+-- ============================================================================
 
-/-- The target vector sequence -/
-noncomputable def φ (n : ℕ) : ℝ × ℝ := (1 / (n : ℝ), 1 / ((n : ℝ) - 1 : ℝ))
+lemma p_k_bound (x : ℝ × ℝ) (k : ℕ) 
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) : 
+  |(construct_n x k).1.1| ≤ Real.sqrt (seq_N k) / (2 * (seq_N k) ^ 2) ∧
+  |(construct_n x k).1.2| ≤ Real.sqrt (seq_N k) / (2 * (seq_N k) ^ 3) := by
+  induction k with
+  | zero => exact hx
+  | succ k ih =>
+    unfold construct_n
+    dsimp only
+    split_ifs with h
+    · have h_exists := one_step_composition (seq_N k) (seq_N (k + 1)) (seq_N_bound0 k) (seq_N_bound1 k) (seq_N_bound2 k) (construct_n x k).1.1 (construct_n x k).1.2 h.1 h.2
+      have h_spec := Classical.choose_spec (Classical.choose_spec h_exists)
+      exact ⟨h_spec.2.2.1, h_spec.2.2.2⟩
+    · have h0 : (0 : ℝ) ≤ Real.sqrt (seq_N (k + 1)) / (2 * (seq_N (k + 1)) ^ 2) := by positivity
+      have h1 : (0 : ℝ) ≤ Real.sqrt (seq_N (k + 1)) / (2 * (seq_N (k + 1)) ^ 3) := by positivity
+      exact ⟨by dsimp; linarith, by dsimp; linarith⟩
 
-/-- The space of valid sequences satisfying the Kovač-Tao growth bounds -/
-def ValidSeq (a : ℕ → ℕ) : Prop :=
-  a 0 ≥ 10 ∧ (∀ n, a (n + 1) ≥ (a n)^2 - 2 * (a n)) ∧ (∀ n, a n < a (n + 1))
+lemma residual_decay1 (x : ℝ × ℝ) : Tendsto (fun k => (construct_n x k).1.1) atTop (𝓝 0) := sorry
+lemma residual_decay2 (x : ℝ × ℝ) : Tendsto (fun k => (construct_n x k).1.2) atTop (𝓝 0) := sorry
 
-/-- The infinite sum mapping a sequence into ℝ² -/
-noncomputable def SumMap (a : ℕ → ℕ) : ℝ × ℝ :=
-  (∑' n, (φ (a n)).1, ∑' n, (φ (a n)).2)
+noncomputable def C_total_partial (m : ℕ) : ℝ × ℝ :=
+  (∑ k ∈ Finset.range m, (f₁ (seq_N k) + f₁ (2 * seq_N k)),
+   ∑ k ∈ Finset.range m, (f₂ (seq_N k) + f₂ (2 * seq_N k)))
 
-/-- The 2D image of all valid sequences -/
-def Sumset : Set (ℝ × ℝ) :=
-  { p | ∃ a, ValidSeq a ∧ SumMap a = p }
+lemma C_total_tendsto1 : Tendsto (fun m => (C_total_partial m).1) atTop (𝓝 C_total.1) := sorry
+lemma C_total_tendsto2 : Tendsto (fun m => (C_total_partial m).2) atTop (𝓝 C_total.2) := sorry
 
-/-- 
-THE KOVAČ-TAO BREAKTHROUGH AXIOM:
-Because the Ahmes vectors have non-zero curvature, the discrete 
-sumset has a strictly non-empty topological interior in ℝ².
--/
-axiom kovac_tao_interior : (interior Sumset).Nonempty
+lemma even_partial_sums1 (x : ℝ × ℝ) (m : ℕ) :
+  ∑ j ∈ Finset.range (2 * m), f₁ (construct_a x j) = x.1 - (construct_n x m).1.1 + (C_total_partial m).1 := sorry
 
-/-- 
-Lemma: ℚ² is dense in ℝ²
-Any set in ℝ² with a non-empty topological interior must contain a rational point.
--/
-lemma rational_dense_intersection {S : Set (ℝ × ℝ)} (h_int : (interior S).Nonempty) : 
-  ∃ p ∈ S, ∃ (q1 q2 : ℚ), p = (↑q1, ↑q2) := by
-  obtain ⟨x, hx⟩ := h_int
-  obtain ⟨ε, hε, h_ball⟩ := Metric.nhds_basis_ball.mem_iff.mp (isOpen_interior.mem_nhds hx)
-  have h_dense : Dense { p : ℝ × ℝ | ∃ (q1 q2 : ℚ), p = (↑q1, ↑q2) } := by
-    have : { p : ℝ × ℝ | ∃ (q1 q2 : ℚ), p = (↑q1, ↑q2) } = range (fun q : ℚ => (q : ℝ)) ×ˢ range (fun q : ℚ => (q : ℝ)) := by
-      ext p; simp [Prod.ext_iff, eq_comm]
-    rw [this]
-    apply Dense.prod <;> exact Rat.denseRange_cast
-  obtain ⟨p_rat, ⟨q1, q2, rfl⟩, h_dist⟩ := h_dense.exists_dist_lt x hε
-  use (↑q1, ↑q2)
-  constructor
-  · apply interior_subset
-    apply h_ball
-    rw [Metric.mem_ball, dist_comm]
-    exact h_dist
-  · refine ⟨q1, q2, rfl⟩
+lemma even_partial_sums2 (x : ℝ × ℝ) (m : ℕ) :
+  ∑ j ∈ Finset.range (2 * m), f₂ (construct_a x j) = x.2 - (construct_n x m).1.2 + (C_total_partial m).2 := sorry
+
+lemma tendsto_even_sums1 (x : ℝ × ℝ) :
+  Tendsto (fun m => ∑ j ∈ Finset.range (2 * m), f₁ (construct_a x j)) atTop (𝓝 (x.1 + C_total.1)) := by
+  have h1 : Tendsto (fun m => x.1 - (construct_n x m).1.1 + (C_total_partial m).1) atTop (𝓝 (x.1 - 0 + C_total.1)) :=
+    Tendsto.add (Tendsto.sub tendsto_const_nhds (residual_decay1 x)) (C_total_tendsto1)
+  have heq : x.1 - 0 + C_total.1 = x.1 + C_total.1 := by ring
+  rw [heq] at h1
+  exact h1.congr (fun m => (even_partial_sums1 x m).symm)
+
+lemma tendsto_even_sums2 (x : ℝ × ℝ) :
+  Tendsto (fun m => ∑ j ∈ Finset.range (2 * m), f₂ (construct_a x j)) atTop (𝓝 (x.2 + C_total.2)) := by
+  have h1 : Tendsto (fun m => x.2 - (construct_n x m).1.2 + (C_total_partial m).2) atTop (𝓝 (x.2 - 0 + C_total.2)) :=
+    Tendsto.add (Tendsto.sub tendsto_const_nhds (residual_decay2 x)) (C_total_tendsto2)
+  have heq : x.2 - 0 + C_total.2 = x.2 + C_total.2 := by ring
+  rw [heq] at h1
+  exact h1.congr (fun m => (even_partial_sums2 x m).symm)
+
+lemma tendsto_all_sums1 (x : ℝ × ℝ) : Tendsto (fun m => ∑ j ∈ Finset.range m, f₁ (construct_a x j)) atTop (𝓝 (x.1 + C_total.1)) := sorry
+lemma tendsto_all_sums2 (x : ℝ × ℝ) : Tendsto (fun m => ∑ j ∈ Finset.range m, f₂ (construct_a x j)) atTop (𝓝 (x.2 + C_total.2)) := sorry
+
+lemma construct_a_has_sum (x : ℝ × ℝ) 
+    (hx : |x.1| < Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| < Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) : 
+  HasSum (fun k => (f₁ (construct_a x k), f₂ (construct_a x k))) (x.1 + C_total.1, x.2 + C_total.2) := by
+  have h1 : HasSum (fun k => f₁ (construct_a x k)) (x.1 + C_total.1) :=
+    (hasSum_iff_tendsto_nat_of_nonneg (f_pos1 x) _).mpr (tendsto_all_sums1 x)
+  have h2 : HasSum (fun k => f₂ (construct_a x k)) (x.2 + C_total.2) :=
+    (hasSum_iff_tendsto_nat_of_nonneg (f_pos2 x) _).mpr (tendsto_all_sums2 x)
+  exact h1.prodMk h2
+
+-- ============================================================================
+-- The full theorem
+-- ============================================================================
+
+lemma sumset_has_interior :
+    ∃ (U : Set (ℝ × ℝ)), IsOpen U ∧ U.Nonempty ∧ 
+    ∀ x ∈ U, ∃ (a : ℕ → ℕ), StrictMono a ∧ (∀ k, a k ≥ 2) ∧
+      (∃ β : ℝ, β > 1 ∧ Tendsto (fun k => (a k : ℝ) ^ ((1 : ℝ) / β ^ k)) atTop atTop) ∧
+      HasSum (fun k => (f₁ (a k), f₂ (a k))) x := by
+  let U : Set (ℝ × ℝ) := {x | |x.1 - C_total.1| < Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+                              |x.2 - C_total.2| < Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)}
+  use U
+  refine ⟨?_, ?_, ?_⟩
+  · have h1 : IsOpen {x : ℝ × ℝ | |x.1 - C_total.1| < Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2)} :=
+      isOpen_lt (Continuous.comp continuous_abs (Continuous.sub continuous_fst continuous_const)) continuous_const
+    have h2 : IsOpen {x : ℝ × ℝ | |x.2 - C_total.2| < Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)} :=
+      isOpen_lt (Continuous.comp continuous_abs (Continuous.sub continuous_snd continuous_const)) continuous_const
+    exact IsOpen.inter h1 h2
+  · use C_total
+    change |C_total.1 - C_total.1| < _ ∧ |C_total.2 - C_total.2| < _
+    rw [sub_self, sub_self, abs_zero]
+    have hN : seq_N 0 > 0 := by
+      have : seq_N 0 ≥ 3 * 10^13 := seq_N_bound0 0
+      linarith
+    have h_r1 : Real.sqrt (seq_N 0) / (2 * seq_N 0 ^ 2) > 0 := by positivity
+    have h_r2 : Real.sqrt (seq_N 0) / (2 * seq_N 0 ^ 3) > 0 := by positivity
+    exact ⟨h_r1, h_r2⟩
+  · intro x hx
+    let x' := (x.1 - C_total.1, x.2 - C_total.2)
+    use construct_a x'
+    refine ⟨construct_a_strict_mono x', construct_a_ge_2 x', construct_a_growth x', ?_⟩
+    have h_sum := construct_a_has_sum x' hx
+    have h_eq1 : x'.1 + C_total.1 = x.1 := by
+      dsimp [x']; ring
+    have h_eq2 : x'.2 + C_total.2 = x.2 := by
+      dsimp [x']; ring
+    have h_eq : (x'.1 + C_total.1, x'.2 + C_total.2) = x := Prod.ext h_eq1 h_eq2
+    rwa [h_eq] at h_sum
+
+-- ============================================================================
+-- [G] FINAL THEOREM (Corollary 2.9 for d=2)
+-- Difficulty: 🟡 Medium (density of ℚ² in ℝ² + partial fractions)
+-- Strategy: 
+--   1. [F] gives an open set U ⊂ ℝ² where each point is realized by a sequence.
+--   2. ℚ × ℚ is dense in ℝ × ℝ, so U contains a point (q₁, q₂) ∈ ℚ².
+--   3. F gives sequence (aₖ) with Σ 1/aₖ = q₁, Σ 1/(aₖ(aₖ+1)) = q₂.
+--   4. Partial fractions: 1/(n(n+1)) = 1/n - 1/(n+1).
+--      So Σ 1/(aₖ+1) = Σ 1/aₖ - Σ 1/(aₖ(aₖ+1)) = q₁ - q₂ ∈ ℚ.
+--   5. Set bₖ = aₖ + 1. Then:
+--      - Σ 1/bₖ = Σ 1/(aₖ+1) = q₁ - q₂ ∈ ℚ
+--      - Σ 1/(bₖ-1) = Σ 1/aₖ = q₁ ∈ ℚ
+--      - bₖ ≥ 3, StrictMono, same growth rate.
+-- ============================================================================
+
+-- Helper lemmas for rational density
+lemma rat_prod_dense (U : Set (ℝ × ℝ)) (hU : IsOpen U) (hU_nonempty : U.Nonempty) :
+    ∃ (q₁ q₂ : ℚ), ((q₁ : ℝ), (q₂ : ℝ)) ∈ U := by
+  obtain ⟨⟨x₁, x₂⟩, hx⟩ := hU_nonempty
+  rw [isOpen_prod_iff] at hU
+  obtain ⟨u₁, u₂, hu₁, hu₂, hx₁, hx₂, hsub⟩ := hU x₁ x₂ hx
+  have hd : DenseRange (fun q : ℚ => (q : ℝ)) := Rat.denseRange_cast
+  obtain ⟨q₁, hq₁⟩ := hd.exists_mem_open hu₁ ⟨x₁, hx₁⟩
+  obtain ⟨q₂, hq₂⟩ := hd.exists_mem_open hu₂ ⟨x₂, hx₂⟩
+  exact ⟨q₁, q₂, hsub (Set.mk_mem_prod hq₁ hq₂)⟩
+
+-- Helper lemmas for HasSum projection
+lemma hasSum_fst {f : ℕ → ℝ × ℝ} {x : ℝ × ℝ} (h : HasSum f x) : HasSum (fun n => (f n).1) x.1 :=
+  h.map (ContinuousLinearMap.fst ℝ ℝ ℝ) (ContinuousLinearMap.fst ℝ ℝ ℝ).continuous
+
+lemma hasSum_snd {f : ℕ → ℝ × ℝ} {x : ℝ × ℝ} (h : HasSum f x) : HasSum (fun n => (f n).2) x.2 :=
+  h.map (ContinuousLinearMap.snd ℝ ℝ ℝ) (ContinuousLinearMap.snd ℝ ℝ ℝ).continuous
+
+-- Helper lemma for sum decomposition
+lemma has_sum_shift (a : ℕ → ℕ) (ha_pos : ∀ k, a k ≥ 2) (q₁ q₂ : ℝ) 
+    (h₁ : HasSum (fun k => 1 / (a k : ℝ)) q₁)
+    (h₂ : HasSum (fun k => 1 / ((a k : ℝ) * ((a k : ℝ) + 1))) q₂) :
+    HasSum (fun k => 1 / ((a k : ℝ) + 1)) (q₁ - q₂) := by
+  have h_sub := h₁.sub h₂
+  suffices h_eq : (fun k => 1 / (a k : ℝ) - 1 / ((a k : ℝ) * ((a k : ℝ) + 1))) = 
+                  (fun k => 1 / ((a k : ℝ) + 1)) by
+    rwa [h_eq] at h_sub
+  ext k
+  have hak : (a k : ℝ) > 0 := by
+    have := ha_pos k; exact_mod_cast Nat.pos_of_ne_zero (by omega)
+  have ha : (a k : ℝ) ≠ 0 := ne_of_gt hak
+  have ha1 : (a k : ℝ) + 1 > 0 := by linarith
+  field_simp
+  ring
+
+lemma tendsto_shift (a : ℕ → ℕ) (β : ℝ) (hβ : β > 0)
+    (h_tendsto : Tendsto (fun k => (a k : ℝ) ^ ((1 : ℝ) / β ^ k)) atTop atTop) : 
+    Tendsto (fun k => ((a k : ℝ) + 1) ^ ((1 : ℝ) / β ^ k)) atTop atTop := by
+  apply Filter.tendsto_atTop_mono _ h_tendsto
+  intro k
+  apply Real.rpow_le_rpow (Nat.cast_nonneg _) (by linarith) (by positivity)
 
 /--
-Erdős Problem #265: Affirmative Resolution.
-There exists a strictly increasing integer sequence satisfying a strict 
-double-exponential growth floor whose reciprocal sums simultaneously hit 
-rational coordinates.
+Erdős Problem #265 (Formal Specification — Kovač-Tao Theorem 2.8/2.9):
+There exist β > 1 and a strictly increasing sequence of integers aₖ ≥ 2
+growing at least double-exponentially (i.e., aₖ^{1/βᵏ} → ∞),
+such that both ∑ 1/aₖ and ∑ 1/(aₖ - 1) converge to rational numbers.
 -/
-theorem erdos_265_affirmative_resolution : 
-  ∃ (a : ℕ → ℕ), 
-    (∀ n, a n < a (n + 1)) ∧
-    (∀ n, (a n : ℝ) ^ (1 / (2 ^ n : ℝ)) ≥ 7) ∧ 
-    ∃ (q1 q2 : ℚ), SumMap a = (↑q1, ↑q2) := by
-  
-  -- 1. By the Kovač-Tao axiom, the Sumset has a non-empty interior.
-  have h_nonempty := kovac_tao_interior
-  
-  -- 2. By topological density, the Sumset must contain a rational point.
-  obtain ⟨p, hp_in_S, q1, q2, hp_rat⟩ := rational_dense_intersection h_nonempty
-  
-  -- 3. Unpack the definition of the Sumset to extract the sequence `a`
-  obtain ⟨a, ha_valid, ha_sum⟩ := hp_in_S
-  
-  -- 4. Provide the sequence as the existential witness
-  use a
-  constructor
-  · exact ha_valid.2.2
-  · constructor
-    · -- The sequence satisfies the Erdős growth floor (Stronger than limsup > 1)
-      intro n
-      have h_floor := growth_floor a ha_valid.1 ha_valid.2.1 n
-      have h_ge : (a n : ℝ) ≥ (7 : ℝ) ^ (2 ^ n : ℝ) := by
-        have h_nat : a n ≥ 7 ^ 2 ^ n := by linarith [Nat.one_le_pow (2^n) 7]
-        rw [← Real.rpow_natCast]; exact_mod_cast h_nat
-        
-      -- Directly apply monotonicity of rpow
-      have h_pow := Real.rpow_le_rpow (by positivity) h_ge (by positivity : 0 ≤ (1 / (2 ^ n : ℝ)))
-      have h_cancel : ((7 : ℝ) ^ (2 ^ n : ℝ)) ^ (1 / (2 ^ n : ℝ)) = 7 := by
-        rw [← Real.rpow_mul (by positivity), mul_one_div_cancel (by positivity), Real.rpow_one]
-      rwa [h_cancel] at h_pow
-      
-    · -- The sequence sums to the extracted rational coordinates
-      use q1, q2
-      exact ha_sum.trans hp_rat
+theorem erdos_265 : ∃ (β : ℝ) (a : ℕ → ℕ),
+    β > 1 ∧ (∀ k, a k ≥ 2) ∧ StrictMono a ∧
+    Tendsto (fun k => (a k : ℝ) ^ ((1 : ℝ) / β ^ k)) atTop atTop ∧
+    (∃ q₁ : ℚ, HasSum (fun k => (1 : ℝ) / (a k : ℝ)) ↑q₁) ∧
+    (∃ q₂ : ℚ, HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q₂) := by
+  rcases sumset_has_interior with ⟨U, hU_open, hU_nonempty, hU_prop⟩
+  have ⟨q₁, q₂, hq⟩ := rat_prod_dense U hU_open hU_nonempty
+  rcases hU_prop (↑q₁, ↑q₂) hq with ⟨a, h_mono, h_ge2, h_growth, h_sum⟩
+  have h_sum1 : HasSum (fun k => f₁ (a k)) ↑q₁ := hasSum_fst h_sum
+  have h_sum2 : HasSum (fun k => f₂ (a k)) ↑q₂ := hasSum_snd h_sum
+  -- The actual sequence is b(k) = a(k) + 1, so 1/b(k) and 1/(b(k)-1) are rational
+  rcases h_growth with ⟨β, hβ, h_tendsto⟩
+  use β, fun k => a k + 1
+  refine ⟨hβ, ?_, ?_, ?_, ?_, ?_⟩
+  · -- ≥ 2
+    intro k; linarith [h_ge2 k]
+  · -- StrictMono
+    intro x y hxy; exact Nat.add_lt_add_right (h_mono hxy) 1
+  · -- Double exponential growth: (a(k)+1)^{1/β^k} → ∞
+    convert tendsto_shift a β (by linarith) h_tendsto using 1
+    ext k
+    push_cast
+    rfl
+  · -- ∑ 1/(a(k)+1) is rational (= q₁ - q₂, by partial fractions)
+    use q₁ - q₂
+    push_cast
+    exact has_sum_shift a h_ge2 ↑q₁ ↑q₂ h_sum1 h_sum2
+  · -- ∑ 1/((a(k)+1) - 1) = ∑ 1/a(k) is rational (= q₁)
+    use q₁
+    push_cast
+    have h_eq : (fun k => 1 / ((a k : ℝ) + 1 - 1)) = fun k => 1 / (a k : ℝ) := by
+      ext k; congr 1; ring
+    rw [h_eq]
+    exact h_sum1
+
+

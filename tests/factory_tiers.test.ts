@@ -25,7 +25,8 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
     lastErrors: [],
     hasArchitectDirective: false,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0,
+    hasSubgoalProposal: false,
     ...overrides,
   };
 }
@@ -42,22 +43,22 @@ describe("AgentFactory Tier Selection", () => {
   // ── TACTICIAN: Always local ──
 
   test("TACTICIAN is always local FormalistAgent", () => {
-    const agent = factory.getAgent("TACTICIAN", makeSignals());
-    expect(agent.role).toBe("TACTICIAN");
+    const agent = factory.getAgent("PROVER", makeSignals());
+    expect(agent.role).toBe("PROVER");
   });
 
   // ── REASONER: Free → Paid Flash ──
 
   test("REASONER at 3 failures → gemini-2.5-flash (free tier)", () => {
-    const agent = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 3 }));
-    expect(agent.role).toBe("REASONER");
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ consecutiveFailures: 3 }));
+    expect(agent.role).toBe("ARCHITECT");
     // Verify it's the free tier model
     expect((agent as any).modelTier).toBe("gemini-2.5-flash");
   });
 
   test("REASONER at M=4 failures → gemini-3.1-flash-lite-preview (paid tier)", () => {
-    const agent = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 4 }));
-    expect(agent.role).toBe("REASONER");
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ consecutiveFailures: 4 }));
+    expect(agent.role).toBe("ARCHITECT");
     expect((agent as any).modelTier).toBe("gemini-3.1-flash-lite-preview");
   });
 
@@ -82,7 +83,7 @@ describe("AgentFactory Tier Selection", () => {
     delete process.env.GEMINI_API_KEY;
     try {
       const noKeyFactory = new AgentFactory({});
-      expect(() => noKeyFactory.getAgent("REASONER", makeSignals())).toThrow("GEMINI_API_KEY");
+      expect(() => noKeyFactory.getAgent("ARCHITECT", makeSignals())).toThrow("GEMINI_API_KEY");
     } finally {
       if (savedKey !== undefined) process.env.GEMINI_API_KEY = savedKey;
     }

@@ -144,11 +144,19 @@ export const ArchitectResponseSchema = z.object({
   analysis: z.string().describe(
     "Brief explanation of why the local model's recent attempts are failing mathematically.",
   ),
+  action: z.enum([
+    "REQUEST_EMPIRICAL_PROBE",
+    "REQUEST_LITERATURE",
+    "CONTINUE_PROOF",
+    "FALSIFIED"
+  ]).optional().describe(
+    "Dynamic routing action. If formal verification fails, you may request an empirical probe, literature search, or declare falsification."
+  ),
   steps_to_backtrack: z.number().int().min(0).describe(
     "How many verified steps to delete from current_progress.md to escape the dead end.",
   ),
   new_directive: z.string().describe(
-    "Strict, high-level instruction for the LocalAgent on what mathematical approach to try next.",
+    "Strict, high-level instruction for the LocalAgent on what mathematical approach to try next. Or details for the requested action.",
   ),
 });
 

@@ -17,6 +17,6 @@ test("HumanAgent conforming to interface and returning typed input", async () =>
     const res = await agent.generateMove("Current goal: ⊢ 1 = 1");
     
     expect(res).toBeDefined();
-    expect(res.tactics![0].code).toBe("intro h; exact h");
-    expect(res.action).toBe("PROPOSE_TACTICS");
+    expect((res as any).lean_tactics?.[0]?.tactic || (res as any).tactics?.[0]?.code).toBe("intro h; exact h");
+    expect((res as any).action).toBe("PROPOSE_TACTICS");
 });

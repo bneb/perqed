@@ -107,7 +107,16 @@ export function countIndependentSets(adj: AdjacencyMatrix, k: number): number {
  * E = 0 iff the graph is a valid R(r,s) witness.
  */
 export function ramseyEnergy(adj: AdjacencyMatrix, r: number, s: number): number {
-  return countCliques(adj, r) + countIndependentSets(adj, s);
+  let penalty = 0;
+  if (adj.n === 35 && r === 4 && s === 6) {
+    for (let v = 0; v < adj.n; v++) {
+      const dR = adj.degree(v);
+      if (dR < 10) penalty += (10 - dR) * 100;
+      if (dR > 17) penalty += (dR - 17) * 100;
+    }
+  }
+
+  return countCliques(adj, r) + countIndependentSets(adj, s) + penalty;
 }
 
 // ──────────────────────────────────────────────
@@ -178,7 +187,32 @@ export function ramseyEnergyDelta(
 
   const deltaCl = cliquesAfter - cliquesBefore;
   const deltaIn = indSetsAfter - indSetsBefore;
-  return deltaCl + deltaIn;
+
+  let penaltyDelta = 0;
+  if (adj.n === 35 && r === 4 && s === 6) {
+    const dRu = adj.degree(u);
+    const dRv = adj.degree(v);
+
+    const currentPenalty = (dRu < 10 ? (10 - dRu) * 100 : (dRu > 17 ? (dRu - 17) * 100 : 0)) +
+                           (dRv < 10 ? (10 - dRv) * 100 : (dRv > 17 ? (dRv - 17) * 100 : 0));
+
+    let newDRu = dRu;
+    let newDRv = dRv;
+    if (edgePresent) {
+      newDRu--;
+      newDRv--;
+    } else {
+      newDRu++;
+      newDRv++;
+    }
+
+    const newPenalty = (newDRu < 10 ? (10 - newDRu) * 100 : (newDRu > 17 ? (newDRu - 17) * 100 : 0)) +
+                       (newDRv < 10 ? (10 - newDRv) * 100 : (newDRv > 17 ? (newDRv - 17) * 100 : 0));
+
+    penaltyDelta = newPenalty - currentPenalty;
+  }
+
+  return deltaCl + deltaIn + penaltyDelta;
 }
 
 /**
@@ -318,3 +352,77 @@ export function ramseyEnergyDeltaBatch(
 
   return newEnergy - oldEnergy;
 }
+
+// ──────────────────────────────────────────────
+// Spectral Graph Bounds Energy
+// ──────────────────────────────────────────────
+
+/**
+ * Power iteration to find the dominant eigenvalue of a symmetric matrix.
+ */
+function powerIteration(A: number[][], numIters: number = 30): number {
+  const n = A.length;
+  let v = new Float64Array(n);
+  // Initialize with a somewhat random vector (avoiding pure uniform to not hit invariant subspace)
+  for (let i = 0; i < n; i++) v[i] = Math.sin(i + 1);
+  
+  for (let iter = 0; iter < numIters; iter++) {
+    const nextV = new Float64Array(n);
+    let norm = 0;
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let j = 0; j < n; j++) {
+        sum += A[i]![j]! * v[j]!;
+      }
+      nextV[i] = sum;
+      norm += sum * sum;
+    }
+    norm = Math.sqrt(norm);
+    if (Math.abs(norm) < 1e-9) break;
+    for (let i = 0; i < n; i++) {
+      v[i] = nextV[i]! / norm;
+    }
+  }
+  
+  // Rayleigh quotient: v^T A v
+  let eigenvalue = 0;
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let j = 0; j < n; j++) {
+      sum += A[i]![j]! * v[j]!;
+    }
+    eigenvalue += v[i]! * sum;
+  }
+  return eigenvalue;
+}
+
+/**
+ * Computes the spectral proxy energy for a graph to enforce expansion and structure.
+ * Target typically is √(degree - 1) for Ramanujan graphs, or similar bounds.
+ * E = max(0, λ₁ - target) + max(0, target - |λ_n|)
+ */
+export function spectralEnergy(adj: AdjacencyMatrix, target: number): number {
+  const n = adj.n;
+  const A: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    A[i] = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) {
+      A[i]![j] = adj.hasEdge(i, j) ? 1 : 0;
+    }
+  }
+  
+  const lambda1 = powerIteration(A);
+  
+  // Shift matrix by lambda1 to find the most negative eigenvalue (which becomes dominant in magnitude)
+  const shiftedA: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    shiftedA[i] = [...A[i]!];
+    shiftedA[i]![i] = shiftedA[i]![i]! - lambda1;
+  }
+  
+  const shiftedMin = powerIteration(shiftedA);
+  const lambdaN = shiftedMin + lambda1; // Unshift
+  
+  return Math.max(0, lambda1 - target) + Math.max(0, target - Math.abs(lambdaN));
+}
+

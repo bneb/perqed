@@ -18,7 +18,7 @@ async function main() {
     console.log("Res3:", res3);
   }
 
-  repl.kill();
+  repl.close();
 }
 
 main().catch(console.error);

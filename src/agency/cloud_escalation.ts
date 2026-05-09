@@ -1,5 +1,5 @@
 import { getAgencyRegistry } from "./index";
-import { GoogleGenAI } from "@google/genai";
+import { PerqedLLM } from "./llm_client";
 
 export class CloudEscalationEngine {
     /**
@@ -9,7 +9,7 @@ export class CloudEscalationEngine {
     public static async escalateToFrontierLLM(apiKey: string, derivationChainTrace: string, originalPrompt: string): Promise<string> {
         console.warn(`[CloudEscalation] ⚠️ Local PR-CoT constraints breached. Phoning Home to Frontier API bounds...`);
         
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new PerqedLLM({ apiKey });
         
         const escalationContext = `
 [SYSTEM OVERRIDE] We are executing a massive offline proof. The local inference arrays exhausted their logic capabilities mapping the following topological boundaries.

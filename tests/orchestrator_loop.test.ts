@@ -193,22 +193,22 @@ describe("runDynamicLoop()", () => {
 
     const factory = new MockAgentFactory();
     const architectAgent = new MockAgent("ARCHITECT", [architectDirectiveResponse()]);
-    const tacticianAgent = new MockAgent("TACTICIAN", [tacticianSuccessResponse()]);
+    const tacticianAgent = new MockAgent("PROVER", [tacticianSuccessResponse()]);
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", tacticianAgent);
+    factory.registerAgent("PROVER", tacticianAgent);
 
     const result = await runDynamicLoop(workspace, solver, {
-      maxGlobalIterations: 10,
+      maxGlobalIterations: 10, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
       theoremName: "nat_succ_gt",
-      theoremSignature: "(n : Nat) : n + 1 > n",
+      theoremSignature: "theorem thm (n : Nat) : n + 1 > n",
     });
 
     // Verify routing decisions
     expect(factory.agentRequests.length).toBeGreaterThanOrEqual(2);
     expect(factory.agentRequests[0]!.role).toBe("ARCHITECT"); // Turn 1: initial plan
-    expect(factory.agentRequests[1]!.role).toBe("TACTICIAN"); // Turn 2: execute
+    expect(factory.agentRequests[1]!.role).toBe("PROVER"); // Turn 2: execute
 
     // Verify result
     expect(result.status).toBe("SOLVED");
@@ -221,30 +221,30 @@ describe("runDynamicLoop()", () => {
 
     const factory = new MockAgentFactory();
     const architectAgent = new MockAgent("ARCHITECT", [architectDirectiveResponse()]);
-    const tacticianAgent = new MockAgent("TACTICIAN", [
+    const tacticianAgent = new MockAgent("PROVER", [
       tacticianFailResponse("Try 1"),
       tacticianFailResponse("Try 2"),
     ]);
-    const reasonerAgent = new MockAgent("REASONER", [reasonerResponse()]);
+    const reasonerAgent = new MockAgent("ARCHITECT", [reasonerResponse()]);
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", tacticianAgent);
-    factory.registerAgent("REASONER", reasonerAgent);
+    factory.registerAgent("PROVER", tacticianAgent);
+    factory.registerAgent("ARCHITECT", reasonerAgent);
 
     const result = await runDynamicLoop(workspace, solver, {
-      maxGlobalIterations: 10,
+      maxGlobalIterations: 10, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
       theoremName: "nat_succ_gt",
-      theoremSignature: "(n : Nat) : n + 1 > n",
+      theoremSignature: "theorem thm (n : Nat) : n + 1 > n",
     });
 
     // Routing: ARCHITECT → TACTICIAN (×2 fail, same error = stuck-in-loop) → REASONER
     const roles = factory.agentRequests.map(r => r.role);
     expect(roles[0]).toBe("ARCHITECT");    // Turn 1: plan
-    expect(roles[1]).toBe("TACTICIAN");    // Turn 2: fail
-    expect(roles[2]).toBe("TACTICIAN");    // Turn 3: fail (same error → stuck)
+    expect(roles[1]).toBe("PROVER");    // Turn 2: fail
+    expect(roles[2]).toBe("PROVER");    // Turn 3: fail (same error → stuck)
     // Stuck-in-loop triggers REASONER even with < 3 consecutive failures
-    expect(roles[3]).toBe("REASONER");     // Turn 4: reasoner unblocks
+    expect(roles[3]).toBe("ARCHITECT");     // Turn 4: reasoner unblocks
 
     expect(result.status).toBe("SOLVED");
   });
@@ -261,7 +261,7 @@ describe("runDynamicLoop()", () => {
       architectDirectiveResponse(),  // Catastrophic rethink (Pro)
     ]);
     // After rethink, the Tactician must succeed
-    const tacticianAgent = new MockAgent("TACTICIAN", [
+    const tacticianAgent = new MockAgent("PROVER", [
       // First batch: 2 unique failures before stuck-in-loop triggers REASONER
       { thoughts: "try1", action: "PROPOSE_LEAN_TACTICS" as const, lean_tactics: [{ tactic: "ring", informal_sketch: "try ring", confidence_score: 0.5 }] },
       { thoughts: "try2", action: "PROPOSE_LEAN_TACTICS" as const, lean_tactics: [{ tactic: "norm_num", informal_sketch: "try norm_num", confidence_score: 0.5 }] },
@@ -269,7 +269,7 @@ describe("runDynamicLoop()", () => {
       { thoughts: "final", action: "PROPOSE_LEAN_TACTICS" as const, lean_tactics: [{ tactic: "exact_proof_qed", informal_sketch: "exact proof", confidence_score: 0.99 }] },
     ]);
     // Reasoner also fails — needs to accumulate to 6 total consecutive failures
-    const reasonerAgent = new MockAgent("REASONER", [
+    const reasonerAgent = new MockAgent("ARCHITECT", [
       { thoughts: "r1", action: "PROPOSE_LEAN_TACTICS" as const, lean_tactics: [{ tactic: "simp_all", informal_sketch: "try simp_all", confidence_score: 0.6 }] },
       { thoughts: "r2", action: "PROPOSE_LEAN_TACTICS" as const, lean_tactics: [{ tactic: "linarith", informal_sketch: "try linarith", confidence_score: 0.6 }] },
       { thoughts: "r3", action: "PROPOSE_LEAN_TACTICS" as const, lean_tactics: [{ tactic: "decide", informal_sketch: "try decide", confidence_score: 0.6 }] },
@@ -277,15 +277,15 @@ describe("runDynamicLoop()", () => {
       { thoughts: "r5", action: "PROPOSE_LEAN_TACTICS" as const, lean_tactics: [{ tactic: "tauto", informal_sketch: "try tauto", confidence_score: 0.6 }] },
     ]);
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", tacticianAgent);
-    factory.registerAgent("REASONER", reasonerAgent);
+    factory.registerAgent("PROVER", tacticianAgent);
+    factory.registerAgent("ARCHITECT", reasonerAgent);
 
     const result = await runDynamicLoop(workspace, solver, {
-      maxGlobalIterations: 20,
+      maxGlobalIterations: 20, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
       theoremName: "nat_succ_gt",
-      theoremSignature: "(n : Nat) : n + 1 > n",
+      theoremSignature: "theorem thm (n : Nat) : n + 1 > n",
     });
 
     // Verify ARCHITECT was called at least twice (second time for structural rethink)

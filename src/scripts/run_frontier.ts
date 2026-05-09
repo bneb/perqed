@@ -58,7 +58,7 @@ async function verifyFrontier(n: number) {
 
       if (!CycleFinder.hasPowerOfTwoCycle(adj)) {
         counterexample = g6;
-        proc.kill();
+        proc.close();
         break;
       }
 

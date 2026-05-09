@@ -74,7 +74,7 @@ function buildDistanceClauses(N: number, k: number): number[][] {
  * @param r  Red clique size to forbid (e.g. 4)
  * @param s  Blue clique size to forbid (e.g. 6)
  */
-export function generateRamseyZ3Script(N: number, r: number, s: number): string {
+export function generateRamseyZ3Script(N: number, r: number, s: number, symmetry: 'circulant' | 'paley' | 'block-circulant' = 'circulant'): string {
   const maxDist = Math.floor(N / 2);
 
   // Precompute all unique distance-clauses in TypeScript (fast)
@@ -85,13 +85,24 @@ export function generateRamseyZ3Script(N: number, r: number, s: number): string 
   const redStr = JSON.stringify(redClauses);
   const blueStr = JSON.stringify(blueClauses);
 
+  let symmetryConstraints = "";
+  if (symmetry === 'block-circulant') {
+    symmetryConstraints = `
+# Block-circulant symmetry constraints
+# Tie adjacent distance colors together to further compress search space
+for d in range(1, num_distances, 2):
+    if d < num_distances:
+        solver.add(e[d - 1] == e[d])
+`;
+  }
+
   return `from z3 import *
 
 num_distances = ${maxDist}
 e = [Bool(f'e_{"{d}"}') for d in range(1, num_distances + 1)]
 
 solver = Solver()
-
+${symmetryConstraints}
 # Constraint 1: No monochromatic red K_${r}
 # ${redClauses.length} unique distance-set clauses (precomputed, deduplicated)
 for dists in ${redStr}:

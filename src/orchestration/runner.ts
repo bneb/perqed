@@ -41,11 +41,11 @@ export async function runResearchMachine(
     workspaceDir: config.workspaceDir,
     outputDir,
     publishableMode: config.publishableMode ?? false,
-    crossPollinate: config.crossPollinate ?? false,
   });
 
   return new Promise<ResearchResult>((resolve) => {
     actor.subscribe((snapshot) => {
+      console.log(`[XState] Snapshot changed. State: ${JSON.stringify(snapshot.value)}`);
       if (snapshot.status === "done") {
         const ctx = snapshot.context;
         resolve({
@@ -70,14 +70,27 @@ export async function runResearchMachine(
 export async function runFormalVerificationOnly(
   prompt: string,
   config: ResearchMachineConfig & {
-    signature: string;
+    signature?: string;
     objective?: string;
     maxIterations?: number;
+    problemClass?: string;
+    agentFactory?: any;
   }
 ): Promise<ResearchResult> {
   const runId = `run_${Date.now()}_formal`;
   const outputDir = join(config.workspaceDir, "runs", runId);
   mkdirSync(outputDir, { recursive: true });
+
+  let activeSignature = config.signature;
+  if (!activeSignature) {
+    console.log(`[Runner] No signature provided. Auto-formalizing prompt: "${prompt}"...`);
+    const { AutoformalizerAgent } = await import("../agents/autoformalizer");
+    const { LeanBridge } = await import("../lean_bridge");
+    const lean = new LeanBridge(undefined, config.workspaceDir);
+    const formalizer = new AutoformalizerAgent({ apiKey: config.apiKey, leanBridge: lean });
+    activeSignature = await formalizer.formalize(prompt);
+    console.log(`[Runner] Auto-formalization complete: ${activeSignature}`);
+  }
 
   const actor = createActor(researchMachine);
 
@@ -89,13 +102,16 @@ export async function runFormalVerificationOnly(
     apiKey: config.apiKey,
     workspaceDir: config.workspaceDir,
     outputDir,
-    signature: config.signature,
+    signature: activeSignature,
     objective: config.objective,
     maxIterations: config.maxIterations,
+    problemClass: config.problemClass,
+    agentFactory: config.agentFactory,
   });
 
   return new Promise<ResearchResult>((resolve) => {
     actor.subscribe((snapshot) => {
+      console.log(`[XState] Snapshot changed. State: ${JSON.stringify(snapshot.value)}`);
       if (snapshot.status === "done") {
         const ctx = snapshot.context;
         resolve({

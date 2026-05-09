@@ -6,6 +6,7 @@ package «perqed» {
 }
 
 require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "v4.30.0-rc2"
+require repl from git "https://github.com/leanprover-community/repl" @ "v4.30.0-rc2"
 
 lean_lib «VerifiedConstruction» {
   srcDir := "src/lean"
@@ -15,7 +16,10 @@ lean_lib «VerifiedConstruction» {
     `verified_convergence,
     `verified_patch,
     `kt_combinatorics,
-    `affirmative_proof_core
+    `affirmative_proof_core,
+    `verified_rounding,
+    `problem_specification,
+    `kt_proof_d2
   ]
 }
 

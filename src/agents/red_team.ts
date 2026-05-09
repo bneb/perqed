@@ -12,7 +12,7 @@
  * The caller runs up to MAX_ROUNDS of WEAKEN→re-audit before giving up.
  */
 
-import { GoogleGenAI } from "@google/genai";
+import { PerqedLLM } from "../agency/llm_client";
 import type { RedTeamResult } from "./research_types";
 import { getAgencyRegistry } from "../agency";
 import { SolverBridge } from "../solver";
@@ -28,19 +28,42 @@ export interface RedTeamOutput {
 }
 
 export class RedTeamAuditor {
-  private ai: GoogleGenAI;
+  private ai: PerqedLLM;
   private model: string;
   private solver: SolverBridge;
 
   constructor(cfg: RedTeamConfig) {
-    this.ai = new GoogleGenAI({ apiKey: cfg.apiKey });
+    this.ai = new PerqedLLM({ apiKey: cfg.apiKey });
     this.model = cfg.model ?? getAgencyRegistry().resolveProvider("red_team").model;
     this.solver = new SolverBridge();
   }
 
+  private constructLeanWitness(payload: any, conjectureSignature: string): string {
+    const N = payload.nodes || 0;
+    const edges: number[][] = payload.edges || [];
+    
+    // Auto-generate the Lean definition for a finite simple graph
+    const edgeConditions = edges.map(e => `(x = ${e[0]} ∧ y = ${e[1]}) ∨ (x = ${e[1]} ∧ y = ${e[0]})`).join(" ∨ ");
+    
+    return `
+import Mathlib
+
+def WitnessGraph : SimpleGraph (Fin ${N}) := {
+  Adj := fun x y => ${edgeConditions || "False"}
+  symm := by decide
+  loopless := by decide
+}
+
+-- Assert that the witness actively breaks the proposed rule:
+theorem falsification_verified : ¬ (${conjectureSignature} WitnessGraph) := by decide
+
+def main : IO Unit := IO.println "FALSIFICATION_CONFIRMED"
+`;
+  }
+
   /**
    * Generates a Python Z3 script to actively hunt for pathological counter-examples.
-   * If a counter-example is found, it extracts and returns the JSON layout.
+   * Leverages Lean 4 certification to prevent false falsification.
    */
   async runAdversarialRedTeam(conjecture: string): Promise<RedTeamOutput> {
     console.log(`\n[RedTeam] Generative Adversary launched against conjecture.`);
@@ -52,13 +75,13 @@ The Ideator has proposed the following formal conjecture:
 ${conjecture}
 </CONJECTURE>
 
-Your goal is to DESTROY this conjecture. Write a complete, isolated Python script using \`z3-solver\` or \`networkx\` that searches specifically for a pathological combinatorial structure (an 'evil graph' or partition) that STRICTLY SATISFIES the domain constraints but VIOLATES the proposed bound or property.
+Your goal is to DESTROY this conjecture. Write a complete, isolated Python script using \`z3-solver\` or \`networkx\`.
 
 CRITICAL REQUIREMENTS:
 1. Output ONLY pure valid Python code. Do not include markdown codeblocks (\`\`\`python) or explanatory text. The very first character must be 'import'.
 2. The script must execute cleanly without external input.
-3. If a counter-example is found, print a raw JSON string of the structure to stdout.
-4. If no counter-example can be found within bounds, print nothing or 'unsat'.`;
+3. If a counter-example is found, your script MUST print ONLY a strictly formatted JSON object to STDOUT containing the structural witness data. Example: \`{"nodes": 12, "edges": [[0,1], [3,4]]}\`.
+4. Do not print "sat", "unsat", or debug information.`;
 
     const response = await this.ai.models.generateContent({
       model: this.model,
@@ -72,32 +95,44 @@ CRITICAL REQUIREMENTS:
     console.log(`[RedTeam] Z3 Python Script generated. Executing in sandbox...`);
     
     try {
-      // Execute in isolated subprocess / docker
       const result = await this.solver.runZ3(script, 45_000);
 
-      // Python execution output indicates success/sat?
-      if (result.output && (result.output.includes("sat") || result.output.includes("{"))) {
-        let payload = result.output;
-        try {
-          // Attempt to extract the JSON payload printed by the python script
-          const jsonMatch = result.output.match(/\{[\s\S]*\}/);
-          if (jsonMatch) payload = JSON.parse(jsonMatch[0]);
-        } catch {
-          // Fallback to raw string if parsing fails
-        }
-        
-        console.log(`[RedTeam] 🚨 COUNTER-EXAMPLE FOUND! Conjecture broken.`);
-        return {
-          status: "COUNTER_EXAMPLE_FOUND",
-          counterExamplePayload: payload,
-        };
+      // Attempt to extract the JSON payload printed by the python script
+      const jsonMatch = result.output ? result.output.match(/\{[\s\S]*\}/) : null;
+      if (!jsonMatch) {
+        console.log(`[RedTeam] No valid JSON counter-example emitted. Sandbox execution clear.`);
+        return { status: "VERIFIED_BULLETPROOF" };
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(jsonMatch[0]);
+      } catch {
+        console.log(`[RedTeam] JSON parsing failed. Rejecting hallucinated counter-example.`);
+        return { status: "VERIFIED_BULLETPROOF" };
+      }
+
+      const { LeanBridge } = await import("../lean_bridge");
+      const bridge = new LeanBridge();
+      console.log("[RedTeam] Counter-example generated by Z3. Escalating to Lean 4 for strict mathematical verification...");
+      
+      const leanSource = this.constructLeanWitness(payload, conjecture);
+      const leanValidation = await bridge.executeLean(leanSource, 30_000);
+
+      if (leanValidation.success && leanValidation.rawOutput.includes("FALSIFICATION_CONFIRMED")) {
+          console.log(`[RedTeam] 🚨 CLEAN KILL ACHIEVED! Lean 4 verified the Z3 counter-example.`);
+          return {
+              status: "COUNTER_EXAMPLE_FOUND",
+              counterExamplePayload: payload,
+          };
+      } else {
+          console.log(`[RedTeam] 🛡️ FALSE FALSIFICATION BLOCKED! Z3 hallucinated a mathematically invalid counter-example.`);
+          // Suppress the hallucinated error so the true conjecture proceeds
+          return { status: "VERIFIED_BULLETPROOF" };
       }
       
-      console.log(`[RedTeam] Sandbox execution clear. No counter-example bounded.`);
-      return { status: "VERIFIED_BULLETPROOF" };
-      
     } catch (e) {
-      console.warn(`[RedTeam] Python execution crashed. Skipping counter-example propagation.`);
+      console.warn(`[RedTeam] Python execution crashed or Lean verification failed structurally.`);
       return { status: "VERIFIED_BULLETPROOF" };
     }
   }

@@ -84,7 +84,7 @@ function waitForFinal(actor: ReturnType<typeof createActor>, timeoutMs = 5000): 
 // ──────────────────────────────────────────────
 
 function mockIdeation(output: IdeationOutput) {
-  return fromPromise<IdeationOutput, { prompt: string; retries: number; apiKey: string; workspaceDir: string; lastValidationError: string | null; publishableMode: boolean }>(
+  return fromPromise<IdeationOutput, any>(
     async () => output,
   );
 }
@@ -113,14 +113,14 @@ function mockRefinement(output: RefinementOutput) {
 }
 
 function mockLeanVerification(output: any) {
-  return fromPromise<any, { tactic: string; signature: string; theoremName: string; outputDir: string }>(
+  return fromPromise<any, any>(
     async () => output,
   );
 }
 
 function mockTacticGenerator() {
   return fromPromise<any, any>(async () => ({
-    role: "TACTICIAN",
+    role: "PROVER",
     response: { lean_tactics: [{ tactic: "skip" }] }
   }));
 }
@@ -132,7 +132,7 @@ function mockErrorCorrection(output: ErrorCorrectionOutput) {
 }
 
 function mockScribe(output: ScribeOutput) {
-  return fromPromise<ScribeOutput, { plan: any; evidence: any; conjecture: any; proofStatus: string; outputDir: string; apiKey: string; redTeamHistory: any[] }>(
+  return fromPromise<ScribeOutput, any>(
     async () => output,
   );
 }
@@ -215,8 +215,7 @@ describe("Research State Machine", () => {
         ideationActor: mockIdeation(NOVEL_IDEATION),
         validationActor: mockValidation(true),
         sandboxActor: mockSandbox(WITNESS_SANDBOX),
-        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
-        tacticGeneratorActor: mockTacticGenerator(),
+        leanDynamicActor: mockLeanVerification(PROOF_COMPLETE),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -237,8 +236,7 @@ describe("Research State Machine", () => {
         ideationActor: mockIdeation(NOVEL_IDEATION),
         validationActor: mockValidation(true),
         sandboxActor: mockSandbox(WITNESS_SANDBOX),
-        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
-        tacticGeneratorActor: mockTacticGenerator(),
+        leanDynamicActor: mockLeanVerification(PROOF_COMPLETE),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -307,8 +305,7 @@ describe("Research State Machine", () => {
           return { isValid: true as const, ast: { validated: true } };
         }),
         sandboxActor: mockSandbox(WITNESS_SANDBOX),
-        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
-        tacticGeneratorActor: mockTacticGenerator(),
+        leanDynamicActor: mockLeanVerification(PROOF_COMPLETE),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -335,8 +332,7 @@ describe("Research State Machine", () => {
         validationActor: mockValidation(true),
         sandboxActor: mockSandbox(PLATEAU_SANDBOX),
         smtActor: mockSMT({ status: "SAT", model: "e_0_1=true" }),
-        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
-        tacticGeneratorActor: mockTacticGenerator(),
+        leanDynamicActor: mockLeanVerification(PROOF_COMPLETE),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -383,8 +379,7 @@ describe("Research State Machine", () => {
             plan: NOVEL_IDEATION.plan
           };
         }),
-        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
-        tacticGeneratorActor: mockTacticGenerator(),
+        leanDynamicActor: mockLeanVerification(PROOF_COMPLETE),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -429,8 +424,7 @@ describe("Research State Machine", () => {
             plan: NOVEL_IDEATION.plan
           };
         }),
-        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
-        tacticGeneratorActor: mockTacticGenerator(),
+        leanDynamicActor: mockLeanVerification(PROOF_COMPLETE),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -458,11 +452,10 @@ describe("Research State Machine", () => {
         ideationActor: mockIdeation(NOVEL_IDEATION),
         validationActor: mockValidation(true),
         sandboxActor: mockSandbox(WITNESS_SANDBOX),
-        leanVerificationActor: fromPromise<any, any>(async () => {
+        leanDynamicActor: fromPromise<any, any>(async () => {
           leanCalls++;
           return COMPILER_ERROR; // triggers another Inference loop
         }),
-        tacticGeneratorActor: mockTacticGenerator(),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });
@@ -493,8 +486,7 @@ describe("Research State Machine", () => {
           return WITNESS_SANDBOX;
         }),
         smtActor: mockSMT({ status: "UNSAT", model: null }),
-        leanVerificationActor: mockLeanVerification(PROOF_COMPLETE),
-        tacticGeneratorActor: mockTacticGenerator(),
+        leanDynamicActor: mockLeanVerification(PROOF_COMPLETE),
         scribeActor: mockScribe(SCRIBE_DONE),
       },
     });

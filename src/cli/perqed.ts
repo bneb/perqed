@@ -13,8 +13,9 @@
  *   - GEMINI_API_KEY in environment or .env
  */
 
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { getAgencyRegistry } from "../agency";
 import { JsonHandler } from "../utils/json_handler";
 import { WorkspaceManager } from "../workspace";
 import { SolverBridge } from "../solver";
@@ -46,6 +47,7 @@ import {
 import { GistPublisher } from "../gist_publisher";
 import { repairJSON } from "../util/json_repair";
 import { ArxivLibrarian } from "../librarian/arxiv_librarian";
+import { QueryExpander } from "../librarian/query_expander";
 import { DOMAIN_SEED_QUERIES } from "../librarian/seed_queries";
 import { VectorDatabase, TABLE_ARXIV, TABLE_MATHLIB } from "../embeddings/vector_store";
 import { LocalEmbedder } from "../embeddings/embedder";
@@ -398,8 +400,10 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
+  const registry = getAgencyRegistry();
+  const provider = registry.resolveProvider("reasoning");
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: provider.model,
     systemInstruction:
       "You are the Perqed Problem Formulator. Output a structured JSON run configuration for the Perqed proof engine.",
     generationConfig: {
@@ -479,35 +483,61 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
 
     try {
       const fs = await import("fs");
-      fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: "gemini-2.5-flash", step: "doFormulate", rawText: text }) + "\n");
+      fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: provider.model, step: "doFormulate", rawText: text }) + "\n");
     } catch (e) { }
 
     const jsonString = JsonHandler.extractAndRepair(text);
     return JSON.parse(jsonString) as RunConfig;
   };
 
-  const config = await callSafe(doFormulate, 3, "ARCHITECT formulate");
-  if (!config) throw new Error("ARCHITECT failed to produce a valid run configuration after 3 attempts.");
+  let finalConfig: RunConfig | null = null;
+  const MAX_FORMULATION_PIVOTS = 6;
+  let formulationError: string | undefined = undefined;
 
-  console.log("   ⠼ [Autoformalizer] Translating informal objective into type-safe Lean 4 signature...");
-  const { AutoformalizerAgent } = await import("../agents/autoformalizer");
-  const { LeanBridge } = await import("../lean_bridge");
-  try {
-    const auto = new AutoformalizerAgent({ leanBridge: new LeanBridge(), apiKey });
-    config.theorem_signature = await auto.formalize(config.objective_md);
-    console.log("   ✅ [Autoformalizer] Translation complete.");
-  } catch (err: any) {
-    const pc = config.search_config?.problem_class;
-    if (pc === "vdw_partition" || pc === "schur_partition") {
-      console.log(`   ⚠️ [Autoformalizer] Failed to formalize partition arithmetic for ${pc}. Using dummy signature to allow search to proceed.`);
-      config.theorem_signature = `∃ (partition : Fin ${(config.search_config as any).domain_size ?? 1} → Fin ${(config.search_config as any).num_partitions ?? 1}), True := by sorry`;
-    } else {
-      console.error("\n❌ Autoformalization failed: " + err.message);
-      throw err;
+  for (let attempt = 1; attempt <= MAX_FORMULATION_PIVOTS; attempt++) {
+    if (attempt > 1) {
+      console.log(`\n🔄 Formulation Pivot ${attempt}/${MAX_FORMULATION_PIVOTS}`);
+    }
+
+    const doFormulateOuter = async () => doFormulate(formulationError);
+    const config = await callSafe(doFormulateOuter, 3, "ARCHITECT formulate");
+    if (!config) throw new Error("ARCHITECT failed to produce a valid run configuration after 3 attempts.");
+
+    console.log("   ⠼ [Autoformalizer] Translating informal objective into type-safe Lean 4 signature...");
+    const { AutoformalizerAgent } = await import("../agents/autoformalizer");
+    const { LeanBridge } = await import("../lean_bridge");
+    try {
+      const workspaceDir = join(process.cwd(), "agent_workspace");
+      // Reduce retries so it pivots faster rather than getting stuck on syntax
+      const auto = new AutoformalizerAgent({ leanBridge: new LeanBridge(undefined, process.cwd()), apiKey, maxRetries: 3 });
+      config.theorem_signature = await auto.formalize(config.objective_md);
+      console.log("   ✅ [Autoformalizer] Translation complete.");
+      finalConfig = config;
+      break; // Success!
+    } catch (err: any) {
+      const pc = config.search_config?.problem_class;
+      if (pc === "vdw_partition" || pc === "schur_partition") {
+        console.log(`   ⚠️ [Autoformalizer] Failed to formalize partition arithmetic for ${pc}. Using dummy signature to allow search to proceed.`);
+        config.theorem_signature = `∃ (partition : Fin ${(config.search_config as any).domain_size ?? 1} → Fin ${(config.search_config as any).num_partitions ?? 1}), True := by sorry`;
+        finalConfig = config;
+        break;
+      } else {
+        console.warn(`\n❌ Autoformalization failed: ${err.message}`);
+        if (attempt < MAX_FORMULATION_PIVOTS) {
+          console.log("   🔄 Initiating ARCHITECT rethink...");
+          formulationError = `Autoformalization failed for your previous objective and signature. The Lean 4 compiler rejected it with this error:\n${err.message}\n\nPlease rethink the theorem signature, simplify the objective, or strictly use standard Mathlib imports without hallucinating unproven typeclasses.`;
+        } else {
+          throw new Error(`Autoformalization failed after ${MAX_FORMULATION_PIVOTS} ARCHITECT pivots. Last error: ${err.message}`);
+        }
+      }
     }
   }
 
-  return config;
+  if (!finalConfig) {
+    throw new Error(`Autoformalization failed after ${MAX_FORMULATION_PIVOTS} ARCHITECT pivots.`);
+  }
+
+  return finalConfig;
 }
 
 // ──────────────────────────────────────────────
@@ -671,8 +701,10 @@ async function requestSearchPivot(
   tabuHashes?: string[],
 ): Promise<SearchPhase> {
   const genAI = new GoogleGenerativeAI(apiKey);
+  const registry = getAgencyRegistry();
+  const provider = registry.resolveProvider("reasoning");
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: provider.model,
     systemInstruction:
       "You are the Perqed Search Orchestrator. Output an updated search_phase JSON object only. No markdown, no code blocks.",
     generationConfig: {
@@ -769,14 +801,16 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   console.log("═══════════════════════════════════════════════\n");
 
   // ── Background Library Seeding (non-blocking) ──────────────────────────────
-  // Bug 1: canonical process.cwd()-derived path so formulate() and
-  // executeRun() share the same LanceDB directory regardless of CWD.
-  // Bug 3: needsSeeding() replaces the count()<10 + magic-999-sentinel check.
   const DB_PATH = join(process.cwd(), "data", "perqed.lancedb");
   void (async () => {
     try {
+      // Dynamic query expansion for domain-specific literature seeding
+      const expander = new QueryExpander(apiKey);
+      const dynamicQueries = await expander.expand(config.problem_description);
+      console.log(`📚 [Librarian] Expanded search terms: ${dynamicQueries.join(", ")}`);
+
       const librarian = new ArxivLibrarian({
-        queries: DOMAIN_SEED_QUERIES,
+        queries: dynamicQueries,
         maxPerQuery: 15,
         dbPath: DB_PATH,
       });
@@ -838,7 +872,6 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
       try {
         const architectClient = new ArchitectClient({
           apiKey,
-          model: "gemini-2.5-flash",
         });
 
         const journalSummaryText = await journal.getSummary(targetGoal);
@@ -998,6 +1031,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
               return { note: result };
             },
             algebraic_graph_construction: async (node) => {
+              console.log("DEBUG: Entered algebraic_graph_construction for", node.id);
               console.log(`   ⚙️  Compiling Edge Rule for node ${node.id}...`);
               const algConfig = node.config as any;
               const algR = algConfig.r ?? (config.search_config as any)?.r ?? 4;
@@ -1374,7 +1408,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 const colorClasses: number[][] = Array.from({ length: numPartitions }, () => []);
                 for (let i = 1; i <= domainSize; i++) {
                   const b = saResult.partition[i];
-                  if (b !== undefined && b >= 0) colorClasses[b]!.push(i);
+                  if (b !== undefined && b >= 0 && b < numPartitions) colorClasses[b]!.push(i);
                 }
                 await Bun.write(witnessPath, JSON.stringify({ domain_size: domainSize, num_partitions: numPartitions, description, color_classes: colorClasses }, null, 2));
                 console.log(`\n📄 Partition SA witness written: ${witnessPath}`);
@@ -1590,9 +1624,10 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
       // Clamp workers to PHYSICAL cores, not logical threads.
       // os.cpus().length returns logical threads (SMT). Two SA workers on one
       // physical core thrash each other's L1/L2 cache, killing IPS.
+      const isAppleSilicon = process.platform === "darwin" && process.arch === "arm64";
       const cpuCount = require("os").cpus().length;
-      const physicalCores = Math.max(1, Math.floor(cpuCount / 2));
-      const workers = Math.min(Math.max(1, sp.workers ?? 8), physicalCores);
+      const physicalCores = isAppleSilicon ? cpuCount : Math.max(1, Math.floor(cpuCount / 2));
+      const workers = Math.min(Math.max(1, sp.workers ?? 4), Math.min(4, physicalCores));
       const strategy = sp.strategy ?? "island_model";
 
 
@@ -1631,17 +1666,17 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
         initialGraph: memeticSeed ?? undefined,
         // Tabu hashes: prevents all workers from re-entering Z3-certified sterile basins
         tabuHashes: saTabuHashes.length > 0 ? saTabuHashes : undefined,
-        // Micro-SAT Patch: always-on Z3 surgery for sterile basins at E ≤ 13.
+        // Micro-SAT Patch: always-on Z3 surgery for sterile basins at E ≤ 8.
         // Previously gated on micro_sat.enabled in the ARCHITECT's search config,
         // but since MicroSAT only fires at the glass floor it is always safe.
         // ARCHITECT can still override via micro_sat.threshold if it wants a
         // tighter or looser threshold.
-        microSatThreshold: (sp as any).micro_sat?.threshold ?? 13,
+        microSatThreshold: (sp as any).micro_sat?.threshold ?? 8,
 
 
         onProgress: (worker: number, iter: number, energy: number, best: number, temp: number) => {
-          // Scale report interval: single-worker runs at 10M intervals same as multi-worker
-          const reportEvery = Math.max(10_000_000, Math.floor(iters / 50));
+          // Scale report interval
+          const reportEvery = Math.max(500_000, Math.floor(iters / 50));
           if (iter % reportEvery !== 0) return;
           const pct = ((iter / iters) * 100).toFixed(1);
           const wLabel = (sp.workers ?? 1) > 1 ? `W${worker} ` : "";
@@ -1978,7 +2013,6 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
       const architectClient = new ArchitectClient({
         apiKey,
-        model: "gemini-2.5-flash",
       });
 
       // ── ALL attempts: ask ARCHITECT to emit a ProofDAG ──
@@ -2348,12 +2382,16 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   const result = await runDynamicLoop(workspace, solver, {
     maxGlobalIterations: config.max_iterations,
     maxLocalRetries: 3,
+    z3TimeoutMs: 30000,
+    leanTimeoutMs: 60000,
+    contextWindowTokens: 4096,
     leanBridge: lean,
     theoremName: config.theorem_name,
     theoremSignature: config.theorem_signature,
     objective: config.objective_md,
     agentFactory: factory,
     batchSize: 3,
+    problemClass: config.search_config?.problem_class,
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

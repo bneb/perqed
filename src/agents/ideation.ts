@@ -1,11 +1,12 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
+import { PerqedLLM } from "../agency/llm_client";
 import { ArxivLibrarian } from "../librarian/arxiv_librarian";
 import type { IdeationOutput } from "../orchestration/types";
 import { getAgencyRegistry } from "../agency";
 import { LakatosianVault, type GraveyardEntry } from "../vault/lakatosian_vault";
 
 export class IdeatorAgent {
-  private readonly ai: GoogleGenAI;
+  private readonly ai: PerqedLLM;
   private readonly workspaceDir: string;
   private readonly model: string;
 
@@ -14,7 +15,7 @@ export class IdeatorAgent {
     if (!key) {
       throw new Error("IdeatorAgent requires a Gemini API key. Set it in GEMINI_API_KEY env or pass it.");
     }
-    this.ai = new GoogleGenAI({ apiKey: key });
+    this.ai = new PerqedLLM({ apiKey: key });
     this.workspaceDir = workspaceDir;
     // Escalate to Tier 3 (L3_complex) which maps to gemini-2.5-pro for deep reasoning
     this.model = getAgencyRegistry().resolveProvider("reasoning", false, 2).model;
@@ -198,31 +199,15 @@ ${publishableMode
 }
 ${historyFeedback}${graveyardWarning}`;
 
-    let response: any;
-    let retries = 5;
-    while (retries > 0) {
-      try {
-        response = await this.ai.models.generateContent({
-          model: this.model,
-          contents: systemPrompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: schema,
-            temperature: 0.1,
-          },
-        });
-        break;
-      } catch (err: any) {
-        if (err?.message?.includes("503") || err?.message?.includes("429") || err?.status === 503) {
-          console.warn(`[Ideation] Gemini API capacity spike detected. Retries left: ${retries - 1}. Sleeping 5 seconds...`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          retries--;
-          if (retries === 0) throw err;
-        } else {
-          throw err;
-        }
-      }
-    }
+    const response = await this.ai.models.generateContent({
+      model: this.model,
+      contents: systemPrompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+        temperature: 0.1,
+      },
+    });
 
     if (!response || !response.text) throw new Error("[Ideation] Plan generation failed");
 

@@ -30,10 +30,10 @@ function makePayload(overrides: Partial<TelemetryPayload> = {}): TelemetryPayloa
       hasArchitectDirective: true,
     globalFailures: 0,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0, hasSubgoalProposal: false,
     },
     latestLog: {
-      agent: "TACTICIAN",
+      agent: "PROVER",
       action: "PROPOSE_LEAN_TACTICS",
       success: false,
       error: "tactic 'simp' failed",
@@ -161,7 +161,7 @@ describe("TelemetryEmitter", () => {
       expect(content.currentSignals).toBeDefined();
       expect(content.currentSignals.consecutiveFailures).toBe(2);
       expect(content.latestLog).toBeDefined();
-      expect(content.latestLog.agent).toBe("TACTICIAN");
+      expect(content.latestLog.agent).toBe("PROVER");
     } finally {
       globalThis.fetch = originalFetch;
     }

@@ -118,6 +118,7 @@ async function main() {
     maxLocalRetries: 3,
     maxGlobalIterations: liveMode ? 100 : 10,
     z3TimeoutMs: 30_000,
+    leanTimeoutMs: 60_000,
     contextWindowTokens: liveMode ? 8000 : 4000,
   };
 
@@ -138,12 +139,9 @@ async function main() {
     if (geminiKey) {
       const architectModel = getAgencyRegistry().resolveProvider("reasoning").model;
       const architect = new ArchitectClient({ apiKey: geminiKey, model: architectModel });
-      console.log(`  🏛️  Architect:   ${architectModel} (escalation enabled)\n`);
+      console.log(`  🏛️  Architect:   ${architectModel} (escalation enabled via machine)\n`);
 
-      await runProverLoop(workspace, solver, config, undefined, async (labLog, progress) => {
-        const context = `## LAB LOG\n${labLog}\n\n## CURRENT PROGRESS\n${progress}`;
-        return architect.escalate(context);
-      });
+      await runProverLoop(workspace, solver, config);
     } else {
       console.log("  🏛️  Architect:   MOCK (set GEMINI_API_KEY for live escalation)\n");
       await runProverLoop(workspace, solver, config);

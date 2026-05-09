@@ -16,7 +16,7 @@ import type { AttemptLog, RoutingSignals } from "../src/types";
 
 function makeLog(overrides: Partial<AttemptLog> = {}): AttemptLog {
   return {
-    agent: "TACTICIAN",
+    agent: "PROVER",
     action: "PROPOSE_LEAN_TACTICS",
     success: false,
     timestamp: Date.now(),
@@ -34,7 +34,8 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
     lastErrors: [],
     hasArchitectDirective: false,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0,
+    hasSubgoalProposal: false,
     ...overrides,
   };
 }
@@ -53,51 +54,51 @@ describe("End-to-End Routing Integration", () => {
     ];
     const signals = buildRoutingSignals(logs, "n m : Nat\n⊢ n + m = m + n", true);
     const role = AgentRouter.determineNextAgent(signals);
-    expect(role).toBe("TACTICIAN");
+    expect(role).toBe("PROVER");
   });
 
   test("tactician fails 3 times → REASONER", () => {
     const logs = [
       makeLog({ agent: "ARCHITECT", success: true }),
-      makeLog({ agent: "TACTICIAN", success: false, error: "unknown tactic" }),
-      makeLog({ agent: "TACTICIAN", success: false, error: "type mismatch" }),
-      makeLog({ agent: "TACTICIAN", success: false, error: "unsolved goals" }),
+      makeLog({ agent: "PROVER", success: false, error: "unknown tactic" }),
+      makeLog({ agent: "PROVER", success: false, error: "type mismatch" }),
+      makeLog({ agent: "PROVER", success: false, error: "unsolved goals" }),
     ];
     const signals = buildRoutingSignals(logs, "⊢ n + m = m + n", false);
     const role = AgentRouter.determineNextAgent(signals);
-    expect(role).toBe("REASONER");
+    expect(role).toBe("ARCHITECT");
   });
 
   test("same error repeated → loop detection → REASONER", () => {
     const logs = [
       makeLog({ agent: "ARCHITECT", success: true }),
-      makeLog({ agent: "TACTICIAN", success: false, error: "unknown identifier 'omega'" }),
-      makeLog({ agent: "TACTICIAN", success: false, error: "unknown identifier 'omega'" }),
+      makeLog({ agent: "PROVER", success: false, error: "unknown identifier 'omega'" }),
+      makeLog({ agent: "PROVER", success: false, error: "unknown identifier 'omega'" }),
     ];
     const signals = buildRoutingSignals(logs, "⊢ n + m = m + n", false);
     const role = AgentRouter.determineNextAgent(signals);
-    expect(role).toBe("REASONER");
+    expect(role).toBe("ARCHITECT");
   });
 
   test("goal explosion (induction splits to 2 goals) → REASONER", () => {
     const logs = [
       makeLog({ agent: "ARCHITECT", success: true }),
-      makeLog({ agent: "TACTICIAN", success: true }),
+      makeLog({ agent: "PROVER", success: true }),
     ];
     const signals = buildRoutingSignals(logs, "2 goals\ncase zero\ncase succ", false);
     const role = AgentRouter.determineNextAgent(signals);
-    expect(role).toBe("REASONER");
+    expect(role).toBe("ARCHITECT");
   });
 
   test("6+ global tree failures → ARCHITECT (break glass structural failure)", () => {
     const logs = [
       makeLog({ agent: "ARCHITECT", success: true }),
-      makeLog({ agent: "TACTICIAN", success: false }),
-      makeLog({ agent: "TACTICIAN", success: false }),
-      makeLog({ agent: "REASONER", success: false }),
-      makeLog({ agent: "TACTICIAN", success: false }),
-      makeLog({ agent: "TACTICIAN", success: false }),
-      makeLog({ agent: "TACTICIAN", success: false }),
+      makeLog({ agent: "PROVER", success: false }),
+      makeLog({ agent: "PROVER", success: false }),
+      makeLog({ agent: "ARCHITECT", success: false }),
+      makeLog({ agent: "PROVER", success: false }),
+      makeLog({ agent: "PROVER", success: false }),
+      makeLog({ agent: "PROVER", success: false }),
     ];
     const signals = buildRoutingSignals(logs, "⊢ n + m = m + n", false);
     // Simulate ProofTree.getGlobalTreeFailures() — in production this comes from the tree
@@ -110,26 +111,26 @@ describe("End-to-End Routing Integration", () => {
     const factory = new AgentFactory({ geminiApiKey: "test-key" });
     const signals = makeSignals();
 
-    const tacticianAgent = factory.getAgent("TACTICIAN", signals);
-    const reasonerAgent = factory.getAgent("REASONER", signals);
+    const tacticianAgent = factory.getAgent("PROVER", signals);
+    const reasonerAgent = factory.getAgent("ARCHITECT", signals);
     const architectAgent = factory.getAgent("ARCHITECT", signals);
 
-    expect(tacticianAgent.role).toBe("TACTICIAN");
-    expect(reasonerAgent.role).toBe("REASONER");
+    expect(tacticianAgent.role).toBe("PROVER");
+    expect(reasonerAgent.role).toBe("ARCHITECT");
     expect(architectAgent.role).toBe("ARCHITECT");
   });
 
   test("success resets failure count → back to TACTICIAN", () => {
     const logs = [
       makeLog({ agent: "ARCHITECT", success: true }),
-      makeLog({ agent: "TACTICIAN", success: false }),
-      makeLog({ agent: "TACTICIAN", success: false }),
-      makeLog({ agent: "REASONER", success: true }), // Reasoner unblocks
-      makeLog({ agent: "TACTICIAN", success: false }), // One failure after reset
+      makeLog({ agent: "PROVER", success: false }),
+      makeLog({ agent: "PROVER", success: false }),
+      makeLog({ agent: "ARCHITECT", success: true }), // Reasoner unblocks
+      makeLog({ agent: "PROVER", success: false }), // One failure after reset
     ];
     const signals = buildRoutingSignals(logs, "⊢ n + m = m + n", false);
     const role = AgentRouter.determineNextAgent(signals);
     // Only 1 consecutive failure → TACTICIAN
-    expect(role).toBe("TACTICIAN");
+    expect(role).toBe("PROVER");
   });
 });

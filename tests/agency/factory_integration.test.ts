@@ -21,7 +21,8 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
     lastErrors: [],
     hasArchitectDirective: false,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0,
+    hasSubgoalProposal: false,
     ...overrides,
   };
 }
@@ -30,15 +31,15 @@ describe("AgentFactory with AgencyRegistry", () => {
   test("TACTICIAN uses the local thinker model from registry", () => {
     const registry = new AgencyRegistry();
     const factory = new AgentFactory({ geminiApiKey: "test-key" }, registry);
-    const agent = factory.getAgent("TACTICIAN", makeSignals());
-    expect(agent.role).toBe("TACTICIAN");
+    const agent = factory.getAgent("PROVER", makeSignals());
+    expect(agent.role).toBe("PROVER");
   });
 
   test("REASONER creates an agent with correct role", () => {
     const registry = new AgencyRegistry();
     const factory = new AgentFactory({ geminiApiKey: "test-key" }, registry);
-    const agent = factory.getAgent("REASONER", makeSignals());
-    expect(agent.role).toBe("REASONER");
+    const agent = factory.getAgent("ARCHITECT", makeSignals());
+    expect(agent.role).toBe("ARCHITECT");
   });
 
   test("ARCHITECT creates an agent with correct role", () => {
@@ -52,11 +53,11 @@ describe("AgentFactory with AgencyRegistry", () => {
     const registry = new AgencyRegistry();
     const factory = new AgentFactory({ geminiApiKey: "test-key" }, registry);
 
-    const base = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 0 }));
-    const escalated = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 4 }));
+    const base = factory.getAgent("ARCHITECT", makeSignals({ consecutiveFailures: 0 }));
+    const escalated = factory.getAgent("ARCHITECT", makeSignals({ consecutiveFailures: 4 }));
 
-    expect(base.role).toBe("REASONER");
-    expect(escalated.role).toBe("REASONER");
+    expect(base.role).toBe("ARCHITECT");
+    expect(escalated.role).toBe("ARCHITECT");
     // The model tier should differ between base and escalated
     expect((base as any).modelTier).not.toBe((escalated as any).modelTier);
   });
@@ -73,8 +74,8 @@ describe("AgentFactory with AgencyRegistry", () => {
 
   test("backward compat: factory works without registry parameter", () => {
     const factory = new AgentFactory({ geminiApiKey: "test-key" });
-    const agent = factory.getAgent("TACTICIAN", makeSignals());
-    expect(agent.role).toBe("TACTICIAN");
+    const agent = factory.getAgent("PROVER", makeSignals());
+    expect(agent.role).toBe("PROVER");
   });
 
   test("backward compat: factory throws on unknown role", () => {

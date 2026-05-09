@@ -130,7 +130,11 @@ export class CompilerAgent {
     const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
     // Strip any markdown fences
-    return text.replace(/^```(?:cpp|c\+\+|js|javascript)?\n?/m, "").replace(/```\s*$/m, "").trim();
+    let cleaned = text.replace(/^```(?:cpp|c\+\+|js|javascript)?\n?/mi, "").replace(/```\s*$/mi, "").trim();
+    if (!isJs && !cleaned.includes("<cstdint>") && !cleaned.includes("<stdint.h>")) {
+      cleaned = `#include <cstdint>\n${cleaned}`;
+    }
+    return cleaned;
   }
 
   /** Returns the hardcoded fallback for the requested target language */

@@ -4,14 +4,13 @@
  * Pure function. No I/O, no side effects. Analyzes telemetry
  * signals to determine which specialist should handle the next move.
  *
- * 5-Tier Escalation (evaluated top-to-bottom):
+ * 4-Tier Escalation (evaluated top-to-bottom):
  *   1. Initial state (no attempts)                → ARCHITECT (build proof plan)
  *   2. Middle-Out tripwires (budget/stuck)         → ARCHITECT (forced strategic review)
- *   3. 6+ global tree failures                    → ARCHITECT (break glass / structural rethink)
- *   4. 3+ local failures / stuck / multigoal      → REASONER  (tactical unblock)
- *   5. Default                                     → TACTICIAN (fast tactic spray)
+ *   3. 3+ local failures / stuck / multigoal      → ARCHITECT (tactical/structural rethink)
+ *   4. Default                                     → PROVER (fast tactic spray)
  *
- * The ARCHITECT sees global tree health; the REASONER sees local node state.
+ * The ARCHITECT handles both global tree health and local unblocking.
  * Gemini tier selection is handled by the AgentFactory, not the router.
  */
 
@@ -38,7 +37,7 @@ export class AgentRouter {
     }
 
     // ── Priority 2: Middle-Out Tripwires — deterministic forced escalation ──
-    if (signals.totalTacticianCalls >= MAX_TACTIC_ATTEMPTS) {
+    if (signals.totalProverCalls >= MAX_TACTIC_ATTEMPTS) {
       return "ARCHITECT";
     }
     if (signals.identicalErrorCount >= MAX_IDENTICAL_ERRORS) {
@@ -53,25 +52,18 @@ export class AgentRouter {
       return "HUMAN";
     }
 
-    // ── Priority 3: Global tree failure (N=6+) — Architect must intervene structurally ──
-    // Requires BOTH global tree health to be poor AND an active local crisis
-    // (consecutive failures >= 6). Prevents infinite ARCHITECT loops when
-    // tree-accumulated errors persist after a DIRECTIVE reset.
-    if (signals.globalFailures >= 6 && signals.consecutiveFailures >= 6) {
-      return "ARCHITECT";
-    }
-
-    // ── Priority 4: Struggling (3+) — Reasoner analyzes and unblocks ──
+    // ── Priority 3: Struggling (3+) — Architect analyzes and unblocks ──
     if (
       signals.consecutiveFailures >= 3 ||
       signals.isStuckInLoop ||
-      signals.goalCount > 1
+      signals.goalCount > 1 ||
+      signals.globalFailures >= 6
     ) {
-      return "REASONER";
+      return "ARCHITECT";
     }
 
-    // ── Priority 5: Normal operation — Tactician fires fast tactics ──
-    return "TACTICIAN";
+    // ── Priority 4: Normal operation — Prover fires fast tactics ──
+    return "PROVER";
   }
 
   /**

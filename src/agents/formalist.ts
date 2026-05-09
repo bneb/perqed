@@ -110,8 +110,8 @@ export class FormalistAgent {
 
   constructor(config: Partial<FormalistConfig> = {}) {
     this.config = {
-      endpoint: config.endpoint ?? getAgencyRegistry().getEndpoint("L0_thinker"),
-      model: config.model ?? getAgencyRegistry().getModel("L0_thinker"),
+      endpoint: config.endpoint ?? getAgencyRegistry().getEndpoint("L0_prover"),
+      model: config.model ?? getAgencyRegistry().getModel("L0_prover"),
       ...DEFAULT_CONFIG,
       ...config,
     } as FormalistConfig;

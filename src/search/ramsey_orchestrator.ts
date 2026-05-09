@@ -183,10 +183,22 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
   let resolved = false;
   const allResults: RamseySearchResult[] = [];
 
+  // Replica Exchange state
+  const workerStates = new Array<{ iter: number; energy: number; best: number; temp: number; adjRaw?: Int8Array }>(numWorkers);
+  for (let i = 0; i < numWorkers; i++) {
+    workerStates[i] = { iter: 0, energy: Infinity, best: Infinity, temp: 1.0 };
+  }
+  let lastReplicaExchangeIter = 0;
+
   // Spawn workers
   const workers: Worker[] = [];
   const workerPromises: Promise<void>[] = [];
   const resolvers: (() => void)[] = [];
+
+  const replicaBuffers = new Array<SharedArrayBuffer>(numWorkers);
+  for (let w = 0; w < numWorkers; w++) {
+    replicaBuffers[w] = new SharedArrayBuffer(4 + config.n * config.n);
+  }
 
   for (let w = 0; w < numWorkers; w++) {
     const worker = new Worker(new URL("./ramsey_worker_thread.ts", import.meta.url).href);
@@ -198,8 +210,69 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
       worker.onmessage = (event: MessageEvent) => {
         const msg = event.data;
 
-        if (msg.type === "progress" && config.onProgress) {
-          config.onProgress(msg.worker, msg.iter, msg.energy, msg.best, msg.temp);
+        if (msg.type === "progress") {
+          workerStates[msg.worker] = {
+            iter: msg.iter,
+            energy: msg.energy,
+            best: msg.best,
+            temp: msg.temp,
+            adjRaw: msg.adjRaw ? new Int8Array(msg.adjRaw) : workerStates[msg.worker]!.adjRaw
+          };
+
+          if (config.onProgress) {
+            config.onProgress(msg.worker, msg.iter, msg.energy, msg.best, msg.temp);
+          }
+
+          // ── Replica Exchange / Parallel Tempering ──
+          // Every 1,000,000 iterations, attempt to swap states between a hot and a cold worker
+          if (msg.iter - lastReplicaExchangeIter > 1_000_000 && numWorkers > 1) {
+            lastReplicaExchangeIter = msg.iter;
+            
+            // Find hottest worker and coldest worker
+            let coldW = 0, hotW = 0;
+            let minT = Infinity, maxT = -Infinity;
+            for (let i = 0; i < numWorkers; i++) {
+               const wState = workerStates[i]!;
+               if (wState.temp < minT) { minT = wState.temp; coldW = i; }
+               if (wState.temp > maxT) { maxT = wState.temp; hotW = i; }
+            }
+
+            if (coldW !== hotW) {
+               const E_cold = workerStates[coldW]!.energy;
+               const E_hot = workerStates[hotW]!.energy;
+               
+               // Metropolis-Hastings acceptance probability for replica exchange
+               // exponent = (beta_cold - beta_hot) * (E_cold - E_hot)
+               // where beta = 1/T
+               const beta_cold = 1.0 / minT;
+               const beta_hot = 1.0 / maxT;
+               const exponent = (beta_cold - beta_hot) * (E_cold - E_hot);
+               
+               if (exponent >= 0 || Math.random() < Math.exp(exponent)) {
+                  // ACCEPT SWAP!
+                  // Inject the adj of the hot worker into the cold worker and vice-versa
+                  // using the REPLICA_EXCHANGE message.
+                  const coldAdj = workerStates[coldW]!.adjRaw;
+                  const hotAdj = workerStates[hotW]!.adjRaw;
+                  
+                  if (coldAdj && hotAdj) {
+                      // Lock-free mutation: write into the cold worker's buffer
+                      const coldView = new Int32Array(replicaBuffers[coldW]!, 0, 1);
+                      const coldAdjView = new Int8Array(replicaBuffers[coldW]!, 4, config.n * config.n);
+                      for (let i = 0; i < hotAdj.length; i++) coldAdjView[i] = hotAdj[i]!;
+                      Atomics.store(coldView, 0, 1); // Trigger the swap flag
+                      
+                      // Lock-free mutation: write into the hot worker's buffer
+                      const hotView = new Int32Array(replicaBuffers[hotW]!, 0, 1);
+                      const hotAdjView = new Int8Array(replicaBuffers[hotW]!, 4, config.n * config.n);
+                      for (let i = 0; i < coldAdj.length; i++) hotAdjView[i] = coldAdj[i]!;
+                      Atomics.store(hotView, 0, 1); // Trigger the swap flag
+
+                      console.log(`   🔄 [ReplicaExchange] Swapped W${coldW} (T=${minT.toFixed(2)}, E=${E_cold}) with W${hotW} (T=${maxT.toFixed(2)}, E=${E_hot})`);
+                  }
+               }
+            }
+          }
         }
 
         if (msg.type === "STERILE_BASIN") {
@@ -209,7 +282,8 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
           const basinEnergy = msg.energy as number;
           const workerRef = workers[w_idx]!;
           const lock = msg.lock as SharedArrayBuffer | undefined;
-          console.log(`   🔬 [W${w_idx}] Sterile basin at E=${basinEnergy} — routing to MicroSAT (worker paused)`);
+          const basinEnergyStr = Number.isInteger(basinEnergy) ? basinEnergy : basinEnergy.toFixed(2);
+          console.log(`   🔬 [W${w_idx}] Sterile basin at E=${basinEnergyStr} — routing to MicroSAT (worker paused)`);
 
           if (msg.bestAdjRaw && msg.bestAdjN) {
             const basinAdj = new AdjacencyMatrix(msg.bestAdjN as number);
@@ -227,7 +301,7 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
               if (coreResult.lockedVertices.length > 0) {
                 lockedVertices = new Set(coreResult.lockedVertices);
                 console.log(
-                  `   ❅️  [FrozenCore] E=${basinEnergy} → ${coreResult.lockedVertices.length} vertices locked, ` +
+                  `   ❅️  [FrozenCore] E=${basinEnergyStr} → ${coreResult.lockedVertices.length} vertices locked, ` +
                   `${coreResult.freeVertices.length} in crust`
                 );
               }
@@ -352,6 +426,7 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
       tabuPenaltyTemperature: config.tabuPenaltyTemperature,
       // MicroSAT: pass threshold so workers know when to emit STERILE_BASIN
       microSatThreshold: config.microSatThreshold,
+      replicaExchangeBuffer: replicaBuffers[w],
     };
 
 

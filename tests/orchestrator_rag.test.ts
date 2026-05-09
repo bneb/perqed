@@ -91,12 +91,12 @@ class MockVectorDatabase {
     return [
       {
         id: "nat_add_comm",
-        theoremSignature: "(n m : Nat) : n + m = m + n",
+        theoremSignature: "theorem thm (n m : Nat) : n + m = m + n",
         successfulTactic: "induction n; simp; ring",
       },
       {
         id: "nat_mul_comm",
-        theoremSignature: "(n m : Nat) : n * m = m * n",
+        theoremSignature: "theorem thm (n m : Nat) : n * m = m * n",
         successfulTactic: "induction n; simp [Nat.succ_mul]; ring",
       },
     ];
@@ -134,7 +134,7 @@ describe("runDynamicLoop() — RAG Premise Injection", () => {
       { action: "DIRECTIVE", target_node_id: "root", reasoning: "omega", tactics: "omega" } as any,
     ]);
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", new MockAgent("TACTICIAN", [{
+    factory.registerAgent("PROVER", new MockAgent("PROVER", [{
       thoughts: "omega", action: "PROPOSE_LEAN_TACTICS",
       lean_tactics: [{ tactic: "omega", informal_sketch: "omega", confidence_score: 0.99 }],
     }]));
@@ -143,11 +143,11 @@ describe("runDynamicLoop() — RAG Premise Injection", () => {
     const mockVectorDb = new MockVectorDatabase();
 
     const result = await runDynamicLoop(workspace, new SolverBridge(), {
-      maxGlobalIterations: 10,
+      maxGlobalIterations: 10, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
       theoremName: "thm",
-      theoremSignature: "(n : Nat) : n = n",
+      theoremSignature: "theorem thm (n : Nat) : n = n",
       embedder: mockEmbedder as unknown as LocalEmbedder,
       vectorDb: mockVectorDb as unknown as VectorDatabase,
     });
@@ -174,18 +174,18 @@ describe("runDynamicLoop() — RAG Premise Injection", () => {
       { action: "DIRECTIVE", target_node_id: "root", reasoning: "omega", tactics: "omega" } as any,
     ]);
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", new MockAgent("TACTICIAN", [{
+    factory.registerAgent("PROVER", new MockAgent("PROVER", [{
       thoughts: "omega", action: "PROPOSE_LEAN_TACTICS",
       lean_tactics: [{ tactic: "omega", informal_sketch: "omega", confidence_score: 0.99 }],
     }]));
 
     // No embedder or vectorDb provided
     const result = await runDynamicLoop(workspace, new SolverBridge(), {
-      maxGlobalIterations: 10,
+      maxGlobalIterations: 10, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
       theoremName: "thm",
-      theoremSignature: "(n : Nat) : n = n",
+      theoremSignature: "theorem thm (n : Nat) : n = n",
     });
 
     expect(result.status).toBe("SOLVED");

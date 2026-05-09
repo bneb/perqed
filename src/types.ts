@@ -9,8 +9,8 @@
 // Agent Roles
 // ──────────────────────────────────────────────
 
-/** The three specialist roles in the roster. */
-export type AgentRole = "TACTICIAN" | "REASONER" | "ARCHITECT" | "HUMAN";
+/** The specialist roles in the roster. */
+export type AgentRole = "PROVER" | "ARCHITECT" | "HUMAN";
 
 // ──────────────────────────────────────────────
 // Routing Signals
@@ -37,8 +37,8 @@ export interface RoutingSignals {
   hasArchitectDirective: boolean;
   /** Middle-Out: count of consecutive identical error messages. */
   identicalErrorCount: number;
-  /** Middle-Out: cumulative TACTICIAN invocations in this run. */
-  totalTacticianCalls: number;
+  /** cumulative PROVER invocations in this run. */
+  totalProverCalls: number;
   /** Lemmatization: indicates if the LLM explicitly requested a subgoal. */
   hasSubgoalProposal: boolean;
 }

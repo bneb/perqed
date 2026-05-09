@@ -7,7 +7,7 @@
  *   - returns valid:false when there are hard type errors
  *   - correctly parses sorry goal names from Lean warning output
  */
-import { describe, expect, it, mock } from "bun:test";
+import { describe, expect, it, mock, spyOn } from "bun:test";
 import { LeanBridge } from "../src/lean_bridge";
 
 // Warning format emitted by Lean 4 for sorry-stub declarations:
@@ -24,13 +24,14 @@ function makeLeanOutputWithSorry(goalNames: string[]): string {
 describe("verifyStructuralSkeleton", () => {
   it("returns { valid: true, sorryGoals: ['lemma1','lemma2'] } for a 2-sorry skeleton", async () => {
     const bridge = new LeanBridge();
-    // Mock executeLean so tests run without the Lean toolchain
-    bridge.executeLean = mock(async (_source: string) => ({
-      success: false,
-      isComplete: false,
-      hasSorry: true,
-      rawOutput: makeLeanOutputWithSorry(["lemma1", "lemma2"]),
-    }));
+    spyOn(bridge as any, "initialize").mockImplementation(async () => { (bridge as any).isReady = true; });
+    spyOn(bridge as any, "sendNotification").mockImplementation(() => {});
+    spyOn(bridge as any, "waitForProgress").mockImplementation(async (uri: string) => {
+      (bridge as any).diagnosticsMap.set(uri, [
+        { range: { start: { line: 0 } }, severity: 2, message: "warning: declaration 'lemma1' uses 'sorry'" },
+        { range: { start: { line: 1 } }, severity: 2, message: "warning: declaration 'lemma2' uses 'sorry'" }
+      ] as any);
+    });
 
     const result = await bridge.verifyStructuralSkeleton(
       "lemma lemma1 : True := by sorry\nlemma lemma2 : True := by sorry"
@@ -44,12 +45,13 @@ describe("verifyStructuralSkeleton", () => {
 
   it("returns { valid: true, sorryGoals: ['my_thm'] } for a single sorry", async () => {
     const bridge = new LeanBridge();
-    bridge.executeLean = mock(async () => ({
-      success: false,
-      isComplete: false,
-      hasSorry: true,
-      rawOutput: "warning: declaration 'my_thm' uses 'sorry'",
-    }));
+    spyOn(bridge as any, "initialize").mockImplementation(async () => { (bridge as any).isReady = true; });
+    spyOn(bridge as any, "sendNotification").mockImplementation(() => {});
+    spyOn(bridge as any, "waitForProgress").mockImplementation(async (uri: string) => {
+      (bridge as any).diagnosticsMap.set(uri, [
+        { range: { start: { line: 0 } }, severity: 2, message: "warning: declaration 'my_thm' uses 'sorry'" }
+      ] as any);
+    });
 
     const result = await bridge.verifyStructuralSkeleton("theorem my_thm : 1 = 1 := by sorry");
     expect(result.valid).toBe(true);
@@ -58,13 +60,13 @@ describe("verifyStructuralSkeleton", () => {
 
   it("returns { valid: false, sorryGoals: [] } when Lean reports a hard error", async () => {
     const bridge = new LeanBridge();
-    bridge.executeLean = mock(async () => ({
-      success: false,
-      isComplete: false,
-      hasSorry: false,
-      error: "error: unknown identifier 'foo'",
-      rawOutput: "error: unknown identifier 'foo'",
-    }));
+    spyOn(bridge as any, "initialize").mockImplementation(async () => { (bridge as any).isReady = true; });
+    spyOn(bridge as any, "sendNotification").mockImplementation(() => {});
+    spyOn(bridge as any, "waitForProgress").mockImplementation(async (uri: string) => {
+      (bridge as any).diagnosticsMap.set(uri, [
+        { range: { start: { line: 0 } }, severity: 1, message: "error: unknown identifier 'foo'" }
+      ] as any);
+    });
 
     const result = await bridge.verifyStructuralSkeleton("garbage lean code");
     expect(result.valid).toBe(false);
@@ -74,27 +76,27 @@ describe("verifyStructuralSkeleton", () => {
   it("returns { valid: false } when output has both a hard error and sorry", async () => {
     // A skeleton with a type error is not structurally valid even if sorry appears
     const bridge = new LeanBridge();
-    bridge.executeLean = mock(async () => ({
-      success: false,
-      isComplete: false,
-      hasSorry: true,
-      error: "error: type mismatch",
-      rawOutput: "error: type mismatch\nwarning: declaration 'x' uses 'sorry'",
-    }));
+    spyOn(bridge as any, "initialize").mockImplementation(async () => { (bridge as any).isReady = true; });
+    spyOn(bridge as any, "sendNotification").mockImplementation(() => {});
+    spyOn(bridge as any, "waitForProgress").mockImplementation(async (uri: string) => {
+      (bridge as any).diagnosticsMap.set(uri, [
+        { range: { start: { line: 0 } }, severity: 1, message: "error: type mismatch" },
+        { range: { start: { line: 0 } }, severity: 2, message: "warning: declaration 'x' uses 'sorry'" }
+      ] as any);
+    });
 
-    const result = await bridge.verifyStructuralSkeleton("...");
+    const result = await bridge.verifyStructuralSkeleton("lemma case_analysis_lemma : True := by sorry");
     expect(result.valid).toBe(false);
   });
 
   it("returns { valid: false, sorryGoals: [] } when lean succeeds with no sorry (proof already complete)", async () => {
     // A fully proved skeleton is not a sorry-skeleton
     const bridge = new LeanBridge();
-    bridge.executeLean = mock(async () => ({
-      success: true,
-      isComplete: true,
-      hasSorry: false,
-      rawOutput: "PROOF_VALID",
-    }));
+    spyOn(bridge as any, "initialize").mockImplementation(async () => { (bridge as any).isReady = true; });
+    spyOn(bridge as any, "sendNotification").mockImplementation(() => {});
+    spyOn(bridge as any, "waitForProgress").mockImplementation(async (uri: string) => {
+      (bridge as any).diagnosticsMap.set(uri, [] as any);
+    });
 
     const result = await bridge.verifyStructuralSkeleton("theorem trivial : True := trivial");
     // Valid proof is NOT a sorry skeleton — valid=false (skeleton has no sorry stubs to expand)
@@ -105,14 +107,15 @@ describe("verifyStructuralSkeleton", () => {
   it("correctly extracts goal name from backtick-quoting style", async () => {
     // Some Lean versions use backticks: "warning: 'my_lemma' uses `sorry`"
     const bridge = new LeanBridge();
-    bridge.executeLean = mock(async () => ({
-      success: false,
-      isComplete: false,
-      hasSorry: true,
-      rawOutput: "warning: 'case_analysis_lemma' uses `sorry`",
-    }));
+    spyOn(bridge as any, "initialize").mockImplementation(async () => { (bridge as any).isReady = true; });
+    spyOn(bridge as any, "sendNotification").mockImplementation(() => {});
+    spyOn(bridge as any, "waitForProgress").mockImplementation(async (uri: string) => {
+      (bridge as any).diagnosticsMap.set(uri, [
+        { range: { start: { line: 0 } }, severity: 2, message: "warning: 'case_analysis_lemma' uses `sorry`" }
+      ] as any);
+    });
 
-    const result = await bridge.verifyStructuralSkeleton("...");
+    const result = await bridge.verifyStructuralSkeleton("lemma case_analysis_lemma : True := by sorry");
     expect(result.valid).toBe(true);
     expect(result.sorryGoals).toContain("case_analysis_lemma");
   });

@@ -19,9 +19,10 @@ import { repairJSON } from "../util/json_repair";
 // ──────────────────────────────────────────────
 
 export type GeminiModelTier =
-  | "gemini-2.5-flash"              // Tier 1: Free / base
-  | "gemini-3.1-flash-lite-preview" // Tier 2: Paid flash
-  | "gemini-3.1-pro-preview";       // Tier 3: Break glass Pro
+  | "gemini-2.5-flash"
+  | "gemini-3.1-flash-lite-preview"
+  | "gemini-3.1-flash"
+  | "gemini-3.1-pro-preview";
 
 // ──────────────────────────────────────────────
 // Response Schemas (for structured output)
@@ -29,38 +30,7 @@ export type GeminiModelTier =
 
 import { ARCHITECT_SCHEMA, ARCHITECT_SYSTEM_PROMPT } from "./architect";
 
-const REASONER_SCHEMA = {
-  type: SchemaType.OBJECT as const,
-  properties: {
-    action: {
-      type: SchemaType.STRING as const,
-      enum: ["PROPOSE_LEAN_TACTICS", "PROPOSE_TACTICS", "FALSIFY_FIRST"],
-    },
-    tactics: { type: SchemaType.STRING as const },
-    confidence_score: { type: SchemaType.NUMBER as const },
-    reasoning: { type: SchemaType.STRING as const },
-  },
-  required: ["action", "tactics", "confidence_score", "reasoning"],
-};
 
-// ──────────────────────────────────────────────
-// System Prompts
-// ──────────────────────────────────────────────
-
-const REASONER_SYSTEM_PROMPT =
-  "You are the Reasoner, a Lean 4 tactical expert. " +
-  "Review the Tactician's recent failed attempts and error messages. " +
-  "Output a specific, mathematically sound Lean 4 tactic to unblock the current goal state. " +
-  "Keep your reasoning under 100 words. Focus on the exact tactic syntax.\n\n" +
-  "The Computational Fast-Path Heuristic:\n" +
-  "Before attempting any complex logical deduction (intro, by_contra, induction), your FIRST node expansion in the MCTS tree MUST attempt Lean 4's computational and automation tactics.\n\n" +
-  "If the theorem involves finite arithmetic, equalities, or bounded evaluations, you must immediately try one of the following:\n\n" +
-  "rfl (if it evaluates by definitional equality)\n" +
-  "decide (if it is a decidable proposition)\n" +
-  "norm_num (the ultimate hammer for numerical arithmetic)\n" +
-  "ring (for polynomial algebra)\n" +
-  "omega (for integer/natural number linear arithmetic)\n\n" +
-  "Do not overcomplicate finite bounds. Let the Lean kernel compute them.";
 
 // ──────────────────────────────────────────────
 // GeminiAgent
@@ -72,8 +42,8 @@ export class GeminiAgent {
   private readonly model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
 
   constructor(role: AgentRole, modelTier: GeminiModelTier, apiKey: string) {
-    if (role === "TACTICIAN") {
-      throw new Error("GeminiAgent cannot be used for TACTICIAN — use local FormalistAgent.");
+    if (role === "PROVER") {
+      throw new Error("GeminiAgent cannot be used for PROVER — use local FormalistAgent.");
     }
 
     this.role = role;
@@ -81,13 +51,8 @@ export class GeminiAgent {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    const systemInstruction = role === "ARCHITECT"
-      ? ARCHITECT_SYSTEM_PROMPT
-      : REASONER_SYSTEM_PROMPT;
-
-    const responseSchema = role === "ARCHITECT"
-      ? ARCHITECT_SCHEMA
-      : REASONER_SCHEMA;
+    const systemInstruction = ARCHITECT_SYSTEM_PROMPT;
+    const responseSchema = ARCHITECT_SCHEMA;
 
     this.model = genAI.getGenerativeModel({
       model: modelTier,
@@ -158,13 +123,6 @@ export class GeminiAgent {
       };
     }
 
-    // REASONER fallback
-    console.log(`   🧠 [GeminiAgent:REASONER] All ${retries} attempts failed. Using fallback.`);
-    return {
-      action: "PROPOSE_LEAN_TACTICS",
-      tactics: "omega",
-      confidence_score: 0.3,
-      reasoning: `Gemini ${this.modelTier} failed after ${retries} attempts. Falling back to omega.`,
-    };
+
   }
 }

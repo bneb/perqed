@@ -109,8 +109,10 @@ export interface OrchestratorConfig {
   embedder?: LocalEmbedder;
   /** Sprint 13: Vector database for premise storage and search. */
   vectorDb?: VectorDatabase;
-  /** Sprint 17: Concurrent node expansion batch size. */
+  /** Batch size for parallel generation (default: 3) */
   batchSize?: number;
+  /** Problem class hint to dictate model escalation difficulty */
+  problemClass?: string;
 }
 
 export const DEFAULT_CONFIG: OrchestratorConfig = {
@@ -179,9 +181,9 @@ export function buildRoutingSignals(
     }
   }
 
-  // Middle-Out: count total TACTICIAN invocations
-  const totalTacticianCalls = attemptLogs.filter(
-    (l) => l.agent === "TACTICIAN",
+  // Middle-Out: count total PROVER invocations
+  const totalProverCalls = attemptLogs.filter(
+    (l) => l.agent === "PROVER",
   ).length;
 
   return {
@@ -193,7 +195,8 @@ export function buildRoutingSignals(
     lastErrors,
     hasArchitectDirective,
     identicalErrorCount,
-    totalTacticianCalls,
+    totalProverCalls,
+    hasSubgoalProposal: false,
   };
 }
 
@@ -310,6 +313,7 @@ export async function runDynamicLoop(
     signature: config.theoremSignature || "",
     objective: config.objective,
     maxIterations: config.maxGlobalIterations,
+    problemClass: config.problemClass,
     verbose: true,
   });
 
@@ -336,6 +340,7 @@ export async function runProverLoop(
     signature: config.theoremSignature || "",
     objective: config.objective,
     maxIterations: config.maxGlobalIterations,
+    agentFactory: config.agentFactory,
     verbose: true,
   });
 

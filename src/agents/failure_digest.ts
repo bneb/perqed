@@ -48,7 +48,7 @@ export interface FailureDigest {
 
 const RECOMMENDATIONS: Record<TriggerReason, string> = {
   MAX_TACTIC_ATTEMPTS:
-    "TACTICIAN has exhausted its budget. Consider a fundamentally different approach: helper lemma, alternative encoding, or decomposition into sub-goals.",
+    "PROVER has exhausted its budget. Consider a fundamentally different approach: helper lemma, alternative encoding, or decomposition into sub-goals.",
   IDENTICAL_ERRORS:
     "The same error is repeating. The current tactic family cannot solve this goal. Try a different proof strategy entirely.",
   STUCK_LOOP:
@@ -65,7 +65,7 @@ export function buildFailureDigest(
   let triggerReason: TriggerReason;
   if (signals.identicalErrorCount >= MAX_IDENTICAL_ERRORS) {
     triggerReason = "IDENTICAL_ERRORS";
-  } else if (signals.totalTacticianCalls >= MAX_TACTIC_ATTEMPTS) {
+  } else if (signals.totalProverCalls >= MAX_TACTIC_ATTEMPTS) {
     triggerReason = "MAX_TACTIC_ATTEMPTS";
   } else if (signals.isStuckInLoop && signals.consecutiveFailures >= 6) {
     triggerReason = "STUCK_LOOP";
@@ -89,7 +89,7 @@ export function buildFailureDigest(
   const currentState = [
     `${signals.totalAttempts} total attempts`,
     `${signals.consecutiveFailures} consecutive failures`,
-    `${signals.totalTacticianCalls} TACTICIAN calls`,
+    `${signals.totalProverCalls} PROVER calls`,
     `${signals.goalCount} open goal(s)`,
   ].join(", ");
 

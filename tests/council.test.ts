@@ -199,9 +199,9 @@ describe("Council — Falsification Phase", () => {
     });
 
     await runProverLoop(wm, solver, {
-      maxGlobalIterations: 2,
+      maxGlobalIterations: 2, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       maxLocalRetries: 3,
-    }, falsifyingLLM, noopArchitect);
+    });
 
     expect(callCount).toBe(2);
 
@@ -243,9 +243,9 @@ describe("Council — Falsification Phase", () => {
     };
 
     await runProverLoop(wm, solver, {
-      maxGlobalIterations: 1,
+      maxGlobalIterations: 1, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       maxLocalRetries: 3,
-    }, brokenTheoremLLM, mockArchitect);
+    });
 
     // A successful falsification (sat = counterexample found) should escalate
     expect(architectCalled).toBe(true);
@@ -300,9 +300,9 @@ describe("Council — Parallel Execution", () => {
     });
 
     await runProverLoop(wm, solver, {
-      maxGlobalIterations: 1,
+      maxGlobalIterations: 1, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       maxLocalRetries: 3,
-    }, parallelLLM, noopArchitect);
+    });
 
     // All 3 tactics should have been sent to the solver
     expect(z3CallCount).toBe(3);
@@ -339,9 +339,9 @@ describe("Council — Parallel Execution", () => {
     });
 
     await runProverLoop(wm, solver, {
-      maxGlobalIterations: 1,
+      maxGlobalIterations: 1, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       maxLocalRetries: 3,
-    }, mixedResultLLM, noopArchitect);
+    });
 
     // The winning tactic's informal_sketch should be in progress
     const progress = await Bun.file(wm.paths.progress).text();
@@ -373,9 +373,9 @@ describe("Council — Parallel Execution", () => {
 
     // 3 iterations × 2 failing tactics each → 3 consecutive failures → architect
     await runProverLoop(wm, solver, {
-      maxGlobalIterations: 4,
+      maxGlobalIterations: 4, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       maxLocalRetries: 3,
-    }, allFailLLM, mockArchitect);
+    });
 
     expect(architectCalled).toBe(true);
   });
@@ -428,9 +428,9 @@ describe("Council — Confidence Scoring", () => {
     });
 
     await runProverLoop(wm, solver, {
-      maxGlobalIterations: 1,
+      maxGlobalIterations: 1, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       maxLocalRetries: 3,
-    }, unsortedLLM, noopArchitect);
+    });
 
     // Tactics should have been sorted: HIGH (0.95), MED (0.6), LOW (0.2)
     expect(executionOrder).toEqual(["HIGH", "MED", "LOW"]);
@@ -455,9 +455,9 @@ describe("Council — Confidence Scoring", () => {
     });
 
     await runProverLoop(wm, solver, {
-      maxGlobalIterations: 1,
+      maxGlobalIterations: 1, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       maxLocalRetries: 3,
-    }, confidentLLM, noopArchitect);
+    });
 
     const labLog = await Bun.file(wm.paths.labLog).text();
     // The confidence score should appear in the log

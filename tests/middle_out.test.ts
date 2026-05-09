@@ -24,14 +24,15 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
     lastErrors: [],
     hasArchitectDirective: false,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0,
+    hasSubgoalProposal: false,
     ...overrides,
   };
 }
 
-function makeLogs(count: number, opts: { error?: string; agent?: "TACTICIAN" | "REASONER" | "ARCHITECT" } = {}): AttemptLog[] {
+function makeLogs(count: number, opts: { error?: string; agent?: "PROVER" | "ARCHITECT" | "ARCHITECT" } = {}): AttemptLog[] {
   return Array.from({ length: count }, (_, i) => ({
-    agent: opts.agent ?? "TACTICIAN" as const,
+    agent: opts.agent ?? "PROVER" as const,
     action: "PROPOSE_LEAN_TACTICS",
     success: false,
     error: opts.error ?? `error ${i}`,
@@ -45,19 +46,19 @@ function makeLogs(count: number, opts: { error?: string; agent?: "TACTICIAN" | "
 
 describe("Middle-Out Tripwires", () => {
 
-  test("ARCHITECT when totalTacticianCalls >= 10 (budget ceiling)", () => {
-    const signals = makeSignals({ totalTacticianCalls: 10, totalAttempts: 12 });
+  test("ARCHITECT when totalProverCalls >= 10 (budget ceiling)", () => {
+    const signals = makeSignals({ totalProverCalls: 10, totalAttempts: 12 });
     expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
-  test("ARCHITECT when totalTacticianCalls = 15 (well above ceiling)", () => {
-    const signals = makeSignals({ totalTacticianCalls: 15, totalAttempts: 20 });
+  test("ARCHITECT when totalProverCalls = 15 (well above ceiling)", () => {
+    const signals = makeSignals({ totalProverCalls: 15, totalAttempts: 20 });
     expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
-  test("TACTICIAN still used when totalTacticianCalls = 9 (below ceiling)", () => {
-    const signals = makeSignals({ totalTacticianCalls: 9, totalAttempts: 10 });
-    expect(AgentRouter.determineNextAgent(signals)).toBe("TACTICIAN");
+  test("TACTICIAN still used when totalProverCalls = 9 (below ceiling)", () => {
+    const signals = makeSignals({ totalProverCalls: 9, totalAttempts: 10 });
+    expect(AgentRouter.determineNextAgent(signals)).toBe("PROVER");
   });
 
   test("ARCHITECT when identicalErrorCount >= 3 (stuck detection)", () => {
@@ -67,7 +68,7 @@ describe("Middle-Out Tripwires", () => {
 
   test("TACTICIAN when identicalErrorCount = 2 (below threshold)", () => {
     const signals = makeSignals({ identicalErrorCount: 2, totalAttempts: 5 });
-    expect(AgentRouter.determineNextAgent(signals)).toBe("TACTICIAN");
+    expect(AgentRouter.determineNextAgent(signals)).toBe("PROVER");
   });
 
   test("tripwire takes priority over REASONER", () => {
@@ -75,14 +76,14 @@ describe("Middle-Out Tripwires", () => {
     // but 10 tactician calls should route to ARCHITECT
     const signals = makeSignals({
       consecutiveFailures: 3,
-      totalTacticianCalls: 10,
+      totalProverCalls: 10,
       totalAttempts: 12,
     });
     expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
   test("initial state (totalAttempts=0) still routes to ARCHITECT", () => {
-    const signals = makeSignals({ totalAttempts: 0, totalTacticianCalls: 0 });
+    const signals = makeSignals({ totalAttempts: 0, totalProverCalls: 0, hasSubgoalProposal: false });
     expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 });
@@ -94,7 +95,7 @@ describe("Middle-Out Tripwires", () => {
 describe("FailureDigest", () => {
 
   test("produces MAX_TACTIC_ATTEMPTS digest when tactician ceiling is hit", () => {
-    const signals = makeSignals({ totalTacticianCalls: 10, totalAttempts: 12 });
+    const signals = makeSignals({ totalProverCalls: 10, totalAttempts: 12 });
     const logs = makeLogs(10);
     const digest = buildFailureDigest(signals, logs);
 
@@ -128,7 +129,7 @@ describe("FailureDigest", () => {
   });
 
   test("deduplicates error signatures", () => {
-    const signals = makeSignals({ totalTacticianCalls: 10, totalAttempts: 10 });
+    const signals = makeSignals({ totalProverCalls: 10, totalAttempts: 10 });
     const logs = [
       ...makeLogs(3, { error: "error A" }),
       ...makeLogs(4, { error: "error B" }),
@@ -151,7 +152,7 @@ describe("FailureDigest", () => {
   });
 
   test("lastNErrors contains at most 3 entries", () => {
-    const signals = makeSignals({ totalTacticianCalls: 10, totalAttempts: 10 });
+    const signals = makeSignals({ totalProverCalls: 10, totalAttempts: 10 });
     const logs = makeLogs(10);
     const digest = buildFailureDigest(signals, logs);
 

@@ -387,6 +387,7 @@ export function makeProductBridge(params: {
     },
 
     gradient(encoded, N, K) {
+      if (K % 2 !== 0) throw new Error("ProductBridge requires an even number of color partitions (K).");
       const half = Math.floor(K / 2);
       const euclidGrad = schurEuclideanGradient(encoded, N, K);
       const grad: number[][] = new Array(N + 1);

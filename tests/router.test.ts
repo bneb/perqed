@@ -23,7 +23,8 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
     lastErrors: [],
     hasArchitectDirective: false,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0,
+    hasSubgoalProposal: false,
     ...overrides,
   };
 }
@@ -41,22 +42,22 @@ describe("AgentRouter — determineNextAgent()", () => {
 
   test("returns TACTICIAN on 1 goal and 0 failures (happy path)", () => {
     const signals = makeSignals({ goalCount: 1, consecutiveFailures: 0 });
-    expect(AgentRouter.determineNextAgent(signals)).toBe("TACTICIAN");
+    expect(AgentRouter.determineNextAgent(signals)).toBe("PROVER");
   });
 
   test("returns REASONER on 3 consecutive failures", () => {
     const signals = makeSignals({ consecutiveFailures: 3 });
-    expect(AgentRouter.determineNextAgent(signals)).toBe("REASONER");
+    expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
   test("returns REASONER on identical back-to-back errors (stuck in loop)", () => {
     const signals = makeSignals({ isStuckInLoop: true, consecutiveFailures: 1 });
-    expect(AgentRouter.determineNextAgent(signals)).toBe("REASONER");
+    expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
   test("returns REASONER when Lean state has multiple goals (goal explosion)", () => {
     const signals = makeSignals({ goalCount: 2, consecutiveFailures: 0 });
-    expect(AgentRouter.determineNextAgent(signals)).toBe("REASONER");
+    expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 
   test("returns ARCHITECT on 6+ global tree failures (break glass)", () => {
@@ -71,7 +72,7 @@ describe("AgentRouter — determineNextAgent()", () => {
 
   test("returns TACTICIAN when architect directive exists but 0 failures", () => {
     const signals = makeSignals({ hasArchitectDirective: true, consecutiveFailures: 0 });
-    expect(AgentRouter.determineNextAgent(signals)).toBe("TACTICIAN");
+    expect(AgentRouter.determineNextAgent(signals)).toBe("PROVER");
   });
 
   test("ARCHITECT takes priority over REASONER at 6 global failures with loop", () => {
@@ -81,7 +82,7 @@ describe("AgentRouter — determineNextAgent()", () => {
 
   test("returns REASONER at exactly 5 failures (below ARCHITECT threshold of 6)", () => {
     const signals = makeSignals({ consecutiveFailures: 5 });
-    expect(AgentRouter.determineNextAgent(signals)).toBe("REASONER");
+    expect(AgentRouter.determineNextAgent(signals)).toBe("ARCHITECT");
   });
 });
 

@@ -6,8 +6,8 @@
  * so a human can monitor the agent's "mind" in real-time.
  */
 
-import { join } from "node:path";
-import { mkdir } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { mkdir, symlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 
 export class WorkspaceManager {
@@ -66,38 +66,70 @@ export class WorkspaceManager {
     await mkdir(this.paths.scratch, { recursive: true });
     await mkdir(this.paths.verifiedLib, { recursive: true });
 
-    // Auto-generate Lean 4 DevOps environment in baseDir
-    const lakefile = join(this.baseDir, "lakefile.lean");
-    const toolchain = join(this.baseDir, "lean-toolchain");
+    // DO NOT run `lake update` synchronously here.
+    // Instead, symlink or copy from a pre-compiled global cache.
+    const globalCacheDir = process.env.PERQED_GLOBAL_CACHE || join(process.env.HOME!, ".perqed_cache");
+    const localLakeDir = join(this.baseDir, ".lake");
     
-    if (!existsSync(lakefile)) {
-      const lakeContent = `import Lake
-open Lake DSL
-
-package «perqed_proofs» where
-  -- add package configuration options here
-
-@[default_target]
-lean_lib «PerqedProofs» where
-  -- add library configuration options here
-
-require mathlib from git
-  "https://github.com/leanprover-community/mathlib4.git"
-`;
-      await Bun.write(lakefile, lakeContent);
-      await Bun.write(toolchain, "leanprover/lean4:v4.6.0\n");
-      
-      console.log("   🪣 [DevOps] Bootstrapping Lean 4 Workspace and pulling Mathlib (this takes a moment)...");
-      try {
+    if (!existsSync(localLakeDir) && existsSync(join(globalCacheDir, ".lake"))) {
+        console.log(`[Workspace] Restoring pre-compiled Lean environment from cache...`);
         const { execSync } = await import("node:child_process");
-        const lakeBin = `${process.env.HOME}/.elan/bin/lake`;
-        execSync(`${lakeBin} update`, { cwd: this.baseDir, stdio: "ignore" });
-        execSync(`${lakeBin} build`, { cwd: this.baseDir, stdio: "ignore" });
-        console.log("   ✅ [DevOps] Mathlib environment ready.");
-      } catch (err: any) {
-        console.log(`   ⚠️ [DevOps] lake update/build failed: ${err.message}. Mathlib might not be fully available.`);
+        // Use recursive copy or symlinking to avoid synchronous build times
+        execSync(`ln -s ${join(globalCacheDir, ".lake")} ${this.baseDir}/.lake`);
+        execSync(`cp ${join(globalCacheDir, "lakefile.lean")} ${this.baseDir}`);
+    } else if (!existsSync(localLakeDir)) {
+        throw new Error("CRITICAL: Global Lean cache not found. Please run `./scripts/setup.sh` to pre-compile Mathlib.");
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // CORAL-Inspired Worktree Sandboxing
+  // ──────────────────────────────────────────────
+
+  /**
+   * Provisions a dedicated working directory for parallel agents.
+   * Isolates scratchpads while symlinking shared state libraries.
+   */
+  async allocateWorkerSandbox(workerId: string): Promise<{ directory: string, scratch: string }> {
+    const workerDir = join(this.paths.runDir, "workers", workerId);
+    const workerScratch = join(workerDir, "scratch");
+    const workerVerified = join(workerDir, "verified_lib");
+    const workerSkills = join(workerDir, "domain_skills");
+    
+    await mkdir(workerDir, { recursive: true });
+    await mkdir(workerScratch, { recursive: true });
+
+    // ── Lean Infrastructure Symlinking ──────────────────────────────
+    // The Lean REPL (lake exe repl) requires these to be present in the CWD
+    const leanFiles = ["lakefile.lean", "lean-toolchain", ".lake"];
+    for (const file of leanFiles) {
+      const src = resolve(this.baseDir, file);
+      const dest = join(workerDir, file);
+      if (existsSync(src) && !existsSync(dest)) {
+        try {
+          await symlink(src, dest, file === ".lake" ? "dir" : "file");
+        } catch (e: any) {
+          console.warn(`[WorkspaceManager] Unable to symlink Lean infra '${file}' for worker ${workerId}: ${e.message}`);
+        }
       }
     }
+
+    // ── Shared Hub Symlinking ───────────────────────────────────────
+    // Implement CORAL symlink pattern for shared hub state
+    try {
+      if (!existsSync(workerVerified)) {
+        await symlink(resolve(this.paths.verifiedLib), workerVerified, "dir");
+      }
+      if (!existsSync(workerSkills)) {
+        await symlink(resolve(this.paths.domainSkills), workerSkills, "dir");
+      }
+    } catch (e: any) {
+      if (e.code !== "EEXIST") {
+         console.warn(`[WorkspaceManager] Unable to symlink shared hubs for worker ${workerId}: ${e.message}`);
+      }
+    }
+
+    return { directory: workerDir, scratch: workerScratch };
   }
 
   // ──────────────────────────────────────────────

@@ -43,10 +43,10 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
         hasArchitectDirective: true,
     globalFailures: 0,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0, hasSubgoalProposal: false,
       },
       latestLog: {
-        agent: "TACTICIAN",
+        agent: "PROVER",
         action: "PROPOSE_LEAN_TACTICS",
         success: false,
         error: "tactic 'simp' failed",
@@ -54,7 +54,7 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
       },
       history: [
         { agent: "ARCHITECT", action: "ARCHITECT_ESCALATION", success: true, timestamp: Date.now() },
-        { agent: "TACTICIAN", action: "PROPOSE_LEAN_TACTICS", success: false, error: "tactic 'simp' failed", timestamp: Date.now() },
+        { agent: "PROVER", action: "PROPOSE_LEAN_TACTICS", success: false, error: "tactic 'simp' failed", timestamp: Date.now() },
       ],
       timestamp: new Date().toISOString(),
     };
@@ -66,7 +66,7 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
     expect(payload.iteration).toBe(3);
     expect(payload.currentSignals.consecutiveFailures).toBe(2);
     expect(payload.latestLog).not.toBeNull();
-    expect(payload.latestLog!.agent).toBe("TACTICIAN");
+    expect(payload.latestLog!.agent).toBe("PROVER");
     expect(payload.history).toHaveLength(2);
     expect(payload.timestamp).toBeString();
   });
@@ -86,10 +86,10 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
         hasArchitectDirective: false,
     globalFailures: 0,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0, hasSubgoalProposal: false,
       },
       latestLog: {
-        agent: "TACTICIAN",
+        agent: "PROVER",
         action: "PROPOSE_LEAN_TACTICS",
         success: true,
         timestamp: Date.now(),
@@ -118,10 +118,10 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
         hasArchitectDirective: false,
     globalFailures: 0,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0, hasSubgoalProposal: false,
       },
       latestLog: {
-        agent: "REASONER",
+        agent: "ARCHITECT",
         action: "PROPOSE_LEAN_TACTICS",
         success: false,
         error: "maxRecDepth reached",
@@ -163,9 +163,9 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
           hasArchitectDirective: true,
     globalFailures: 0,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0, hasSubgoalProposal: false,
         },
-        latestLog: { agent: "REASONER", action: "PROPOSE_LEAN_TACTICS", success: false, timestamp: Date.now() },
+        latestLog: { agent: "ARCHITECT", action: "PROPOSE_LEAN_TACTICS", success: false, timestamp: Date.now() },
         history: [],
         timestamp: new Date().toISOString(),
       });
@@ -178,7 +178,7 @@ describe("TelemetryEmitter — Orchestrator Integration", () => {
       expect(content.iteration).toBe(4);
       expect(content.currentSignals.consecutiveFailures).toBe(3);
       expect(content.currentSignals.hasArchitectDirective).toBe(true);
-      expect(content.latestLog.agent).toBe("REASONER");
+      expect(content.latestLog.agent).toBe("ARCHITECT");
     } finally {
       globalThis.fetch = originalFetch;
     }

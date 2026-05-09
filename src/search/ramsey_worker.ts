@@ -13,6 +13,7 @@ import {
   ramseyEnergyDelta,
   ramseyEnergyDeltaBatch,
   flipEdge,
+  spectralEnergy,
 } from "../math/graph/RamseyEnergy";
 import {
   getEdgesForDistance,
@@ -61,6 +62,17 @@ export interface RamseySearchConfig {
    */
   /** Symmetry constraint */
   symmetry?: 'none' | 'circulant';
+  /**
+   * Energy evaluation mode:
+   * - 'clique_count' (default): ramseyEnergy = |red K_r| + |blue K_s|
+   * - 'spectral_proxy': E = max(0, λ₁ - spectralTarget) + max(0, spectralTarget - |λ_n|)
+   */
+  energyMode?: 'clique_count' | 'spectral_proxy';
+  /**
+   * Target for the dominant eigenvalue in spectral_proxy mode.
+   * Typically √(n-1) or similar Ramanujan bound.
+   */
+  spectralTarget?: number;
   /**
    * Tabu: set of 64-bit Zobrist hashes representing known-sterile energy
    * basins (glass floors). Stored as decimal strings for safe JSON transport
@@ -114,6 +126,11 @@ export interface RamseySearchConfig {
    * null = no patch (scatter normally)
    */
   microSatPatch?: { adj: AdjacencyMatrix | null };
+  /**
+   * Shared memory buffer used for asynchronous replica exchange.
+   * The orchestrator sets byte 0 to 1 when a new adj matrix has been written to bytes 4+.
+   */
+  replicaExchangeBuffer?: SharedArrayBuffer;
 }
 
 
@@ -152,7 +169,7 @@ export interface RamseySearchResult {
  */
 export function ramseySearch(
   config: RamseySearchConfig,
-  onProgress?: (iter: number, energy: number, bestEnergy: number, temp: number) => void,
+  onProgress?: (iter: number, energy: number, bestEnergy: number, temp: number, currentAdj?: AdjacencyMatrix) => void,
 ): RamseySearchResult {
   const { n, r, s, maxIterations, initialTemp, coolingRate } = config;
   const useCirculant = config.symmetry === 'circulant';
@@ -161,6 +178,10 @@ export function ramseySearch(
   const maxDist = Math.floor(n / 2);
   // Adaptive reheat patience — configurable per worker (default: 10% of budget)
   const minPatience = config.minPatience ?? Math.max(100_000, Math.floor(maxIterations * 0.1));
+
+  const evalEnergy = (a: AdjacencyMatrix) => config.energyMode === 'spectral_proxy'
+    ? spectralEnergy(a, config.spectralTarget ?? Math.sqrt(n - 1))
+    : ramseyEnergy(a, r, s);
 
   // Initialize: use seed graph, or random (circulant or unconstrained)
   let adj: AdjacencyMatrix;
@@ -215,9 +236,37 @@ export function ramseySearch(
   const energyTrajectory: number[] = [];
   const temperatureTrajectory: number[] = [];
 
+  let replicaView: Int32Array | null = null;
+  let replicaAdjView: Int8Array | null = null;
+  if (config.replicaExchangeBuffer) {
+    replicaView = new Int32Array(config.replicaExchangeBuffer, 0, 1);
+    replicaAdjView = new Int8Array(config.replicaExchangeBuffer, 4, n * n);
+  }
+
   const startTime = Date.now();
 
   for (let iter = 0; iter < maxIterations; iter++) {
+    // ── Asynchronous Replica Exchange Check ────────────────────────────────
+    // Every 10k iterations, check if the orchestrator injected a better state
+    if (replicaView && iter % 10_000 === 0) {
+      if (Atomics.load(replicaView, 0) === 1) {
+        // Apply the replica exchange mutation
+        for (let i = 0; i < n * n; i++) adj.raw[i] = replicaAdjView![i]!;
+        energy = ramseyEnergy(adj, r, s);
+        bestAdj = adj.clone();
+        if (energy < bestEnergy) bestEnergy = energy;
+        staleCount = 0;
+        localReheatCount = 0;
+        if (hasher) graphHash = hasher.computeInitial(adj);
+        
+        // Acknowledge receipt
+        Atomics.store(replicaView, 0, 0);
+        
+        // Skip the normal mutation for this iteration
+        continue;
+      }
+    }
+
     let delta: number;
 
     if (useCirculant && distanceColors) {
@@ -249,7 +298,7 @@ export function ramseySearch(
               energyTrajectory.push(bestEnergy);
               temperatureTrajectory.push(temp);
             }
-            if (onProgress && iter % 10000 === 0) onProgress(iter, energy, bestEnergy, temp);
+            if (onProgress && iter % 10000 === 0) onProgress(iter, energy, bestEnergy, temp, adj);
             continue;
           }
         }
@@ -292,7 +341,14 @@ export function ramseySearch(
       let v = Math.floor(Math.random() * (n - 1));
       if (v >= u) v++;
 
-      delta = ramseyEnergyDelta(adj, u, v, r, s);
+      if (config.energyMode === 'spectral_proxy') {
+        const oldE = evalEnergy(adj);
+        flipEdge(adj, u, v);
+        delta = evalEnergy(adj) - oldE;
+        flipEdge(adj, u, v);
+      } else {
+        delta = ramseyEnergyDelta(adj, u, v, r, s);
+      }
 
       // ── Tabu check (O(1)) ────────────────────────────────────────────
       // If this mutation would land on a known glass floor, hard-reject it
@@ -376,7 +432,8 @@ export function ramseySearch(
         // Basin is a proven glass floor after MAX_LOCAL_REHEATS consecutive
         // failed escape attempts. Teleport to a new sector of the search
         // space by randomly flipping 50% of edges.
-        console.log(`[SA] Basin sterile after ${MAX_LOCAL_REHEATS} reheats. SCATTERING to new coordinates. E=${energy}`);
+        const eStr = Number.isInteger(energy) ? energy : energy.toFixed(2);
+        console.log(`[SA] Basin sterile after ${MAX_LOCAL_REHEATS} reheats. SCATTERING to new coordinates. E=${eStr}`);
 
         // ── MicroSAT hook: pause worker until Z3 resolves ──────────────────
         //
@@ -406,11 +463,11 @@ export function ramseySearch(
             Atomics.wait(lockView, 0, 0, 130_000);
             
             // Atomics.wait returned. Read status from lockView[0].
-            // 0 = timeout, 1 = patch ready, 2 = no patch (scatter)
+            // 0 = timeout, 1 = patch ready, 2 = no patch (scatter), 3 = replica exchange
             const status = Atomics.load(lockView, 0);
             
-            if (status === 1) {
-              // Orchestrator delivered a surgical fix via SharedArrayBuffer — apply it, skip scatter.
+            if (status === 1 || status === 3) {
+              // Orchestrator delivered a surgical fix (1) or replica exchange (3) via SharedArrayBuffer.
               // Payload starts at byte 4.
               const patchRaw = new Int8Array(config.microSatLock, 4, adj.raw.length);
               for (let i = 0; i < patchRaw.length; i++) adj.raw[i] = patchRaw[i]!;
@@ -422,7 +479,11 @@ export function ramseySearch(
               if (hasher) graphHash = hasher.computeInitial(adj);
               temp = initialTemp;
               reheatCooldown = Math.min(minPatience, maxCooldown);
-              console.log(`[MicroSAT] Applied surgical patch — E=${energy}, skipping scatter`);
+              if (status === 1) {
+                console.log(`[MicroSAT] Applied surgical patch — E=${energy}, skipping scatter`);
+              } else {
+                console.log(`[ReplicaExchange] Swapped state with remote worker — E=${energy}, skipping scatter`);
+              }
               continue;  // ← do NOT scatter
             }
             // status !== 1 → fall through to scatter below
@@ -449,7 +510,8 @@ export function ramseySearch(
         temp = initialTemp;
         reheatCooldown = Math.min(minPatience, maxCooldown);
 
-        console.log(`[SA] Basin sterile after ${MAX_LOCAL_REHEATS} reheats. SCATTERING to new coordinates. E=${energy}`);
+        const eStrFallback = Number.isInteger(energy) ? energy : energy.toFixed(2);
+        console.log(`[SA] Basin sterile after ${MAX_LOCAL_REHEATS} reheats. SCATTERING to new coordinates. E=${eStrFallback}`);
 
       } else {
         // ── STAGE 1: SUPERCRITICAL REHEAT ───────────────────────────────
@@ -477,7 +539,7 @@ export function ramseySearch(
 
     // Progress callback
     if (onProgress && iter % 10000 === 0) {
-      onProgress(iter, energy, bestEnergy, temp);
+      onProgress(iter, energy, bestEnergy, temp, adj);
     }
   }
 

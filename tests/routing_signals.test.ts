@@ -15,7 +15,7 @@ import type { AttemptLog } from "../src/types";
 
 function makeLog(overrides: Partial<AttemptLog> = {}): AttemptLog {
   return {
-    agent: "TACTICIAN",
+    agent: "PROVER",
     action: "PROPOSE_LEAN_TACTICS",
     success: false,
     timestamp: Date.now(),

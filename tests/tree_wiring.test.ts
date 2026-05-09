@@ -120,16 +120,16 @@ describe("runDynamicLoop() — Physical ProofTree Wiring", () => {
     factory.registerAgent("ARCHITECT", new MockAgent("ARCHITECT", [
       { action: "DIRECTIVE", target_node_id: "root", reasoning: "omega", tactics: "omega" } as any,
     ]));
-    factory.registerAgent("TACTICIAN", new MockAgent("TACTICIAN", [{
+    factory.registerAgent("PROVER", new MockAgent("PROVER", [{
       thoughts: "omega", action: "PROPOSE_LEAN_TACTICS",
       lean_tactics: [{ tactic: "omega", informal_sketch: "omega", confidence_score: 0.99 }],
     }]));
 
     const result = await runDynamicLoop(workspace, new SolverBridge(), {
-      maxGlobalIterations: 10,
+      maxGlobalIterations: 10, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
-      theoremName: "thm", theoremSignature: "(n : Nat) : n = n",
+      theoremName: "thm", theoremSignature: "theorem thm (n : Nat) : n = n",
     });
 
     expect(result.status).toBe("SOLVED");
@@ -146,16 +146,16 @@ describe("runDynamicLoop() — Physical ProofTree Wiring", () => {
     factory.registerAgent("ARCHITECT", new MockAgent("ARCHITECT", [
       { action: "DIRECTIVE", target_node_id: "root", reasoning: "omega", tactics: "omega" } as any,
     ]));
-    factory.registerAgent("TACTICIAN", new MockAgent("TACTICIAN", [{
+    factory.registerAgent("PROVER", new MockAgent("PROVER", [{
       thoughts: "omega", action: "PROPOSE_LEAN_TACTICS",
       lean_tactics: [{ tactic: "omega", informal_sketch: "omega", confidence_score: 0.99 }],
     }]));
 
     const result = await runDynamicLoop(workspace, new SolverBridge(), {
-      maxGlobalIterations: 10,
+      maxGlobalIterations: 10, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
-      theoremName: "thm", theoremSignature: "(n : Nat) : n = n",
+      theoremName: "thm", theoremSignature: "theorem thm (n : Nat) : n = n",
     });
 
     const tree = result.tree!;
@@ -178,16 +178,16 @@ describe("runDynamicLoop() — Physical ProofTree Wiring", () => {
     ]);
 
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", new MockAgent("TACTICIAN", [{
+    factory.registerAgent("PROVER", new MockAgent("PROVER", [{
       thoughts: "t", action: "PROPOSE_LEAN_TACTICS" as const,
       lean_tactics: [{ tactic: "omega", informal_sketch: "omega", confidence_score: 0.99 }],
     }]));
 
     const result = await runDynamicLoop(workspace, new SolverBridge(), {
-      maxGlobalIterations: 10,
+      maxGlobalIterations: 10, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
-      theoremName: "thm", theoremSignature: "(n : Nat) : n = n",
+      theoremName: "thm", theoremSignature: "theorem thm (n : Nat) : n = n",
     });
 
     expect(result.status).toBe("SOLVED");
@@ -206,13 +206,13 @@ describe("runDynamicLoop() — Physical ProofTree Wiring", () => {
       { action: "DIRECTIVE", target_node_id: "root", reasoning: "plan", tactics: "simp" } as any,
       { action: "DIRECTIVE", target_node_id: "root", reasoning: "rethink", tactics: "exact_proof" } as any,
     ]));
-    factory.registerAgent("TACTICIAN", new MockAgent("TACTICIAN", [
+    factory.registerAgent("PROVER", new MockAgent("PROVER", [
       { thoughts: "t", action: "PROPOSE_LEAN_TACTICS" as const,
         lean_tactics: [{ tactic: "simp", informal_sketch: "simp", confidence_score: 0.5 }] },
       { thoughts: "t", action: "PROPOSE_LEAN_TACTICS" as const,
         lean_tactics: [{ tactic: "exact_proof", informal_sketch: "exact", confidence_score: 0.99 }] },
     ]));
-    factory.registerAgent("REASONER", new MockAgent("REASONER", [
+    factory.registerAgent("ARCHITECT", new MockAgent("ARCHITECT", [
       { thoughts: "r", action: "PROPOSE_LEAN_TACTICS" as const,
         lean_tactics: [{ tactic: "ring", informal_sketch: "ring", confidence_score: 0.5 }] },
       { thoughts: "r", action: "PROPOSE_LEAN_TACTICS" as const,
@@ -224,10 +224,10 @@ describe("runDynamicLoop() — Physical ProofTree Wiring", () => {
     ]));
 
     const result = await runDynamicLoop(workspace, new SolverBridge(), {
-      maxGlobalIterations: 30,
+      maxGlobalIterations: 30, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
-      theoremName: "thm", theoremSignature: "(n : Nat) : n = n",
+      theoremName: "thm", theoremSignature: "theorem thm (n : Nat) : n = n",
     });
 
     expect(result.status).toBe("SOLVED");
@@ -247,13 +247,13 @@ describe("runDynamicLoop() — Physical ProofTree Wiring", () => {
       { action: "DIRECTIVE", target_node_id: "root", reasoning: "plan", tactics: "simp" } as any,
       { action: "DIRECTIVE", target_node_id: "root", reasoning: "rethink", tactics: "exact_proof" } as any,
     ]));
-    factory.registerAgent("TACTICIAN", new MockAgent("TACTICIAN", [
+    factory.registerAgent("PROVER", new MockAgent("PROVER", [
       { thoughts: "t", action: "PROPOSE_LEAN_TACTICS" as const,
         lean_tactics: [{ tactic: "simp", informal_sketch: "simp", confidence_score: 0.5 }] },
       { thoughts: "t", action: "PROPOSE_LEAN_TACTICS" as const,
         lean_tactics: [{ tactic: "exact_proof", informal_sketch: "exact", confidence_score: 0.99 }] },
     ]));
-    factory.registerAgent("REASONER", new MockAgent("REASONER", [
+    factory.registerAgent("ARCHITECT", new MockAgent("ARCHITECT", [
       { thoughts: "r", action: "PROPOSE_LEAN_TACTICS" as const,
         lean_tactics: [{ tactic: "ring", informal_sketch: "ring", confidence_score: 0.5 }] },
       { thoughts: "r", action: "PROPOSE_LEAN_TACTICS" as const,
@@ -265,10 +265,10 @@ describe("runDynamicLoop() — Physical ProofTree Wiring", () => {
     ]));
 
     const result = await runDynamicLoop(workspace, new SolverBridge(), {
-      maxGlobalIterations: 30,
+      maxGlobalIterations: 30, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
-      theoremName: "thm", theoremSignature: "(n : Nat) : n = n",
+      theoremName: "thm", theoremSignature: "theorem thm (n : Nat) : n = n",
     });
 
     expect(result.status).toBe("SOLVED");

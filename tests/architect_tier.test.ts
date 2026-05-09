@@ -21,7 +21,8 @@ function makeSignals(overrides: Partial<RoutingSignals> = {}): RoutingSignals {
     lastErrors: [],
     hasArchitectDirective: false,
     identicalErrorCount: 0,
-    totalTacticianCalls: 0,
+    totalProverCalls: 0,
+    hasSubgoalProposal: false,
     ...overrides,
   };
 }
@@ -52,17 +53,17 @@ describe("AgentFactory — Gemini tier based on signals", () => {
   });
 
   test("REASONER at 0 failures → gemini-2.5-flash (free tier)", () => {
-    const agent = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 0 }));
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ consecutiveFailures: 0 }));
     expect((agent as any).modelTier).toBe("gemini-2.5-flash");
   });
 
   test("REASONER at 3 failures → gemini-2.5-flash (below M=4)", () => {
-    const agent = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 3 }));
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ consecutiveFailures: 3 }));
     expect((agent as any).modelTier).toBe("gemini-2.5-flash");
   });
 
   test("REASONER at M=4 failures → gemini-3.1-flash-lite-preview (paid tier)", () => {
-    const agent = factory.getAgent("REASONER", makeSignals({ consecutiveFailures: 4 }));
+    const agent = factory.getAgent("ARCHITECT", makeSignals({ consecutiveFailures: 4 }));
     expect((agent as any).modelTier).toBe("gemini-3.1-flash-lite-preview");
   });
 

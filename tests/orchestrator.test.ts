@@ -82,8 +82,8 @@ describe("Orchestrator — Failure Counting", () => {
 
     await runProverLoop(wm, solver, {
       maxLocalRetries: 3,
-      maxGlobalIterations: 4,
-    }, failingLLM, mockArchitect);
+      maxGlobalIterations: 4, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
+    });
 
     expect(architectCalled).toBe(true);
   });
@@ -103,8 +103,8 @@ describe("Orchestrator — Failure Counting", () => {
 
     await runProverLoop(wm, solver, {
       maxLocalRetries: 3,
-      maxGlobalIterations: 2,
-    }, failingLLM, mockArchitect);
+      maxGlobalIterations: 2, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
+    });
 
     expect(architectCalled).toBe(false);
   });
@@ -137,8 +137,8 @@ describe("Orchestrator — Escalation Reset", () => {
 
     await runProverLoop(wm, solver, {
       maxLocalRetries: 3,
-      maxGlobalIterations: 7,
-    }, failingLLM, mockArchitect);
+      maxGlobalIterations: 7, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
+    });
 
     expect(architectCallCount).toBe(2);
   });
@@ -168,8 +168,8 @@ describe("Orchestrator — Backtracking Integration", () => {
 
     await runProverLoop(wm, solver, {
       maxLocalRetries: 3,
-      maxGlobalIterations: 3,
-    }, failingLLM, mockArchitect);
+      maxGlobalIterations: 3, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
+    });
 
     const progress = await Bun.file(join(BASE_DIR, "runs", RUN_NAME, "current_progress.md")).text();
     const lines = progress.trim().split("\n").filter(Boolean);
@@ -198,8 +198,8 @@ describe("Orchestrator — Directive Injection", () => {
 
     await runProverLoop(wm, solver, {
       maxLocalRetries: 3,
-      maxGlobalIterations: 3,
-    }, failingLLM, mockArchitect);
+      maxGlobalIterations: 3, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
+    });
 
     const directiveFile = Bun.file(join(BASE_DIR, "runs", RUN_NAME, "domain_skills", "architect_directive.md"));
     expect(await directiveFile.exists()).toBe(true);
@@ -228,8 +228,8 @@ describe("Orchestrator — Directive Injection", () => {
 
     await runProverLoop(wm, solver, {
       maxLocalRetries: 3,
-      maxGlobalIterations: 5,
-    }, trackingLLM, mockArchitect);
+      maxGlobalIterations: 5, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
+    });
 
     expect(callCount).toBeGreaterThanOrEqual(4);
     const postArchitectContext = contextsSeen[3];
@@ -257,8 +257,8 @@ describe("Orchestrator — Directive Injection", () => {
 
     await runProverLoop(wm, solver, {
       maxLocalRetries: 3,
-      maxGlobalIterations: 1,
-    }, givingUpLLM, mockArchitect);
+      maxGlobalIterations: 1, z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
+    });
 
     expect(architectCalled).toBe(true);
   });

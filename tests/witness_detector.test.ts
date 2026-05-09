@@ -55,9 +55,9 @@ describe("extractSearchConfig — ramsey_coloring", () => {
     expect(result!.s).toBe(6);
   });
 
-  test("auto-scales to 8 workers (island_model) for n=35", () => {
+  test("auto-scales to 4 workers (island_model) for n=35", () => {
     const result = extractSearchConfig(ramseyConfig);
-    expect(result!.workers).toBe(8);
+    expect(result!.workers).toBe(4);
     expect(result!.strategy).toBe("island_model");
     expect(result!.saIterations).toBe(500_000_000);
   });
@@ -65,7 +65,7 @@ describe("extractSearchConfig — ramsey_coloring", () => {
   test("auto-scales to single worker for small problems (n≤20)", () => {
     const small: ArchitectSearchConfig = {
       problem_class: "ramsey_coloring",
-      domain_size: 5,
+      domain_size: 15,
       num_colors: 2,
       forbidden_subgraphs: [
         { color: 0, clique_size: 3 },
@@ -80,7 +80,7 @@ describe("extractSearchConfig — ramsey_coloring", () => {
   test("auto-scales to 4 workers for medium problems (21-30v)", () => {
     const medium: ArchitectSearchConfig = {
       problem_class: "ramsey_coloring",
-      domain_size: 25,
+      domain_size: 26,
       num_colors: 2,
       forbidden_subgraphs: [
         { color: 0, clique_size: 4 },

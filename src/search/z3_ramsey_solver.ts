@@ -8,59 +8,32 @@
  * For R(4,6) on N=35: solves in ~5-30 seconds (vs. SA's glass floor at E=12-15).
  */
 
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import { AdjacencyMatrix } from "../math/graph/AdjacencyMatrix";
 import { buildCirculantGraph } from "./symmetry";
 import { generateRamseyZ3Script } from "./z3_circulant_generator";
-
-export interface Z3WitnessResult {
-  status: 'sat';
-  /** The adjacency matrix of the found witness */
-  adj: AdjacencyMatrix;
-  /** The distance-color bit string from Z3 (e.g. "10110100110110100") */
-  distanceBits: string;
-  /** Wall time for Z3 to solve in milliseconds */
-  solveTimeMs: number;
-}
-
-export interface Z3UnsatResult {
-  status: 'unsat';
-}
-
-export interface Z3TimeoutResult {
-  status: 'timeout';
-}
-
-export interface Z3ErrorResult {
-  status: 'error';
-  message: string;
-}
-
-export type Z3Result = Z3WitnessResult | Z3UnsatResult | Z3TimeoutResult | Z3ErrorResult;
+import { spawn } from "node:child_process";
 
 export interface Z3SolverOptions {
-  /** Timeout for the Z3 process in milliseconds (default 120s) */
   timeoutMs?: number;
-  /** Python executable to use (default: "python3") */
   pythonBinary?: string;
+  symmetry?: 'circulant' | 'paley' | 'block-circulant';
 }
 
-/**
- * Check if Z3 Python package is installed and available.
- */
-export async function isZ3Available(pythonBinary = "python3"): Promise<boolean> {
+export type Z3Result = 
+  | { status: 'sat'; adj: AdjacencyMatrix; distanceBits: string; solveTimeMs: number }
+  | { status: 'unsat' }
+  | { status: 'timeout' }
+  | { status: 'error'; message?: string };
+
+export async function isZ3Available(): Promise<boolean> {
   try {
-    const proc = Bun.spawn([pythonBinary, "-c", "from z3 import *; print('ok')"], {
-      stdout: "pipe",
-      stderr: "pipe",
+    const { exitCode, stdout } = await new Promise<{exitCode: number, stdout: string}>((resolve) => {
+       const proc = spawn("python3", ["-c", "import z3; print('ok')"]);
+       let out = "";
+       proc.stdout.on("data", (d) => out += d.toString());
+       proc.on("close", (code) => resolve({ exitCode: code ?? 1, stdout: out }));
+       proc.on("error", () => resolve({ exitCode: 1, stdout: "" }));
     });
-    const [stdout, _, exitCode] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
     return exitCode === 0 && stdout.trim() === "ok";
   } catch {
     return false;
@@ -80,64 +53,63 @@ export async function solveWithZ3(
   s: number,
   options: Z3SolverOptions = {},
 ): Promise<Z3Result> {
-  const { timeoutMs = 120_000, pythonBinary = "python3" } = options;
+  const { timeoutMs = 120_000, pythonBinary = "python3", symmetry = 'circulant' } = options;
 
-  const script = generateRamseyZ3Script(N, r, s);
-  const tempFile = join(tmpdir(), `perqed_z3_ramsey_${randomUUID()}.py`);
-  await Bun.write(tempFile, script);
-
+  const script = generateRamseyZ3Script(N, r, s, symmetry);
   const startTime = Date.now();
 
-  try {
-    const proc = Bun.spawn([pythonBinary, tempFile], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+  const response = await new Promise<{exitCode: number, stdout: string, stderr: string, timedOut: boolean}>((resolve) => {
+      const proc = spawn(pythonBinary, ["-c", script]);
+      let out = "";
+      let err = "";
+      let isTimeout = false;
+      proc.stdout.on("data", (d) => out += d.toString());
+      proc.stderr.on("data", (d) => err += d.toString());
+      
+      const timer = setTimeout(() => {
+          isTimeout = true;
+          proc.kill(9);
+      }, timeoutMs);
 
-    const timeoutHandle = new Promise<"timeout">((resolve) =>
-      setTimeout(() => resolve("timeout"), timeoutMs),
-    );
+      proc.on("close", (code) => {
+          clearTimeout(timer);
+          resolve({ exitCode: code ?? 1, stdout: out, stderr: err, timedOut: isTimeout });
+      });
+      proc.on("error", (error) => {
+          clearTimeout(timer);
+          resolve({ exitCode: 1, stdout: out, stderr: error.message, timedOut: false });
+      });
+  });
 
-    const processResult = (async () => {
-      const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-        proc.exited,
-      ]);
-      return { stdout: stdout.trim(), stderr: stderr.trim(), exitCode } as const;
-    })();
+  if (response.timedOut) {
+     console.error(`[Z3 Native] Timed out after ${timeoutMs}ms for R(${r},${s}) on N=${N}`);
+     return { status: 'timeout' };
+  }
 
-    const race = await Promise.race([processResult, timeoutHandle]);
+  const { stdout, stderr, exitCode } = response;
+  const solveTimeMs = Date.now() - startTime;
+  const outTrimmed = stdout.trim();
 
-    if (race === "timeout") {
-      proc.kill();
-      console.error(`[Z3] Timed out after ${timeoutMs}ms for R(${r},${s}) on N=${N}`);
-      return { status: 'timeout' };
-    }
+  if (exitCode !== 0) {
+    console.error(`[Z3 Native] Process error (exit ${exitCode}): ${stderr || outTrimmed}`);
+    return { status: 'error', message: stderr || outTrimmed || `exit ${exitCode}` };
+  }
 
-    const { stdout, stderr, exitCode } = race;
-    const solveTimeMs = Date.now() - startTime;
-
-    if (exitCode !== 0) {
-      console.error(`[Z3] Process error (exit ${exitCode}): ${stderr || stdout}`);
-      return { status: 'error', message: stderr || stdout || `exit ${exitCode}` };
-    }
-
-    if (stdout === "UNSAT") {
+    if (outTrimmed === "UNSAT") {
       console.log(`[Z3] UNSAT — no circulant R(${r},${s}) witness exists on N=${N}`);
       return { status: 'unsat' };
     }
 
-    if (stdout.startsWith("ERROR:")) {
-      console.error(`[Z3] Solver error: ${stdout}`);
-      return { status: 'error', message: stdout };
+    if (outTrimmed.startsWith("ERROR:")) {
+      console.error(`[Z3] Solver error: ${outTrimmed}`);
+      return { status: 'error', message: outTrimmed };
     }
 
     // Parse SAT:{bits}
-    const match = stdout.match(/^SAT:([01]+)$/);
+    const match = outTrimmed.match(/^SAT:([01]+)$/);
     if (!match) {
-      console.error(`[Z3] Unexpected output: ${stdout}`);
-      return { status: 'error', message: `Unexpected output: ${stdout}` };
+      console.error(`[Z3] Unexpected output: ${outTrimmed}`);
+      return { status: 'error', message: `Unexpected output: ${outTrimmed}` };
     }
 
     const distanceBits = match[1]!;
@@ -158,10 +130,4 @@ export async function solveWithZ3(
     console.log(`[Z3] Distance colors: ${distanceBits}`);
 
     return { status: 'sat', adj, distanceBits, solveTimeMs };
-  } finally {
-    // Clean up temp file
-    try {
-      await import("node:fs/promises").then((fs) => fs.unlink(tempFile).catch(() => {}));
-    } catch {}
-  }
 }

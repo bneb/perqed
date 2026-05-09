@@ -4,10 +4,10 @@
   "type": "module",
   "private": true,
   "bin": {
-    "perqed": "src/cli.ts"
+    "perqed": "src/cli/perqed.ts"
   },
   "scripts": {
-    "perqed": "bun run src/cli.ts"
+    "perqed": "bun run src/cli/perqed.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

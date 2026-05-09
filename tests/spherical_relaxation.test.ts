@@ -63,7 +63,7 @@ describe("initSphericalFromHard", () => {
   test("argmax direction aligns with hard color", () => {
     const N = 6, K = 3;
     const hard = makeZeroPartition(N, K);
-    const sv = initSphericalFromHard(hard, N, K);
+    const sv = initSphericalFromHard(hard, N, K, 0.0); // T=0 to prevent noise from flipping argmax
     for (let i = 1; i <= N; i++) {
       const v = sv[i]!;
       const expectedColor = hard[i]!;

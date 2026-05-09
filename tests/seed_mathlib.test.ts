@@ -44,6 +44,18 @@ const SEED_DATA = [
     successfulTactic: "induction n with | zero => simp [nat_mul_zero] | succ n' ih => simp [Nat.mul, ih, nat_add_comm]",
     vector: [0.1, 0.1, 0.8, 0.0], // multiplication commutativity (close to mul_zero)
   },
+  {
+    id: "paleyGraph",
+    theoremSignature: "noncomputable def paleyGraph (p : ℕ) [Fact (Nat.Prime p)] : SimpleGraph (ZMod p)",
+    successfulTactic: "exact ⟨hne.symm, ⟨-c, by ring_nf; rw [← hc]; ring⟩⟩",
+    vector: [0.0, 0.0, 0.0, 1.0], // topological graph
+  },
+  {
+    id: "circulantGraph",
+    theoremSignature: "noncomputable def circulantGraph (n : ℕ) (S : Finset (ZMod n)) : SimpleGraph (ZMod n)",
+    successfulTactic: "exact ⟨hne.symm, h.symm⟩",
+    vector: [0.0, 0.1, 0.0, 0.9], // topological graph
+  },
 ];
 
 describe("Seed Mathlib Pipeline", () => {
@@ -62,9 +74,9 @@ describe("Seed Mathlib Pipeline", () => {
 
     await db.addPremises(SEED_DATA);
 
-    // Search for all — should find all 5
-    const allResults = await db.search([0.5, 0.5, 0.5, 0.0], 10);
-    expect(allResults.length).toBe(5);
+    // Search for all — should find all 7
+    const allResults = await db.search([0.5, 0.5, 0.5, 0.5], 10);
+    expect(allResults.length).toBe(7);
   });
 
   test("querying with addition-like vector returns addition theorems first", async () => {
@@ -98,6 +110,21 @@ describe("Seed Mathlib Pipeline", () => {
     expect(results[0]!.id).toBe("nat_mul_zero");
     // Second should be nat_mul_comm
     expect(results[1]!.id).toBe("nat_mul_comm");
+  });
+
+  test("querying with topological graph vector returns algebraic graphs first", async () => {
+    const db = new VectorDatabase(TEST_DB_PATH);
+    await db.initialize();
+
+    await db.addPremises(SEED_DATA);
+
+    // Query close to graph topology vectors [0, 0, 0, 1]
+    const results = await db.search([0.05, 0.05, 0.0, 0.95], 2);
+
+    expect(results.length).toBe(2);
+    const ids = results.map(r => r.id);
+    expect(ids).toContain("paleyGraph");
+    expect(ids).toContain("circulantGraph");
   });
 
   test("search results include correct tactic data", async () => {

@@ -19,6 +19,12 @@ import type { AttemptLog, AgentRole } from "../types";
 // Novelty Classification
 // ──────────────────────────────────────────────
 
+export type ResearchAction = 
+  | { type: "CONTINUE_PROOF"; tactic: string }
+  | { type: "REQUEST_EMPIRICAL_PROBE"; hypothesis: string; domain: string }
+  | { type: "REQUEST_LITERATURE"; concept: string }
+  | { type: "FALSIFIED"; counterexample: any };
+
 export type NoveltyClassification =
   | "NOVEL_DISCOVERY"
   | "KNOWN_THEOREM"
@@ -44,6 +50,8 @@ export interface ResearchContext {
   apiKey: string;
   /** Whether to bypass native_decide constraints for publishable targets. */
   publishableMode: boolean;
+  /** Custom agent factory used during tests */
+  agentFactory?: any;
   /** Workspace root directory for output artifacts. */
   workspaceDir: string;
   /** Output directory for this specific run. */
@@ -124,6 +132,12 @@ export interface ResearchContext {
   proofStatus: "PROVED" | "FAILED" | "SKIPPED" | null;
   /** Path to generated report. */
   reportPath: string | null;
+
+  /** ── Hot Loop Prevention ── */
+  /** Timestamp (ms) of the last FormalVerification start. */
+  lastFormalVerificationStart?: number;
+  /** Counter for consecutive failures that happen within < 1s of starting FormalVerification. */
+  rapidFailureCount: number;
 }
 
 // ──────────────────────────────────────────────

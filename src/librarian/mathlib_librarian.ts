@@ -22,15 +22,14 @@ import { VectorDatabase, TABLE_MATHLIB, type Premise } from "../embeddings/vecto
 // ──────────────────────────────────────────────────────────────────────────
 
 /** A Lean 4 theorem definition accepted by MathlibLibrarian. */
-export interface LeanTheorem {
-  /** Machine-readable identifier, e.g. "Finset.sum_comm" */
-  theorem: string;
-  /** Full Lean 4 signature, e.g. "theorem Finset.sum_comm ..." */
+export interface MathlibPremise {
+  name: string;
   signature: string;
-  /** Human-readable description; embedded as the semantic vector. Fallback: signature. */
+  dependencies: string[]; // List of theorems this premise depends on
+  ast_hash: string;       // Structural hash
   docstring?: string;
-  /** Optional Lean 4 module path, e.g. "Mathlib.Algebra.BigOperators.Basic" */
   module?: string;
+  embedding?: number[];
 }
 
 export interface MathlibLibrarianConfig {
@@ -66,7 +65,7 @@ export class MathlibLibrarian {
    * @param theorems - Array of Lean 4 definitions to embed and store
    * @returns {ingested, skipped} counts
    */
-  async ingest(theorems: LeanTheorem[]): Promise<MathlibIngestionResult> {
+  async ingest(theorems: MathlibPremise[]): Promise<MathlibIngestionResult> {
     await this.db.initialize();
 
     const available = await this.embedder.isAvailable();
@@ -81,7 +80,8 @@ export class MathlibLibrarian {
     // Process in batches to avoid memory pressure on large theorem sets
     for (let batchStart = 0; batchStart < theorems.length; batchStart += this.batchSize) {
       const batch = theorems.slice(batchStart, batchStart + this.batchSize);
-      const texts = batch.map((t) => t.docstring?.trim() || t.signature);
+      // Embed AST structure and dependencies instead of raw docstrings
+      const texts = batch.map((t) => `${t.signature}\nDependencies: ${t.dependencies.join(", ")}\nAST Hash: ${t.ast_hash}`);
 
       const vectors = await this.embedder.embedBatch(texts);
       const premises: Premise[] = [];
@@ -92,15 +92,14 @@ export class MathlibLibrarian {
 
         if (!v) {
           skipped++;
-          console.warn(`[MathlibLibrarian] Embed failed for "${t.theorem}" — skipping`);
+          console.warn(`[MathlibLibrarian] Embed failed for "${t.name}" — skipping`);
           continue;
         }
 
         premises.push({
-          id: `mathlib-${t.theorem}`,
+          id: `mathlib-${t.name}`,
           theoremSignature: t.signature,
-          // Store the docstring as the tactic field so RAG retrieval returns readable text
-          successfulTactic: t.docstring ?? t.signature,
+          successfulTactic: JSON.stringify({ deps: t.dependencies, ast_hash: t.ast_hash }),
           type: "MATHLIB",
           vector: v,
         });
@@ -114,5 +113,11 @@ export class MathlibLibrarian {
 
     console.log(`[MathlibLibrarian] Ingestion complete: ${ingested} stored, ${skipped} skipped`);
     return { ingested, skipped };
-  }
-}
+    }
+    }
+
+    export async function getStructuralContext(targetConcept: string) {
+    // 1. Vector search for targetConcept
+    // 2. Fetch immediate dependencies of the top results to provide deep structural context.
+    return `Structural context for ${targetConcept} (Implementation pending RAG expansion)`;
+    }

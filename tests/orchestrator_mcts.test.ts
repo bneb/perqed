@@ -152,7 +152,7 @@ describe("runDynamicLoop() — MCTS Tree Navigation", () => {
       thoughts: "try simp", action: "PROPOSE_LEAN_TACTICS" as const,
       lean_tactics: [{ tactic: "simp", informal_sketch: "simplify", confidence_score: 0.5 }],
     };
-    const tacticianAgent = new MockAgent("TACTICIAN", [
+    const tacticianAgent = new MockAgent("PROVER", [
       failTactic, failTactic, // Fail before escalation chain
       // After BACKTRACK + new DIRECTIVE, omega succeeds
       {
@@ -166,20 +166,20 @@ describe("runDynamicLoop() — MCTS Tree Navigation", () => {
       thoughts: "try ring", action: "PROPOSE_LEAN_TACTICS" as const,
       lean_tactics: [{ tactic: "ring", informal_sketch: "ring", confidence_score: 0.6 }],
     };
-    const reasonerAgent = new MockAgent("REASONER", [
+    const reasonerAgent = new MockAgent("ARCHITECT", [
       failReason, failReason, failReason, failReason, failReason,
     ]);
 
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", tacticianAgent);
-    factory.registerAgent("REASONER", reasonerAgent);
+    factory.registerAgent("PROVER", tacticianAgent);
+    factory.registerAgent("ARCHITECT", reasonerAgent);
 
     const result = await runDynamicLoop(workspace, solver, {
-      maxGlobalIterations: 30,
+      maxGlobalIterations: 30, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
       theoremName: "nat_add_comm",
-      theoremSignature: "(n m : Nat) : n + m = m + n",
+      theoremSignature: "theorem thm (n m : Nat) : n + m = m + n",
     });
 
     expect(result.status).toBe("SOLVED");
@@ -204,7 +204,7 @@ describe("runDynamicLoop() — MCTS Tree Navigation", () => {
       tactics: "omega",
     } as any]);
 
-    const tacticianAgent = new MockAgent("TACTICIAN", [{
+    const tacticianAgent = new MockAgent("PROVER", [{
       thoughts: "omega should work",
       action: "PROPOSE_LEAN_TACTICS",
       lean_tactics: [{
@@ -215,14 +215,14 @@ describe("runDynamicLoop() — MCTS Tree Navigation", () => {
     }]);
 
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", tacticianAgent);
+    factory.registerAgent("PROVER", tacticianAgent);
 
     const result = await runDynamicLoop(workspace, solver, {
-      maxGlobalIterations: 10,
+      maxGlobalIterations: 10, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
       theoremName: "simple_theorem",
-      theoremSignature: "(n : Nat) : n + 0 = n",
+      theoremSignature: "theorem thm (n : Nat) : n + 0 = n",
     });
 
     expect(result.status).toBe("SOLVED");
@@ -251,7 +251,7 @@ describe("runDynamicLoop() — MCTS Tree Navigation", () => {
       } as any,
     ]);
 
-    const tacticianAgent = new MockAgent("TACTICIAN", [
+    const tacticianAgent = new MockAgent("PROVER", [
       // 1st: fails
       {
         thoughts: "try simp",
@@ -284,7 +284,7 @@ describe("runDynamicLoop() — MCTS Tree Navigation", () => {
       },
     ]);
 
-    const reasonerAgent = new MockAgent("REASONER", [{
+    const reasonerAgent = new MockAgent("ARCHITECT", [{
       thoughts: "r1",
       action: "PROPOSE_LEAN_TACTICS",
       lean_tactics: [{
@@ -295,15 +295,15 @@ describe("runDynamicLoop() — MCTS Tree Navigation", () => {
     }]);
 
     factory.registerAgent("ARCHITECT", architectAgent);
-    factory.registerAgent("TACTICIAN", tacticianAgent);
-    factory.registerAgent("REASONER", reasonerAgent);
+    factory.registerAgent("PROVER", tacticianAgent);
+    factory.registerAgent("ARCHITECT", reasonerAgent);
 
     const result = await runDynamicLoop(workspace, solver, {
-      maxGlobalIterations: 15,
+      maxGlobalIterations: 15, maxLocalRetries: 3,  z3TimeoutMs: 30000, leanTimeoutMs: 60000, contextWindowTokens: 4096, 
       agentFactory: factory,
       leanBridge: mockLean as unknown as LeanBridge,
       theoremName: "test_thm",
-      theoremSignature: "(n : Nat) : n = n",
+      theoremSignature: "theorem thm (n : Nat) : n = n",
     });
 
     expect(result.status).toBe("SOLVED");

@@ -24,7 +24,7 @@ export interface ProofNode {
   id: string;
   parentId: string | null;
   tacticApplied: string | null;  // The tactic that produced this state
-  leanState: string;              // Lean 4 tactic state at this node
+  leanState: string;              // Lean 4 tactic state at this node (cleared on DEAD_END)
   status: NodeStatus;
   childrenIds: string[];
   depth: number;
@@ -35,16 +35,59 @@ export interface ProofNode {
   envId?: number;                 // Sprint 21: Persistent REPL environment ID for state restoration
 }
 
+export interface NodeMutation {
+  nodeId: string;
+  updates: Partial<ProofNode>;
+}
+
+export interface RemoteTreeStore {
+  flushMutations(mutations: NodeMutation[]): Promise<void>;
+}
+
 // ──────────────────────────────────────────────
 // ProofTree
 // ──────────────────────────────────────────────
 
 export class ProofTree {
   public nodes: Map<string, ProofNode> = new Map();
-  public rootId: string;
-  public activeNodeId: string;
+  public rootId!: string;
+  public activeNodeId!: string;
+  private remoteStore?: RemoteTreeStore;
+  private pendingMutations: NodeMutation[] = [];
 
   constructor(initialState: string) {
+    this.reset(initialState);
+  }
+
+  public setRemoteStore(store: RemoteTreeStore | undefined): void {
+    this.remoteStore = store;
+  }
+
+  private queueMutation(nodeId: string, updates: Partial<ProofNode>): void {
+    if (this.remoteStore) {
+      // Find if we already have a pending mutation for this node
+      const existing = this.pendingMutations.find(m => m.nodeId === nodeId);
+      if (existing) {
+        Object.assign(existing.updates, updates);
+      } else {
+        this.pendingMutations.push({ nodeId, updates: { ...updates } });
+      }
+    }
+  }
+
+  public async flush(): Promise<void> {
+    if (this.remoteStore && this.pendingMutations.length > 0) {
+      const mutationsToFlush = [...this.pendingMutations];
+      this.pendingMutations = []; // clear early to allow concurrent queuing
+      await this.remoteStore.flushMutations(mutationsToFlush);
+    }
+  }
+
+  /**
+   * Reset the tree to a new initial state (used when iterating through multiple sorry blocks).
+   */
+  public reset(initialState: string, envId?: number): void {
+    this.nodes.clear();
     const root: ProofNode = {
       id: randomUUID(),
       parentId: null,
@@ -57,7 +100,7 @@ export class ProofTree {
       errorHistory: [],
       splitType: "OR",
       value: 0.5,
-      envId: undefined,
+      envId: envId,
     };
     this.nodes.set(root.id, root);
     this.rootId = root.id;
@@ -192,7 +235,8 @@ export class ProofTree {
    */
   public getBestOpenNodes(batchSize: number = 3): ProofNode[] {
     const openNodes = Array.from(this.nodes.values())
-      .filter(n => n.status === "OPEN");
+      // Only select nodes that have a valid proofState (envId)
+      .filter(n => n.status === "OPEN" && n.envId !== undefined && n.envId !== null);
 
     const EXPLORATION_CONSTANT = 1.414;
 
@@ -234,6 +278,11 @@ export class ProofTree {
     while (current) {
       current.visits += 1;
       current.value += (score - current.value) / current.visits;
+
+      this.queueMutation(current.id, {
+        visits: current.visits,
+        value: current.value,
+      });
 
       if (!current.parentId) break;
       current = this.nodes.get(current.parentId);
@@ -409,7 +458,8 @@ export class ProofTree {
   // ──────────────────────────────────────────────
 
   /**
-   * Traces back from a SOLVED leaf node to the root, returning the successful path.
+   * Reconstructs the path from the root to a solved leaf,
+   * returning the successful path.
    * Returns an array of nodes ordered Root → Leaf.
    *
    * @param solvedNodeId - ID of the SOLVED leaf node

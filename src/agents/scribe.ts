@@ -5,17 +5,17 @@
  * and translates it into a rigorous AMS-LaTeX document using Gemini.
  */
 
-import { GoogleGenAI } from "@google/genai";
+import { PerqedLLM } from "../agency/llm_client";
 import type { ProofNode } from "../tree";
 import type { ResearchPlan, EvidenceReport, RedTeamResult } from "./research_types";
 import { getAgencyRegistry } from "../agency";
 
 export class ScribeAgent {
-  private ai: GoogleGenAI;
+  private ai: PerqedLLM;
   private model: string;
 
   constructor(apiKey: string, model?: string) {
-    this.ai = new GoogleGenAI({ apiKey });
+    this.ai = new PerqedLLM({ apiKey });
     this.model = model ?? getAgencyRegistry().resolveProvider("latex").model;
   }
 

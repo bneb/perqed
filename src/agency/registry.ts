@@ -19,9 +19,16 @@ const BUILTIN_TOPOLOGY: AgencyTopology = {
     escalation_policy: "sequential_chain",
     max_parse_retries: 2,
     providers: {
-      L0_thinker: {
+      L0_prover: {
         engine: "ollama",
         model: "deepseek-prover-v2:7b-q8",
+        endpoint: "http://127.0.0.1:11434",
+        capabilities: ["lean4"],
+        fallback_for: [],
+      },
+      L0_architect: {
+        engine: "ollama",
+        model: "gemma4:26b",
         endpoint: "http://127.0.0.1:11434",
         capabilities: ["reasoning", "lean4", "chat", "conjecture", "red_team", "formalization"],
         fallback_for: [],
@@ -33,33 +40,19 @@ const BUILTIN_TOPOLOGY: AgencyTopology = {
         capabilities: ["bash", "file_edit", "python", "compilation"],
         fallback_for: [],
       },
-      L1_micro: {
+      L1_architect: {
         engine: "gemini",
         model: "gemini-2.5-flash",
         api_env_var: "GEMINI_API_KEY",
         capabilities: ["reasoning", "lean4", "chat", "python", "conjecture", "red_team", "formalization", "latex", "compilation"],
-        fallback_for: ["L0_thinker", "L0_typist"],
+        fallback_for: ["L0_architect", "L0_typist"],
       },
-      L2_standard: {
-        engine: "gemini",
-        model: "gemini-3.1-flash-lite-preview",
-        api_env_var: "GEMINI_API_KEY",
-        capabilities: ["reasoning", "lean4", "chat", "python", "conjecture", "red_team", "formalization", "latex", "compilation"],
-        fallback_for: ["L1_micro"],
-      },
-      L3_complex: {
-        engine: "gemini",
-        model: "gemini-3.1-flash",
-        api_env_var: "GEMINI_API_KEY",
-        capabilities: ["reasoning", "lean4", "chat", "conjecture", "latex", "compilation", "formalization"],
-        fallback_for: ["L2_standard"],
-      },
-      L4_frontier: {
+      L2_architect: {
         engine: "gemini",
         model: "gemini-3.1-pro-preview",
         api_env_var: "GEMINI_API_KEY",
         capabilities: ["reasoning", "lean4", "chat", "conjecture", "latex", "compilation", "formalization"],
-        fallback_for: ["L3_complex"],
+        fallback_for: ["L1_architect"],
       },
     },
   },

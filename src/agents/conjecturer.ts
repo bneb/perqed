@@ -6,7 +6,8 @@
  * signatures via structured JSON output from Gemini.
  */
 
-import { GoogleGenAI, Type, type Schema } from "@google/genai";
+import { Type, type Schema } from "@google/genai";
+import { PerqedLLM } from "../agency/llm_client";
 import type { EvidenceReport } from "./research_types";
 import { getAgencyRegistry } from "../agency";
 
@@ -17,11 +18,11 @@ export interface Conjecture {
 }
 
 export class ConjecturerAgent {
-  private ai: GoogleGenAI;
+  private ai: PerqedLLM;
   private model: string;
 
   constructor(apiKey: string, model?: string) {
-    this.ai = new GoogleGenAI({ apiKey });
+    this.ai = new PerqedLLM({ apiKey });
     this.model = model ?? getAgencyRegistry().resolveProvider("conjecture").model;
   }
 

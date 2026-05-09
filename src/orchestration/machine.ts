@@ -54,6 +54,7 @@ import {
   redTeamActor as defaultRedTeamActor,
   sketcherActor as defaultSketcherActor,
   saResolutionActor as defaultSaResolutionActor,
+  provisionerActor as defaultProvisionerActor,
 } from "./actors";
 import { flagAlgebraActor } from "./actors/flag_algebra_actor";
 import { ProofTree } from "../tree";
@@ -105,6 +106,7 @@ const INITIAL_CONTEXT: ResearchContext = {
   maxGlobalIterations: 15,
   proofStatus: null,
   reportPath: null,
+  rapidFailureCount: 0,
 };
 
 // ──────────────────────────────────────────────
@@ -116,7 +118,7 @@ export const researchMachine = setup({
     context: {} as ResearchContext,
     events: {} as
       | { type: "START"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string; publishableMode: boolean }
-      | { type: "WAKE_AT_FORMAL"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string; signature: string; objective?: string; maxIterations?: number }
+      | { type: "WAKE_AT_FORMAL"; prompt: string; apiKey: string; workspaceDir: string; outputDir: string; signature: string; objective?: string; maxIterations?: number; problemClass?: string; agentFactory?: any }
       | { type: "xstate.done.actor.ideation"; output: IdeationOutput }
       | { type: "xstate.done.actor.validation"; output: ValidationOutput }
       | { type: "xstate.done.actor.sandbox"; output: SandboxOutput }
@@ -128,6 +130,8 @@ export const researchMachine = setup({
       | { type: "xstate.done.actor.redTeamActor"; output: RedTeamOutput }
       | { type: "xstate.done.actor.tacticGenerator"; output: { role: AgentRole; response: any } }
       | { type: "xstate.done.actor.lean"; output: LeanOutput }
+      | { type: "xstate.done.actor.leanDynamicActor"; output: LeanOutput }
+      | { type: "xstate.error.actor.leanDynamicActor"; error?: any; data?: any }
       | { type: "xstate.done.actor.errorCorrection"; output: ErrorCorrectionOutput }
       | { type: "xstate.done.actor.scribe"; output: ScribeOutput },
   },
@@ -145,6 +149,7 @@ export const researchMachine = setup({
     sketcherActor: defaultSketcherActor,
     saResolutionActor: defaultSaResolutionActor,
     flagAlgebraActor: flagAlgebraActor,
+    provisionerActor: defaultProvisionerActor,
   },
 
   guards: {
@@ -212,16 +217,20 @@ export const researchMachine = setup({
       return false;
     },
     isCompilerError: ({ event }) => {
-      if (event.type === "xstate.done.actor.lean") {
+      if (event.type === "xstate.done.actor.leanDynamicActor") {
         return event.output.status === "COMPILER_ERROR";
       }
       return false;
     },
     isFixed: ({ event }) => {
-      if (event.type === "xstate.done.actor.errorCorrection") {
-        return event.output.status === "FIXED";
-      }
-      return false;
+      const output = (event as any).output;
+      return output?.status === "FIXED";
+    },
+    isRapidFailure: ({ context, event }) => {
+      const now = Date.now();
+      const elapsed = context.lastFormalVerificationStart ? now - context.lastFormalVerificationStart : Infinity;
+      // If failure happens in < 1000ms and we've already had 2 rapid failures, this is the 3rd.
+      return elapsed < 1000 && context.rapidFailureCount >= 2;
     },
   },
 
@@ -235,6 +244,7 @@ export const researchMachine = setup({
           outputDir: (event as any).outputDir,
           publishableMode: (event as any).publishableMode ?? false,
           crossPollinate: (event as any).crossPollinate ?? false,
+          agentFactory: (event as any).agentFactory,
           plan: undefined,
         };
       }
@@ -248,6 +258,9 @@ export const researchMachine = setup({
             description: event.objective || "Legacy theorem",
           },
           maxGlobalIterations: event.maxIterations || 15,
+          searchConfig: {
+            problem_class: event.problemClass,
+          } as any,
         };
       }
       return {};
@@ -339,15 +352,17 @@ export const researchMachine = setup({
       return {};
     }),
     setProofComplete: assign(({ event }) => {
+      console.log("[DEBUG] setProofComplete called!");
       // Triggered by onDone transition of FormalVerification compound node
       return {
         proofStatus: "PROVED" as const,
       };
     }),
     setCompilerError: assign(({ context, event }) => {
-      if (event.type === "xstate.done.actor.lean") {
+      console.error(`[DEBUG] setCompilerError triggered! Error:`, (event as any).data || (event as any).error || event);
+      if (event.type === "xstate.error.actor.leanDynamicActor") {
         return {
-          lastCompilerError: event.output.error,
+          lastCompilerError: String((event as any).error || (event as any).data),
           proofRetries: context.proofRetries + 1,
         };
       }
@@ -365,6 +380,35 @@ export const researchMachine = setup({
       }
       return {};
     }),
+    harvestSFTData: ({ context }) => {
+      if (context.proofTree && context.proofTree.getActiveNode()) {
+        try {
+          const solvedNodeId = context.proofTree.getActiveNode().id;
+          const winningPath = context.proofTree.getWinningPath(solvedNodeId);
+          
+          const { SFTHarvester } = require("../scripts/harvest_sft");
+          const datasetPath = require("node:path").join(context.workspaceDir, "data", "sft_dataset.jsonl");
+
+          // Skip root node, zip pairs of (parent state, child tactic)
+          for (let i = 0; i < winningPath.length - 1; i++) {
+            const stateNode = winningPath[i]!;
+            const tacticNode = winningPath[i+1]!;
+            
+            // Only harvest if it was a direct tactic application, not an unrolling
+            if (tacticNode.tacticApplied && !tacticNode.tacticApplied.includes("lemma injected recursively")) {
+              SFTHarvester.appendToJsonl(
+                datasetPath,
+                stateNode.leanState,
+                tacticNode.tacticApplied
+              );
+            }
+          }
+          console.log(`[SFT Harvester] Automatically exported ${winningPath.length - 1} successful (State → Tactic) pairs to SFT dataset.`);
+        } catch (err: any) {
+          console.error(`[SFT Harvester] Failed to harvest data: ${err.message}`);
+        }
+      }
+    },
     markFailed: assign({
       proofStatus: "FAILED" as const,
     }),
@@ -421,7 +465,7 @@ export const researchMachine = setup({
        };
     }),
     logTransition: ({ context, event }) => {
-      if (process.env.DEBUG) {
+      if (process.env.DEBUG === "true") {
         console.log(
           `🔄 [Machine] Event: ${event.type} | Retries: idea=${context.ideationRetries} proof=${context.proofRetries} iter=${context.globalIteration}`,
         );
@@ -484,6 +528,21 @@ export const researchMachine = setup({
         attemptLogs: [...context.attemptLogs, newLog],
       };
     }),
+    trackFormalStart: assign({
+      lastFormalVerificationStart: () => Date.now(),
+    }),
+    incrementRapidFailureCount: assign(({ context }) => {
+      const now = Date.now();
+      const elapsed = context.lastFormalVerificationStart ? now - context.lastFormalVerificationStart : Infinity;
+      if (elapsed < 1000) {
+        console.warn(`⚠️ [Machine] Rapid failure detected! Elapsed: ${elapsed}ms. Count: ${context.rapidFailureCount + 1}`);
+        return { rapidFailureCount: context.rapidFailureCount + 1 };
+      }
+      return { rapidFailureCount: 0 };
+    }),
+    logRapidFailure: ({ context }) => {
+      console.error(`🛑 [Machine] CATASTROPHIC FAILURE: Infinite loop detected in FormalVerification. Rapid failure count: ${context.rapidFailureCount + 1}`);
+    },
   },
 }).createMachine({
   id: "perqedResearch",
@@ -746,7 +805,10 @@ export const researchMachine = setup({
       invoke: {
         id: "redTeamActor",
         src: "redTeamActor",
-        input: ({ context }: { context: ResearchContext }) => ({ conjecture: context.approvedConjecture?.signature ?? context.hypothesis ?? "" }),
+        input: ({ context }: { context: ResearchContext }) => ({ 
+          conjecture: context.approvedConjecture?.signature ?? context.hypothesis ?? "",
+          domain: context.plan?.domains_to_probe?.[0] ?? ""
+        }),
         onDone: [
           {
             guard: ({ event }: { event: any }) => event.output.status === "COUNTER_EXAMPLE_FOUND",
@@ -796,8 +858,17 @@ export const researchMachine = setup({
       initial: "Initialize",
       states: {
         Initialize: {
-          entry: "initProofTree",
-          after: { 0: "MCTSSearch" },
+          entry: ["initProofTree", "trackFormalStart"],
+          invoke: {
+            id: "provisioner",
+            src: "provisionerActor",
+            input: ({ context }) => ({
+              workspaceDir: context.workspaceDir,
+              outputDir: context.outputDir || context.workspaceDir,
+            }),
+            onDone: "MCTSSearch",
+            onError: "MCTSSearch", // Continue even if provisioning fails, though REPL will likely fail later
+          }
         },
         MCTSSearch: {
           invoke: {
@@ -812,7 +883,10 @@ export const researchMachine = setup({
               apiKey: context.apiKey,
               proofTree: context.proofTree!,
               maxIterations: context.maxGlobalIterations,
-              prunedContext: require("./context_pruner").pruneContext(context)
+              prunedContext: require("./context_pruner").pruneContext(context),
+              isEmpiricalWitness: context.sandboxSignal === "WITNESS_FOUND" || context.sandboxSignal === "CLEAN_KILL" || context.saModel !== null || context.smtModel !== null,
+              problemDifficulty: (context as any).searchConfig?.problem_class === "unknown" ? "hard" as const : "normal" as const,
+              agentFactory: context.agentFactory,
             }),
             onDone: [
               {
@@ -825,13 +899,35 @@ export const researchMachine = setup({
                 actions: "logTransition"
               },
               {
+                guard: ({ event }) => (event as any).output.status === "REQUEST_PROBE",
+                target: "#perqedResearch.EmpiricalSandbox", 
+                actions: "logTransition"
+              },
+              {
+                guard: ({ event }) => (event as any).output.status === "REQUEST_LITERATURE",
+                target: "#perqedResearch.Ideation", 
+                actions: "logTransition"
+              },
+              {
+                guard: ({ event }) => (event as any).output.status === "FALSIFIED",
+                target: "#perqedResearch.FalsificationFork", 
+                actions: "logTransition"
+              },
+              {
                 target: "Exhausted" // FAILED or EXHAUSTED
               }
             ],
-            onError: {
-              target: "#perqedResearch.ErrorCorrection",
-              actions: "setCompilerError" 
-            }
+            onError: [
+              {
+                guard: "isRapidFailure",
+                target: "#perqedResearch.TerminalFailure",
+                actions: ["setCompilerError", "logRapidFailure"]
+              },
+              {
+                target: "#perqedResearch.ErrorCorrection",
+                actions: ["setCompilerError", "incrementRapidFailureCount"] 
+              }
+            ]
           }
         },
         PushLemmaAndRestart: {
@@ -852,7 +948,7 @@ export const researchMachine = setup({
         },
         Complete: {
           type: "final",
-          entry: "setProofComplete",
+          entry: ["harvestSFTData", "setProofComplete"],
         },
         Exhausted: {
           type: "final",

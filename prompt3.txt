@@ -1,0 +1,15 @@
+Please solve this specific lemma from Erdős #265.
+It bounds the w-error component using a telescoping sum.
+
+```lean
+import Mathlib
+
+open Finset Real
+
+/-- Telescoping: Σ_{n=L}^{R-1} 1/(n(n-1)) ≤ 1/(L-1) -/
+lemma w_sum_le (L R : ℕ) (hL : 2 ≤ L) (hLR : L ≤ R) :
+    ∑ n ∈ Ico L R, (1 : ℝ) / ((n : ℝ) * ((n : ℝ) - 1)) ≤ 1 / ((L : ℝ) - 1) := by
+  sorry
+```
+
+Please output the complete, verified Lean 4 code block replacing the sorry. You must use the local Lean 4 REPL to ensure your tactic sequence compiles.

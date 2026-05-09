@@ -20,7 +20,38 @@ export interface SFTRecord {
   }>;
 }
 
+export interface TelemetryEvent {
+  eventType: string;
+  timestamp: string;
+  payload: any;
+}
+
+export interface TelemetryEventStream {
+  emit(event: TelemetryEvent): void | Promise<void>;
+}
+
 export class SFTHarvester {
+  private static telemetryStream?: TelemetryEventStream;
+
+  static setTelemetryStream(stream: TelemetryEventStream | undefined) {
+    this.telemetryStream = stream;
+  }
+
+  /**
+   * Emit a structured SFT training pair event.
+   * If a stream is registered, it routes there (e.g. Dataflow, Kafka).
+   * Otherwise, it acts as a no-op or falls back to local JSONL based on caller logic.
+   */
+  static emitSftPair(state: string, tactic: string): void {
+    if (this.telemetryStream) {
+      this.telemetryStream.emit({
+        eventType: "SFT_TRAINING_PAIR",
+        timestamp: new Date().toISOString(),
+        payload: { state, tactic },
+      });
+    }
+  }
+
   /**
    * Parse a Lean file for SFT markers and extract the state-tactic pair.
    * Returns null if markers are missing or malformed.
@@ -96,13 +127,17 @@ export class SFTHarvester {
   }
 
   /**
-   * Append a state-tactic pair to the specified JSONL dataset file.
+   * Emit the SFT pair globally, and also append it to the specified local JSONL dataset file.
    */
   static appendToJsonl(
     datasetPath: string,
     state: string,
     tactic: string,
   ): void {
+    // 1. Send to structured event stream if configured
+    this.emitSftPair(state, tactic);
+
+    // 2. Local Fallback / Developer UX
     const record = this.formatRecord(state, tactic);
     const dir = path.dirname(datasetPath);
     if (!fs.existsSync(dir)) {

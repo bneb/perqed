@@ -35,13 +35,13 @@ describe("VectorDatabase", () => {
     const premises: Premise[] = [
       {
         id: "nat_add_comm",
-        theoremSignature: "(n m : Nat) : n + m = m + n",
+        theoremSignature: "theorem thm (n m : Nat) : n + m = m + n",
         successfulTactic: "induction n; simp; ring",
         vector: [1.0, 0.0, 0.0, 0.0],
       },
       {
         id: "nat_add_zero",
-        theoremSignature: "(n : Nat) : n + 0 = n",
+        theoremSignature: "theorem thm (n : Nat) : n + 0 = n",
         successfulTactic: "simp",
         vector: [0.0, 1.0, 0.0, 0.0],
       },

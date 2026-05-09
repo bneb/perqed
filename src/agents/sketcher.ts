@@ -2,6 +2,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { LeanBridge } from "../lean_bridge";
 import { getAgencyRegistry } from "../agency/index";
 import { LocalProverClient } from "../agency/local_prover_client";
+import { LocalEmbedder } from "../embeddings/embedder";
+import { VectorDatabase } from "../embeddings/vector_store";
 
 /**
  * The SketcherAgent serves as a Translation Layer ("Draft-Sketch-Prove").
@@ -14,17 +16,18 @@ import { LocalProverClient } from "../agency/local_prover_client";
 export class SketcherAgent {
   private readonly model: any;
   private readonly leanBridge: LeanBridge;
+  private readonly embedder: LocalEmbedder;
+  private readonly db: VectorDatabase;
 
   constructor(apiKey: string, workspaceDir?: string) {
     const genAI = process.env.USE_LOCAL_PROVER === "true" 
       ? LocalProverClient.createMockGenAI() as any
       : new GoogleGenerativeAI(apiKey);
     
-    // We bind it immediately to Flash 2.5 when using the Google SDK because it is insanely fast.
     // If using the local proxy, we resolve the native formalization model (e.g. deepseek).
     const providerModel = process.env.USE_LOCAL_PROVER === "true"
       ? getAgencyRegistry().resolveProvider("formalization").model
-      : "gemini-2.5-flash";
+      : getAgencyRegistry().resolveProvider("formalization", false).model;
 
     this.model = genAI.getGenerativeModel({
       model: providerModel,
@@ -32,6 +35,8 @@ export class SketcherAgent {
     });
 
     this.leanBridge = new LeanBridge(undefined, workspaceDir);
+    this.embedder = new LocalEmbedder();
+    this.db = new VectorDatabase("./data/perqed.lancedb");
   }
 
   /**
@@ -51,48 +56,59 @@ You are operating under a strict Lean 4 Mathlib environment. You must obey these
 4. **PRIMITIVES:** To model finite graphs, use \`ZMod N\`, \`Fin N\`, basic \`Matrix\`, or raw Adjacency Relations (\`(i j : ZMod N) -> Prop\`). Define the generating sets explicitly.
 5. **SIMPLEGRAPH INITIALIZATION:** Because Mathlib4 has changed, you must initialize graphs EXACTLY using 'where' clauses (like \`SimpleGraph V where Adj := adj; symm := by sorry; loopless := by sorry\`). Do NOT use \`SimpleGraph.mk\`, \`SimpleGraph.from_rel\`, or any function application.
 6. **NO PROOF TACTICS:** You MUST NOT use tactics like 'rewrite', 'introN', or facts like 'neg_sub_eq_sub' or 'Finset.sum_congr'. DO NOT try to prove \`symm\` or \`loopless\` manually. You must assign 'by sorry' to EVERY single proof obligation.
+7. **DECIDABILITY & FINTYPES:** If your design creates sets or requires subsets (like Residue classes), ALWAYS add \`open Classical\` and \`noncomputable section\` at the top of your file to prevent \`DecidablePred\` synthesis errors!
+8. **PRIME FACTS:** Methods like \`p.prime\` or \`Nat.prime\` DO NOT EXIST. If you need a prime \`p\` for \`ZMod p\` to behave well, you must take it as an instance \`[Fact (Nat.Prime p)]\` or state \`Nat.Prime p\`.
 
-Example of a valid manual Circulant graph construction in Lean 4:
-\`\`\`lean
-import Mathlib.Data.ZMod.Basic
-import Mathlib.Combinatorics.SimpleGraph.Basic
+{{RAG_CONTEXT}}
 
-def isCirculantEdge {N : ℕ} (S : Set (ZMod N)) (v w : ZMod N) : Prop :=
-  (v - w) ∈ S ∨ (w - v) ∈ S
-
-def myCirculantGraph (N : ℕ) (S : Set (ZMod N)) : SimpleGraph (ZMod N) where
-  Adj v w := v ≠ w ∧ isCirculantEdge S v w
-  symm := by sorry
-  loopless := by sorry
-\`\`\`
 <INFORMAL_MATH>
 ${informalMath}
 </INFORMAL_MATH>`;
 
-    let sketch = await this.generateCode(prompt);
-    let retries = 3;
-
-    while (retries > 0) {
-      console.log(`[Sketcher] Verifying structural syntax of drafted skeleton (retries left: ${retries})...`);
-      
-      // We pass the full generated code to verifyStructuralSkeleton.
-      // This enforces that the Lean file compiles cleanly (exit code 0) 
-      // but expects a 'uses \`sorry\`' warning.
-      const result = await this.leanBridge.verifyStructuralSkeleton(sketch);
-
-      if (result.valid) {
-        console.log(`[Sketcher] Successfully compiled Lean 4 skeleton. Detected ${result.sorryGoals.length} stubs.`);
-        return sketch;
+    let ragContext = "";
+    try {
+      if (await this.embedder.isAvailable()) {
+        await this.db.initialize();
+        const vector = await this.embedder.embed(informalMath, true);
+        if (vector && vector.length > 0) {
+          const results = await this.db.searchMathlib(vector, 5);
+          if (results && results.length > 0) {
+            ragContext = "<RETRIEVED_MATHLIB_TYPES>\n" +
+              "The following Mathlib 4 core primitives are semantically relevant to your goal. " +
+              "You are COMMANDED to strictly utilize these types if applicable instead of hallucinating novel graph modules.\n\n" +
+              results.map(r => `Theorem: ${r.id}\nSignature: ${r.theoremSignature}`).join("\n---\n") +
+              "\n</RETRIEVED_MATHLIB_TYPES>\n";
+          }
+        }
       }
+    } catch (e: any) {
+      console.warn(`[SketcherAgent] Graceful fallback: Could not fetch Mathlib RAG context (${e.message})`);
+    }
 
-      // If invalid, we extract the raw compiler output directly to feed into the auto-repair loop!
-      // To get the error, we just run executeLean on it to pull the actual trace.
-      const executionResult = await this.leanBridge.executeLean(sketch, 15000);
-      
-      console.warn(`[Sketcher] Skeleton compilation failed. Auto-repairing...`);
-      console.warn(`[Sketcher] COMPILER TRACE:\n${executionResult.rawOutput}`);
-      
-      const repairPrompt = `The following Lean 4 code failed to compile. 
+    const finalPrompt = prompt.replace("{{RAG_CONTEXT}}", ragContext);
+    
+    // CORAL-inspired Parallel Competitive Sketching: 
+    // Spawn 3 independent LLM workers racing to produce a valid structural bound.
+    const runWorker = async (workerId: number): Promise<string> => {
+      let sketch = await this.generateCode(finalPrompt);
+      let retries = 3;
+
+      while (retries > 0) {
+        console.log(`[Sketcher Worker ${workerId}] Verifying structural syntax of drafted skeleton (retries left: ${retries})...`);
+        
+        const result = await this.leanBridge.verifyStructuralSkeleton(sketch);
+
+        if (result.valid) {
+          console.log(`[Sketcher Worker ${workerId}] 🏆 Successfully compiled Lean 4 skeleton. Detected ${result.sorryGoals.length} stubs.`);
+          return sketch;
+        }
+
+        const executionResult = await this.leanBridge.executeLean(sketch, 15000);
+        const traceContent = executionResult.rawOutput || executionResult.error || "No output provided (Silent failure)";
+        
+        console.warn(`[Sketcher Worker ${workerId}] Skeleton compilation failed. Auto-repairing...`);
+        
+        const repairPrompt = `The following Lean 4 code failed to compile. 
 Fix the compiler errors. Respond ONLY with the fully repaired Lean 4 code block. DO NOT attempt to prove it.
 
 If the compiler trace indicates \`unknown package\` or \`object file ... does not exist\` for a Mathlib module, you have hallucinated an import that does not exist. 
@@ -100,21 +116,29 @@ You MUST remove that import and manually implement the required logic (e.g., def
 
 CRITICAL REMINDER: Do NOT attempt to use \`SimpleGraph.autGroup\` or import \`Mathlib.Combinatorics.SimpleGraph.Aut\`. It will fatally crash the Lean compiler. Keep it brutally simple.
 Additionally, DO NOT attempt to write actual proofs! If you see type mismatch errors on functions like \`Finset.sum_congr\`, it means you tried to write a proof instead of using \`by sorry\`. You must use \`by sorry\` for EVERYTHING. Initialize graphs using \`where\` clauses, not \`SimpleGraph.mk\`.
-Do NOT hallucinate methods like \`SimpleGraph.cliqueNumber\` (it does not exist in this form) or \`q.IsPrime\` (use \`Nat.Prime q\` or \`Fact (Nat.Prime q)\`).
+Do NOT hallucinate methods like \`SimpleGraph.cliqueNumber\` (it does not exist in this form) or \`q.IsPrime\` or \`p.prime\` (use \`Nat.Prime q\` or \`Fact (Nat.Prime q)\`).
+If the compiler failed to synthesize an instance of \`DecidablePred\` or \`Fintype\`, you must insert \`open Classical\` and \`noncomputable section\` at the top of the file to force classical logic!
 
 Compiler Trace:
-${executionResult.rawOutput}
+${traceContent}
 
 Broken Code:
 \`\`\`lean
 ${sketch}
 \`\`\`
 `;
-      sketch = await this.generateCode(repairPrompt);
-      retries--;
-    }
+        sketch = await this.generateCode(repairPrompt);
+        retries--;
+      }
+      throw new Error(`Worker ${workerId} exhausted all retries`);
+    };
 
-    throw new Error("SketcherAgent failed to produce a compiling Lean 4 syntax skeleton after 3 retries.");
+    try {
+       console.log(`[Sketcher] Launching 3 parallel Competitive Sketchers for MCTS Formalization...`);
+       return await Promise.any([runWorker(1), runWorker(2), runWorker(3)]);
+    } catch (e) {
+       throw new Error("SketcherAgent failed to produce a compiling Lean 4 syntax skeleton after all parallel workers exhausted their retries.");
+    }
   }
 
   private async generateCode(prompt: string): Promise<string> {

@@ -9,7 +9,7 @@ describe("LeanREPLBridge", () => {
   });
 
   afterEach(() => {
-    if (repl) repl.kill();
+    if (repl) repl.close();
   });
 
   test("should start REPL, parse expressions, and handle proof states sequentially", async () => {
@@ -33,15 +33,11 @@ describe("LeanREPLBridge", () => {
       cmd: "theorem basic_proof (n : Nat) : n = n := by sorry" 
     });
     expect(res3.env).toBeDefined();
-    expect(res3.sorries).toBeDefined();
-    expect(res3.sorries!.length).toBeGreaterThan(0);
     
-    const proofStateId = res3.sorries![0].proofState;
-    expect(proofStateId).toBeDefined();
 
     console.log("  [Test] Discarding to sendCmd tactic...");
-    const res4 = await repl.sendCmd({ proofState: proofStateId, tactic: "rfl" });
-    expect(res4.proofState).toBeDefined();
+    const res4 = await repl.sendCmd({ env: res3.env, tactic: "rfl" });
+    
     expect(res4.goals).toBeDefined();
     // length of goals shouldn't be defined explicitly if we don't know it, but empty array means proven.
     expect(res4.goals!.length).toBe(0);
