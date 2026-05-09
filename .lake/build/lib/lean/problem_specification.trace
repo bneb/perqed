@@ -1,17 +1,14 @@
 {"synthetic": false,
  "schemaVersion": "2025-09-10",
  "outputs":
- {"o": ["bd7521765a616ab5.olean"],
+ {"o": ["9381e8d7bd037a13.olean"],
   "m": false,
-  "i": "3edf8f8a17ed9bc1.ilean",
+  "i": "00ba5c88e561fe72.ilean",
   "c": "11f2e63bc4718e74.c"},
  "log":
  [{"message":
    ".> LEAN_PATH=/Users/kevin/projects/perqed/.lake/packages/Cli/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/batteries/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/Qq/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/aesop/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/proofwidgets/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/importGraph/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/plausible/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/mathlib/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/repl/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/build/lib/lean /Users/kevin/.elan/toolchains/leanprover--lean4---v4.30.0-rc2/bin/lean /Users/kevin/projects/perqed/src/lean/problem_specification.lean -o /Users/kevin/projects/perqed/.lake/build/lib/lean/problem_specification.olean -i /Users/kevin/projects/perqed/.lake/build/lib/lean/problem_specification.ilean -c /Users/kevin/projects/perqed/.lake/build/ir/problem_specification.c --setup /Users/kevin/projects/perqed/.lake/build/ir/problem_specification.setup.json --json",
-   "level": "trace"},
-  {"message":
-   "src/lean/problem_specification.lean:37:8: declaration uses `sorry`",
-   "level": "warning"}],
+   "level": "trace"}],
  "inputs":
  [["problem_specification:deps",
    [["deps",
@@ -28,10 +25,10 @@
   ["Lean 4.30.0, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc",
    "2c8d2623007dfc36"],
   ["/Users/kevin/projects/perqed/src/lean/problem_specification.lean",
-   "2dae6f97f687e320"],
+   "e7b8cac065c086ef"],
   ["options", "00000000000006bb"],
   ["isModule: false", "feefd2a0d3a1847e"],
   ["Module.name: problem_specification", "93f54d1905a54b11"],
   ["Package.id?: (some perqed)", "8f8d3ee9ae42d2c1"],
   ["Module.leanArgs: #[]", "00000000000006bb"]],
- "depHash": "518182ba8616c73c"}
+ "depHash": "b50a96cf63de6bc5"}

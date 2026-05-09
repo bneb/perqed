@@ -18,7 +18,9 @@
   "dependencies": {
     "@google/genai": "^1.45.0",
     "@google/generative-ai": "^0.24.1",
+    "@types/jsdom": "^28.0.1",
     "fast-xml-parser": "^5.5.5",
+    "jsdom": "^29.1.1",
     "vectordb": "^0.21.2",
     "xstate": "^5.30.0",
     "zod": "^4.3.6"

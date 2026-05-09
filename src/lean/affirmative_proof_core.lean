@@ -3,7 +3,7 @@ import «verified_growth»
 import «kt_combinatorics»
 import «kt_proof_d2»
 
-open Filter Topology Metric Set
+open Filter Topology Metric Set Finset
 
 /-!
 # Erdős Problem #265: The Topological Measure Theory Resolution
@@ -29,53 +29,343 @@ lemma p_k_bound (x : ℝ × ℝ) (k : ℕ)
     · have h_exists := one_step_composition (seq_N k) (seq_N (k + 1)) (seq_N_bound0 k) (seq_N_bound1 k) (seq_N_bound2 k) (construct_n x k).1.1 (construct_n x k).1.2 h.1 h.2
       have h_spec := Classical.choose_spec (Classical.choose_spec h_exists)
       exact ⟨h_spec.2.2.1, h_spec.2.2.2⟩
-    · have h0 : (0 : ℝ) ≤ Real.sqrt (seq_N (k + 1)) / (2 * (seq_N (k + 1)) ^ 2) := by positivity
-      have h1 : (0 : ℝ) ≤ Real.sqrt (seq_N (k + 1)) / (2 * (seq_N (k + 1)) ^ 3) := by positivity
-      exact ⟨by dsimp; linarith, by dsimp; linarith⟩
+    · exact False.elim (h ih)
 
-lemma residual_decay1 (x : ℝ × ℝ) : Tendsto (fun k => (construct_n x k).1.1) atTop (𝓝 0) := sorry
-lemma residual_decay2 (x : ℝ × ℝ) : Tendsto (fun k => (construct_n x k).1.2) atTop (𝓝 0) := sorry
+
 
 noncomputable def C_total_partial (m : ℕ) : ℝ × ℝ :=
   (∑ k ∈ Finset.range m, (f₁ (seq_N k) + f₁ (2 * seq_N k)),
    ∑ k ∈ Finset.range m, (f₂ (seq_N k) + f₂ (2 * seq_N k)))
 
-lemma C_total_tendsto1 : Tendsto (fun m => (C_total_partial m).1) atTop (𝓝 C_total.1) := sorry
-lemma C_total_tendsto2 : Tendsto (fun m => (C_total_partial m).2) atTop (𝓝 C_total.2) := sorry
+-- Helper: geometric bound for 1/seq_N
+private lemma seq_N_inv_le_geom (k : ℕ) : 1 / seq_N k ≤ (1 / (3 * 10^13 : ℝ)) * (1 / 3) ^ k := by
+  induction k with
+  | zero =>
+    simp only [pow_zero, mul_one]
+    have hN0 : seq_N 0 ≥ 3 * 10^13 := seq_N_bound0 0
+    have h3_pos : (3 * 10^13 : ℝ) > 0 := by positivity
+    exact div_le_div_of_nonneg_left one_pos.le h3_pos hN0
+  | succ k ih =>
+    have h3 : seq_N (k + 1) ≥ 3 * seq_N k := seq_N_bound3 k
+    have h3Nk_pos : 3 * seq_N k > 0 := by have := seq_N_bound0 k; positivity
+    calc 1 / seq_N (k + 1) 
+        ≤ 1 / (3 * seq_N k) := by
+          exact div_le_div_of_nonneg_left one_pos.le h3Nk_pos h3
+      _ = (1 / 3) * (1 / seq_N k) := by ring
+      _ ≤ (1 / 3) * ((1 / (3 * 10^13 : ℝ)) * (1 / 3) ^ k) := by gcongr
+      _ = (1 / (3 * 10^13 : ℝ)) * (1 / 3) ^ (k + 1) := by ring
 
-lemma even_partial_sums1 (x : ℝ × ℝ) (m : ℕ) :
-  ∑ j ∈ Finset.range (2 * m), f₁ (construct_a x j) = x.1 - (construct_n x m).1.1 + (C_total_partial m).1 := sorry
+private lemma seq_N_inv_summable : Summable (fun k => 1 / seq_N k) := by
+  apply Summable.of_nonneg_of_le
+  · intro k; have : seq_N k > 0 := by have := seq_N_bound0 k; linarith
+    exact div_nonneg one_pos.le (le_of_lt this)
+  · exact seq_N_inv_le_geom
+  · exact (summable_geometric_of_lt_one (by positivity) (by norm_num)).mul_left _
 
-lemma even_partial_sums2 (x : ℝ × ℝ) (m : ℕ) :
-  ∑ j ∈ Finset.range (2 * m), f₂ (construct_a x j) = x.2 - (construct_n x m).1.2 + (C_total_partial m).2 := sorry
+private lemma seq_N_summable_f1 : Summable (fun k => f₁ (seq_N k) + f₁ (2 * seq_N k)) := by
+  have hg : Summable (fun k => 2 * (1 / seq_N k)) := seq_N_inv_summable.mul_left 2
+  apply hg.of_norm_bounded
+  intro k
+  have hN : seq_N k > 0 := by have := seq_N_bound0 k; linarith
+  have heq : f₁ (seq_N k) + f₁ (2 * seq_N k) = 3 / (2 * seq_N k) := by
+    unfold f₁; field_simp; ring
+  rw [heq, Real.norm_eq_abs, abs_of_pos (by positivity), mul_one_div]
+  rw [div_le_div_iff₀ (by positivity : 2 * seq_N k > 0) hN]
+  nlinarith
 
-lemma tendsto_even_sums1 (x : ℝ × ℝ) :
+private lemma seq_N_summable_f2 : Summable (fun k => f₂ (seq_N k) + f₂ (2 * seq_N k)) := by
+  have h_nn : ∀ k, 0 ≤ f₂ (seq_N k) + f₂ (2 * seq_N k) := by
+    intro k; have hN : seq_N k > 0 := by have := seq_N_bound0 k; linarith
+    unfold f₂; apply add_nonneg <;> positivity
+  have h_le : ∀ k, f₂ (seq_N k) + f₂ (2 * seq_N k) ≤ 2 / seq_N k := by
+    intro k
+    have hN : seq_N k > 0 := by have := seq_N_bound0 k; linarith
+    have h1 : f₂ (seq_N k) ≤ 1 / seq_N k := by
+      unfold f₂; rw [div_le_div_iff₀ (by positivity) hN]; nlinarith
+    have h2 : f₂ (2 * seq_N k) ≤ 1 / seq_N k := by
+      unfold f₂; rw [div_le_div_iff₀ (by positivity) hN]; nlinarith
+    have : 1 / seq_N k + 1 / seq_N k = 2 / seq_N k := by ring
+    linarith
+  have h_summ : Summable (fun k => 2 / seq_N k) := by
+    have : (fun k => 2 / seq_N k) = (fun k => 2 * (1 / seq_N k)) := by ext k; ring
+    rw [this]; exact seq_N_inv_summable.mul_left 2
+  exact Summable.of_nonneg_of_le h_nn h_le h_summ
+
+lemma C_total_tendsto1 : Tendsto (fun m => (C_total_partial m).1) atTop (𝓝 C_total.1) := by
+  change Tendsto (fun m => ∑ k ∈ Finset.range m, (f₁ (seq_N k) + f₁ (2 * seq_N k))) atTop 
+    (𝓝 (∑' k, (f₁ (seq_N k) + f₁ (2 * seq_N k))))
+  exact seq_N_summable_f1.hasSum.tendsto_sum_nat
+
+lemma C_total_tendsto2 : Tendsto (fun m => (C_total_partial m).2) atTop (𝓝 C_total.2) := by
+  change Tendsto (fun m => ∑ k ∈ Finset.range m, (f₂ (seq_N k) + f₂ (2 * seq_N k))) atTop 
+    (𝓝 (∑' k, (f₂ (seq_N k) + f₂ (2 * seq_N k))))
+  exact seq_N_summable_f2.hasSum.tendsto_sum_nat
+
+lemma residual_decay1 (x : ℝ × ℝ)
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) : Tendsto (fun k => (construct_n x k).1.1) atTop (𝓝 0) := by
+  apply squeeze_zero_norm
+  · intro k; exact (p_k_bound x k hx).1
+  · apply squeeze_zero
+    · intro k; have := seq_N_bound0 k; positivity
+    · intro k
+      have hN : seq_N k > 0 := by have := seq_N_bound0 k; linarith
+      have hsq : Real.sqrt (seq_N k) ≤ seq_N k := by
+        rw [Real.sqrt_le_iff]
+        refine ⟨le_of_lt hN, ?_⟩
+        have := seq_N_bound0 k; nlinarith
+      have hd : 2 * (seq_N k) ^ 2 > 0 := by positivity
+      rw [div_le_iff₀ hd]
+      have hRHS : (1 / seq_N k) * (2 * (seq_N k) ^ 2) = 2 * seq_N k := by
+        have hN_ne : seq_N k ≠ 0 := by linarith
+        field_simp
+      rw [hRHS]
+      calc Real.sqrt (seq_N k) ≤ seq_N k := hsq
+        _ ≤ 2 * seq_N k := by linarith
+    · exact Summable.tendsto_atTop_zero seq_N_inv_summable
+
+lemma residual_decay2 (x : ℝ × ℝ)
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) : Tendsto (fun k => (construct_n x k).1.2) atTop (𝓝 0) := by
+  apply squeeze_zero_norm
+  · intro k; exact (p_k_bound x k hx).2
+  · apply squeeze_zero
+    · intro k; have := seq_N_bound0 k; positivity
+    · intro k
+      have hN : seq_N k > 0 := by have := seq_N_bound0 k; linarith
+      have hsq : Real.sqrt (seq_N k) ≤ seq_N k := by
+        rw [Real.sqrt_le_iff]
+        refine ⟨le_of_lt hN, ?_⟩
+        have := seq_N_bound0 k; nlinarith
+      have hd : 2 * (seq_N k) ^ 3 > 0 := by positivity
+      rw [div_le_iff₀ hd]
+      have hRHS : (1 / seq_N k) * (2 * (seq_N k) ^ 3) = 2 * (seq_N k) ^ 2 := by
+        have hN_ne : seq_N k ≠ 0 := by linarith
+        field_simp
+      rw [hRHS]
+      calc Real.sqrt (seq_N k) ≤ seq_N k := hsq
+        _ ≤ 2 * (seq_N k) ^ 2 := by
+          have := seq_N_bound0 k
+          nlinarith
+    · exact Summable.tendsto_atTop_zero seq_N_inv_summable
+
+lemma seq_N_is_nat (k : ℕ) : seq_N k = ↑((10 : ℕ) ^ E_seq k) := by
+  unfold seq_N; push_cast; rfl
+
+lemma nat_floor_of_nonneg_int (n : ℤ) (h : n ≥ 0) : 
+    ⌊(↑n : ℝ)⌋₊ = n.toNat := by
+  have h_nat : (n.toNat : ℤ) = n := Int.toNat_of_nonneg h
+  have h_real : (↑n : ℝ) = ↑(n.toNat) := by 
+    rw [show (↑n : ℝ) = (↑(n : ℤ) : ℝ) from rfl]
+    rw [show (↑(n.toNat) : ℝ) = (↑(n.toNat : ℤ) : ℝ) from by push_cast; rfl]
+    congr 1
+    exact h_nat.symm
+  rw [h_real, Nat.floor_natCast]
+
+lemma f1_floor_eq (N_nat : ℕ) (n : ℤ) (h : (N_nat : ℤ) + n ≥ 0) :
+    f₁ (↑(⌊(↑N_nat : ℝ) + (↑n : ℝ)⌋₊) : ℝ) = f₁ ((↑N_nat : ℝ) + (↑n : ℝ)) := by
+  congr 1
+  have h_eq : (↑N_nat : ℝ) + (↑n : ℝ) = ↑((N_nat : ℤ) + n) := by push_cast; ring
+  rw [h_eq, nat_floor_of_nonneg_int _ h]
+  have hnn : (((N_nat : ℤ) + n).toNat : ℤ) = (N_nat : ℤ) + n := Int.toNat_of_nonneg h
+  exact_mod_cast hnn
+
+lemma f2_floor_eq (N_nat : ℕ) (n : ℤ) (h : (N_nat : ℤ) + n ≥ 0) :
+    f₂ (↑(⌊(↑N_nat : ℝ) + (↑n : ℝ)⌋₊) : ℝ) = f₂ ((↑N_nat : ℝ) + (↑n : ℝ)) := by
+  congr 1
+  have h_eq : (↑N_nat : ℝ) + (↑n : ℝ) = ↑((N_nat : ℤ) + n) := by push_cast; ring
+  rw [h_eq, nat_floor_of_nonneg_int _ h]
+  have hnn : (((N_nat : ℤ) + n).toNat : ℤ) = (N_nat : ℤ) + n := Int.toNat_of_nonneg h
+  exact_mod_cast hnn
+
+lemma int_nonneg_of_nat_floor_ge_2 (Z : ℤ) (h : 2 ≤ ⌊(Z : ℝ)⌋₊) : Z ≥ 0 := by
+  by_contra h_neg
+  push_neg at h_neg
+  have h1 : (Z : ℝ) < 0 := by exact_mod_cast h_neg
+  have h2 : ⌊(Z : ℝ)⌋₊ = 0 := Nat.floor_of_nonpos (le_of_lt h1)
+  omega
+
+lemma sum_range_two_mul_succ {α : Type*} [AddCommMonoid α] (f : ℕ → α) (m : ℕ) :
+  ∑ j ∈ Finset.range (2 * (m + 1)), f j = ∑ j ∈ Finset.range (2 * m), f j + f (2 * m) + f (2 * m + 1) := by
+  have h_eq : 2 * (m + 1) = 2 * m + 2 := by ring
+  rw [h_eq, Finset.sum_range_succ, Finset.sum_range_succ]
+
+lemma even_partial_sums1 (x : ℝ × ℝ) (m : ℕ)
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) :
+  ∑ j ∈ Finset.range (2 * m), f₁ (construct_a x j) = x.1 - (construct_n x m).1.1 + (C_total_partial m).1 := by
+  induction' m with m ih
+  · unfold construct_n C_total_partial
+    simp
+  · rw [sum_range_two_mul_succ]
+    rw [ih]
+    -- we know h is true by p_k_bound
+    have hb := p_k_bound x m hx
+    have h : |(construct_n x m).1.1| ≤ √(seq_N m) / (2 * seq_N m ^ 2) ∧ |(construct_n x m).1.2| ≤ √(seq_N m) / (2 * seq_N m ^ 3) := hb
+    
+    unfold C_total_partial
+    simp only [sum_range_succ]
+    
+    have h_div1 : (2 * m) / 2 = m := by omega
+    have h_div2 : (2 * m + 1) / 2 = m := by omega
+    
+    have h_a_2m : construct_a x (2 * m) = ⌊seq_N m + (construct_n x (m + 1)).2.1⌋₊ := by
+      unfold construct_a; simp [h_div1, Nat.even_mul]
+    have h_a_2m1 : construct_a x (2 * m + 1) = ⌊2 * seq_N m + (construct_n x (m + 1)).2.2⌋₊ := by
+      unfold construct_a; simp [h_div2]
+    
+    rw [h_a_2m, h_a_2m1]
+      
+    have h1 : f₁ ↑⌊seq_N m + ↑(construct_n x (m + 1)).2.1⌋₊ = f₁ (seq_N m + ↑(construct_n x (m + 1)).2.1) := by
+      have hN_nat : seq_N m = ↑((10:ℕ)^E_seq m) := seq_N_is_nat m
+      have h_ge : 2 ≤ ⌊seq_N m + ↑(construct_n x (m + 1)).2.1⌋₊ := by
+        rw [← h_a_2m]
+        exact construct_a_ge_2 x (2 * m)
+      rw [hN_nat] at h_ge ⊢
+      have h_ge_cast : 2 ≤ ⌊( (((10:ℕ)^E_seq m : ℤ) + (construct_n x (m + 1)).2.1 : ℤ) : ℝ)⌋₊ := by
+        exact_mod_cast h_ge
+      exact f1_floor_eq ((10:ℕ)^E_seq m) (construct_n x (m + 1)).2.1 (int_nonneg_of_nat_floor_ge_2 _ h_ge_cast)
+    
+    have h2 : f₁ ↑⌊2 * seq_N m + ↑(construct_n x (m + 1)).2.2⌋₊ = f₁ (2 * seq_N m + ↑(construct_n x (m + 1)).2.2) := by
+      have hN_nat : seq_N m = ↑((10:ℕ)^E_seq m) := seq_N_is_nat m
+      have hN_nat2 : 2 * seq_N m = ↑(2 * (10:ℕ)^E_seq m) := by rw [hN_nat]; push_cast; ring
+      have h_ge : 2 ≤ ⌊2 * seq_N m + ↑(construct_n x (m + 1)).2.2⌋₊ := by
+        rw [← h_a_2m1]
+        exact construct_a_ge_2 x (2 * m + 1)
+      rw [hN_nat2] at h_ge ⊢
+      have h_ge_cast : 2 ≤ ⌊( (((2 * (10:ℕ)^E_seq m) : ℤ) + (construct_n x (m + 1)).2.2 : ℤ) : ℝ)⌋₊ := by
+        exact_mod_cast h_ge
+      exact f1_floor_eq (2 * (10:ℕ)^E_seq m) (construct_n x (m + 1)).2.2 (int_nonneg_of_nat_floor_ge_2 _ h_ge_cast)
+    
+    rw [h1, h2]
+    
+    rw [construct_n]
+    rw [dif_pos h]
+    dsimp only
+    ring
+
+lemma even_partial_sums2 (x : ℝ × ℝ) (m : ℕ)
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) :
+  ∑ j ∈ Finset.range (2 * m), f₂ (construct_a x j) = x.2 - (construct_n x m).1.2 + (C_total_partial m).2 := by
+  induction' m with m ih
+  · unfold construct_n C_total_partial
+    simp
+  · rw [sum_range_two_mul_succ]
+    rw [ih]
+    have hb := p_k_bound x m hx
+    have h : |(construct_n x m).1.1| ≤ √(seq_N m) / (2 * seq_N m ^ 2) ∧ |(construct_n x m).1.2| ≤ √(seq_N m) / (2 * seq_N m ^ 3) := hb
+    
+    unfold C_total_partial
+    simp only [sum_range_succ]
+    
+    have h_div1 : (2 * m) / 2 = m := by omega
+    have h_div2 : (2 * m + 1) / 2 = m := by omega
+    
+    have h_a_2m : construct_a x (2 * m) = ⌊seq_N m + (construct_n x (m + 1)).2.1⌋₊ := by
+      unfold construct_a; simp [h_div1, Nat.even_mul]
+    have h_a_2m1 : construct_a x (2 * m + 1) = ⌊2 * seq_N m + (construct_n x (m + 1)).2.2⌋₊ := by
+      unfold construct_a; simp [h_div2]
+    
+    rw [h_a_2m, h_a_2m1]
+      
+    have h1 : f₂ ↑⌊seq_N m + ↑(construct_n x (m + 1)).2.1⌋₊ = f₂ (seq_N m + ↑(construct_n x (m + 1)).2.1) := by
+      have hN_nat : seq_N m = ↑((10:ℕ)^E_seq m) := seq_N_is_nat m
+      have h_ge : 2 ≤ ⌊seq_N m + ↑(construct_n x (m + 1)).2.1⌋₊ := by
+        rw [← h_a_2m]
+        exact construct_a_ge_2 x (2 * m)
+      rw [hN_nat] at h_ge ⊢
+      have h_ge_cast : 2 ≤ ⌊( (((10:ℕ)^E_seq m : ℤ) + (construct_n x (m + 1)).2.1 : ℤ) : ℝ)⌋₊ := by
+        exact_mod_cast h_ge
+      exact f2_floor_eq ((10:ℕ)^E_seq m) (construct_n x (m + 1)).2.1 (int_nonneg_of_nat_floor_ge_2 _ h_ge_cast)
+    
+    have h2 : f₂ ↑⌊2 * seq_N m + ↑(construct_n x (m + 1)).2.2⌋₊ = f₂ (2 * seq_N m + ↑(construct_n x (m + 1)).2.2) := by
+      have hN_nat : seq_N m = ↑((10:ℕ)^E_seq m) := seq_N_is_nat m
+      have hN_nat2 : 2 * seq_N m = ↑(2 * (10:ℕ)^E_seq m) := by rw [hN_nat]; push_cast; ring
+      have h_ge : 2 ≤ ⌊2 * seq_N m + ↑(construct_n x (m + 1)).2.2⌋₊ := by
+        rw [← h_a_2m1]
+        exact construct_a_ge_2 x (2 * m + 1)
+      rw [hN_nat2] at h_ge ⊢
+      have h_ge_cast : 2 ≤ ⌊( (((2 * (10:ℕ)^E_seq m) : ℤ) + (construct_n x (m + 1)).2.2 : ℤ) : ℝ)⌋₊ := by
+        exact_mod_cast h_ge
+      exact f2_floor_eq (2 * (10:ℕ)^E_seq m) (construct_n x (m + 1)).2.2 (int_nonneg_of_nat_floor_ge_2 _ h_ge_cast)
+    
+    rw [h1, h2]
+    
+    rw [construct_n]
+    rw [dif_pos h]
+    dsimp only
+    ring
+
+lemma tendsto_even_sums1 (x : ℝ × ℝ)
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) :
   Tendsto (fun m => ∑ j ∈ Finset.range (2 * m), f₁ (construct_a x j)) atTop (𝓝 (x.1 + C_total.1)) := by
   have h1 : Tendsto (fun m => x.1 - (construct_n x m).1.1 + (C_total_partial m).1) atTop (𝓝 (x.1 - 0 + C_total.1)) :=
-    Tendsto.add (Tendsto.sub tendsto_const_nhds (residual_decay1 x)) (C_total_tendsto1)
+    Tendsto.add (Tendsto.sub tendsto_const_nhds (residual_decay1 x hx)) (C_total_tendsto1)
   have heq : x.1 - 0 + C_total.1 = x.1 + C_total.1 := by ring
   rw [heq] at h1
-  exact h1.congr (fun m => (even_partial_sums1 x m).symm)
+  exact h1.congr (fun m => (even_partial_sums1 x m hx).symm)
 
-lemma tendsto_even_sums2 (x : ℝ × ℝ) :
+lemma tendsto_even_sums2 (x : ℝ × ℝ)
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) :
   Tendsto (fun m => ∑ j ∈ Finset.range (2 * m), f₂ (construct_a x j)) atTop (𝓝 (x.2 + C_total.2)) := by
   have h1 : Tendsto (fun m => x.2 - (construct_n x m).1.2 + (C_total_partial m).2) atTop (𝓝 (x.2 - 0 + C_total.2)) :=
-    Tendsto.add (Tendsto.sub tendsto_const_nhds (residual_decay2 x)) (C_total_tendsto2)
+    Tendsto.add (Tendsto.sub tendsto_const_nhds (residual_decay2 x hx)) (C_total_tendsto2)
   have heq : x.2 - 0 + C_total.2 = x.2 + C_total.2 := by ring
   rw [heq] at h1
-  exact h1.congr (fun m => (even_partial_sums2 x m).symm)
+  exact h1.congr (fun m => (even_partial_sums2 x m hx).symm)
 
-lemma tendsto_all_sums1 (x : ℝ × ℝ) : Tendsto (fun m => ∑ j ∈ Finset.range m, f₁ (construct_a x j)) atTop (𝓝 (x.1 + C_total.1)) := sorry
-lemma tendsto_all_sums2 (x : ℝ × ℝ) : Tendsto (fun m => ∑ j ∈ Finset.range m, f₂ (construct_a x j)) atTop (𝓝 (x.2 + C_total.2)) := sorry
+lemma tendsto_all_sums1 (x : ℝ × ℝ)
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) : Tendsto (fun m => ∑ j ∈ Finset.range m, f₁ (construct_a x j)) atTop (𝓝 (x.1 + C_total.1)) := by
+  have h_even := tendsto_even_sums1 x hx
+  have h_even_succ : Tendsto (fun m => ∑ j ∈ Finset.range (2 * (m + 1)), f₁ (construct_a x j)) atTop (𝓝 (x.1 + C_total.1)) := by
+    have h1 : (fun m => ∑ j ∈ Finset.range (2 * (m + 1)), f₁ (construct_a x j)) = (fun m => ∑ j ∈ Finset.range (2 * m), f₁ (construct_a x j)) ∘ (fun m => m + 1) := rfl
+    rw [h1]
+    exact h_even.comp (tendsto_add_atTop_nat 1)
+  apply tendsto_of_tendsto_of_tendsto_of_le_of_le'
+  · have hf : Tendsto (fun n : ℕ => n / 2) atTop atTop := tendsto_atTop_atTop.mpr (fun b => ⟨2 * b, fun a ha => by omega⟩)
+    exact h_even.comp hf
+  · have hf : Tendsto (fun n : ℕ => n / 2) atTop atTop := tendsto_atTop_atTop.mpr (fun b => ⟨2 * b, fun a ha => by omega⟩)
+    exact h_even_succ.comp hf
+  · filter_upwards [] with n
+    have h_sub : Finset.range (2 * (n / 2)) ⊆ Finset.range n := by intro i hi; rw [Finset.mem_range] at *; omega
+    exact sum_le_sum_of_subset_of_nonneg h_sub (fun i _ _ => f_pos1 x i)
+  · filter_upwards [] with n
+    have h_sub : Finset.range n ⊆ Finset.range (2 * (n / 2 + 1)) := by intro i hi; rw [Finset.mem_range] at *; omega
+    exact sum_le_sum_of_subset_of_nonneg h_sub (fun i _ _ => f_pos1 x i)
+lemma tendsto_all_sums2 (x : ℝ × ℝ)
+    (hx : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
+          |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) : Tendsto (fun m => ∑ j ∈ Finset.range m, f₂ (construct_a x j)) atTop (𝓝 (x.2 + C_total.2)) := by
+  have h_even := tendsto_even_sums2 x hx
+  have h_even_succ : Tendsto (fun m => ∑ j ∈ Finset.range (2 * (m + 1)), f₂ (construct_a x j)) atTop (𝓝 (x.2 + C_total.2)) := by
+    have h1 : (fun m => ∑ j ∈ Finset.range (2 * (m + 1)), f₂ (construct_a x j)) = (fun m => ∑ j ∈ Finset.range (2 * m), f₂ (construct_a x j)) ∘ (fun m => m + 1) := rfl
+    rw [h1]
+    exact h_even.comp (tendsto_add_atTop_nat 1)
+  apply tendsto_of_tendsto_of_tendsto_of_le_of_le'
+  · have hf : Tendsto (fun n : ℕ => n / 2) atTop atTop := tendsto_atTop_atTop.mpr (fun b => ⟨2 * b, fun a ha => by omega⟩)
+    exact h_even.comp hf
+  · have hf : Tendsto (fun n : ℕ => n / 2) atTop atTop := tendsto_atTop_atTop.mpr (fun b => ⟨2 * b, fun a ha => by omega⟩)
+    exact h_even_succ.comp hf
+  · filter_upwards [] with n
+    have h_sub : Finset.range (2 * (n / 2)) ⊆ Finset.range n := by intro i hi; rw [Finset.mem_range] at *; omega
+    exact sum_le_sum_of_subset_of_nonneg h_sub (fun i _ _ => f_pos2 x i)
+  · filter_upwards [] with n
+    have h_sub : Finset.range n ⊆ Finset.range (2 * (n / 2 + 1)) := by intro i hi; rw [Finset.mem_range] at *; omega
+    exact sum_le_sum_of_subset_of_nonneg h_sub (fun i _ _ => f_pos2 x i)
 
 lemma construct_a_has_sum (x : ℝ × ℝ) 
     (hx : |x.1| < Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ 
           |x.2| < Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3)) : 
   HasSum (fun k => (f₁ (construct_a x k), f₂ (construct_a x k))) (x.1 + C_total.1, x.2 + C_total.2) := by
+  have hx_le : |x.1| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 2) ∧ |x.2| ≤ Real.sqrt (seq_N 0) / (2 * (seq_N 0) ^ 3) := 
+    ⟨le_of_lt hx.1, le_of_lt hx.2⟩
   have h1 : HasSum (fun k => f₁ (construct_a x k)) (x.1 + C_total.1) :=
-    (hasSum_iff_tendsto_nat_of_nonneg (f_pos1 x) _).mpr (tendsto_all_sums1 x)
+    (hasSum_iff_tendsto_nat_of_nonneg (f_pos1 x) _).mpr (tendsto_all_sums1 x hx_le)
   have h2 : HasSum (fun k => f₂ (construct_a x k)) (x.2 + C_total.2) :=
-    (hasSum_iff_tendsto_nat_of_nonneg (f_pos2 x) _).mpr (tendsto_all_sums2 x)
+    (hasSum_iff_tendsto_nat_of_nonneg (f_pos2 x) _).mpr (tendsto_all_sums2 x hx_le)
   exact h1.prodMk h2
 
 -- ============================================================================

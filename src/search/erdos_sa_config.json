@@ -1,0 +1,40 @@
+{
+  "search_target": "Erdos265_Full_Resolution",
+  "branch": "Constructive_Break",
+  "engine_parameters": {
+    "temperature_initial": 1000.0,
+    "cooling_rate": 0.995,
+    "restarts": 5,
+    "iterations_per_restart": 5000000
+  },
+  "energy_function": {
+    "components": [
+      {
+        "name": "q1_rationality_penalty",
+        "type": "absolute_deviation",
+        "target": "1/N^2",
+        "weight": 1000.0
+      },
+      {
+        "name": "q2_rationality_penalty",
+        "type": "absolute_deviation",
+        "target": "1/N^3",
+        "weight": 1000.0
+      },
+      {
+        "name": "growth_rate_reward",
+        "type": "limsup_bound",
+        "target": "limsup (a_k^(1/2^k)) > 1",
+        "weight": -500.0
+      }
+    ],
+    "strict_constraints": [
+      "StrictMono",
+      "a_k >= 2"
+    ]
+  },
+  "mutation_operators": [
+    "Ahmes_Vector_Perturbation",
+    "Lattice_Rounding_Shift"
+  ]
+}

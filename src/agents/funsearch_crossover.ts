@@ -42,6 +42,11 @@ Your goal is to perform an AST cross-over/mutation:
 5. The script must be self-contained and print out the numerical performance size as "SCORE: <integer>" at the end of its output, so the scoring engine can rank it.
 6. The script must run in a WASI python runtime. Use only sympy/numpy/math.
 
+${domain.includes("Erdos265_Full_Resolution") ? `MCTS BRANCHING DIRECTIVE:
+The target is Erdos265_Full_Resolution. You must allocate the proof search into two branches:
+- Branch A (Constructive Break): Synthesize an Ahmes vector perturbation to hunt for a combinatorial witness violating the 2^n barrier.
+- Branch B (Analytic Ceiling): Synthesize a Lean 4 sub-lemma utilizing lattice_rounding_2d to bound the rate of convergence.` : ""}
+
 PARENT A (Score: ${parentA.score}):
 \`\`\`python
 ${parentA.code}

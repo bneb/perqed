@@ -14,7 +14,7 @@ import { adaptiveZ3Solve } from "./z3_lns_optimizer";
 import { SolverBridge } from "../solver";
 import { findFrozenCore } from "./frozen_core";
 import { extractCommonSubgraph, describeObstruction } from "./obstruction_detector";
-import { ResearchJournal, defaultJournalPath } from "./research_journal";
+import type { Journal } from "./journal_interface";
 import { join } from "node:path";
 
 export type SearchStrategy = "single" | "island_model";
@@ -41,6 +41,8 @@ export interface OrchestratedSearchConfig {
   symmetry?: 'none' | 'circulant';
   /** Optional warm-start graph (memetic handoff from previous SA run) */
   initialGraph?: AdjacencyMatrix;
+  /** Journal instance for logging (DI injected) */
+  journal?: Journal;
   /**
    * Tabu hashes: Zobrist hashes of Z3-certified sterile energy basins.
    * Forwarded to every SA worker so they hard-reject re-entry into known
@@ -469,14 +471,14 @@ async function parallelSearch(config: OrchestratedSearchConfig): Promise<Orchest
       console.log(`[ObstructionDetector] ${desc}`);
 
       // Non-blocking journal write — failure must never crash the search
-      const journalPath = defaultJournalPath(join(process.cwd(), "agent_workspace"));
-      const journal = new ResearchJournal(journalPath);
-      journal.addEntry({
-        type: "observation",
-        claim: desc,
-        evidence: `Convergence across ${nearMisses.length} independent SA workers.`,
-        target_goal: `R(${config.r},${config.s})`,
-      }).catch(() => {});
+      if (config.journal && config.journal.addEntry) {
+        config.journal.addEntry({
+          type: "observation",
+          claim: desc,
+          evidence: `Convergence across ${nearMisses.length} independent SA workers.`,
+          target_goal: `R(${config.r},${config.s})`,
+        }).catch(() => {});
+      }
     }
   }
 

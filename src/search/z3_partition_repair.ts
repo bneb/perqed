@@ -179,15 +179,19 @@ export async function runZ3Repair(
     return { solved: true, partition: new Int8Array(partition), z3Output: "Already E=0" };
   }
 
-  // For the script, we need ALL POSSIBLE conflicts in the domain (like x+y=z for all x,y)
-  // but only those that touch our repair widow. 
-  // Wait, if I pass a detector that find violators, I also need a way to get the "structure" of the problem.
-  // Actually, for Z3 to repair, it needs to know all constraints.
-  // In Schur, we know x+y=z. In VdW, we know all k-APs.
-  // The detector should probably return ALL possible conflict sets for the domain if we want it truly generic.
-  // Let's redefine the detector to return ALL theoretical conflicts for N.
-  
+  // Safety cutoff: if domain is too large, generic constraint unrolling will OOM node
+  // or hang the Z3 Python process.
+  if (domainSize > 800) {
+    console.log(`   ⚠️ [Z3Repair] Domain size ${domainSize} exceeds generic repair limits (max 800). Skipping local repair.`);
+    return { solved: false, z3Output: "Domain too large for generic Z3 local repair." };
+  }
+
   const allConflicts = conflictDetector(new Int8Array(domainSize + 1).fill(-1), domainSize); 
+
+  if (allConflicts.length > 250_000) {
+    console.log(`   ⚠️ [Z3Repair] Generated ${allConflicts.length} theoretical conflicts, exceeding safety limit of 250k. Skipping.`);
+    return { solved: false, z3Output: "Too many constraints for generic unrolling." };
+  }
 
   console.log(`   🔧 [Z3Repair] ${violatingSets.length} violating sets, ${repairElements.length} elements in repair window`);
 

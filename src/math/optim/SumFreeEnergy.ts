@@ -46,17 +46,20 @@ export function computeSumFreeEnergy(
   // For each color class, count (x, y) pairs where x + y is also in the class
   for (let c = 0; c < numPartitions; c++) {
     const members = classes[c]!;
-    if (members.length < 2) continue;
+    const len = members.length;
+    if (len < 2) continue;
 
-    // Build a Set for O(1) membership lookup
-    const memberSet = new Set(members);
-
-    for (let xi = 0; xi < members.length; xi++) {
+    for (let xi = 0; xi < len; xi++) {
       const x = members[xi]!;
-      for (let yi = xi; yi < members.length; yi++) {
+      for (let yi = xi; yi < len; yi++) {
         const y = members[yi]!;
         const z = x + y;
-        if (z <= domainSize && memberSet.has(z)) {
+        
+        if (z > domainSize) {
+          break; // Optimization: early exit since members array is sorted
+        }
+        
+        if (partition[z] === c) {
           energy++;
         }
       }

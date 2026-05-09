@@ -138,9 +138,9 @@ describe("parseArgs --wiles flag", () => {
     expect(args.wiles).toBe(true);
   });
 
-  test("sets wiles=false when --wiles is absent", () => {
+  test("sets wiles=true when --wiles is absent (now default)", () => {
     const args = parseArgs(["--prompt=Prove R(4,6)"]);
-    expect(args.wiles).toBe(false);
+    expect(args.wiles).toBe(true);
   });
 });
 

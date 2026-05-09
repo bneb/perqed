@@ -5,21 +5,33 @@
 import { createActor } from "xstate";
 import { researchMachine } from "./machine";
 import type { ResearchResult, ResearchMachineConfig } from "./types";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 
 export async function runResearchMachine(
   prompt: string,
   config: ResearchMachineConfig,
 ): Promise<ResearchResult> {
-  const runId = `run_${Date.now()}`;
+  const runId = `run_${Date.now()}_${randomBytes(4).toString('hex')}`;
   const outputDir = join(config.workspaceDir, "runs", runId);
   mkdirSync(outputDir, { recursive: true });
 
   const verbose = config.verbose ?? true;
 
+  let activePrompt = prompt;
+  const { isErdosProblemQuery, fetchErdosProblem, formatErdosProblemForPrompt } = await import("../utils/erdos_problems");
+  if (isErdosProblemQuery(activePrompt)) {
+    if (verbose) console.log(`🔍 [ErdosProblems] Detected Erdős problem reference: "${activePrompt}"`);
+    const erdosProblem = await fetchErdosProblem(activePrompt);
+    if (erdosProblem) {
+      if (verbose) console.log(`✅ [ErdosProblems] Fetched "${erdosProblem.title}"`);
+      activePrompt = formatErdosProblemForPrompt(erdosProblem);
+    }
+  }
+
   if (verbose) {
-    console.log(`  Target: "${prompt}"`);
+    console.log(`  Target: "${activePrompt.split('\n')[0]}${activePrompt.includes('\n') ? '...' : ''}"`);
     console.log(`  Output: ${outputDir}`);
   }
 
@@ -30,13 +42,18 @@ export async function runResearchMachine(
     if (verbose && (snapshot as any).changed) {
        console.log(`\n  [XState] Transitioned to: ${stateValue.toUpperCase()}`);
     }
+    try {
+      writeFileSync(join(outputDir, "state_snapshot.json"), JSON.stringify(snapshot, null, 2));
+    } catch (e) {
+      // Non-blocking write
+    }
   });
 
   actor.start();
 
   actor.send({
     type: "START",
-    prompt,
+    prompt: activePrompt,
     apiKey: config.apiKey,
     workspaceDir: config.workspaceDir,
     outputDir,
@@ -77,28 +94,48 @@ export async function runFormalVerificationOnly(
     agentFactory?: any;
   }
 ): Promise<ResearchResult> {
-  const runId = `run_${Date.now()}_formal`;
+  const runId = `run_${Date.now()}_${randomBytes(4).toString('hex')}_formal`;
   const outputDir = join(config.workspaceDir, "runs", runId);
   mkdirSync(outputDir, { recursive: true });
 
   let activeSignature = config.signature;
+  let activePrompt = prompt;
+  const { isErdosProblemQuery, fetchErdosProblem, formatErdosProblemForPrompt } = await import("../utils/erdos_problems");
+  
+  if (isErdosProblemQuery(activePrompt)) {
+    console.log(`🔍 [ErdosProblems] Detected Erdős problem reference in formal-only mode: "${activePrompt}"`);
+    const erdosProblem = await fetchErdosProblem(activePrompt);
+    if (erdosProblem) {
+      console.log(`✅ [ErdosProblems] Fetched "${erdosProblem.title}"`);
+      activePrompt = formatErdosProblemForPrompt(erdosProblem);
+    }
+  }
+
   if (!activeSignature) {
-    console.log(`[Runner] No signature provided. Auto-formalizing prompt: "${prompt}"...`);
+    console.log(`[Runner] No signature provided. Auto-formalizing prompt: "${activePrompt.split('\n')[0]}..."...`);
     const { AutoformalizerAgent } = await import("../agents/autoformalizer");
     const { LeanBridge } = await import("../lean_bridge");
     const lean = new LeanBridge(undefined, config.workspaceDir);
     const formalizer = new AutoformalizerAgent({ apiKey: config.apiKey, leanBridge: lean });
-    activeSignature = await formalizer.formalize(prompt);
+    activeSignature = await formalizer.formalize(activePrompt);
     console.log(`[Runner] Auto-formalization complete: ${activeSignature}`);
   }
 
   const actor = createActor(researchMachine);
 
+  actor.subscribe((snapshot) => {
+    try {
+      writeFileSync(join(outputDir, "state_snapshot.json"), JSON.stringify(snapshot, null, 2));
+    } catch (e) {
+      // Non-blocking write
+    }
+  });
+
   actor.start();
 
   actor.send({
     type: "WAKE_AT_FORMAL",
-    prompt,
+    prompt: activePrompt,
     apiKey: config.apiKey,
     workspaceDir: config.workspaceDir,
     outputDir,

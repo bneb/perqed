@@ -53,8 +53,7 @@ import { VectorDatabase, TABLE_ARXIV, TABLE_MATHLIB } from "../embeddings/vector
 import { LocalEmbedder } from "../embeddings/embedder";
 import { DAGExecutor } from "../proof_dag/dag_executor";
 import { ArchitectClient } from "../architect_client";
-import { readdir } from "node:fs/promises";
-import { ZobristHasher } from "../search/zobrist_hash";
+import { displayConfig, confirmOrAbort } from "./cli_ui";
 import { AlgebraicBuilder } from "../search/algebraic_builder";
 import { SmtWilesBuilder } from "../search/smt_wiles_builder";
 import { SmtWilesConfigSchema } from "../proof_dag/smt_wiles_config";
@@ -65,69 +64,7 @@ import { extractCommonSubgraph, describeObstruction } from "../search/obstructio
 // CLI Argument Parsing
 // ──────────────────────────────────────────────
 
-interface CliArgs {
-  prompt?: string;
-  configPath?: string;
-  noconfirm: boolean;
-  /** Force ARCHITECT into Wiles Mode (Conceptual Scatter) from iteration 0. */
-  wiles: boolean;
-  /** Override the maximum number of architect replanning pivots (default 5). */
-  maxPivots: number;
-  /** Run the Auto-Curriculum Daemon (autonomous research loop). */
-  daemon: boolean;
-}
-
-export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
-  const args = argv;
-  const promptArg = args.find((a) => a.startsWith("--prompt="));
-  const promptFileArg = args.find((a) => a.startsWith("--prompt_file="));
-  const configArg = args.find((a) => a.startsWith("--config="));
-  const maxPivotsArg = args.find((a) => a.startsWith("--max-pivots="));
-  const noconfirm = args.includes("--noconfirm");
-  const wiles = args.includes("--wiles");
-  const daemon = args.includes("--daemon");
-
-  const maxPivots = maxPivotsArg ? parseInt(maxPivotsArg.replace("--max-pivots=", ""), 10) : 5;
-
-  // --daemon bypasses the prompt/config requirement
-  if (!daemon && !promptArg && !promptFileArg && !configArg) {
-    console.error("Usage:");
-    console.error("  perqed --prompt=\"<problem description>\"");
-    console.error("  perqed --prompt_file=<path/to/prompt.txt>");
-    console.error("  perqed --config=<path/to/run_config.json>");
-    console.error("  perqed --prompt=\"...\" --noconfirm");
-    console.error("  perqed --prompt=\"...\" --wiles   # Force Wiles Mode (Conceptual Scatter)");
-    console.error("  perqed --prompt=\"...\" --max-pivots=1000");
-    console.error("  perqed --daemon                  # Auto-Curriculum: autonomous research loop");
-    process.exit(1);
-  }
-
-  let finalPrompt = promptArg?.replace("--prompt=", "");
-  if (!finalPrompt && promptFileArg) {
-    const fs = require("node:fs");
-    const filePath = promptFileArg.replace("--prompt_file=", "");
-    try {
-      finalPrompt = fs.readFileSync(filePath, "utf-8").trim();
-    } catch (e: any) {
-      console.error(`❌ Failed to read prompt file ${filePath}: ${e.message}`);
-      process.exit(1);
-    }
-  }
-
-  return {
-    prompt: finalPrompt,
-    configPath: configArg?.replace("--config=", ""),
-    noconfirm,
-    wiles,
-    maxPivots,
-    daemon,
-  };
-}
-
-// ──────────────────────────────────────────────
-// Run Config Schema
-// ──────────────────────────────────────────────
-
+import { parseArgs, type CliArgs } from "./cli_args";
 export interface SearchPhase {
   type: "ramsey_sa";
   /** Number of vertices */
@@ -201,11 +138,12 @@ const RUN_CONFIG_SCHEMA = {
       properties: {
         problem_class: {
           type: SchemaType.STRING as const,
-          enum: ["ramsey_coloring", "schur_partition", "vdw_partition", "unknown"],
+          enum: ["ramsey_coloring", "schur_partition", "vdw_partition", "sequence_subset", "unknown"],
         },
-        domain_size: { type: SchemaType.NUMBER as const, description: "Number of integers (Schur) or vertices (Ramsey)" },
+        domain_size: { type: SchemaType.NUMBER as const, description: "Number of integers (Schur/Sequence) or vertices (Ramsey)" },
         num_colors: { type: SchemaType.NUMBER as const },
-        num_partitions: { type: SchemaType.NUMBER as const, description: "Number of color classes for Schur/partition problems" },
+        num_partitions: { type: SchemaType.NUMBER as const, description: "Number of color classes for Schur/partition problems (2 for sequence subsets)" },
+        target_size: { type: SchemaType.NUMBER as const, description: "Target size for sequence-based subset problems." },
         vdw_length: { type: SchemaType.NUMBER as const, description: "Length of the forbidden arithmetic progression, 'k'." },
         r: { type: SchemaType.NUMBER as const, description: "Clique size for color 0 (red)" },
         s: { type: SchemaType.NUMBER as const, description: "Clique size for color 1 (blue)" },
@@ -351,6 +289,21 @@ Example — W(5,3) ≥ 171:
 \`\`\`json
 { "problem_class": "vdw_partition", "domain_size": 171, "num_partitions": 5, "vdw_length": 3 }
 \`\`\`
+
+### Sequence subset problems (find a subset A ⊆ {1..N} of size K with a specific property)
+\`\`\`json
+{
+  "problem_class": "sequence_subset",
+  "domain_size": <N>,
+  "target_size": <K>,
+  "num_partitions": 2
+}
+\`\`\`
+Example — Erdos 321 (distinct reciprocal sums):
+\`\`\`json
+{ "problem_class": "sequence_subset", "domain_size": 39, "target_size": 13, "num_partitions": 2 }
+\`\`\`
+**Note**: For sequence subsets, \`num_partitions\` is always 2 (0 = excluded, 1 = included). The goal is to maximize size or satisfy a property.
 
 ### Problems that do NOT require a constructive witness
 \`\`\`json
@@ -539,41 +492,41 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
 
   return finalConfig;
 }
-
 // ──────────────────────────────────────────────
 // Phase 2: Confirm
 // ──────────────────────────────────────────────
 
-function displayConfig(config: RunConfig, configPath: string) {
-  console.log("✅ ARCHITECT produced run configuration:\n");
-  console.log(`  Run Name:  ${config.run_name}`);
-  console.log(`  Problem:   ${config.problem_description}`);
-  console.log(`  Theorem:   ${config.theorem_name}`);
-  console.log(`  Budget:    ${config.max_iterations} iterations`);
-  console.log(`  Signature: ${config.theorem_signature.slice(0, 100)}...`);
-  console.log(`  Config:    ${configPath}`);
-  console.log();
-}
+export async function createRunDirectory(workspaceBase: string, config: RunConfig): Promise<{ runDir: string, configPath: string }> {
+  const { mkdir, stat } = await import("node:fs/promises");
+  const { join } = await import("node:path");
 
-async function confirmOrAbort(): Promise<void> {
-  console.log("Continue with this plan? [Y/n] (or use --noconfirm to skip)");
-  process.stdout.write("> ");
+  let baseRunName = config.run_name;
+  let actualRunName = baseRunName;
+  let runDir = join(workspaceBase, "runs", actualRunName);
 
-  const response = await new Promise<string>((resolve) => {
-    const handler = (chunk: Buffer) => {
-      process.stdin.removeListener("data", handler);
-      process.stdin.pause();
-      resolve(chunk.toString().trim().toLowerCase());
-    };
-    process.stdin.resume();
-    process.stdin.once("data", handler);
-  });
-
-  if (response && response !== "y" && response !== "yes") {
-    console.log("\n🛑 Aborted. Config saved — re-run with --config= to resume.");
-    process.exit(0);
+  let counter = 1;
+  while (true) {
+    try {
+      await stat(runDir);
+      // Exists! Increment and retry
+      actualRunName = `${baseRunName}_${counter}`;
+      runDir = join(workspaceBase, "runs", actualRunName);
+      counter++;
+    } catch (e: any) {
+      if (e.code === "ENOENT") {
+        break; // Free to use!
+      }
+      throw e;
+    }
   }
-  console.log();
+
+  config.run_name = actualRunName;
+  const configPath = join(runDir, "run_config.json");
+
+  await mkdir(runDir, { recursive: true });
+  await Bun.write(configPath, JSON.stringify(config, null, 2));
+
+  return { runDir, configPath };
 }
 
 // ──────────────────────────────────────────────
@@ -2579,16 +2532,27 @@ async function main() {
     console.log("═══════════════════════════════════════════════");
     console.log("  🧠 PERQED — Problem Formulation");
     console.log("═══════════════════════════════════════════════");
-    console.log(`  Prompt: "${args.prompt}"`);
+    
+    let activePrompt = args.prompt!;
+    const { isErdosProblemQuery, fetchErdosProblem, formatErdosProblemForPrompt } = await import("../utils/erdos_problems");
+    if (isErdosProblemQuery(activePrompt)) {
+      console.log(`🔍 [ErdosProblems] Detected Erdős problem reference: "${activePrompt}"`);
+      const erdosProblem = await fetchErdosProblem(activePrompt);
+      if (erdosProblem) {
+        console.log(`✅ [ErdosProblems] Fetched "${erdosProblem.title}"`);
+        activePrompt = formatErdosProblemForPrompt(erdosProblem);
+      } else {
+        console.warn(`⚠️ [ErdosProblems] Could not fetch problem details. Proceeding with raw prompt.`);
+      }
+    }
+
+    console.log(`  Prompt: "${activePrompt.split('\n')[0]}${activePrompt.includes('\n') ? '...' : ''}"`);
     console.log("═══════════════════════════════════════════════\n");
 
-    config = await formulate(args.prompt!, apiKey, args.wiles);
+    config = await formulate(activePrompt, apiKey, args.wiles);
 
-    configPath = join(workspaceBase, "runs", config.run_name, "run_config.json");
-
-    const { mkdir } = await import("node:fs/promises");
-    await mkdir(join(workspaceBase, "runs", config.run_name), { recursive: true });
-    await Bun.write(configPath, JSON.stringify(config, null, 2));
+    const result = await createRunDirectory(workspaceBase, config);
+    configPath = result.configPath;
   }
 
   // Phase 2: Confirm

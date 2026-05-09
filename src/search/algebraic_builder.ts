@@ -25,6 +25,7 @@ import type { EvaluatorType } from "./evaluator_router";
 import { computeSumFreeEnergy } from "../math/optim/SumFreeEnergy";
 import { SurrogateClient } from "./surrogate_client";
 import { optimizeThroughFunnel } from "./neighborhood_funnel";
+import { type Journal } from "./journal_interface";
 
 // ── Error type ────────────────────────────────────────────────────────────────
 
@@ -80,9 +81,15 @@ export interface PartitionBuildResult {
  */
 const SANDBOX_TIMEOUT_MS = 500;
 
+const FORBIDDEN_WORDS = /\b(require|import|process|eval|globalThis|global|window|document|setTimeout|setInterval|XMLHttpRequest|fetch|Promise|fs|child_process|Reflect|Proxy)\b/;
+
 // ── Compiler Helper ─────────────────────────────────────────────────────────────
 
 export function compileEdgeRule(ruleStr: string): (i: number, j: number) => boolean {
+  if (FORBIDDEN_WORDS.test(ruleStr)) {
+    throw new SandboxError(`Security violation: forbidden identifier detected in rule. Avoid using system globals.`);
+  }
+
   let cleanRule = ruleStr.trim();
 
   // 1. Strip Arrow Functions: `(i, j) => { ... }` or `i => { ... }`
@@ -181,7 +188,7 @@ export class AlgebraicBuilder {
     config: AlgebraicConstructionConfig,
     r: number,
     s: number,
-    journal: { record(obs: string): void } | null,
+    journal: Journal | null,
     workspace: { paths: { scratch: string } } | null,
     constraints?: { exact_vertices?: number; undirected?: boolean; no_self_loops?: boolean },
     evaluatorType: EvaluatorType = "RAMSEY_CLIQUES"
@@ -271,6 +278,11 @@ export class AlgebraicBuilder {
    */
   static buildPartition(config: AlgebraicPartitionConfig): Int8Array {
     const { domain_size, num_partitions, partition_rule_js } = config;
+    
+    if (FORBIDDEN_WORDS.test(partition_rule_js)) {
+      throw new SandboxError(`Security violation: forbidden identifier detected in partition rule. Avoid using system globals.`);
+    }
+
     const partition = new Int8Array(domain_size + 1).fill(-1); // 1-indexed
 
     let ruleFn: (i: number, np: number, ds: number) => number | undefined;

@@ -151,18 +151,32 @@ export class SkillLibrary {
    * Return a formatted prompt block with the top-k relevant skills.
    * Suitable for direct injection into ARCHITECT or prover prompts.
    *
-   * Format:
-   *   ## APPLICABLE SKILLS
-   *   ### [skill-name]
-   *   > Description: ...
-   *   <full SKILL.md body>
-   *   ---
-   *
    * @param contextText  Free-text context: goal string, problem description, etc.
    * @param maxSkills    Number of skills to include (default 3).
+   * @param threshold    Minimum Jaccard-like score for a skill to be included (default 0.05).
    */
-  getSummaryBlock(contextText: string, maxSkills = 3): string {
-    const relevant = this.getRelevantSkills(contextText, maxSkills);
+  getSummaryBlock(contextText: string, maxSkills = 3, threshold = 0.05): string {
+    const contextTokens = tokenize(contextText);
+    if (contextTokens.length === 0) return "";
+
+    const contextSet = new Set(contextTokens);
+    const scored = this.skills.map((skill) => {
+      let overlap = 0;
+      for (const t of contextSet) {
+        if (skill.tokens.has(t)) overlap++;
+      }
+      const union = contextSet.size + skill.tokens.size - overlap;
+      const score = union > 0 ? overlap / union : 0;
+      return { skill, score };
+    });
+
+    // Sort descending by score and filter by threshold
+    const relevant = scored
+      .filter(s => s.score >= threshold)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxSkills)
+      .map(s => s.skill);
+
     if (relevant.length === 0) return "";
 
     const sections = relevant.map(

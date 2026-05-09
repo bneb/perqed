@@ -19,11 +19,12 @@ lean_lib «VerifiedConstruction» {
     `affirmative_proof_core,
     `verified_rounding,
     `problem_specification,
-    `kt_proof_d2
+    `kt_proof_d2,
+    `erdos265.erdos265_strict_target,
+    `erdos265.erdos265_obstruction,
+    `erdos265.negative_resolution,
+    `erdos265.beta2_boundary
   ]
 }
 
-@[default_target]
-lean_exe «perqed» {
-  root := `src.Main
-}
+

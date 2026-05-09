@@ -1,34 +1,22 @@
 {"synthetic": false,
  "schemaVersion": "2025-09-10",
  "outputs":
- {"o": ["e75c9e60174fe910.olean"],
+ {"o": ["094eaaa4da3b7243.olean"],
   "m": false,
-  "i": "5282fc3999c9930c.ilean",
-  "c": "d5a48598f93ef41f.c"},
+  "i": "f676e263f7a66b06.ilean",
+  "c": "d84bfd94394953d4.c"},
  "log":
  [{"message":
-   ".> LEAN_PATH=/Users/kevin/projects/perqed/.lake/packages/Cli/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/batteries/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/Qq/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/aesop/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/proofwidgets/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/importGraph/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/plausible/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/mathlib/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/repl/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/build/lib/lean /Users/kevin/.elan/toolchains/leanprover--lean4---v4.30.0-rc2/bin/lean /Users/kevin/projects/perqed/src/lean/affirmative_proof_core.lean -o /Users/kevin/projects/perqed/.lake/build/lib/lean/affirmative_proof_core.olean -i /Users/kevin/projects/perqed/.lake/build/lib/lean/affirmative_proof_core.ilean -c /Users/kevin/projects/perqed/.lake/build/ir/affirmative_proof_core.c --setup /Users/kevin/projects/perqed/.lake/build/ir/affirmative_proof_core.setup.json --json",
+   ".> LEAN_PATH=/Users/kevin/projects/perqed/.lake/packages/Cli/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/batteries/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/Qq/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/aesop/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/proofwidgets/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/importGraph/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/LeanSearchClient/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/plausible/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/mathlib/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/packages/repl/.lake/build/lib/lean:/Users/kevin/projects/perqed/.lake/build/lib/lean /Users/kevin/.elan/toolchains/leanprover--lean4---v4.30.0-rc2/bin/lean /Users/kevin/projects/perqed/src/lean/erdos265/affirmative_proof_core.lean -o /Users/kevin/projects/perqed/.lake/build/lib/lean/affirmative_proof_core.olean -i /Users/kevin/projects/perqed/.lake/build/lib/lean/affirmative_proof_core.ilean -c /Users/kevin/projects/perqed/.lake/build/ir/affirmative_proof_core.c --setup /Users/kevin/projects/perqed/.lake/build/ir/affirmative_proof_core.setup.json --json",
    "level": "trace"},
   {"message":
-   "src/lean/affirmative_proof_core.lean:38:18: declaration uses `sorry`",
+   "src/lean/erdos265/affirmative_proof_core.lean:183:2: `push_neg` has been deprecated. Prefer using `push Not` instead.\nIf you'd rather continue using `push_neg` in your project, you can implement it as follows:\n```\nopen Lean.Parser.Tactic in\nmacro \"push_neg\" cfg:optConfig loc:(location)? : tactic =>\n  `(tactic| push $cfg:optConfig Not $[$loc]?)\n```",
    "level": "warning"},
   {"message":
-   "src/lean/affirmative_proof_core.lean:103:6: declaration uses `sorry`",
+   "src/lean/erdos265/affirmative_proof_core.lean:213:40: This simp argument is unused:\n  Nat.even_mul\n\nHint: Omit it from the simp argument list.\n  simp [h_div1,̵ ̵N̵a̵t̵.̵e̵v̵e̵n̵_̵m̵u̵l̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`",
    "level": "warning"},
   {"message":
-   "src/lean/affirmative_proof_core.lean:129:6: declaration uses `sorry`",
-   "level": "warning"},
-  {"message":
-   "src/lean/affirmative_proof_core.lean:139:6: declaration uses `sorry`",
-   "level": "warning"},
-  {"message":
-   "src/lean/affirmative_proof_core.lean:193:6: declaration uses `sorry`",
-   "level": "warning"},
-  {"message":
-   "src/lean/affirmative_proof_core.lean:197:6: declaration uses `sorry`",
-   "level": "warning"},
-  {"message":
-   "src/lean/affirmative_proof_core.lean:206:8: declaration uses `sorry`",
+   "src/lean/erdos265/affirmative_proof_core.lean:266:40: This simp argument is unused:\n  Nat.even_mul\n\nHint: Omit it from the simp argument list.\n  simp [h_div1,̵ ̵N̵a̵t̵.̵e̵v̵e̵n̵_̵m̵u̵l̵]\n\nNote: This linter can be disabled with `set_option linter.unusedSimpArgs false`",
    "level": "warning"}],
  "inputs":
  [["affirmative_proof_core:deps",
@@ -41,7 +29,9 @@
         ["verified_growth transitive imports (legacy)", "1213389096d5c55c"],
         ["verified_growth:importAllArts", "26afaf33007d25ad"],
         ["kt_combinatorics transitive imports (legacy)", "4a8394603cf3afef"],
-        ["kt_combinatorics:importAllArts", "ee3c79a0493d7896"]]]]],
+        ["kt_combinatorics:importAllArts", "ee3c79a0493d7896"],
+        ["kt_proof_d2 transitive imports (legacy)", "1213389096d5c55c"],
+        ["kt_proof_d2:importAllArts", "18eabc1181d0dd37"]]]]],
     ["libs",
      [["import dynlibs", "00000000000006bb"],
       ["package external libraries", "00000000000006bb"],
@@ -49,11 +39,11 @@
       ["module plugins", "00000000000006bb"]]]]],
   ["Lean 4.30.0, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc",
    "2c8d2623007dfc36"],
-  ["/Users/kevin/projects/perqed/src/lean/affirmative_proof_core.lean",
-   "1ea50bcef1bb85ca"],
+  ["/Users/kevin/projects/perqed/src/lean/erdos265/affirmative_proof_core.lean",
+   "e638e9cb46c821e9"],
   ["options", "00000000000006bb"],
   ["isModule: false", "feefd2a0d3a1847e"],
   ["Module.name: affirmative_proof_core", "18a7db1eb281e31b"],
   ["Package.id?: (some perqed)", "8f8d3ee9ae42d2c1"],
   ["Module.leanArgs: #[]", "00000000000006bb"]],
- "depHash": "6d6bbcf8dbb25074"}
+ "depHash": "38cb9052edb0818e"}

@@ -35,7 +35,7 @@ function makeGlassFloorEntry(zobristHash: string, id = "glass-1"): JournalEntry 
 /** Build a ResearchJournal backed by a fixed in-memory entry list (no disk I/O). */
 function journalWithEntries(entries: JournalEntry[]): ResearchJournal {
   const j = new ResearchJournal("/tmp/nonexistent_tabu.json");
-  (j as any).readFile = async () => ({ version: 1, entries });
+  j.getAllEntries = async () => entries;
   return j;
 }
 

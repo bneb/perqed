@@ -42,6 +42,7 @@ Before running a long search, verify:
 - If stuck at a specific energy plateau (e.g., E=2), diagnose what that energy value means combinatorially BEFORE tuning hyperparameters.
 - Try non-monotonic reheat: `temperature = max(1, E_best^0.4)` when stagnating.
 - If a specific mutation type can't cross the basin, consider a multi-vertex "topological" mutation.
+- **For Erdős 265 (Ahmes Vector)**: If the search space of direct $a_k$ values is too large, swap to perturbing via Ahmes vectors $(1/n, 1/(n(n+1)))$ and lattice rounding strategies (see `lattice_rounding_2d`). Limit perturbations to small integers $|n| \le N/8$ around the exponential base $N$.
 
 ## After Finding a Witness
 
