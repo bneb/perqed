@@ -119,8 +119,8 @@ theorem R₁_is_pos_integer (a : ℕ → ℕ) (p : ℤ) (q : ℕ) (hq : q > 0)
     rw [h_R1_tail]
     have hq_pos : (q : ℝ) > 0 := by exact_mod_cast hq
     have hP_pos : (P_N a N : ℝ) > 0 := by
-      -- product of positive is positive
-      sorry
+      unfold P_N
+      exact_mod_cast Finset.prod_pos (fun i _ => by have := h_pos i; omega)
     exact mul_pos (mul_pos hq_pos hP_pos) h_tail
     
   have h_eq_int := R₁_eq_R₁_int a p q N h_pos hq
@@ -138,7 +138,22 @@ theorem R₁_le_q (a : ℕ → ℕ) (p : ℤ) (q : ℕ) (hq : q > 0)
     (h_sum : HasSum (fun k => (1 : ℝ) / (a k : ℝ)) (p / q))
     (N : ℕ) :
     R₁ a p q N ≤ (q : ℝ) := by
-  sorry -- From strict_tail_bound
+  -- R₁ = q * P_N * tail, and strict_tail_bound says P_N * tail ≤ 1
+  have h_tail_sum : HasSum (fun k => (1 : ℝ) / (a (k + N) : ℝ)) 
+    (↑p / ↑q - ∑ i ∈ Finset.range N, (1 : ℝ) / (a i : ℝ)) := by
+    sorry -- HasSum shift (shared sorry)
+  have h_tail_eq : ↑p / ↑q - ∑ i ∈ Finset.range N, (1 : ℝ) / (a i : ℝ) = ∑' k, (1 : ℝ) / (a (k + N) : ℝ) := by
+    exact h_tail_sum.tsum_eq.symm
+  have h_R1_eq : R₁ a p q N = (q : ℝ) * ((∏ i ∈ Finset.range N, (a i : ℝ)) * ∑' k, (1 : ℝ) / (a (k + N) : ℝ)) := by
+    unfold R₁
+    rw [h_tail_eq]
+    ring
+  rw [h_R1_eq]
+  have h_bound := strict_tail_bound a N h_fast h_pos
+  have hq_pos : (q : ℝ) ≥ 1 := by exact_mod_cast hq
+  calc (q : ℝ) * ((∏ i ∈ Finset.range N, (a i : ℝ)) * ∑' k, 1 / (a (k + N) : ℝ))
+      ≤ (q : ℝ) * 1 := by exact mul_le_mul_of_nonneg_left h_bound (by linarith)
+    _ = (q : ℝ) := by ring
 
 -- ============================================================================
 -- Section 2: The algebraic constraint on aₙ - 1
@@ -151,7 +166,13 @@ theorem a_sub_one_eq (a : ℕ → ℕ) (p : ℤ) (q : ℕ) (N : ℕ)
     (a N : ℝ) - 1 =
       ((q : ℝ) * ∏ i ∈ Finset.range N, (a i : ℝ) +
        R₁ a p q (N + 1) - R₁ a p q N) / R₁ a p q N := by
-  sorry -- From R₁_recurrence: rearrange aₙ = (R₁(N+1) + q·P_N)/R₁(N)
+  have h_rec := R₁_recurrence a p q N h_pos
+  -- From recurrence: R₁(N+1) = a_N * R₁(N) - q * P_N
+  -- So: a_N * R₁(N) = R₁(N+1) + q * P_N
+  -- So: a_N = (R₁(N+1) + q * P_N) / R₁(N)
+  -- So: a_N - 1 = (R₁(N+1) + q * P_N - R₁(N)) / R₁(N)
+  field_simp
+  linarith
 
 -- ============================================================================
 -- Section 3: R₁ Monotonicity and Sylvester Convergence
@@ -331,8 +352,23 @@ theorem eventually_sylvester (a : ℕ → ℕ) (p : ℤ) (q : ℕ)
       
   -- Cancel R₁
   have h_cancel : ((a N : ℝ) - 1) * (a N : ℝ) = (a (N + 1) : ℝ) - 1 := by
-    -- We know R₁ > 0 from the tail bound.
-    sorry
+    -- From h_combine: R₁ * (a_N - 1) * a_N = R₁ * (a_{N+1} - 1)
+    -- We need R₁ ≠ 0 to cancel. From h_relN: q * P_N = R₁ * (a_N - 1),
+    -- and q * P_N > 0, so R₁ > 0.
+    have hq_pos : (q : ℝ) > 0 := by exact_mod_cast hq
+    have hP_pos : (∏ i ∈ Finset.range N, (a i : ℝ)) > 0 := by
+      apply Finset.prod_pos; intro i _; have := h_pos i; exact_mod_cast (show (a i : ℕ) > 0 by omega)
+    have hqP_pos : (q : ℝ) * ∏ i ∈ Finset.range N, (a i : ℝ) > 0 := mul_pos hq_pos hP_pos
+    have haN_gt1 : (a N : ℝ) - 1 > 0 := by
+      have : (a N : ℝ) ≥ 2 := by exact_mod_cast h_pos N
+      linarith
+    have hR1_pos : R₁ a p q N > 0 := by
+      have := h_relN; -- q * P_N = R₁ * (a_N - 1)
+      nlinarith
+    have hR1_ne : R₁ a p q N ≠ 0 := ne_of_gt hR1_pos
+    have := h_combine -- R₁ * (a_N - 1) * a_N = R₁ * (a_{N+1} - 1)
+    have h_eq : R₁ a p q N * (((a N : ℝ) - 1) * (a N : ℝ)) = R₁ a p q N * ((a (N + 1) : ℝ) - 1) := by linarith
+    exact mul_left_cancel₀ hR1_ne h_eq
     
   -- Final algebraic shuffle
   have h_final : (a (N + 1) : ℝ) = (a N : ℝ)^2 - (a N : ℝ) + 1 := by
@@ -340,7 +376,16 @@ theorem eventually_sylvester (a : ℕ → ℕ) (p : ℤ) (q : ℕ)
       (a (N + 1) : ℝ) = ((a N : ℝ) - 1) * (a N : ℝ) + 1 := by linarith [h_cancel]
       _ = (a N : ℝ)^2 - (a N : ℝ) + 1 := by ring
       
-  sorry -- exact_mod_cast h_final (Needs a_N >= 1 for Nat subtraction)
+  -- Cast from ℝ to ℕ: need a_N^2 ≥ a_N for Nat subtraction
+  have haN_ge2 := h_pos N
+  -- Goal: a (N + 1) = (a N)^2 - a N + 1 in ℕ
+  -- h_final: (a (N + 1) : ℝ) = (a N : ℝ)^2 - (a N : ℝ) + 1
+  -- Strategy: cast to ℤ where subtraction is total
+  have haN_ge1 : 1 ≤ a N := by omega
+  have haN_sq_ge : a N ≤ (a N)^2 := le_self_pow₀ (by omega) (by omega)
+  have h_cast : (a (N + 1) : ℤ) = (a N : ℤ)^2 - (a N : ℤ) + 1 := by exact_mod_cast h_final
+  zify [haN_sq_ge]
+  exact h_cast
 
 -- ============================================================================
 -- Section 4: Irrationality and Final Resolution
@@ -407,41 +452,3 @@ theorem no_fast_growing_erdos265 (a : ℕ → ℕ)
   have h_rat : ∃ (r : ℚ), HasSum (fun n => 1 / ((a n : ℝ) - 1)) (↑r) := ⟨r₂, h_sum2⟩
   exact shifted_sum_irrational_of_eventually_sylvester a h_pos h_sylv h_rat
 
--- ============================================================================
--- Section 5: The Erdős 265 Ceiling Conjecture
--- ============================================================================
-
--- (This captures the remainder of the Kovač-Tao analytic bound not formalized here).
-axiom fast_growth_of_limsup_gt_1 (a : ℕ → ℕ) (h_erdos : Erdos265_Sequence a)
-  (h_lim : limsup (fun k => (a k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
-  ∃ N₀, FastGrowth (fun n => a (n + N₀))
-
-axiom shifted_erdos265 (a : ℕ → ℕ) (h_erdos : Erdos265_Sequence a) (N₀ : ℕ) :
-  Erdos265_Sequence (fun n => a (n + N₀))
-
-/--
-**Erdős 265 Ceiling Conjecture** (Proof):
-Every Erdős 265 sequence satisfies limsup aₖ^{1/2ᵏ} ≤ 1.
--/
-theorem erdos265_ceiling_conjecture_proof :
-    ∀ a : ℕ → ℕ, Erdos265_Sequence a →
-      limsup (fun k => (a k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop ≤ 1 := by
-  intro a h_erdos
-  by_contra h_contra
-  push_neg at h_contra
-  
-  -- By Kovač-Tao analytic bounds, if limsup > 1 and the sum is rational,
-  -- the sequence must eventually hit the FastGrowth double-exponential floor.
-  have h_fast_eventual := fast_growth_of_limsup_gt_1 a h_erdos h_contra
-  rcases h_fast_eventual with ⟨N₀, h_fast⟩
-  
-  -- Create the shifted sequence that strictly obeys FastGrowth
-  let b := fun n => a (n + N₀)
-  have hb_pos : ∀ n, b n ≥ 2 := fun n => h_erdos.2.1 (n + N₀)
-  have hb_mono : StrictMono b := fun n m hnm => h_erdos.1 (by omega)
-  
-  -- The shifted sequence must also be an Erdős 265 sequence
-  have hb_erdos : Erdos265_Sequence b := shifted_erdos265 a h_erdos N₀
-  
-  -- Apply our unified structural contradiction to the shifted sequence
-  exact no_fast_growing_erdos265 b hb_pos hb_mono h_fast hb_erdos
