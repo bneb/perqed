@@ -195,3 +195,31 @@ Compiles against Mathlib (via agent_workspace lakefile).
 The chain has TWO sorry blocks:
 1. `R₁_growing_kills_limsup` (quantitative, should be provable with real analysis)
 2. near-Sylvester (bounded R₁ excursions) ⟹ ES growth condition (the generalization of ES)
+
+## Coupling Argument Attempt (same session)
+
+### The idea
+From the two residual recurrences:
+```
+q1*P1(k)*Rs(k) - q2*P2(k)*R1(k) = R1(k)*(Rs(k)+Rs(k+1)) - Rs(k)*R1(k+1)
+```
+LHS grows with P1, P2. RHS bounded if both R1, Rs bounded.
+This forces L = prod(a_j/(a_j-1)) to be rational.
+If L is always irrational → contradiction → proof.
+
+### The flaw
+L = prod(a_j/(a_j-1)) is NOT obviously always irrational.
+The "P1*B = P2*A eventually" argument fails because P1*B - P2*A converges
+to a nonzero constant (~-A), not zero. So the a_k-1 = a_k contradiction
+doesn't fire.
+
+### What remains
+The coupling equation IS a real Diophantine constraint. But extracting a
+contradiction requires proving L irrational for the specific hypothetical
+sequence — which circles back to the original ES problem.
+
+### Current honest status
+- `R1_growing_kills_limsup`: ✓ (real, provable)
+- Coupling forces L rational: ✓ (if both residuals truly bounded)
+- L is always irrational: ❌ (not proved, argument was flawed)
+- Conjecture: STILL OPEN
