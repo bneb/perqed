@@ -162,3 +162,36 @@ is the tail sum irrational for such sequences?
 
 Standard ES requires exact Sylvester (R₁ = 1 always).
 Need: generalized ES for R₁ ∈ {1,...,B} with bounded excursions.
+
+## Lean Formalization
+
+File: `src/lean/erdos265/residual_growth_bound.lean`
+Compiles against Mathlib (via agent_workspace lakefile).
+
+### Formalized (compiles, no sorry):
+- `prodPrefix`: P₁(k) = ∏_{j<k} a(j)
+- `R₁`: residual recurrence R₁(0)=p, R₁(k+1) = aₖ·R₁(k) - q·P₁(k)
+- `R₁_succ`: recurrence identity (definitional)
+- `R₁_pos_iff`: R₁(k+1) > 0 ↔ aₖ·R₁(k) > q·P₁(k)
+
+### Stated with sorry (the open parts):
+- `R₁_growing_kills_limsup`: R₁ ~ P₁^α ⟹ limsup = 1
+- `limsup_gt_one_implies_R₁_bounded`: limsup > 1 ⟹ R₁ = O(1)
+
+## Corrected Proof Architecture
+
+```
+                 ES: a_{k+1} ≥ a_k² ⟹ ∑1/(a_k-1) irrational
+                                    ↑
+                 limsup > 1 ⟹ R₁ bounded [SORRY]
+                                    ↑
+                 R₁ bounded ⟹ near-Sylvester growth
+                                    ↑
+                 near-Sylvester ⟹ a_{k+1} ≈ a_k² [NEED]
+                                    ↑
+                 ES fires ⟹ ∑1/(a_k-1) irrational ⟹ contradiction
+```
+
+The chain has TWO sorry blocks:
+1. `R₁_growing_kills_limsup` (quantitative, should be provable with real analysis)
+2. near-Sylvester (bounded R₁ excursions) ⟹ ES growth condition (the generalization of ES)
