@@ -1,0 +1,22 @@
+{
+  "name": "perqed-parser",
+  "version": "0.1.0",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "perqed_parser",
+    "triples": {
+      "additional": [
+        "aarch64-apple-darwin",
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">= 10"
+  },
+  "scripts": {
+    "build": "napi build --platform --release"
+  }
+}

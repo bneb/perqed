@@ -1,0 +1,9 @@
+[package]
+name = "perqed_search"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+perqed_core = { path = "../perqed_core" }
+rand = "0.8.5"
+rayon = "1.8.1"

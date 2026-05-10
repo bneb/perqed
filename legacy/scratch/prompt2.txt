@@ -1,0 +1,20 @@
+Please solve this specific lemma from Erdős #265.
+It verifies the 1D greedy algorithm for our rounding scheme.
+
+```lean
+import Mathlib
+
+open Finset Real
+
+/--
+1D Greedy Rounding: for t(n) ∈ [0,1], there exists B ⊆ Ico L R with
+  |Σ_{n ∈ Ico L R} (t(n) - 1_B(n)) / n| ≤ 1/L.
+-/
+lemma greedy_1d_rounding (L R : ℕ) (hLR : L ≤ R) (hL : 1 < L)
+    (t : ℕ → ℝ) (ht : ∀ n, t n ∈ Set.Icc 0 1) :
+    ∃ (B : Finset ℕ), B ⊆ Ico L R ∧
+      |∑ n ∈ Ico L R, (t n - if n ∈ B then (1 : ℝ) else 0) / (n : ℝ)| ≤ 1 / (L : ℝ) := by
+  sorry
+```
+
+Please output the complete, verified Lean 4 code block replacing the sorry. You must use the local Lean 4 REPL to ensure your tactic sequence compiles.

@@ -1,0 +1,58 @@
+{
+  "schur": [
+    {
+      "title": "Beutelspacher & Brestovanský (1982): Generalised Schur Numbers",
+      "summary": "Establishes lower bounds for the generalised Schur numbers S(r) via explicit r-partition constructions of {1,...,N} with no monochromatic solution to x+y=z. Foundational reference for SA-based partition search initialisation."
+    },
+    {
+      "title": "Exoo (1994): A Lower Bound for Schur Numbers and Multicolor Ramsey Numbers",
+      "summary": "Constructs explicit witnesses for S(r) ≥ N using a recursive algebraic partitioning scheme. Introduces the 'SA + repair' paradigm: use stochastic search seeded from an algebraic partitioning rule, then correct violations by local recolouring."
+    },
+    {
+      "title": "Fredricksen (1979): Schur's Theorem in Sum-Free Sets",
+      "summary": "Proves tight bounds on sum-free partition density. Key insight: monochromatic Schur triples (x,y,x+y) are detected by scanning each colour class for violations of the form f(i)=f(j)=f(i+j)."
+    }
+  ],
+  "partition": [
+    {
+      "title": "Abbott & Hanson (1972): A Problem of Schur and Its Generalizations",
+      "summary": "Generalises Schur's theorem to broader partition regularity settings. Proves that for any finite colouring of positive integers, a monochromatic solution exists. Relevant for understanding why exhaustive symbolic search is required at large N."
+    }
+  ],
+  "ramsey": [
+    {
+      "title": "Radziszowski (2021): Small Ramsey Numbers (Electronic Journal of Combinatorics Survey)",
+      "summary": "Authoritative survey of known exact values and bounds for R(r,s). Table 1 contains all confirmed values through R(4,9). Critical reference for choosing the right vertex count for any new lower-bound search."
+    },
+    {
+      "title": "Exoo (1989): R(4,6) ≥ 36 via Circulant Graph on Z_35",
+      "summary": "Exhibits the Exoo witness: a 2-coloring of K_35 with no red K_4 and no blue K_6. The witness is a circulant graph with connection set S ⊂ Z_35. This is the canonical example for circulant + SA search on Ramsey problems."
+    },
+    {
+      "title": "Paley Graph Construction for Ramsey Lower Bounds",
+      "summary": "If p ≡ 1 (mod 4) is prime, the Paley graph Paley(p) is self-complementary and often serves as a Ramsey witness. Connect vertices i,j iff (i-j) is a quadratic residue mod p. R(3,5)≥14 uses Paley(13); R(4,4)≥18 uses Paley(17)."
+    }
+  ],
+  "graph": [
+    {
+      "title": "Computational Construction of Ramsey Graphs via SA (Bollobás & others)",
+      "summary": "Details the energy-based Metropolis criterion for graph coloring: E = |{(u,v,w): monochromatic triangle in some color}|, minimised by swapping single edge colors. Convergence to E=0 yields a valid Ramsey witness."
+    }
+  ],
+  "lean": [
+    {
+      "title": "Lean 4 decide Tactic for Finite Decidable Propositions",
+      "summary": "The `decide` tactic reduces any Decidable proposition to a concrete Bool computation evaluated by the Lean kernel. Ideal for Ramsey/Schur witnesses: `exact ⟨f, by decide⟩` proves ∃ f, ∀ x y z, ... in seconds for N≤100, minutes for N≤500."
+    },
+    {
+      "title": "Finset.card_le_card (Mathlib)",
+      "summary": "If h : s ⊆ t then Finset.card_le_card h : s.card ≤ t.card. Useful for bounding color class sizes in partition arguments."
+    }
+  ],
+  "formal": [
+    {
+      "title": "Machine-Checked Combinatorics: Lean 4 Kernel Verification",
+      "summary": "Proofs of finite graph and partition properties can be kernel-verified by reducing to `decide` over Fin types. Key rule: never use `native_decide` (adds C compiler to TCB). Use `decide` with increased `maxHeartbeats` instead."
+    }
+  ]
+}

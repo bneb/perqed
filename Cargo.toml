@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "crates/perqed_parser",
+    "crates/perqed_core",
+    "crates/perqed_lean",
+    "crates/perqed_search",
+    "crates/perqed_cli",
+    "crates/perqed_agents"
+]
+resolver = "2"
