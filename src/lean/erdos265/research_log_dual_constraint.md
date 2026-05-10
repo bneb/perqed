@@ -135,3 +135,30 @@ The Mahler bridge is a genuine new contribution, but it needs to be combined
 with a proof that doubly-exponential growth forces the sequence into a
 regime where one residual stabilizes.
 
+
+## BREAKTHROUGH: R₁ Growing Kills Limsup (same session, later)
+
+### The quantitative argument
+
+If R₁(k) ~ P₁(k)^α for any α > 0:
+- a_k ~ P₁^{1-α} (since a_k = (R₁(k+1) + q₁P₁)/R₁ ≈ q₁P₁/R₁)
+- P₁(k+1) = P₁(k) · a_k ~ P₁(k)^{2-α}
+- log P₁(k) ~ C · (2-α)^k
+- limsup a_k^{1/2^k} = exp(lim (1-α)·C·((2-α)/2)^k) = **1**
+  (since (2-α)/2 < 1 when α > 0)
+
+### Contrapositive
+**limsup > 1 requires R₁ = O(1)** (bounded, not growing).
+
+### Verified computationally
+- a_k = 2×greedy at every step: R₁ grows, L_k → 1 ✓
+- Single +100 deviation then greedy: R₁ explodes, L_k → 1 ✓
+- 1000× jump at step 7: still L_k → 1 ✓
+- Any non-greedy behavior inflates R₁, killing doubly-exponential growth
+
+### Remaining gap (narrowed!)
+R₁ bounded (positive integer in {1,...,B}) with near-Sylvester growth:
+is the tail sum irrational for such sequences?
+
+Standard ES requires exact Sylvester (R₁ = 1 always).
+Need: generalized ES for R₁ ∈ {1,...,B} with bounded excursions.
