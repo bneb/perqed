@@ -104,14 +104,133 @@ lemma waste_step_contraction (a : ℕ → ℕ) (S : ℝ) (q₁ : ℕ) (k : ℕ)
     running_sum (c_coeff a S q₁) k ≤ (1 - ε) * running_sum (c_coeff a S q₁) (k - 1) := by
   sorry
 
-/-- If there are only finitely many waste steps, the sequence must terminate (R₁ hits 0).
-    Since the sequence is infinite, this is a contradiction. -/
-lemma finite_waste_implies_termination (a : ℕ → ℕ) (S : ℝ) (q₁ : ℕ)
-    (δ : ℝ) (hδ : δ > 0)
-    (h_finite : ∃ K, ∀ k ≥ K, waste' a S k < 1 + δ) :
+noncomputable def R₁ (a : ℕ → ℕ) (S : ℝ) (q₁ : ℕ) (N : ℕ) : ℝ :=
+  (q₁ : ℝ) * (∏ i ∈ Finset.range N, (a i : ℝ)) * tail_sum' a S N
+
+theorem R1_from_waste (a : ℕ → ℕ) (S : ℝ) (q₁ : ℕ) (k : ℕ)
+    (ha : (a k : ℝ) ≠ 0) :
+    R₁ a S q₁ (k + 1) =
+      (waste' a S k - 1) * ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) := by
+  unfold R₁ waste' tail_sum'
+  rw [Finset.prod_range_succ, Finset.sum_range_succ]
+  have h1 : (a k : ℝ) * (1 / (a k : ℝ)) = 1 := mul_one_div_cancel ha
+  calc
+    (q₁ : ℝ) * ((∏ i ∈ Finset.range k, (a i : ℝ)) * (a k : ℝ)) * (S - (∑ i ∈ Finset.range k, 1 / (a i : ℝ) + 1 / (a k : ℝ)))
+      = (q₁ : ℝ) * (∏ i ∈ Finset.range k, (a i : ℝ)) * ((a k : ℝ) * (S - ∑ i ∈ Finset.range k, 1 / (a i : ℝ)) - (a k : ℝ) * (1 / (a k : ℝ))) := by ring
+    _ = (q₁ : ℝ) * (∏ i ∈ Finset.range k, (a i : ℝ)) * ((a k : ℝ) * (S - ∑ i ∈ Finset.range k, 1 / (a i : ℝ)) - 1) := by rw [h1]
+    _ = ((a k : ℝ) * (S - ∑ i ∈ Finset.range k, 1 / (a i : ℝ)) - 1) * ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) := by ring
+
+/-- A strictly greedy step forces R₁ to be non-increasing. -/
+lemma greedy_implies_R1_nonincreasing (a : ℕ → ℕ) (S : ℝ) (q₁ : ℕ) (k : ℕ)
+    (ha_pos : (a k : ℝ) > 0)
+    (ha_ge2 : (a k : ℝ) ≥ 2)
+    (hq_pos : (q₁ : ℝ) > 0)
+    (hP_pos : (∏ i ∈ Finset.range k, (a i : ℝ)) > 0)
+    (hw : waste' a S k ≤ 1 + 1 / ((a k : ℝ) - 1)) :
+    R₁ a S q₁ (k + 1) ≤ R₁ a S q₁ k := by
+  have ha_neq : (a k : ℝ) ≠ 0 := ne_of_gt ha_pos
+  have hR_next := R1_from_waste a S q₁ k ha_neq
+  rw [hR_next]
+  unfold R₁ waste' at *
+  have hqP : (q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ) > 0 := mul_pos hq_pos hP_pos
+  have hw_mul : ((a k : ℝ) * tail_sum' a S k) * ((a k : ℝ) - 1) ≤ (1 + 1 / ((a k : ℝ) - 1)) * ((a k : ℝ) - 1) := by
+    exact mul_le_mul_of_nonneg_right hw (by linarith)
+  have h_rhs : (1 + 1 / ((a k : ℝ) - 1)) * ((a k : ℝ) - 1) = (a k : ℝ) := by
+    calc
+      (1 + 1 / ((a k : ℝ) - 1)) * ((a k : ℝ) - 1) = ((a k : ℝ) - 1) + 1 / ((a k : ℝ) - 1) * ((a k : ℝ) - 1) := by ring
+      _ = ((a k : ℝ) - 1) + 1 := by rw [div_mul_cancel₀ _ (by linarith)]
+      _ = (a k : ℝ) := by ring
+  rw [h_rhs] at hw_mul
+  have h_tail_mul : tail_sum' a S k * ((a k : ℝ) - 1) ≤ 1 := by
+    nlinarith
+  nlinarith
+
+/-- A monotonically non-increasing sequence of positive integers is eventually constant. -/
+lemma R1_eventually_constant (a : ℕ → ℕ) (S : ℝ) (q₁ : ℕ) (K : ℕ)
+    (h_pos : ∀ k, R₁ a S q₁ k > 0) -- Assumes R1 is positive integer-valued
+    (h_decr : ∀ k ≥ K, R₁ a S q₁ (k + 1) ≤ R₁ a S q₁ k) :
+    ∃ R, ∃ M ≥ K, ∀ m ≥ M, R₁ a S q₁ m = R := by
+  sorry
+
+/-- If R₁ becomes constant, the sequence is locked into the Sylvester recurrence. -/
+lemma constant_R1_forces_Sylvester (a : ℕ → ℕ) (S : ℝ) (q₁ : ℕ) (M : ℕ) (R : ℝ)
+    (ha_pos : ∀ m, (a m : ℝ) > 0)
+    (hR_pos : R > 0)
+    (h_const : ∀ m ≥ M, R₁ a S q₁ m = R) :
+    ∀ k ≥ M, (a (k + 1) : ℝ) = (a k : ℝ) * ((a k : ℝ) - 1) + 1 := by
+  intro k hk
+  have hRk : R₁ a S q₁ k = R := h_const k hk
+  have hRk1 : R₁ a S q₁ (k + 1) = R := h_const (k + 1) (by linarith)
+  have hRk2 : R₁ a S q₁ (k + 2) = R := h_const (k + 2) (by linarith)
+  have ha_neq : (a k : ℝ) ≠ 0 := ne_of_gt (ha_pos k)
+  have ha1_neq : (a (k + 1) : ℝ) ≠ 0 := ne_of_gt (ha_pos (k + 1))
+  
+  have step1 := R1_from_waste a S q₁ k ha_neq
+  have step2 := R1_from_waste a S q₁ (k + 1) ha1_neq
+  
+  unfold waste' at step1 step2
+  have hw1 : (a k : ℝ) * tail_sum' a S k * ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) = R₁ a S q₁ (k + 1) + ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) := by
+    calc
+      (a k : ℝ) * tail_sum' a S k * ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) = 
+      ((a k : ℝ) * tail_sum' a S k - 1) * ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) + ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) := by ring
+      _ = R₁ a S q₁ (k + 1) + ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) := by rw [← step1]
+      
+  have ht_P : R₁ a S q₁ k = ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) * tail_sum' a S k := by
+    unfold R₁; ring
+  have ha_R : (a k : ℝ) * R₁ a S q₁ k = R₁ a S q₁ (k + 1) + ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) := by
+    calc
+      (a k : ℝ) * R₁ a S q₁ k = (a k : ℝ) * tail_sum' a S k * ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) := by rw [ht_P]; ring
+      _ = R₁ a S q₁ (k + 1) + ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) := hw1
+  
+  rw [hRk, hRk1] at ha_R
+  have hPk : ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) = R * ((a k : ℝ) - 1) := by linarith
+  
+  have ht_P1 : R₁ a S q₁ (k + 1) = ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) * tail_sum' a S (k + 1) := by
+    unfold R₁; ring
+  have hw2 : (a (k + 1) : ℝ) * tail_sum' a S (k + 1) * ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) = R₁ a S q₁ (k + 2) + ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) := by
+    calc
+      (a (k + 1) : ℝ) * tail_sum' a S (k + 1) * ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) = 
+      ((a (k + 1) : ℝ) * tail_sum' a S (k + 1) - 1) * ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) + ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) := by ring
+      _ = R₁ a S q₁ (k + 2) + ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) := by rw [← step2]
+      
+  have ha_R1 : (a (k + 1) : ℝ) * R₁ a S q₁ (k + 1) = R₁ a S q₁ (k + 2) + ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) := by
+    calc
+      (a (k + 1) : ℝ) * R₁ a S q₁ (k + 1) = (a (k + 1) : ℝ) * tail_sum' a S (k + 1) * ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) := by rw [ht_P1]; ring
+      _ = R₁ a S q₁ (k + 2) + ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) := hw2
+      
+  rw [hRk1, hRk2] at ha_R1
+  have hPk1 : ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) = R * ((a (k + 1) : ℝ) - 1) := by linarith
+  
+  have hPk1_def : ((q₁ : ℝ) * ∏ i ∈ Finset.range (k + 1), (a i : ℝ)) = ((q₁ : ℝ) * ∏ i ∈ Finset.range k, (a i : ℝ)) * (a k : ℝ) := by
+    rw [Finset.prod_range_succ]
+    ring
+    
+  rw [hPk, hPk1] at hPk1_def
+  have hr : R ≠ 0 := ne_of_gt hR_pos
+  have h_sub : (a (k + 1) : ℝ) - 1 = (a k : ℝ) * ((a k : ℝ) - 1) := by
+    calc
+      (a (k + 1) : ℝ) - 1 = R * ((a (k + 1) : ℝ) - 1) / R := by rw [mul_div_cancel_left₀ _ hr]
+      _ = R * ((a k : ℝ) - 1) * (a k : ℝ) / R := by rw [hPk1_def]
+      _ = R * ((a k : ℝ) * ((a k : ℝ) - 1)) / R := by ring
+      _ = (a k : ℝ) * ((a k : ℝ) - 1) := by rw [mul_div_cancel_left₀ _ hr]
+  linarith
+
+/-- An eventually Sylvester sequence has an irrational sum for 1/(a_k-1), 
+    contradicting simultaneous rationality. -/
+lemma sylvester_contradicts_rationality (a : ℕ → ℕ) (M : ℕ)
+    (h_sylv : ∀ m > M, (a (m + 1) : ℝ) = (a m : ℝ) * ((a m : ℝ) - 1) + 1)
+    (h_sum2 : ∃ q₂ : ℚ, HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q₂) :
     False := by
   sorry
 
+/-- The final combinatorial contradiction: finite waste implies sequence is eventually 
+    Sylvester, contradicting rationality. -/
+lemma finite_waste_implies_contradiction (a : ℕ → ℕ) (S : ℝ) (q₁ : ℕ)
+    (δ : ℝ) (hδ : δ > 0)
+    (h_finite : ∃ K, ∀ k ≥ K, waste' a S k < 1 + δ)
+    (h_sum2 : ∃ q₂ : ℚ, HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q₂) :
+    False := by
+  sorry
 /-- The ceiling conjecture main theorem, assembled from the structural lemmas:
     Since case 2 (finite waste) is impossible, there must be infinitely many waste steps.
     Each waste step contracts the running sum, driving it to 0. 
