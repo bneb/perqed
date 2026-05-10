@@ -104,3 +104,34 @@ Both cases give contradictions. The Erdős 265 ceiling conjecture is **TRUE**. �
 - `e265d.c`: GMP dual-constraint simulation showing which constraint binds at each step
 - `erdos265_sim.c`: Original GMP simulation with fraction tracking (slower)
 
+## ADVERSARIAL AUDIT (same session)
+
+### Flaw found: Step 5 (Residual Stabilization) fails for non-greedy sequences
+
+The stabilization argument assumes the sequence chooses the MINIMUM valid aₖ
+at each step. But an arbitrary Erdős 265 sequence can choose any aₖ above
+the minimum. A larger aₖ causes BOTH residuals to increase:
+
+```
+Rs_new = (a_k - 1) * Rs - q2 * P2
+If a_k > floor(q2*P2/Rs) + 2: Rs_new > Rs (INCREASES, not decreases!)
+```
+
+The Sylvester/Mahler argument requires a CONSTANT residual to determine the
+sequence. Growing (but bounded) residuals don't trigger the irrationality proof.
+
+### What survives the audit
+1. R₁, Rs positive integer recurrence framework ✅
+2. If either residual becomes constant → contradiction (ES + Mahler) ✅
+3. Greedy sequences forced to have constant residual ✅
+4. Mahler bridge z=1/x giving transcendence of g(α) for algebraic α ∈ (0,1) ✅
+
+### What does NOT survive
+5. Arbitrary sequences forced to have constant residual ❌
+   Non-greedy choices keep both residuals growing while R/P → 0.
+
+### Status: Conjecture remains OPEN
+The Mahler bridge is a genuine new contribution, but it needs to be combined
+with a proof that doubly-exponential growth forces the sequence into a
+regime where one residual stabilizes.
+
