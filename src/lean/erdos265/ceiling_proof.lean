@@ -52,13 +52,25 @@ noncomputable def tail_sum' (a : ℕ → ℕ) (S : ℝ) (N : ℕ) : ℝ :=
 noncomputable def waste' (a : ℕ → ℕ) (S : ℝ) (N : ℕ) : ℝ :=
   (a N : ℝ) * tail_sum' a S N
 
+noncomputable def R₁_sc (a : ℕ → ℕ) (p : ℤ) (q : ℕ) (N : ℕ) : ℝ :=
+  (q : ℝ) * (∏ i ∈ Finset.range N, (a i : ℝ)) *
+    (↑p / ↑q - ∑ i ∈ Finset.range N, (1 : ℝ) / (a i : ℝ))
+
+noncomputable def R_shift_sc (a : ℕ → ℕ) (p₂ : ℤ) (q₂ : ℕ) (N : ℕ) : ℝ :=
+  (q₂ : ℝ) * (∏ i ∈ Finset.range N, ((a i : ℝ) - 1)) *
+    (↑p₂ / ↑q₂ - ∑ i ∈ Finset.range N, (1 : ℝ) / ((a i : ℝ) - 1))
+
+noncomputable def C_val (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q₁ q₂ : ℕ) (N : ℕ) : ℝ :=
+  (q₁ : ℝ) * (R_shift_sc a p₂ q₂ N) * (∏ i ∈ Finset.range N, (a i : ℝ)) -
+  (q₂ : ℝ) * (R₁_sc a p₁ q₁ N) * (∏ i ∈ Finset.range N, ((a i : ℝ) - 1))
+
 /-- A contiguous run of greedy steps cannot exceed a bounded length M.
     This is due to the Diophantine Squeeze on the coupling recurrence C(N),
     which explodes during greedy runs and cannot be closed by an integer a_k. -/
-lemma greedy_run_bounded (a : ℕ → ℕ) (S₁ S₂ : ℝ) (q₁ q₂ : ℕ)
-    (h_sum1 : ∃ q_rat : ℚ, HasSum (fun k => (1 : ℝ) / (a k : ℝ)) ↑q_rat)
-    (h_sum2 : ∃ q_rat : ℚ, HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q_rat) :
-    ∃ M : ℕ, ∀ K, ∃ j ≤ M, waste' a S₁ (K + j) > 1 + 1 / ((a (K + j) : ℝ) - 1) := by
+lemma greedy_run_bounded (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q₁ q₂ : ℕ)
+    (h_sum1 : HasSum (fun k => (1 : ℝ) / (a k : ℝ)) (↑p₁ / ↑q₁))
+    (h_sum2 : HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) (↑p₂ / ↑q₂)) :
+    ∃ M : ℕ, ∀ K, ∃ j ≤ M, waste' a (↑p₁ / ↑q₁) (K + j) > 1 + 1 / ((a (K + j) : ℝ) - 1) := by
   sorry
 
 /-- If the distance between waste steps is bounded by M, the sequence cannot

@@ -27,11 +27,21 @@ This document serves as a laboratory log for our formalization efforts on the Er
 - By spacing waste steps further and further apart, a sequence could theoretically achieve $\limsup S_k = \log 2$ (and thus $\limsup a_k^{1/2^k} = 2$), completely bypassing the contraction.
 **Correction:** We abandoned the pure running sum contraction in favor of the **Coupling Diophantine Squeeze**. The length of the greedy runs is strictly bounded because the coupling residual $C(N)$ grows astronomically during greedy steps and cannot be "closed" by an integer denominator if the run is too long.
 
-## Current Successful Path: The Coupling Diophantine Squeeze
+## Failed Attempt 4: The Pure Diophantine Squeeze (No Waste Steps)
+**Date:** May 2026
+**Strategy:** We attempted to completely bypass the concept of "waste steps" and "greedy runs" by analyzing the coupling recurrence $C(N)$ directly. We proved $C(N) \ge 1$ always. We then hypothesized that if the sequence achieves $\limsup a_N^{1/2^N} = 2$, it must perfectly mimic Sylvester growth, which would force $C(N)$ to converge to a constant. This would trigger the Diophantine equation $y^2 - y = x^2 - x + 1$, which has no integer solutions, supposedly proving $\limsup \le 1$ algebraically.
+**Why it failed:**
+- A deeper algebraic Red Team pass revealed a fundamental flaw: for the exact Sylvester sequence ($a_{N+1} = a_N(a_N-1) + 1$), the quantity $C(N)$ does **not** converge to a constant! 
+- In fact, $C(N)$ grows exactly by a factor of $a_N - 1$ at each step for the Sylvester sequence.
+- Because $C(N)$ is not constant, the "no integer solutions" Diophantine obstruction $y^2 - y = x^2 - x + 1$ is mathematically irrelevant to the sequence's actual growth.
+- Furthermore, we *already* have a proven contradiction for the exact Sylvester sequence: `sylvester_shifted_irrational` in `negative_resolution.lean` proves that Sylvester sequences cannot have a rational shifted sum. We do not need a new algebraic lemma to handle the boundary case.
+**Correction:** We reverted back to the **Bounded Greedy Runs** logic (Attempt 3 correction). The Coupling Squeeze explosion is real, but it must be used to physically bound the length of greedy runs, which forces waste steps to occur frequently enough to collapse the running sum to zero.
+
+## Current Successful Path: The Coupling Diophantine Squeeze (with Bounded Runs)
 **Date:** May 2026
 **Strategy:** 
-1. The sequence cannot be purely greedy eventually (Case 2) because that forces Sylvester growth, contradicting the rationality of $\sum 1/(a_k - 1)$.
+1. The sequence cannot be purely greedy eventually (Case 2) because that forces Sylvester growth, contradicting the rationality of $\sum 1/(a_k - 1)$ (`sylvester_shifted_irrational`).
 2. Therefore, there are infinitely many waste steps.
 3. Between waste steps, the sequence follows greedy runs. During a greedy run, the coupling residual $C(N)$ explodes.
 4. Because the residual must eventually be closed by an integer, the greedy runs cannot be arbitrarily long (`greedy_run_bounded`).
-5. Because the distance between waste steps is strictly bounded, the sequence's growth is uniformly throttled below the double-exponential Sylvester rate, forcing $\limsup a_k^{1/2^k} \le 1$.
+5. Because the distance between waste steps is strictly bounded, the running sum $S_N$ is frequently cut down. This forces the sequence's growth to be uniformly throttled below the double-exponential Sylvester rate, leading to $\limsup a_k^{1/2^k} \le 1$.
