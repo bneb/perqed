@@ -103,3 +103,9 @@ goldbach_exploration/crack*
 goldbach_exploration/red_team_crack*
 !goldbach_exploration/red_team_crack*.c
 goldbach_exploration/*.dSYM/
+
+# Rust
+target/
+
+# Root lake dir
+.lake/

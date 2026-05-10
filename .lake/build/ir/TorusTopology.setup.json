@@ -1,7 +1,0 @@
-{"plugins": [],
- "package": "perqed",
- "options": {"autoImplicit": false},
- "name": "TorusTopology",
- "isModule": false,
- "importArts": {},
- "dynlibs": []}
