@@ -223,3 +223,15 @@ sequence — which circles back to the original ES problem.
 - Coupling forces L rational: ✓ (if both residuals truly bounded)
 - L is always irrational: ❌ (not proved, argument was flawed)
 - Conjecture: STILL OPEN
+
+## Modular Recurrence of Residuals (same session)
+
+### The constraint
+For integer sequences, the sequence of residuals R₁ modulo each other follows:
+`a_k^2 * R1(k) + R1(k+2) ≡ 0 (mod R1(k+1))`
+This comes from the integrality of a_k = (R1(k+1) + q1*P1(k)) / R1(k) and P1(k+1) = P1(k)*a_k.
+
+### Computational check
+We enumerated all valid transitions (r, r') -> (r', r'') for small bounded state spaces (e.g., B=5).
+Result: The modular constraint allows **non-constant cycles** (e.g., oscillating between different residual values).
+Conclusion: The modular recurrence alone is not enough to force R₁ to a constant value. It provides a strong structural constraint, but we need to couple it with the Rs recurrence to extract the final contradiction.
