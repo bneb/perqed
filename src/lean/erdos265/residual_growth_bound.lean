@@ -374,15 +374,55 @@ lemma limsup_gt_one_extract_limit (seq : ℕ → ℕ)
   **Residual Positivity**
   
   For a sequence ≥ 2 with rational sum p/q, the tail residuals are positive integers.
-  
-  **Status**: sorry. Requires showing the tail sum identity gives T_n = q·P_n·(tail sum) > 0.
 -/
+lemma hasSum_pos_of_ge_two (seq : ℕ → ℕ) (q : ℚ)
+    (hGe2 : ∀ k, seq k ≥ 2)
+    (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ↑q) :
+    (q : ℝ) > 0 := by
+  have hSummable := hSum.summable
+  have h_nonneg : ∀ k, (0 : ℝ) ≤ (1 : ℝ) / (seq k : ℝ) := by
+    intro k; positivity
+  have h0_pos : (0 : ℝ) < (1 : ℝ) / (seq 0 : ℝ) := by
+    apply div_pos (zero_lt_one)
+    have : seq 0 ≥ 2 := hGe2 0
+    exact_mod_cast (show (0 : ℕ) < seq 0 by omega)
+  have h_tsum_pos : (0 : ℝ) < ∑' k, (1 : ℝ) / (seq k : ℝ) := 
+    tsum_pos hSummable h_nonneg 0 h0_pos
+  rw [hSum.tsum_eq] at h_tsum_pos
+  exact h_tsum_pos
+
+/--
+  **Status**: sorry. Requires the tail-sum identity T_n = denom·P_n·Σ > 0.
+-/
+lemma tailResidual_pos_inductive (seq : ℕ → ℕ) (num denom : ℕ) 
+    (_hGe2 : ∀ k, seq k ≥ 2) (_hNum : num > 0) (_hDenom : denom ≥ 1)
+    (_hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
+    (k : ℕ) : tailResidual seq num denom k > 0 := by
+  sorry
+
 lemma residual_pos_of_rational_sum (seq : ℕ → ℕ) (q : ℚ) 
-    (_hGe2 : ∀ k, seq k ≥ 2)
-    (_hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ↑q) :
+    (hGe2 : ∀ k, seq k ≥ 2)
+    (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ↑q) :
     q.num > 0 ∧ q.den ≥ 1 ∧ 
     (∀ k, tailResidual seq q.num.toNat q.den k > 0) := by
-  sorry
+  have hq_pos := hasSum_pos_of_ge_two seq q hGe2 hSum
+  have hq_num_pos : q.num > 0 := by
+    have hq_rat_pos : q > 0 := by exact_mod_cast hq_pos
+    exact Rat.num_pos.mpr hq_rat_pos
+  refine ⟨hq_num_pos, q.pos, ?_⟩
+  intro k
+  have hNum : q.num.toNat > 0 := by
+    have := Int.toNat_of_nonneg (le_of_lt hq_num_pos)
+    omega
+  have hSum_nd : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((q.num.toNat : ℝ) / q.den) := by
+    have hq_eq : (q : ℝ) = (q.num.toNat : ℝ) / (q.den : ℝ) := by
+      have h_num : (q.num.toNat : ℤ) = q.num := Int.toNat_of_nonneg (le_of_lt hq_num_pos)
+      rw [Rat.cast_def]
+      congr 1
+      exact_mod_cast h_num.symm
+    rw [hq_eq] at hSum
+    exact hSum
+  exact tailResidual_pos_inductive seq q.num.toNat q.den hGe2 hNum q.pos hSum_nd k
 
 /-- 
   **The Full Chain: limsup > 1 + rational sum → eventually Sylvester recurrence**
