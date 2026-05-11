@@ -29,7 +29,7 @@ The proof relies on:
 | `beta_n_bound` | irrational_Rs.lean | sum | Medium | ❌ Pending |
 | `b_add_one_mod_four` | irrational_Rs.lean | mod | Easy | ✔️ PROVEN |
 | `eight_dvd_D` | irrational_Rs.lean | dvd | Easy | ✔️ PROVEN |
-| `r_decay` | irrational_Rs.lean | ineq | Medium | ❌ Pending (Algebra verified in test script) |
-| `tendsto_r` | irrational_Rs.lean | lim | Easy | ❌ Pending |
+| `r_decay` | irrational_Rs.lean | ineq | Medium | ✔️ PROVEN |
+| `tendsto_r` | irrational_Rs.lean | lim | Easy | ✔️ PROVEN |
 | `Rs_irrational` | irrational_Rs.lean | logic| Easy | ❌ Pending |
 -/
