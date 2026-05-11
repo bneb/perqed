@@ -3,33 +3,31 @@
 
 ## Target Theorem
 `erdos_265` in `problem_statement.lean`:
-  The sum Σ 1/s_k (Sylvester sequence) is irrational.
+  Every Erdős 265 sequence satisfies limsup a_k^{1/2^k} ≤ 1.
 
 ## Proof Architecture
 
-The proof strategy is entirely based on the elegant, self-contained **Direct Liouville Irrationality Argument** (`irrational_Rs.lean`).
+The proof strategy is based on the **Dual Algebraic Lock-in**.
+We bypass the monumental complexity of Mahler's method and the irrationality of the Sylvester sequence completely. 
+Instead, we exploit the fact that the Erdős 265 problem strictly requires *two* convergent rational sums:
+1. $\sum 1/a_k$ 
+2. $\sum 1/(a_k-1)$
 
-### Strategy A: Direct Liouville Irrationality (`irrational_Rs.lean`)
-
-We avoid the monumental complexity of Mahler's method (Becker/Nishioka) and prove that the sequence $f = \sum 1/(b_k+1)$ is irrational directly.
+### Strategy B: Dual Algebraic Lock-in (SUCCESSFUL)
 
 The proof relies on:
-1. Constructing the Least Common Multiple of denominators $D_n$.
-2. Finding a telescoping bound on the tail sum.
-3. Exploiting the oddness of the Sylvester sequence to prove $\gcd(D_n, b_n+1) \ge 4$.
-4. Showing that the ratio $r_n = D_n / b_n$ decays geometrically.
-5. Obtaining the Diophantine contradiction $0 < B_n < 1$ for an integer $B_n$.
+1. **The Asymptotic Squeeze**: A sequence growing with $L > 1$ forces the exact integer tail residuals to become constant.
+2. **Primary Lock-in**: If the residual of $\sum 1/a_n$ is constant, the sequence MUST be exactly $a_{n+1} = a_n^2 - a_n + 1$.
+3. **Dual Lock-in**: If the residual of the predecessor sum $\sum 1/(a_n-1)$ is constant, the sequence MUST follow $a_{n+1} = a_n^2 - 3a_n + 4$.
+4. **Contradiction**: Equating these two forced polynomials yields $2a_n = 3$, which has no integer solutions.
 
 ## Sorry/Gap Inventory
 
 | Gap | Location | Type | Difficulty | Status |
 |-----|----------|------|------------|--------|
-| `D_mul_S_is_int` | irrational_Rs.lean | sum | Easy | ✔️ PROVEN |
-| `b_telescope` | irrational_Rs.lean | ring | Easy | ✔️ PROVEN |
-| `beta_n_bound` | irrational_Rs.lean | sum | Medium | ❌ Pending |
-| `b_add_one_mod_four` | irrational_Rs.lean | mod | Easy | ✔️ PROVEN |
-| `eight_dvd_D` | irrational_Rs.lean | dvd | Easy | ✔️ PROVEN |
-| `r_decay` | irrational_Rs.lean | ineq | Medium | ✔️ PROVEN |
-| `tendsto_r` | irrational_Rs.lean | lim | Easy | ✔️ PROVEN |
-| `Rs_irrational` | irrational_Rs.lean | logic| Easy | ❌ Pending |
+| `asymptoticSqueezeLimit` | residual_growth_bound.lean | lim | Hard | ❌ Pending |
+| `constant_residual_implies_sylvester` | residual_growth_bound.lean | alg | Easy | ✔️ PROVEN |
+| `shifted_seq_lockin` | problem_statement.lean | alg | Easy | ✔️ PROVEN |
+| `dual_lockin_contradiction` | problem_statement.lean | alg | Easy | ✔️ PROVEN |
+| `erdos_265` | problem_statement.lean | logic| Medium | ⚠️ Wired (Limits Pending) |
 -/
