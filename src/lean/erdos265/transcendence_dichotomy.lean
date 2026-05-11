@@ -42,6 +42,7 @@ theorem nishioka_transcendence (F : ℂ → ℂ) (α : ℂ)
     (h_super : phi 0 = 0)
     (h_F_zero : F 0 = 0)
     (h_F_diff : DifferentiableAt ℂ F 0)
+    (h_not_rat : ¬ ∃ (P Q : Polynomial ℂ), Q ≠ 0 ∧ IsCoprime P Q ∧ ∀ w, F w = (P.eval w) / (Q.eval w))
     (h_alg : IsAlgebraic ℚ α)
     (h_conv : abs α < 1) : 
     Transcendental ℚ (F α) := by
@@ -68,6 +69,11 @@ lemma transcendental_implies_irrational (x : ℂ) (h : Transcendental ℚ x) :
     · simp
   exact h h_alg
 
+/-- Step 3: Evaluating the second derivative at `w=1` forces `1 = 1/2`, a contradiction. -/
+lemma F_is_not_rational (F : ℂ → ℂ) (hF : SatisfiesMahlerEquation F) : 
+    ¬ ∃ (P Q : Polynomial ℂ), Q ≠ 0 ∧ IsCoprime P Q ∧ ∀ w, F w = (P.eval w) / (Q.eval w) := by
+  sorry
+
 /--
   **The Resolution of the Rs Case**
 -/
@@ -79,6 +85,7 @@ theorem erdos265_irrational_Rs (F : ℂ → ℂ) (hF : SatisfiesMahlerEquation F
   · exact phi_super_attracting
   · exact h_F_zero
   · exact h_F_diff
+  · exact F_is_not_rational F hF
   · -- 1/2 is algebraic over ℚ
     use 2 * X - 1
     constructor
