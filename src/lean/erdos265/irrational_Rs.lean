@@ -1,24 +1,8 @@
 import Mathlib
 
-/-!
-# Erdős 265: Direct Liouville Irrationality of the $R_s$ Branch
+open Topology
+open scoped BigOperators
 
-This file proves that the sum of the reciprocal of the shifted Sylvester sequence
-is irrational. The proof is a fully self-contained elementary argument using
-Diophantine approximation and Least Common Multiples, bypassing Mahler's method.
-
-The sequence:
-  b_0 = 2
-  b_{n+1} = b_n^2 - b_n + 1
-
-We prove that f = ∑ 1/(b_n + 1) is irrational.
--/
-
-open Filter Topology Real Nat
-
-noncomputable section
-
-/-- The Sylvester sequence -/
 def b : ℕ → ℕ
   | 0 => 2
   | n + 1 => b n * b n - b n + 1
@@ -43,12 +27,10 @@ lemma b_ge_two (n : ℕ) : 2 ≤ b n := by
       rw [Nat.mul_sub_left_distrib, Nat.mul_one]
     omega
 
-/-- Least common multiple of denominators up to n-1. -/
 def D : ℕ → ℕ
   | 0 => 1
   | n + 1 => Nat.lcm (D n) (b n + 1)
 
-/-- D n is always positive. -/
 lemma D_pos (n : ℕ) : 0 < D n := by
   induction n with
   | zero => decide
@@ -59,7 +41,6 @@ lemma D_pos (n : ℕ) : 0 < D n := by
       omega
     exact Nat.lcm_pos ih hb
 
-/-- (b k + 1) divides D n for all k < n. -/
 lemma b_add_one_dvd_D (k n : ℕ) (h : k < n) : (b k + 1) ∣ D n := by
   induction n with
   | zero => exact (Nat.not_lt_zero k h).elim
@@ -71,13 +52,9 @@ lemma b_add_one_dvd_D (k n : ℕ) (h : k < n) : (b k + 1) ∣ D n := by
     · have h_dvd := ih hk
       exact Nat.dvd_trans h_dvd (Nat.dvd_lcm_left (D m) (b m + 1))
 
-open scoped BigOperators
-
-/-- The partial sum S_n = ∑_{k=0}^{n-1} 1/(b_k+1) -/
 noncomputable def S (n : ℕ) : ℚ :=
   Finset.sum (Finset.range n) (fun k => (1 : ℚ) / (b k + 1))
 
-/-- D_n * S_n is an integer. -/
 lemma D_mul_S_is_int (n : ℕ) : ∃ (z : ℤ), (D n : ℚ) * S n = z := by
   dsimp [S]
   rw [Finset.mul_sum]
@@ -112,15 +89,6 @@ lemma D_mul_S_is_int (n : ℕ) : ∃ (z : ℤ), (D n : ℚ) * S n = z := by
   push_cast
   rfl
 
-/-- The tail sum β_n = ∑_{k=n}^{∞} 1/(b_k+1) -/
-noncomputable def beta_n (n : ℕ) : ℝ :=
-  ∑' (k : ℕ), if k ≥ n then (1 : ℝ) / (b k + 1) else 0
-
-/-- B_n = q * D_n * β_n -/
-noncomputable def B_n (q : ℕ) (n : ℕ) : ℝ :=
-  (q : ℝ) * (D n : ℝ) * beta_n n
-
-/-- Telescoping identity for b_k -/
 lemma b_telescope (k : ℕ) : (1 : ℝ) / (b k - 1) - (1 : ℝ) / (b (k + 1) - 1) = (1 : ℝ) / b k := by
   have hk : (b k : ℝ) ≠ 0 := by
     have := b_pos k
@@ -159,15 +127,73 @@ lemma b_telescope (k : ℕ) : (1 : ℝ) / (b k - 1) - (1 : ℝ) / (b (k + 1) - 1
         exact h_pos
       · exact hk
 
-/-- Upper bound on beta_n -/
-lemma beta_n_bound (n : ℕ) (hn : n ≥ 1) : beta_n n < (1 : ℝ) / (b n - 1) := by
-  sorry
+lemma beta_term_pos (k : ℕ) : (0 : ℝ) < 1 / (b k + 1) := by
+  have hk : (0 : ℝ) < b k := by
+    have h2 := b_ge_two k
+    exact_mod_cast (by linarith : 0 < b k)
+  positivity
 
-/-- r_n = D_n / b_n -/
+lemma beta_term_lt (k : ℕ) : (1 : ℝ) / (b k + 1) < (1 : ℝ) / (b k - 1) - (1 : ℝ) / (b (k + 1) - 1) := by
+  rw [b_telescope k]
+  have hk : (0 : ℝ) < b k := by
+    have h2 := b_ge_two k
+    exact_mod_cast (by linarith : 0 < b k)
+  have hk1 : (0 : ℝ) < b k + 1 := by linarith
+  rw [div_lt_div_iff hk1 hk]
+  linarith
+
+lemma sum_range_shifted_strict_bound (n N : ℕ) :
+  Finset.sum (Finset.range N) (fun k => (1 : ℝ) / (b (k + n) + 1)) ≤ (1 : ℝ) / (b n - 1) - (1 : ℝ) / (b (N + n) - 1) := by
+  induction' N with N ih
+  · simp
+  · rw [Finset.sum_range_succ]
+    have h_lt := beta_term_lt (N + n)
+    have h_eq : N + n + 1 = N + 1 + n := by omega
+    rw [h_eq] at h_lt
+    linarith
+
+lemma sum_range_shifted_bound (n N : ℕ) :
+  Finset.sum (Finset.range N) (fun k => (1 : ℝ) / (b (k + n) + 1)) ≤ (1 : ℝ) / (b n - 1) := by
+  have h_strict := sum_range_shifted_strict_bound n N
+  have hb := b_ge_two (N + n)
+  have hb_real : (2 : ℝ) ≤ b (N + n) := by exact_mod_cast hb
+  have hd_pos : (0 : ℝ) < b (N + n) - 1 := by linarith
+  have h_pos : (0 : ℝ) < 1 / (b (N + n) - 1) := by positivity
+  linarith
+
+lemma beta_n_summable (n : ℕ) : Summable (fun k => (1 : ℝ) / (b (k + n) + 1)) := by
+  apply summable_of_sum_range_le (c := (1 : ℝ) / (b n - 1))
+  · intro k
+    exact le_of_lt (beta_term_pos (k + n))
+  · exact sum_range_shifted_bound n
+
+noncomputable def beta_n (n : ℕ) : ℝ :=
+  ∑' (k : ℕ), (1 : ℝ) / (b (k + n) + 1)
+
+lemma beta_n_pos (n : ℕ) : 0 < beta_n n := by
+  have h_summable := beta_n_summable n
+  exact tsum_pos h_summable (fun k => le_of_lt (beta_term_pos (k + n))) 0 (beta_term_pos (0 + n))
+
+lemma beta_n_le (n : ℕ) : beta_n n ≤ (1 : ℝ) / (b n - 1) := by
+  have h := beta_n_summable n
+  exact tsum_le_of_sum_range_le h (sum_range_shifted_bound n)
+
+lemma sum_split (n : ℕ) : (∑' k, (1 : ℝ) / (b k + 1)) = (S n : ℝ) + beta_n n := by
+  have h_summable := beta_n_summable 0
+  have h_eq : (fun k => (1 : ℝ) / (b (k + 0) + 1)) = (fun k => (1 : ℝ) / (b k + 1)) := by
+    ext k
+    rfl
+  rw [h_eq] at h_summable
+  have h_S : (S n : ℝ) = Finset.sum (Finset.range n) (fun k => (1 : ℝ) / (b k + 1)) := by
+    dsimp [S]
+    push_cast
+    rfl
+  rw [h_S]
+  exact (sum_add_tsum_nat_add n h_summable).symm
+
 noncomputable def r (n : ℕ) : ℝ :=
   (D n : ℝ) / (b n : ℝ)
 
-/-- D_n is a multiple of 8 for n ≥ 3 -/
 lemma eight_dvd_D (n : ℕ) (hn : n ≥ 3) : 8 ∣ D n := by
   have h_lt : 2 < n := hn
   have h_dvd := b_add_one_dvd_D 2 n h_lt
@@ -175,7 +201,6 @@ lemma eight_dvd_D (n : ℕ) (hn : n ≥ 3) : 8 ∣ D n := by
   have h_8 : b 2 + 1 = 8 := by rw [h_b2]
   rwa [h_8] at h_dvd
 
-/-- b_n is 3 mod 4 for n ≥ 1 -/
 lemma b_mod_four (n : ℕ) (hn : n ≥ 1) : b n % 4 = 3 := by
   induction' n, hn using Nat.le_induction with k hk ih
   · rfl
@@ -194,7 +219,6 @@ lemma b_mod_four (n : ℕ) (hn : n ≥ 1) : b n % 4 = 3 := by
     rw [h3]
     omega
 
-/-- b_n + 1 is divisible by 4 for n ≥ 1 -/
 lemma b_add_one_mod_four (n : ℕ) (hn : n ≥ 1) : (b n + 1) % 4 = 0 := by
   have h := b_mod_four n hn
   omega
@@ -216,7 +240,6 @@ lemma b_ge_43 (n : ℕ) (hn : n ≥ 3) : 43 ≤ b n := by
   have h_mono := b_strictMono.monotone hn
   omega
 
-/-- The geometric decay of r_n -/
 lemma r_decay (n : ℕ) (hn : n ≥ 3) : r (n + 1) < r n / 3 := by
   have h_b_pos : (0 : ℝ) < b n := by
     have h := b_ge_two n
@@ -309,7 +332,6 @@ lemma r_decay (n : ℕ) (hn : n ≥ 3) : r (n + 1) < r n / 3 := by
       apply mul_lt_mul_of_pos_left h_target h_D_pos
     _ = (D n : ℝ) / (b n : ℝ) / 3 := by ring
 
-/-- Limit of r_n is 0 -/
 lemma tendsto_r : Filter.Tendsto r Filter.atTop (𝓝 0) := by
   have h_pos : ∀ n, 0 ≤ r n := by
     intro n
@@ -362,9 +384,93 @@ lemma tendsto_r : Filter.Tendsto r Filter.atTop (𝓝 0) := by
       
   exact (Filter.tendsto_add_atTop_iff_nat 3).1 h_tendsto_shifted
 
-/-- The main target theorem. -/
-theorem Rs_irrational :
-    Irrational (∑' k : ℕ, (1 : ℝ) / (b k + 1)) := by
-  sorry
-
-end
+theorem Rs_irrational : Irrational (∑' k : ℕ, (1 : ℝ) / (b k + 1)) := by
+  intro h_rat
+  rcases h_rat with ⟨q, hq_eq⟩
+  
+  have hB_pos : ∀ (n : ℕ), 0 < (q.den : ℝ) * (D n : ℝ) * beta_n n := by
+    intro n
+    have h1 : (0 : ℝ) < q.den := by exact_mod_cast q.den_pos
+    have h2 : (0 : ℝ) < D n := by exact_mod_cast (D_pos n)
+    have h3 : 0 < beta_n n := beta_n_pos n
+    positivity
+    
+  have hB_bound : ∀ (n : ℕ), (q.den : ℝ) * (D n : ℝ) * beta_n n ≤ 2 * (q.den : ℝ) * r n := by
+    intro n
+    have hb : beta_n n ≤ 1 / (b n - 1 : ℝ) := beta_n_le n
+    calc
+      (q.den : ℝ) * (D n : ℝ) * beta_n n ≤ (q.den : ℝ) * (D n : ℝ) * (1 / (b n - 1 : ℝ)) := by
+        apply mul_le_mul_of_nonneg_left hb
+        have h1 : (0 : ℝ) < q.den := by exact_mod_cast q.den_pos
+        have h2 : (0 : ℝ) < D n := by exact_mod_cast (D_pos n)
+        positivity
+      _ = (q.den : ℝ) * ((D n : ℝ) / (b n - 1 : ℝ)) := by ring
+      _ ≤ (q.den : ℝ) * (2 * ((D n : ℝ) / (b n : ℝ))) := by
+        apply mul_le_mul_of_nonneg_left
+        · have hb2 : 2 ≤ b n := b_ge_two n
+          have hb2_real : (2 : ℝ) ≤ b n := by exact_mod_cast hb2
+          have hd_pos : (0 : ℝ) < D n := by exact_mod_cast (D_pos n)
+          have h_mul_div : 2 * ((D n : ℝ) / (b n : ℝ)) = (2 * (D n : ℝ)) / (b n : ℝ) := by ring
+          rw [h_mul_div]
+          have h_pos1 : (0 : ℝ) < b n - 1 := by linarith
+          have h_pos2 : (0 : ℝ) < b n := by linarith
+          rw [div_le_div_iff h_pos1 h_pos2]
+          nlinarith
+        · have h1 : (0 : ℝ) < q.den := by exact_mod_cast q.den_pos
+          positivity
+      _ = 2 * (q.den : ℝ) * r n := by
+        dsimp [r]
+        ring
+        
+  have hB_lt_one : ∃ N, ∀ n ≥ N, (q.den : ℝ) * (D n : ℝ) * beta_n n < 1 := by
+    have h_lim : Filter.Tendsto (fun n => 2 * (q.den : ℝ) * r n) Filter.atTop (𝓝 (2 * (q.den : ℝ) * 0)) := by
+      exact Filter.Tendsto.const_mul (2 * (q.den : ℝ)) tendsto_r
+    have h_lim_zero : Filter.Tendsto (fun n => 2 * (q.den : ℝ) * r n) Filter.atTop (𝓝 0) := by
+      have h_zero : 2 * (q.den : ℝ) * 0 = 0 := mul_zero _
+      rw [← h_zero]
+      exact h_lim
+    have h_met := Metric.tendsto_atTop.mp h_lim_zero 1 (by norm_num)
+    rcases h_met with ⟨N, hN⟩
+    use max N 1
+    intro n hn
+    have hnN : n ≥ N := le_trans (le_max_left N 1) hn
+    have h1 := hB_bound n
+    have h2 := hN n hnN
+    rw [Real.dist_eq] at h2
+    have h3 : 2 * (q.den : ℝ) * r n - 0 = 2 * (q.den : ℝ) * r n := sub_zero _
+    rw [h3] at h2
+    have h4 : 2 * (q.den : ℝ) * r n ≤ |2 * (q.den : ℝ) * r n| := le_abs_self _
+    linarith
+    
+  have hB_int : ∀ (n : ℕ), ∃ z : ℤ, (q.den : ℝ) * (D n : ℝ) * beta_n n = (z : ℝ) := by
+    intro n
+    have h_sum_split : (∑' (k : ℕ), 1 / ((b k : ℝ) + 1)) = (S n : ℝ) + beta_n n := sum_split n
+    have h_beta_eq : beta_n n = (q : ℝ) - (S n : ℝ) := by
+      rw [← hq_eq] at h_sum_split
+      linarith
+    have h_B_eq : (q.den : ℝ) * (D n : ℝ) * beta_n n = (q.num : ℝ) * (D n : ℝ) - (q.den : ℝ) * ((D n : ℝ) * (S n : ℝ)) := by
+      rw [h_beta_eq]
+      have h_q_eq : (q : ℝ) * (q.den : ℝ) = (q.num : ℝ) := by exact_mod_cast q.mul_den_eq_num
+      calc
+        (q.den : ℝ) * (D n : ℝ) * ((q : ℝ) - S n) = (q.den : ℝ) * (D n : ℝ) * (q : ℝ) - (q.den : ℝ) * (D n : ℝ) * S n := by ring
+        _ = (q : ℝ) * (q.den : ℝ) * (D n : ℝ) - (q.den : ℝ) * ((D n : ℝ) * S n) := by ring
+        _ = (q.num : ℝ) * (D n : ℝ) - (q.den : ℝ) * ((D n : ℝ) * S n) := by rw [h_q_eq]
+    rcases D_mul_S_is_int n with ⟨z, hz⟩
+    use q.num * (D n : ℤ) - q.den * z
+    push_cast
+    rw [h_B_eq]
+    congr 1
+    have hz_real : (D n : ℝ) * (S n : ℝ) = (z : ℝ) := by exact_mod_cast hz
+    rw [hz_real]
+    
+  rcases hB_lt_one with ⟨N, hN⟩
+  let n := max N 1
+  have hnN : n ≥ N := le_max_left N 1
+  have h1 : 0 < (q.den : ℝ) * (D n : ℝ) * beta_n n := hB_pos n
+  have h2 : (q.den : ℝ) * (D n : ℝ) * beta_n n < 1 := hN n hnN
+  rcases hB_int n with ⟨z, hz⟩
+  rw [hz] at h1 h2
+  
+  have h3 : 0 < z := by exact_mod_cast h1
+  have h4 : z < 1 := by exact_mod_cast h2
+  omega
