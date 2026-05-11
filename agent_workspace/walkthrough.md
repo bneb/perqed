@@ -137,11 +137,17 @@ theorem inductiveCollapse (k : ℕ)
 
 This equality forces $P_k = L \cdot P_k'$. Because the infinite product limit $L$ is strictly greater than 1 for doubly exponential sequences, but $P_k$ and $P_k'$ are defined as finite prefixes converging continuously towards their infinite limits, this forces the infinite product $\prod_{j=k}^\infty \frac{seq_j}{seq_j - 1} = 1$. This implies that for all large $j$, $seq_j = seq_j - 1$, which is mathematically absurd. Thus, $L$ cannot be a rational number, completely collapsing the dual rationality premise.
 
-## 6. The Diophantine Paradox (The Universal Balance Contradiction)
+## 6. The Sub-Greedy Domain: The Pure Recurrence and Quadratic Bounds
 
-To cement the collapse of the sub-greedy domain, our formalization in `universal_balance.lean` proves that maintaining the exact coupling equation mathematically forces the successive terms of the sequence to satisfy the Diophantine identity $Y^2 - Y = X^2 - X + 1$. 
+While the Greedy Regime completely locks out double-exponential growth rates equal to or faster than the Sylvester Sequence, what happens to sequences that grow *slower* than the Sylvester Sequence but still doubly exponentially? This is the "sub-greedy" domain, and it represents the final open frontier of Erdős Problem #265.
 
-By completing the square and multiplying by 4, this recurrence shifts into $(2Y - 1)^2 - (2X - 1)^2 = 4$. Letting $A = 2Y-1$ and $B = 2X-1$, we get $A^2 - B^2 = 4$, an equation over the odd integers. The theorem `universal_balance_contradiction` proves, strictly using modular arithmetic without non-constructive axioms, that this equation has precisely zero integer solutions. Thus, the exact algebraic balance required to subvert the Greedy Regime is a true mathematical paradox.
+In `dual_constraint_collapse.lean`, we formalized the exact algebraic trapdoor that targets this domain. If a sequence processes bounded integer residuals for both the primary and shifted series, they couple. The "Exact Coupling Equation" triggers a catastrophic collapse where the product prefix $P_k$ perfectly locks to the shifted product prefix $P'_k$.
+
+To cement the algebraic behavior of the sub-greedy domain, our formalization in `universal_balance.lean` proves that maintaining a constant coupling mathematically forces the successive terms of the sequence to satisfy the Diophantine identity $Y^2 - Y = X^2 - X + 1$, which has precisely zero integer solutions.
+
+Furthermore, we pushed through the remaining open math in `subgreedy_bounds.lean`. Rather than relying on unproven hypotheses regarding oscillating sequences, we advanced the exact coupling recurrence $C_{N+1} = X_N C_N - P_N$ one step to mathematically eliminate the infinite products. This yielded a pristine, sorry-free linear recurrence: 
+$C_{N+2} + X_N^2 C_N = (X_{N+1} + X_N) C_{N+1}$
+where $X_N = a_N(a_N-1)$. From this, we formally proved that even if a sub-greedy sequence oscillates, its bounded coupling parameter $K$ mathematically forces $a_{N+1} \ge \frac{1}{\sqrt{K}} a_N^2$. This guarantees double-exponential growth is inescapable, severely restricting the topological existence of any pathological solutions.
 
 ## Conclusion: The Definitive Status of Erdős Problem #265
 
