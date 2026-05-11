@@ -164,7 +164,7 @@ export const machineActions: any = {
           const stateNode = winningPath[i]!;
           const tacticNode = winningPath[i+1]!;
           
-          if (tacticNode.tacticApplied && !tacticNode.tacticApplied.includes("lemma injected recursively")) {
+          if (stateNode.leanState && tacticNode.tacticApplied && !tacticNode.tacticApplied.includes("lemma injected recursively")) {
             SFTHarvester.appendToJsonl(
               datasetPath,
               stateNode.leanState,

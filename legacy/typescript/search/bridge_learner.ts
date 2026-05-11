@@ -372,6 +372,7 @@ export function makeProductBridge(params: {
     params: { sphere_weight: sphereW, simplex_weight: simplexW, lr },
 
     encode(partition, N, K) {
+      if (K % 2 !== 0) throw new Error("ProductBridge requires an even number of color partitions (K) to maintain manifold symmetry.");
       const half = Math.floor(K / 2);
       const enc: number[][] = new Array(N + 1);
       for (let i = 1; i <= N; i++) {
@@ -387,7 +388,7 @@ export function makeProductBridge(params: {
     },
 
     gradient(encoded, N, K) {
-      if (K % 2 !== 0) throw new Error("ProductBridge requires an even number of color partitions (K).");
+      if (K % 2 !== 0) throw new Error("ProductBridge requires an even number of color partitions (K) to maintain manifold symmetry.");
       const half = Math.floor(K / 2);
       const euclidGrad = schurEuclideanGradient(encoded, N, K);
       const grad: number[][] = new Array(N + 1);

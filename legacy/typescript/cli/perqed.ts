@@ -1085,7 +1085,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
                 const colorClasses: number[][] = Array.from({ length: partConfig.num_partitions }, () => []);
                 for (let i = 1; i <= partConfig.domain_size; i++) {
                   const b = partResult.partition[i];
-                  if (b !== undefined && b >= 0) colorClasses[b]!.push(i);
+                  if (b !== undefined && b >= 0 && b < partConfig.num_partitions) colorClasses[b]!.push(i);
                 }
                 await Bun.write(witnessPath, JSON.stringify({
                   domain_size: partConfig.domain_size,
@@ -1163,7 +1163,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
               const saColorClasses: number[][] = Array.from({ length: numPartitions }, () => []);
               for (let i = 1; i <= domainSize; i++) {
                 const b = saResult.partition[i];
-                if (b !== undefined && b >= 0) saColorClasses[b]!.push(i);
+                if (b !== undefined && b >= 0 && b < numPartitions) saColorClasses[b]!.push(i);
               }
               await Bun.write(saBestPath, JSON.stringify({
                 domain_size: domainSize,

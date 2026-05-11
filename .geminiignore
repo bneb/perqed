@@ -1,0 +1,10 @@
+Cargo.lock
+.lake/
+target/
+node_modules/
+dist/
+venv/
+lancedb/
+.repl/
+.perqed/
+agent_workspace/run_*/
