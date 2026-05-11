@@ -64,14 +64,15 @@ theorem tailResidualPosIff (seq : ℕ → ℕ) (num denom : ℕ) (k : ℕ)
   By the telescoping sum identity `tailResidual(k) / prefixProduct(k) = ∑ denom / seq_j`, 
   we deduce that `tailResidual(k)` converges to `denom/limitL`.
   
-  *Methodological Note*: We state this explicitly as an axiom in Lean. This 
-  cleanly segregates the assumed continuous topology (standard calculus) from 
-  the novel, verified discrete rigidity of the integers below.
+  **Status**: Unproven. Requires formalizing the relationship between doubly-exponential 
+  growth rates and telescoping sum asymptotics in Mathlib's real analysis library.
+  Previously declared as `axiom` (silently extending the logic); now an honest `sorry`.
 -/
-axiom asymptoticSqueezeLimit (seq : ℕ → ℕ) (num denom : ℕ) (limitL : ℝ)
+theorem asymptoticSqueezeLimit (seq : ℕ → ℕ) (num denom : ℕ) (limitL : ℝ)
     (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
     (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL)) :
-    Tendsto (fun n => (tailResidual seq num denom n : ℝ)) atTop (𝓝 (denom / limitL))
+    Tendsto (fun n => (tailResidual seq num denom n : ℝ)) atTop (𝓝 (denom / limitL)) := by
+  sorry
 
 /-- 
   **Topological Integer Rigidity**
