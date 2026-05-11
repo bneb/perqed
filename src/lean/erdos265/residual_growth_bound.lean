@@ -460,21 +460,195 @@ lemma residual_pos_of_rational_sum (seq : ℕ → ℕ) (q : ℚ)
   exact tailResidual_pos_inductive seq q.num.toNat q.den hGe2 hNum q.pos hSum_nd k
 
 /-- 
-  **The Full Chain: limsup > 1 + rational sum → eventually Sylvester recurrence**
+  **The Tail Sum Bound** (the single remaining analytical gap)
   
-  This is the complete wiring from the analytical hypothesis to the algebraic conclusion.
-  Every step in the chain is either proven or tagged with an honest sorry.
+  For a strictly increasing sequence with limsup a_k^{1/2^k} > 1,
+  the tail sum is eventually bounded by 1/(a_n - 1).
+  
+  Proof sketch: limsup > 1 implies eventually a_k > c^{2^k} for some c > 1.
+  Then Σ_{k≥n} 1/a_k < Σ_{k≥0} 1/c^{2^{n+k}} < 1/(c^{2^n} - 1) ≤ 1/(a_n - 1).
+-/
+lemma tail_sum_eventually_le_inv_pred (seq : ℕ → ℕ) 
+    (_hGe2 : ∀ k, seq k ≥ 2) (_hMono : StrictMono seq)
+    (_hSummable : Summable (fun k => (1 : ℝ) / (seq k : ℝ)))
+    (_hLimsup : limsup (fun k => (seq k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
+    ∃ N : ℕ, ∀ n ≥ N, ∑' k, (1 : ℝ) / (seq (n + k) : ℝ) ≤ 1 / ((seq n : ℝ) - 1) := by
+  sorry
+
+/-- A non-increasing positive integer sequence is eventually constant.
+    Proof: can decrease at most f(N)-1 times before hitting the floor. -/
+lemma nonincr_pos_int_eventually_const (f : ℕ → ℤ) (N : ℕ)
+    (hPos : ∀ k, f k > 0)
+    (hDecr : ∀ n ≥ N, f (n + 1) ≤ f n) :
+    ∃ (C : ℤ) (M : ℕ), ∀ n ≥ M, f n = C := by
+  -- Helper: f is non-increasing from N.
+  have hMono : ∀ n, f (N + n + 1) ≤ f (N + n) := by
+    intro n; exact hDecr (N + n) (by omega)
+  -- Helper: f(N + k) ≤ f(N) for all k
+  have hUpper : ∀ k, f (N + k) ≤ f N := by
+    intro k
+    induction k with
+    | zero => simp
+    | succ m ih => exact le_trans (hMono m) ih
+  -- If f is eventually equal to f(N+k) for some k, we're done.
+  -- Otherwise, f strictly decreases infinitely often past N.
+  -- Since f ≥ 1 always and f(N+k) ≤ f(N), after f(N) strict drops f ≤ 0, contradiction.
+  by_contra h_no_const
+  push_neg at h_no_const
+  -- h_no_const : ∀ C M, ∃ n ≥ M, f n ≠ C
+  -- This means: for every k, f is not constant on [N+k, ∞).
+  -- So for every k, there exists j ≥ N+k with f(j+1) < f(j).
+  have h_inf_decr : ∀ k, ∃ j ≥ N + k, f (j + 1) < f j := by
+    intro k
+    by_contra h_all_eq
+    push_neg at h_all_eq
+    -- f(j+1) ≥ f(j) for all j ≥ N+k. Combined with hDecr: f(j+1) = f(j) for j ≥ N+k.
+    have h_const : ∀ m, f (N + k + m) = f (N + k) := by
+      intro m
+      induction m with
+      | zero => simp
+      | succ p ih =>
+        have h1 : f (N + k + p + 1) ≤ f (N + k + p) := hDecr (N + k + p) (by omega)
+        have h2 : f (N + k + p) ≤ f (N + k + p + 1) := h_all_eq (N + k + p) (by omega)
+        have h3 : f (N + k + (p + 1)) = f (N + k + p) := le_antisymm (by rwa [show N + k + (p + 1) = N + k + p + 1 by omega]) h2
+        rw [h3, ih]
+    -- So f is constant on [N+k, ∞). Contradiction with h_no_const.
+    have : ∃ n ≥ N + k, f n ≠ f (N + k) := h_no_const (f (N + k)) (N + k)
+    rcases this with ⟨n, hn, hne⟩
+    have : f n = f (N + k) := by
+      have : n = N + k + (n - (N + k)) := by omega
+      rw [this]
+      exact h_const (n - (N + k))
+    contradiction
+  -- Now build a chain of strict drops.
+  -- Claim: ∀ j, ∃ n ≥ N, f n ≤ f N - j.
+  suffices h_drop : ∀ j : ℕ, ∃ n ≥ N, f n ≤ f N - (j : ℤ) by
+    have hfN_pos := hPos N
+    rcases h_drop (f N).toNat with ⟨n, _, hn⟩
+    have hToNat : ((f N).toNat : ℤ) = f N := Int.toNat_of_nonneg (le_of_lt hfN_pos)
+    linarith [hPos n]
+  intro j
+  induction j with
+  | zero => exact ⟨N, le_refl N, by simp⟩
+  | succ j ih =>
+    rcases ih with ⟨n, hn_ge, hn_bound⟩
+    rcases h_inf_decr (n - N) with ⟨m, hm_ge, hm_drop⟩
+    have hm_ge_n : m ≥ n := by omega
+    -- f(m) ≤ f(n) by non-increasing from N.
+    have hfm_le : f m ≤ f n := by
+      have h1 : f m ≤ f N := by have := hUpper (m - N); rwa [show N + (m - N) = m by omega] at this
+      have h2 : f n ≤ f N := by have := hUpper (n - N); rwa [show N + (n - N) = n by omega] at this
+      -- We need f(m) ≤ f(n), but hUpper only gives both ≤ f(N).
+      -- Use monotonicity: f(m) ≤ f(n) since m ≥ n and f is non-increasing from N.
+      -- f(n + (m - n)) ≤ f(n) by hUpper-style argument applied from n.
+      clear h1 h2
+      have : ∀ k, f (n + k) ≤ f n := by
+        intro k; induction k with
+        | zero => simp
+        | succ p ihp => exact le_trans (hDecr (n + p) (by omega)) ihp
+      have := this (m - n)
+      rwa [show n + (m - n) = m by omega] at this
+    -- f(m+1) < f(m) ≤ f(n) ≤ f(N) - j, so f(m+1) ≤ f(N) - (j+1)
+    refine ⟨m + 1, by omega, ?_⟩
+    have h1 : f (m + 1) ≤ f m - 1 := Int.le_sub_one_of_lt hm_drop
+    have h2 : (↑(j + 1) : ℤ) = (↑j : ℤ) + 1 := by push_cast; ring
+    rw [h2]
+    linarith
+
+/-- From the tail sum bound + identity, T_n is eventually non-increasing. -/
+lemma tailResidual_eventually_nonincreasing (seq : ℕ → ℕ) (num denom : ℕ) 
+    (hGe2 : ∀ k, seq k ≥ 2) (hDenom : denom ≥ 1)
+    (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
+    (hTailBound : ∃ N₀ : ℕ, ∀ n ≥ N₀, ∑' k, (1 : ℝ) / (seq (n + k) : ℝ) ≤ 1 / ((seq n : ℝ) - 1)) :
+    ∃ N : ℕ, ∀ n ≥ N, tailResidual seq num denom (n + 1) ≤ tailResidual seq num denom n := by
+  rcases hTailBound with ⟨N₀, hBound⟩
+  use N₀
+  intro n hn
+  have hSummable := hSum.summable
+  have hSum_val := hSum.tsum_eq
+  have h_pos : ∀ j, seq j > 0 := by intro j; have := hGe2 j; omega
+  -- Use the identity T_n = denom * P_n * Σ 1/a_k
+  have h_eq_n := tailResidual_eq_sum seq num denom hSummable hSum_val h_pos hDenom n
+  -- T_{n+1} = a_n * T_n - denom * P_n  (by recurrence)
+  -- T_{n+1} ≤ T_n ⟺ a_n * T_n - denom * P_n ≤ T_n
+  --               ⟺ T_n * (a_n - 1) ≤ denom * P_n
+  -- Substituting the identity: denom * P_n * Σ * (a_n - 1) ≤ denom * P_n
+  --                           ⟺ Σ * (a_n - 1) ≤ 1
+  --                           ⟺ Σ ≤ 1/(a_n - 1)
+  -- Which is exactly hBound!
+  have h_rec : tailResidual seq num denom (n + 1) = 
+    (seq n : ℤ) * tailResidual seq num denom n - (denom : ℤ) * (prefixProduct seq n : ℤ) := rfl
+  -- Cast everything to ℝ and use the identity
+  have h_tail_bound := hBound n hn
+  have h_seq_ge2 := hGe2 n
+  have h_an_pos : (seq n : ℝ) > 0 := by exact_mod_cast (h_pos n)
+  have h_an_ge2 : (seq n : ℝ) ≥ 2 := by exact_mod_cast h_seq_ge2
+  have h_an_minus_1_pos : (seq n : ℝ) - 1 > 0 := by linarith
+  -- Σ_{k≥n} 1/a_k ≤ 1/(a_n - 1) means Σ * (a_n - 1) ≤ 1
+  have h_tn_bound : (tailResidual seq num denom n : ℝ) * ((seq n : ℝ) - 1) ≤ 
+                     (denom : ℝ) * (prefixProduct seq n : ℝ) := by
+    rw [h_eq_n]
+    -- Goal: denom * P_n * Σ * (a_n - 1) ≤ denom * P_n
+    -- Since denom * P_n > 0, divide both sides: Σ * (a_n - 1) ≤ 1
+    -- From h_tail_bound: Σ ≤ 1/(a_n - 1), so Σ * (a_n - 1) ≤ 1.
+    have h_denom_prefix_pos : (denom : ℝ) * (prefixProduct seq n : ℝ) > 0 := by
+      exact mul_pos (by exact_mod_cast (show (0:ℕ) < denom by omega)) 
+                    (by exact_mod_cast prefixProduct_pos seq h_pos n)
+    have h_sum_bound : (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((seq n : ℝ) - 1) ≤ 1 := by
+      have h1 : (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) ≤ 1 / ((seq n : ℝ) - 1) := h_tail_bound
+      calc (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((seq n : ℝ) - 1) 
+          ≤ (1 / ((seq n : ℝ) - 1)) * ((seq n : ℝ) - 1) := by
+            apply mul_le_mul_of_nonneg_right h1 (le_of_lt h_an_minus_1_pos)
+        _ = 1 := by field_simp
+    nlinarith
+  -- Now: T_{n+1} = a_n * T_n - denom * P_n ≤ T_n
+  -- ⟺ (a_n - 1) * T_n ≤ denom * P_n
+  -- Which we just proved (in ℝ). Lift to ℤ.
+  have h_z : (seq n : ℤ) * tailResidual seq num denom n - (denom : ℤ) * (prefixProduct seq n : ℤ) ≤ 
+             tailResidual seq num denom n := by
+    -- Need: a_n * T_n - denom * P_n ≤ T_n, i.e., (a_n - 1) * T_n ≤ denom * P_n
+    -- We have h_tn_bound: (T_n : ℝ) * (a_n - 1) ≤ denom * P_n in ℝ.
+    -- Cast to ℤ.
+    have h_real : (tailResidual seq num denom n : ℝ) * ((seq n : ℝ) - 1) ≤ 
+                  (denom : ℝ) * (prefixProduct seq n : ℝ) := h_tn_bound
+    -- Rewrite as: a_n * T_n - denom * P_n ≤ T_n  ⟺  T_n * (a_n - 1) ≤ denom * P_n
+    -- In ℝ this is h_real. In ℤ:
+    -- (seq n : ℤ) * T_n - (denom : ℤ) * P_n ≤ T_n
+    -- ⟺ (seq n : ℤ) * T_n - T_n ≤ (denom : ℤ) * P_n
+    -- ⟺ T_n * ((seq n : ℤ) - 1) ≤ (denom : ℤ) * P_n
+    suffices h_int : tailResidual seq num denom n * ((seq n : ℤ) - 1) ≤ (denom : ℤ) * (prefixProduct seq n : ℤ) by
+      nlinarith
+    -- Now lift h_real to ℤ via Int.cast_le
+    have h_ge2_n := hGe2 n
+    have h_an_sub : ((seq n : ℤ) - 1 : ℤ) = ((seq n - 1 : ℕ) : ℤ) := by omega
+    rw [h_an_sub]
+    have h_real2 : (tailResidual seq num denom n : ℝ) * ((seq n - 1 : ℕ) : ℝ) ≤ 
+                   ((denom * prefixProduct seq n : ℕ) : ℝ) := by
+      push_cast
+      have : ((seq n : ℝ) - 1) = ((seq n - 1 : ℕ) : ℝ) := by
+        rw [Nat.cast_sub (by omega : 1 ≤ seq n)]
+        simp
+      rw [← this]
+      linarith [h_tn_bound]
+    exact_mod_cast h_real2
+  rw [h_rec]
+  exact h_z
+
+/-- 
+  **The Full Chain (v2): limsup > 1 + rational sum → eventually Sylvester recurrence**
+  
+  Uses the corrected proof strategy:
+  1. Tail sum bound (from limsup > 1) → T_n eventually non-increasing
+  2. T_n > 0 + eventually non-increasing → T_n eventually constant
+  3. T_n constant → Sylvester recurrence
 -/
 theorem limsup_forces_sylvester_recurrence (seq : ℕ → ℕ) (q : ℚ) 
     (hMono : StrictMono seq) (hGe2 : ∀ k, seq k ≥ 2)
     (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ↑q)
     (hLimsup : limsup (fun k => (seq k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
     ∃ N : ℕ, ∀ n ≥ N, seq (n + 1) + seq n = seq n * seq n + 1 := by
-  -- Step 1: Extract a limit L > 1
-  rcases limsup_gt_one_extract_limit seq hMono hGe2 hLimsup with ⟨limitL, hL_gt_1, hTendsto⟩
-  -- Step 2: Get the rational sum as num/denom with positivity
-  rcases residual_pos_of_rational_sum seq q hGe2 hSum with ⟨hq_num_pos, hq_den_ge1, hResPos⟩
-  -- Step 3: Rewrite the HasSum in num/denom form
+  -- Step 1: Get positivity and num/denom form
+  rcases residual_pos_of_rational_sum seq q hGe2 hSum with ⟨hq_num_pos, _, hResPos⟩
   have hSum_nd : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((q.num.toNat : ℝ) / q.den) := by
     have hq_eq : (q : ℝ) = (q.num.toNat : ℝ) / (q.den : ℝ) := by
       have h_num : (q.num.toNat : ℤ) = q.num := Int.toNat_of_nonneg (le_of_lt hq_num_pos)
@@ -483,19 +657,20 @@ theorem limsup_forces_sylvester_recurrence (seq : ℕ → ℕ) (q : ℚ)
       exact_mod_cast h_num.symm
     rw [hq_eq] at hSum
     exact hSum
-  -- Step 4: Apply the asymptotic squeeze → T_n → denom/L
-  have hConv := asymptoticSqueezeLimit seq q.num.toNat q.den limitL 
-                  hSum_nd hTendsto hq_den_ge1 hGe2 hL_gt_1
-  -- Step 5: Integer convergence rigidity → T_n eventually constant
-  rcases integerConvergenceRigidity (tailResidual seq q.num.toNat q.den) 
-         (q.den / limitL) hConv with ⟨C, N, hC⟩
-  -- Step 6: C ≠ 0 (since residuals are positive)
+  -- Step 2: Get the tail sum bound
+  have hTailBound := tail_sum_eventually_le_inv_pred seq hGe2 hMono hSum.summable hLimsup
+  -- Step 3: T_n is eventually non-increasing
+  have hNonincr := tailResidual_eventually_nonincreasing seq q.num.toNat q.den 
+                     hGe2 q.pos hSum_nd hTailBound
+  -- Step 4: Eventually non-increasing + positive → eventually constant
+  rcases hNonincr with ⟨N₁, hN₁⟩
+  rcases nonincr_pos_int_eventually_const (tailResidual seq q.num.toNat q.den) N₁ 
+         hResPos hN₁ with ⟨C, N, hC⟩
+  -- Step 5: C ≠ 0 and derive the recurrence
   have hC_ne_zero : C ≠ 0 := by
     have hPos := hResPos N
     have hCN := hC N (le_refl N)
-    rw [hCN] at hPos
-    omega
-  -- Step 7: Derive the recurrence
+    rw [hCN] at hPos; omega
   have hDenom_pos : q.den > 0 := by omega
   exact ⟨N, constant_residual_implies_sylvester seq q.num.toNat q.den C N hC hC_ne_zero hDenom_pos⟩
 
