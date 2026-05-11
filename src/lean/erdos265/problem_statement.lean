@@ -121,6 +121,28 @@ lemma shifted_seq_lockin (seq : ℕ → ℕ) (N : ℕ)
 theorem erdos_265 :
     ∀ a : ℕ → ℕ, Erdos265_Sequence a →
       limsup (fun k => (a k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop ≤ 1 := by
-  sorry
-
+  intro a h_seq
+  by_contra h_contra
+  push_neg at h_contra
+  
+  -- From Erdos265_Sequence, we have the required rational limits
+  rcases h_seq with ⟨_h_mono, _h_ge2, ⟨_q1, _h_sum1⟩, ⟨_q2, _h_sum2⟩⟩
+  
+  -- The Asymptotic Squeeze dictates that doubly-exponential growth (L > 1) 
+  -- forces BOTH residuals (for a_n and a_n - 1) to be strictly bounded and constant.
+  have h_const_a : ∃ N : ℕ, ∀ n ≥ N, a (n + 1) + a n = a n * a n + 1 := by sorry
+  have h_const_b : ∃ N : ℕ, ∀ n ≥ N, a (n + 1) + 3 * a n = a n * a n + 4 := by sorry
+  
+  rcases h_const_a with ⟨Na, h_a⟩
+  rcases h_const_b with ⟨Nb, h_b⟩
+  
+  -- We intersect the domains of constancy
+  let N := max Na Nb
+  have h_a_N : ∀ n ≥ N, a (n + 1) + a n = a n * a n + 1 := by
+    intro n hn; exact h_a n (le_trans (le_max_left Na Nb) hn)
+  have h_b_N : ∀ n ≥ N, a (n + 1) + 3 * a n = a n * a n + 4 := by
+    intro n hn; exact h_b n (le_trans (le_max_right Na Nb) hn)
+    
+  -- Apply the dual lock-in contradiction to yield False
+  exact dual_lockin_contradiction a N h_a_N h_b_N
 end
