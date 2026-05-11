@@ -13,3 +13,5 @@ lean_lib VerifiedVault where
 
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4.git" @ "v4.6.0"
+lean_lib erdos265 where
+  srcDir := "../src/lean"

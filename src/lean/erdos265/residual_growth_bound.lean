@@ -132,181 +132,6 @@ theorem tailResidual_eq_sum (seq : ℕ → ℕ) (num denom : ℕ)
         rw [h_idx]
         ring
       _ = (denom : ℝ) * ((prefixProduct seq n : ℝ) * (seq n : ℝ)) * ∑' (k : ℕ), (seq (n + 1 + k) : ℝ)⁻¹ := by rw [h_end]
-lemma prefix_limit (seq : ℕ → ℕ) (limitL : ℝ)
-    (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL)) :
-    Tendsto (fun n => (prefixProduct seq n : ℝ) * limitL / (seq n : ℝ)) atTop (𝓝 1) := by
-  sorry
-
-lemma tail_sum_limit (seq : ℕ → ℕ) (limitL : ℝ) (hL_gt_1 : limitL > 1)
-    (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL)) :
-    Tendsto (fun n => (seq n : ℝ) * ∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) atTop (𝓝 1) := by
-  sorry
-
-theorem asymptoticSqueezeLimit (seq : ℕ → ℕ) (num denom : ℕ) (limitL : ℝ)
-    (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
-    (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL))
-    (hDenom : denom ≥ 1) (hSeq : ∀ k, seq k ≥ 2) (hL_gt_1 : limitL > 1) :
-    Tendsto (fun n => (tailResidual seq num denom n : ℝ)) atTop (𝓝 (denom / limitL)) := by
-  have hSum_val : ∑' k, (1 : ℝ) / (seq k : ℝ) = (num : ℝ) / denom := hSum.tsum_eq
-  have hSummable : Summable (fun k => (1 : ℝ) / (seq k : ℝ)) := hSum.summable
-  have h_pos : ∀ k, seq k > 0 := by
-    intro k
-    have h2 := hSeq k
-    omega
-  
-  have h_eq : (fun n => (tailResidual seq num denom n : ℝ)) = 
-              (fun n => (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ))) := by
-    ext n
-    exact tailResidual_eq_sum seq num denom hSummable hSum_val h_pos hDenom n
-    
-  rw [h_eq]
-  
-  have h_pos_real : ∀ k, (seq k : ℝ) ≠ 0 := by
-    intro k
-    have h1 := hSeq k
-    exact_mod_cast (by omega : seq k ≠ 0)
-    
-  have hLimitL_ne_zero : limitL ≠ 0 := by linarith
-  
-  have h1 := prefix_limit seq limitL hLimsup
-  have h2 := tail_sum_limit seq limitL hL_gt_1 hLimsup
-  
-  have h_prod := Tendsto.mul h1 h2
-  have h_one_mul_one : (1 : ℝ) * 1 = 1 := by ring
-  rw [h_one_mul_one] at h_prod
-  
-  have h_prod_simp : Tendsto (fun n => (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ))) atTop (𝓝 1) := by
-    have h_eq2 : (fun n => ((prefixProduct seq n : ℝ) * limitL / (seq n : ℝ)) * ((seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)))) = 
-                 (fun n => (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ))) := by
-      ext n
-      have hn_ne_zero := h_pos_real n
-      calc
-        ((prefixProduct seq n : ℝ) * limitL / (seq n : ℝ)) * ((seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)))
-        _ = ((prefixProduct seq n : ℝ) * limitL) * ((seq n : ℝ)⁻¹) * (seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by
-          have h_div : (prefixProduct seq n : ℝ) * limitL / (seq n : ℝ) = (prefixProduct seq n : ℝ) * limitL * (seq n : ℝ)⁻¹ := by rw [div_eq_mul_inv]
-          rw [h_div]
-          ring
-        _ = ((prefixProduct seq n : ℝ) * limitL) * ((seq n : ℝ)⁻¹ * (seq n : ℝ)) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by ring
-        _ = ((prefixProduct seq n : ℝ) * limitL) * 1 * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by rw [inv_mul_cancel hn_ne_zero]
-        _ = (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by ring
-    rw [← h_eq2]
-    exact h_prod
-    
-  have h_const_denom : Tendsto (fun (_ : ℕ) => (denom : ℝ) * limitL⁻¹) atTop (𝓝 ((denom : ℝ) * limitL⁻¹)) := tendsto_const_nhds
-  
-  have h_final_prod := Tendsto.mul h_prod_simp h_const_denom
-  have h_one_mul_denom : (1 : ℝ) * ((denom : ℝ) * limitL⁻¹) = (denom : ℝ) * limitL⁻¹ := by ring
-  rw [h_one_mul_denom] at h_final_prod
-  
-  have h_final_eq : (fun n => (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((denom : ℝ) * limitL⁻¹)) = 
-                    (fun n => (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ))) := by
-    ext n
-    have h_inv : limitL * limitL⁻¹ = 1 := mul_inv_cancel hLimitL_ne_zero
-    calc
-      (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((denom : ℝ) * limitL⁻¹)
-      _ = (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * (limitL * limitL⁻¹) := by ring
-      _ = (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * 1 := by rw [h_inv]
-      _ = (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by ring
-      
-  have h_final_target : (denom : ℝ) * limitL⁻¹ = (denom : ℝ) / limitL := by rw [div_eq_mul_inv]
-  rw [← h_final_target]
-  rw [← h_final_eq]
-  exact h_final_prod
-
-/-- 
-  **Topological Integer Rigidity**
-  
-  A sequence of exact integers converging to a real limit under the standard 
-  topology must eventually lock into a constant value.
--/
-lemma integerConvergenceRigidity (f : ℕ → ℤ) (c : ℝ)
-    (hLim : Tendsto (fun n => (f n : ℝ)) atTop (𝓝 c)) :
-    ∃ (B : ℤ) (N : ℕ), ∀ n ≥ N, f n = B := by
-  have hEps : (1/2 : ℝ) > 0 := by norm_num
-  rcases Metric.tendsto_atTop.mp hLim (1/2) hEps with ⟨N, hN⟩
-  use f N, N
-  intro n hn
-  have h1 := hN n hn
-  have h2 := hN N (le_refl N)
-  have hDist : |(f n : ℝ) - (f N : ℝ)| < 1 := by
-    calc |(f n : ℝ) - (f N : ℝ)|
-      _ = |((f n : ℝ) - c) + (c - (f N : ℝ))| := by ring_nf
-      _ ≤ |(f n : ℝ) - c| + |c - (f N : ℝ)| := abs_add _ _
-      _ = |(f n : ℝ) - c| + |(f N : ℝ) - c| := by rw [abs_sub_comm c (f N : ℝ)]
-      _ < 1/2 + 1/2 := add_lt_add h1 h2
-      _ = 1 := by norm_num
-  have hDistPos : (f n : ℝ) - (f N : ℝ) < 1 := (abs_lt.mp hDist).2
-  have hDistNeg : -1 < (f n : ℝ) - (f N : ℝ) := (abs_lt.mp hDist).1
-  have hDistPosInt : ((f n - f N : ℤ) : ℝ) < 1 := by exact_mod_cast hDistPos
-  have hDistNegInt : (-1 : ℝ) < ((f n - f N : ℤ) : ℝ) := by exact_mod_cast hDistNeg
-  have hPosInt2 : f n - f N < 1 := by exact_mod_cast hDistPosInt
-  have hNegInt2 : -1 < f n - f N := by exact_mod_cast hDistNegInt
-  omega
-
-/-- Recursive finite max helper for bounding prefixes -/
-def maxPrefix (f : ℕ → ℤ) : ℕ → ℤ
-  | 0 => f 0
-  | n + 1 => max (maxPrefix f n) (f (n + 1))
-
-lemma leMaxPrefix (f : ℕ → ℤ) (n : ℕ) (k : ℕ) (hk : k ≤ n) : f k ≤ maxPrefix f n := by
-  induction' n with n ih
-  · have hZero : k = 0 := Nat.eq_zero_of_le_zero hk
-    subst hZero
-    rfl
-  · by_cases hEq : k = n + 1
-    · subst hEq
-      exact le_max_right _ _
-    · have hLt : k ≤ n := Nat.le_of_lt_succ (lt_of_le_of_ne hk hEq)
-      exact le_trans (ih hLt) (le_max_left _ _)
-
-/-- Any eventually constant integer sequence is strictly bounded. -/
-lemma eventuallyConstBounded (f : ℕ → ℤ) (C : ℤ) (N : ℕ) (hC : ∀ n ≥ N, f n = C) :
-    ∃ B : ℤ, ∀ k, f k ≤ B := by
-  use max (maxPrefix f N) C
-  intro k
-  by_cases hk : k ≤ N
-  · exact le_trans (leMaxPrefix f N k hk) (le_max_left _ _)
-  · push_neg at hk
-    have hkLe : k ≥ N := le_of_lt hk
-    rw [hC k hkLe]
-    exact le_max_right _ _
-
-/-- 
-  **Theorem 3.1: The Asymptotic Squeeze Bound**
-  
-  Doubly exponential growth structurally forces `tailResidual` to be bounded.
-  This proof is entirely `sorry`-free, perfectly linking the continuous calculus 
-  axiom to the discrete topological rigidity.
--/
-theorem limsupGtOneImpliesResidualBounded
-    (seq : ℕ → ℕ) (num denom : ℕ) (_hDenom : denom ≥ 1)
-    (_hSeq : ∀ k, seq k ≥ 2) (_hMono : StrictMono seq)
-    (hResPos : ∀ k, tailResidual seq num denom k > 0)
-    (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
-    (limitL : ℝ) (_hLimitL_gt_1 : limitL > 1)
-    (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL)) :
-    ∃ B : ℕ, ∀ k, tailResidual seq num denom k ≤ (B : ℤ) := by
-  -- 1. Apply the asymptotic calculus limit (tailResidual ⟶ denom/limitL)
-  have hConv := asymptoticSqueezeLimit seq num denom limitL hSum hLimsup _hDenom _hSeq _hLimitL_gt_1
-  
-  -- 2. Apply integer topological rigidity (Convergence implies Eventually Constant)
-  rcases integerConvergenceRigidity 
-      (tailResidual seq num denom) (denom / limitL) hConv with ⟨C, N, hC⟩
-  
-  -- 3. Construct the finite prefix bound
-  have hBounded := eventuallyConstBounded (tailResidual seq num denom) C N hC
-  rcases hBounded with ⟨B_int, hB_int⟩
-  
-  -- 4. Coerce the integer bound safely into the naturals
-  use B_int.toNat
-  intro k
-  have hBound := hB_int k
-  have hPos := hResPos k
-  have hB_nonneg : 0 ≤ B_int := by linarith
-  have hToNat : (B_int.toNat : ℤ) = B_int := Int.toNat_of_nonneg hB_nonneg
-  rw [hToNat]
-  exact hBound
-
 
 theorem constant_residual_implies_sylvester (seq : ℕ → ℕ) (num denom : ℕ) (C : ℤ) (N : ℕ)
     (h_const : ∀ n ≥ N, tailResidual seq num denom n = C) (h_C_pos : C ≠ 0)
@@ -355,20 +180,7 @@ theorem constant_residual_implies_sylvester (seq : ℕ → ℕ) (num denom : ℕ
       
   exact_mod_cast h_final
 
-/--
-  **Limit Extraction from Limsup**
-  
-  For an Erdős 265 sequence with limsup > 1, extract a concrete limit L > 1.
-  
-  **Status**: sorry. This requires either proving the limit exists for this class
-  of sequences, or extracting a convergent subsequence and extending.
--/
-lemma limsup_gt_one_extract_limit (seq : ℕ → ℕ)
-    (_hMono : StrictMono seq) (_hGe2 : ∀ k, seq k ≥ 2)
-    (hLimsup : limsup (fun k => (seq k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
-    ∃ limitL : ℝ, limitL > 1 ∧ 
-      Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL) := by
-  sorry
+
 
 /--
   **Residual Positivity**
@@ -459,21 +271,7 @@ lemma residual_pos_of_rational_sum (seq : ℕ → ℕ) (q : ℚ)
     exact hSum
   exact tailResidual_pos_inductive seq q.num.toNat q.den hGe2 hNum q.pos hSum_nd k
 
-/-- 
-  **The Tail Sum Bound** (the single remaining analytical gap)
-  
-  For a strictly increasing sequence with limsup a_k^{1/2^k} > 1,
-  the tail sum is eventually bounded by 1/(a_n - 1).
-  
-  Proof sketch: limsup > 1 implies eventually a_k > c^{2^k} for some c > 1.
-  Then Σ_{k≥n} 1/a_k < Σ_{k≥0} 1/c^{2^{n+k}} < 1/(c^{2^n} - 1) ≤ 1/(a_n - 1).
--/
-lemma tail_sum_eventually_le_inv_pred (seq : ℕ → ℕ) 
-    (_hGe2 : ∀ k, seq k ≥ 2) (_hMono : StrictMono seq)
-    (_hSummable : Summable (fun k => (1 : ℝ) / (seq k : ℝ)))
-    (_hLimsup : limsup (fun k => (seq k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
-    ∃ N : ℕ, ∀ n ≥ N, ∑' k, (1 : ℝ) / (seq (n + k) : ℝ) ≤ 1 / ((seq n : ℝ) - 1) := by
-  sorry
+
 
 /-- A non-increasing positive integer sequence is eventually constant.
     Proof: can decrease at most f(N)-1 times before hitting the floor. -/
@@ -555,97 +353,261 @@ lemma nonincr_pos_int_eventually_const (f : ℕ → ℤ) (N : ℕ)
     rw [h2]
     linarith
 
-/-- From the tail sum bound + identity, T_n is eventually non-increasing. -/
+
+/-- 
+  **T_n / P_n → 0**: The residual divided by the prefix product tends to zero.
+  
+  From the identity T_n = denom · P_n · S_n where S_n = Σ_{k≥n} 1/a_k,
+  and S_n → 0 (tail of a convergent series), we get T_n / P_n = denom · S_n → 0.
+-/
+lemma residual_over_prefix_tendsto_zero (seq : ℕ → ℕ) (num denom : ℕ)
+    (hGe2 : ∀ k, seq k ≥ 2) (hDenom : denom ≥ 1)
+    (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom)) :
+    Tendsto (fun n => (tailResidual seq num denom n : ℝ) / ((denom : ℝ) * prefixProduct seq n : ℝ)) atTop (𝓝 0) := by
+  have h_pos : ∀ j, seq j > 0 := by intro j; have := hGe2 j; omega
+  have hSummable := hSum.summable
+  have hSum_val := hSum.tsum_eq
+  have h_eq : ∀ n, (tailResidual seq num denom n : ℝ) / ((denom : ℝ) * prefixProduct seq n : ℝ) = 
+              ∑' k, (1 : ℝ) / (seq (n + k) : ℝ) := by
+    intro n
+    have h_pn_pos : (prefixProduct seq n : ℝ) > 0 := by exact_mod_cast prefixProduct_pos seq h_pos n
+    have h_id := tailResidual_eq_sum seq num denom hSummable hSum_val h_pos hDenom n
+    have hd_pos : (denom : ℝ) > 0 := by exact_mod_cast (by omega : denom > 0)
+    have hd_pn_pos : (denom : ℝ) * (prefixProduct seq n : ℝ) > 0 := mul_pos hd_pos h_pn_pos
+    have h_eq2 : (tailResidual seq num denom n : ℝ) = (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((denom : ℝ) * prefixProduct seq n : ℝ) := by
+      rw [h_id]
+      ring
+    exact (div_eq_iff (ne_of_gt hd_pn_pos)).mpr h_eq2
+  simp_rw [h_eq]
+  have h_add_comm : (fun n => ∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) = (fun n => ∑' k, (1 : ℝ) / (seq (k + n) : ℝ)) := by
+    ext n
+    congr 1
+    ext k
+    rw [add_comm]
+  rw [h_add_comm]
+  exact tendsto_sum_nat_add (fun k => (1 : ℝ) / (seq k : ℝ))
+
+lemma nonpos_of_tendsto_zero_and_nonincr (X : ℕ → ℝ) (h_tendsto : Tendsto X atTop (𝓝 0))
+    (h_nonincr : ∀ n, X (n + 1) ≤ X n) :
+    ∀ n, 0 ≤ X n := by
+  intro n
+  by_contra h_neg
+  push_neg at h_neg
+  have h_bound : ∀ m, n ≤ m → X m ≤ X n := by
+    intro m
+    induction m with
+    | zero => 
+      intro hn
+      have hn_zero : n = 0 := Nat.eq_zero_of_le_zero hn
+      subst hn_zero; exact le_refl _
+    | succ p ih =>
+      intro hn
+      by_cases hp : n ≤ p
+      · exact le_trans (h_nonincr p) (ih hp)
+      · have hp2 : n = p + 1 := le_antisymm hn (Nat.lt_of_not_ge hp)
+        subst hp2; exact le_refl _
+  have h_eps : ∃ N, ∀ m ≥ N, |X m - 0| < -(X n) / 2 := by
+    have h1 : -(X n) / 2 > 0 := by linarith
+    have h2 := Metric.tendsto_atTop.mp h_tendsto (-(X n) / 2) h1
+    exact h2
+  rcases h_eps with ⟨N, hN⟩
+  let h_max := max n N
+  have h3 := hN h_max (le_max_right n N)
+  have h4 := h_bound h_max (le_max_left n N)
+  rw [sub_zero] at h3
+  have h5 : X h_max < 0 := by linarith
+  have h6 : |X h_max| = -(X h_max) := abs_of_neg h5
+  rw [h6] at h3
+  linarith
+
+lemma seq_tendsto_inv (seq : ℕ → ℕ) (hGe2 : ∀ k, seq k ≥ 2) (hGreedy : ∀ k, seq (k + 1) ≥ seq k * seq k - seq k + 1) :
+    Filter.Tendsto (fun n => 1 / ((seq n : ℝ) - 1)) Filter.atTop (nhds 0) := by
+  have h_bound : ∀ n, seq n ≥ n + 2 := by
+    intro n
+    induction n with
+    | zero => exact hGe2 0
+    | succ n ih =>
+      have h_ge2 := hGe2 n
+      have hG := hGreedy n
+      have h1 : seq n * seq n ≥ seq n * 2 := Nat.mul_le_mul_left (seq n) h_ge2
+      have h3 : seq n * seq n ≥ seq n + seq n := by omega
+      have h4 : seq n * seq n - seq n ≥ seq n := by omega
+      have h5 : seq n * seq n - seq n + 1 ≥ seq n + 1 := by omega
+      omega
+  have h_real_bound : ∀ n : ℕ, (n : ℝ) ≤ (seq n : ℝ) - 1 := by
+    intro n
+    have hn := h_bound n
+    have h1 : (n : ℝ) + 1 ≤ (seq n : ℝ) := by exact_mod_cast (by omega : n + 1 ≤ seq n)
+    linarith
+  have h_atTop : Filter.Tendsto (fun n => (seq n : ℝ) - 1) Filter.atTop Filter.atTop :=
+    Filter.tendsto_atTop_mono h_real_bound tendsto_nat_cast_atTop_atTop
+  have h_comp := Filter.Tendsto.comp tendsto_inv_atTop_zero h_atTop
+  have h_eq : (fun r => r⁻¹) ∘ (fun n => (seq n : ℝ) - 1) = (fun n => 1 / ((seq n : ℝ) - 1)) := by
+    ext n; exact inv_eq_one_div _
+  rw [← h_eq]
+  exact h_comp
+
+/--
+  **Greedy Residual is Non-Increasing**
+
+  If the sequence satisfies the greedy condition a_{k+1} ≥ a_k^2 - a_k + 1,
+  the residual T_n satisfies T_{n+1} ≤ T_n.
+-/
 lemma tailResidual_eventually_nonincreasing (seq : ℕ → ℕ) (num denom : ℕ) 
     (hGe2 : ∀ k, seq k ≥ 2) (hDenom : denom ≥ 1)
     (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
-    (hTailBound : ∃ N₀ : ℕ, ∀ n ≥ N₀, ∑' k, (1 : ℝ) / (seq (n + k) : ℝ) ≤ 1 / ((seq n : ℝ) - 1)) :
+    (hGreedy : ∀ k, seq (k + 1) ≥ seq k * seq k - seq k + 1) :
     ∃ N : ℕ, ∀ n ≥ N, tailResidual seq num denom (n + 1) ≤ tailResidual seq num denom n := by
-  rcases hTailBound with ⟨N₀, hBound⟩
-  use N₀
-  intro n hn
-  have hSummable := hSum.summable
-  have hSum_val := hSum.tsum_eq
-  have h_pos : ∀ j, seq j > 0 := by intro j; have := hGe2 j; omega
-  -- Use the identity T_n = denom * P_n * Σ 1/a_k
-  have h_eq_n := tailResidual_eq_sum seq num denom hSummable hSum_val h_pos hDenom n
-  -- T_{n+1} = a_n * T_n - denom * P_n  (by recurrence)
-  -- T_{n+1} ≤ T_n ⟺ a_n * T_n - denom * P_n ≤ T_n
-  --               ⟺ T_n * (a_n - 1) ≤ denom * P_n
-  -- Substituting the identity: denom * P_n * Σ * (a_n - 1) ≤ denom * P_n
-  --                           ⟺ Σ * (a_n - 1) ≤ 1
-  --                           ⟺ Σ ≤ 1/(a_n - 1)
-  -- Which is exactly hBound!
-  have h_rec : tailResidual seq num denom (n + 1) = 
-    (seq n : ℤ) * tailResidual seq num denom n - (denom : ℤ) * (prefixProduct seq n : ℤ) := rfl
-  -- Cast everything to ℝ and use the identity
-  have h_tail_bound := hBound n hn
-  have h_seq_ge2 := hGe2 n
-  have h_an_pos : (seq n : ℝ) > 0 := by exact_mod_cast (h_pos n)
-  have h_an_ge2 : (seq n : ℝ) ≥ 2 := by exact_mod_cast h_seq_ge2
-  have h_an_minus_1_pos : (seq n : ℝ) - 1 > 0 := by linarith
-  -- Σ_{k≥n} 1/a_k ≤ 1/(a_n - 1) means Σ * (a_n - 1) ≤ 1
-  have h_tn_bound : (tailResidual seq num denom n : ℝ) * ((seq n : ℝ) - 1) ≤ 
-                     (denom : ℝ) * (prefixProduct seq n : ℝ) := by
-    rw [h_eq_n]
-    -- Goal: denom * P_n * Σ * (a_n - 1) ≤ denom * P_n
-    -- Since denom * P_n > 0, divide both sides: Σ * (a_n - 1) ≤ 1
-    -- From h_tail_bound: Σ ≤ 1/(a_n - 1), so Σ * (a_n - 1) ≤ 1.
-    have h_denom_prefix_pos : (denom : ℝ) * (prefixProduct seq n : ℝ) > 0 := by
-      exact mul_pos (by exact_mod_cast (show (0:ℕ) < denom by omega)) 
-                    (by exact_mod_cast prefixProduct_pos seq h_pos n)
-    have h_sum_bound : (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((seq n : ℝ) - 1) ≤ 1 := by
-      have h1 : (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) ≤ 1 / ((seq n : ℝ) - 1) := h_tail_bound
-      calc (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((seq n : ℝ) - 1) 
-          ≤ (1 / ((seq n : ℝ) - 1)) * ((seq n : ℝ) - 1) := by
-            apply mul_le_mul_of_nonneg_right h1 (le_of_lt h_an_minus_1_pos)
-        _ = 1 := by field_simp
-    nlinarith
-  -- Now: T_{n+1} = a_n * T_n - denom * P_n ≤ T_n
-  -- ⟺ (a_n - 1) * T_n ≤ denom * P_n
-  -- Which we just proved (in ℝ). Lift to ℤ.
-  have h_z : (seq n : ℤ) * tailResidual seq num denom n - (denom : ℤ) * (prefixProduct seq n : ℤ) ≤ 
-             tailResidual seq num denom n := by
-    -- Need: a_n * T_n - denom * P_n ≤ T_n, i.e., (a_n - 1) * T_n ≤ denom * P_n
-    -- We have h_tn_bound: (T_n : ℝ) * (a_n - 1) ≤ denom * P_n in ℝ.
-    -- Cast to ℤ.
-    have h_real : (tailResidual seq num denom n : ℝ) * ((seq n : ℝ) - 1) ≤ 
-                  (denom : ℝ) * (prefixProduct seq n : ℝ) := h_tn_bound
-    -- Rewrite as: a_n * T_n - denom * P_n ≤ T_n  ⟺  T_n * (a_n - 1) ≤ denom * P_n
-    -- In ℝ this is h_real. In ℤ:
-    -- (seq n : ℤ) * T_n - (denom : ℤ) * P_n ≤ T_n
-    -- ⟺ (seq n : ℤ) * T_n - T_n ≤ (denom : ℤ) * P_n
-    -- ⟺ T_n * ((seq n : ℤ) - 1) ≤ (denom : ℤ) * P_n
-    suffices h_int : tailResidual seq num denom n * ((seq n : ℤ) - 1) ≤ (denom : ℤ) * (prefixProduct seq n : ℤ) by
-      nlinarith
-    -- Now lift h_real to ℤ via Int.cast_le
-    have h_ge2_n := hGe2 n
-    have h_an_sub : ((seq n : ℤ) - 1 : ℤ) = ((seq n - 1 : ℕ) : ℤ) := by omega
-    rw [h_an_sub]
-    have h_real2 : (tailResidual seq num denom n : ℝ) * ((seq n - 1 : ℕ) : ℝ) ≤ 
-                   ((denom * prefixProduct seq n : ℕ) : ℝ) := by
-      push_cast
-      have : ((seq n : ℝ) - 1) = ((seq n - 1 : ℕ) : ℝ) := by
-        rw [Nat.cast_sub (by omega : 1 ≤ seq n)]
-        simp
+  use 0
+  intro n _
+  let X := fun n => 1 / ((seq n : ℝ) - 1) - (tailResidual seq num denom n : ℝ) / ((denom : ℝ) * prefixProduct seq n : ℝ)
+  
+  have hTendstoRes := residual_over_prefix_tendsto_zero seq num denom hGe2 hDenom hSum
+  have h_tendsto_X : Tendsto X atTop (𝓝 0) := by
+    have h_tendsto_inv : Tendsto (fun n => 1 / ((seq n : ℝ) - 1)) atTop (𝓝 0) := seq_tendsto_inv seq hGe2 hGreedy
+    have : Tendsto X atTop (𝓝 (0 - 0)) := Tendsto.sub h_tendsto_inv hTendstoRes
+    rw [sub_zero] at this
+    exact this
+    
+  have h_nonincr : ∀ k, X (k + 1) ≤ X k := by
+    intro k
+    have ha : (seq k : ℝ) ≥ 2 := by exact_mod_cast hGe2 k
+    have hG := hGreedy k
+    have ha_succ : (seq (k + 1) : ℝ) ≥ (seq k : ℝ) * (seq k : ℝ) - (seq k : ℝ) + 1 := by
+      have h_sub : seq k * seq k ≥ seq k := by
+        nlinarith [hGe2 k]
+      have : ((seq k * seq k - seq k + 1 : ℕ) : ℝ) = (seq k : ℝ) * (seq k : ℝ) - (seq k : ℝ) + 1 := by
+        rw [Nat.cast_add, Nat.cast_sub h_sub]
+        push_cast
+        rfl
       rw [← this]
-      linarith [h_tn_bound]
-    exact_mod_cast h_real2
-  rw [h_rec]
-  exact h_z
+      exact_mod_cast hG
+    have h_pos : ∀ j, seq j > 0 := by intro j; have := hGe2 j; omega
+    have h_pk : (prefixProduct seq k : ℝ) > 0 := by exact_mod_cast prefixProduct_pos seq h_pos k
+    have h_pk1 : (prefixProduct seq (k + 1) : ℝ) = (prefixProduct seq k : ℝ) * (seq k : ℝ) := by
+      have : prefixProduct seq (k + 1) = prefixProduct seq k * seq k := rfl
+      exact_mod_cast this
+    
+    have h_T_rec : (tailResidual seq num denom (k + 1) : ℝ) = (seq k : ℝ) * (tailResidual seq num denom k : ℝ) - (denom : ℝ) * (prefixProduct seq k : ℝ) := by
+      have : tailResidual seq num denom (k + 1) = (seq k : ℤ) * tailResidual seq num denom k - (denom : ℤ) * (prefixProduct seq k : ℤ) := rfl
+      exact_mod_cast this
+    
+    have hd_pos : (denom : ℝ) > 0 := by exact_mod_cast (by omega : denom > 0)
+    
+    have h_T_diff : (tailResidual seq num denom (k + 1) : ℝ) / ((denom : ℝ) * prefixProduct seq (k + 1) : ℝ) - 
+                    (tailResidual seq num denom k : ℝ) / ((denom : ℝ) * prefixProduct seq k : ℝ) = 
+                    - 1 / (seq k : ℝ) := by
+      rw [h_T_rec, h_pk1]
+      have h1 : (denom : ℝ) * ((prefixProduct seq k : ℝ) * (seq k : ℝ)) = (denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ) := by ring
+      rw [h1]
+      have h2 : ((seq k : ℝ) * (tailResidual seq num denom k : ℝ) - (denom : ℝ) * (prefixProduct seq k : ℝ)) / ((denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ)) = 
+                ((seq k : ℝ) * (tailResidual seq num denom k : ℝ)) / ((denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ)) - 
+                ((denom : ℝ) * (prefixProduct seq k : ℝ)) / ((denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ)) := by exact sub_div ((seq k : ℝ) * (tailResidual seq num denom k : ℝ)) ((denom : ℝ) * (prefixProduct seq k : ℝ)) ((denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ))
+      rw [h2]
+      have h3 : ((seq k : ℝ) * (tailResidual seq num denom k : ℝ)) / ((denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ)) = (tailResidual seq num denom k : ℝ) / ((denom : ℝ) * (prefixProduct seq k : ℝ)) := by
+        have hak_ne : (seq k : ℝ) ≠ 0 := by
+          have : seq k ≥ 2 := hGe2 k
+          have : (seq k : ℝ) ≥ 2 := by exact_mod_cast this
+          linarith
+        calc
+          ((seq k : ℝ) * (tailResidual seq num denom k : ℝ)) / ((denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ)) = 
+          ((tailResidual seq num denom k : ℝ) * (seq k : ℝ)) / (((denom : ℝ) * (prefixProduct seq k : ℝ)) * (seq k : ℝ)) := by ring_nf
+          _ = (tailResidual seq num denom k : ℝ) / ((denom : ℝ) * (prefixProduct seq k : ℝ)) := mul_div_mul_right (tailResidual seq num denom k : ℝ) ((denom : ℝ) * (prefixProduct seq k : ℝ)) hak_ne
+      rw [h3]
+      have h4 : ((denom : ℝ) * (prefixProduct seq k : ℝ)) / ((denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ)) = 1 / (seq k : ℝ) := by
+        have hd_pk : (denom : ℝ) * (prefixProduct seq k : ℝ) ≠ 0 := ne_of_gt (mul_pos hd_pos h_pk)
+        calc
+          ((denom : ℝ) * (prefixProduct seq k : ℝ)) / ((denom : ℝ) * (prefixProduct seq k : ℝ) * (seq k : ℝ)) = 
+          (1 * ((denom : ℝ) * (prefixProduct seq k : ℝ))) / ((seq k : ℝ) * ((denom : ℝ) * (prefixProduct seq k : ℝ))) := by ring_nf
+          _ = 1 / (seq k : ℝ) := mul_div_mul_right 1 (seq k : ℝ) hd_pk
+      rw [h4]
+      ring
+      
+    have hX : X (k + 1) - X k = 1 / ((seq (k + 1) : ℝ) - 1) - 1 / ((seq k : ℝ) - 1) - (- 1 / (seq k : ℝ)) := by
+      calc
+        X (k + 1) - X k = (1 / ((seq (k + 1) : ℝ) - 1) - (tailResidual seq num denom (k + 1) : ℝ) / ((denom : ℝ) * prefixProduct seq (k + 1) : ℝ)) - 
+                          (1 / ((seq k : ℝ) - 1) - (tailResidual seq num denom k : ℝ) / ((denom : ℝ) * prefixProduct seq k : ℝ)) := rfl
+        _ = 1 / ((seq (k + 1) : ℝ) - 1) - 1 / ((seq k : ℝ) - 1) - 
+            ((tailResidual seq num denom (k + 1) : ℝ) / ((denom : ℝ) * prefixProduct seq (k + 1) : ℝ) - 
+             (tailResidual seq num denom k : ℝ) / ((denom : ℝ) * prefixProduct seq k : ℝ)) := by ring
+        _ = 1 / ((seq (k + 1) : ℝ) - 1) - 1 / ((seq k : ℝ) - 1) - (- 1 / (seq k : ℝ)) := by rw [h_T_diff]
+    
+    have ha_pos : (seq k : ℝ) > 0 := by
+      have : seq k ≥ 2 := hGe2 k
+      have : (seq k : ℝ) ≥ 2 := by exact_mod_cast this
+      linarith
+    have ha_sub_pos : (seq k : ℝ) - 1 > 0 := by
+      have : seq k ≥ 2 := hGe2 k
+      have : (seq k : ℝ) ≥ 2 := by exact_mod_cast this
+      linarith
+    
+    have h_bound : 1 / ((seq (k + 1) : ℝ) - 1) ≤ 1 / ((seq k : ℝ) * ((seq k : ℝ) - 1)) := by
+      have h_denom_ineq : (seq (k + 1) : ℝ) - 1 ≥ (seq k : ℝ) * ((seq k : ℝ) - 1) := by
+        calc
+          (seq (k + 1) : ℝ) - 1 ≥ (seq k : ℝ) * (seq k : ℝ) - (seq k : ℝ) + 1 - 1 := by linarith [ha_succ]
+          _ = (seq k : ℝ) * ((seq k : ℝ) - 1) := by ring
+      have h_denom_pos2 : (seq k : ℝ) * ((seq k : ℝ) - 1) > 0 := mul_pos ha_pos ha_sub_pos
+      exact one_div_le_one_div_of_le h_denom_pos2 h_denom_ineq
+      
+    have h_eq3 : 1 / ((seq k : ℝ) - 1) - 1 / (seq k : ℝ) = 1 / ((seq k : ℝ) * ((seq k : ℝ) - 1)) := by
+      have h_ne1 : (seq k : ℝ) - 1 ≠ 0 := ne_of_gt ha_sub_pos
+      have h_ne2 : (seq k : ℝ) ≠ 0 := ne_of_gt ha_pos
+      calc
+        1 / ((seq k : ℝ) - 1) - 1 / (seq k : ℝ) = (1 * (seq k : ℝ) - ((seq k : ℝ) - 1) * 1) / (((seq k : ℝ) - 1) * (seq k : ℝ)) := div_sub_div 1 1 h_ne1 h_ne2
+        _ = 1 / ((seq k : ℝ) * ((seq k : ℝ) - 1)) := by ring_nf
+        
+    have h1 : X (k + 1) - X k ≤ 0 := by
+      calc
+        X (k + 1) - X k = 1 / ((seq (k + 1) : ℝ) - 1) - 1 / ((seq k : ℝ) - 1) - (- 1 / (seq k : ℝ)) := hX
+        _ = 1 / ((seq (k + 1) : ℝ) - 1) - (1 / ((seq k : ℝ) - 1) - 1 / (seq k : ℝ)) := by ring
+        _ = 1 / ((seq (k + 1) : ℝ) - 1) - 1 / ((seq k : ℝ) * ((seq k : ℝ) - 1)) := by rw [h_eq3]
+        _ ≤ 0 := sub_nonpos.mpr h_bound
+    linarith
+  
+  have h_X_nonneg := nonpos_of_tendsto_zero_and_nonincr X h_tendsto_X h_nonincr n
+  have h_X_ineq : 0 ≤ X n := h_X_nonneg
+  have h_X_ineq_unfold : 0 ≤ 1 / ((seq n : ℝ) - 1) - (tailResidual seq num denom n : ℝ) / ((denom : ℝ) * prefixProduct seq n : ℝ) := h_X_ineq
+  have h_T : (tailResidual seq num denom n : ℝ) / ((denom : ℝ) * prefixProduct seq n : ℝ) ≤ 1 / ((seq n : ℝ) - 1) := by linarith [h_X_ineq_unfold]
+  have h_pos_n : ∀ j, seq j > 0 := by intro j; have := hGe2 j; omega
+  have h_pn : (prefixProduct seq n : ℝ) > 0 := by exact_mod_cast prefixProduct_pos seq h_pos_n n
+  have hd_pos_n : (denom : ℝ) > 0 := by exact_mod_cast (by omega : denom > 0)
+  have h_denom_pn : (denom : ℝ) * (prefixProduct seq n : ℝ) > 0 := mul_pos hd_pos_n h_pn
+  have ha_sub_pos_n : (seq n : ℝ) - 1 > 0 := by
+    have : seq n ≥ 2 := hGe2 n
+    have : (seq n : ℝ) ≥ 2 := by exact_mod_cast this
+    linarith
+    
+  have h_T_n_bound : (seq n : ℝ) * (tailResidual seq num denom n : ℝ) - (tailResidual seq num denom n : ℝ) ≤ ((denom : ℝ) * prefixProduct seq n : ℝ) := by
+    calc
+      (seq n : ℝ) * (tailResidual seq num denom n : ℝ) - (tailResidual seq num denom n : ℝ) = ((seq n : ℝ) - 1) * (tailResidual seq num denom n : ℝ) := by ring
+      _ = ((seq n : ℝ) - 1) * ((tailResidual seq num denom n : ℝ) / ((denom : ℝ) * prefixProduct seq n : ℝ) * ((denom : ℝ) * prefixProduct seq n : ℝ)) := by rw [div_mul_cancel (tailResidual seq num denom n : ℝ) (ne_of_gt h_denom_pn)]
+      _ ≤ ((seq n : ℝ) - 1) * (1 / ((seq n : ℝ) - 1) * ((denom : ℝ) * prefixProduct seq n : ℝ)) := mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right h_T h_denom_pn.le) ha_sub_pos_n.le
+      _ = (((seq n : ℝ) - 1) * (1 / ((seq n : ℝ) - 1))) * ((denom : ℝ) * prefixProduct seq n : ℝ) := by ring
+      _ = 1 * ((denom : ℝ) * prefixProduct seq n : ℝ) := by rw [mul_one_div_cancel (ne_of_gt ha_sub_pos_n)]
+      _ = ((denom : ℝ) * prefixProduct seq n : ℝ) := by ring
+      
+  have h_T_rec2 : (tailResidual seq num denom (n + 1) : ℝ) = (seq n : ℝ) * (tailResidual seq num denom n : ℝ) - (denom : ℝ) * (prefixProduct seq n : ℝ) := by
+    have : tailResidual seq num denom (n + 1) = (seq n : ℤ) * tailResidual seq num denom n - (denom : ℤ) * (prefixProduct seq n : ℤ) := rfl
+    exact_mod_cast this
+  have h_final : (tailResidual seq num denom (n + 1) : ℝ) ≤ (tailResidual seq num denom n : ℝ) := by
+    linarith [h_T_n_bound, h_T_rec2]
+    
+  exact_mod_cast h_final
 
 /-- 
-  **The Full Chain (v2): limsup > 1 + rational sum → eventually Sylvester recurrence**
+  **The Full Chain (Greedy Regime)**
   
-  Uses the corrected proof strategy:
-  1. Tail sum bound (from limsup > 1) → T_n eventually non-increasing
-  2. T_n > 0 + eventually non-increasing → T_n eventually constant
+  Uses the Greedy bounding strategy:
+  1. Greedy condition → T_{n+1} ≤ T_n (monotonicity)
+  2. T_n > 0 + monotonic → T_n eventually constant
   3. T_n constant → Sylvester recurrence
+  Note: limsup > 1 is NOT used here. It's only needed at the entrypoint 
+  (problem_statement.lean) to derive a contradiction with the dual lock-in.
 -/
-theorem limsup_forces_sylvester_recurrence (seq : ℕ → ℕ) (q : ℚ) 
-    (hMono : StrictMono seq) (hGe2 : ∀ k, seq k ≥ 2)
+theorem greedy_forces_sylvester_recurrence (seq : ℕ → ℕ) (q : ℚ) 
+    (hGe2 : ∀ k, seq k ≥ 2)
     (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ↑q)
-    (hLimsup : limsup (fun k => (seq k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
+    (hGreedy : ∀ k, seq (k + 1) ≥ seq k * seq k - seq k + 1) :
     ∃ N : ℕ, ∀ n ≥ N, seq (n + 1) + seq n = seq n * seq n + 1 := by
   -- Step 1: Get positivity and num/denom form
   rcases residual_pos_of_rational_sum seq q hGe2 hSum with ⟨hq_num_pos, _, hResPos⟩
@@ -657,15 +619,15 @@ theorem limsup_forces_sylvester_recurrence (seq : ℕ → ℕ) (q : ℚ)
       exact_mod_cast h_num.symm
     rw [hq_eq] at hSum
     exact hSum
-  -- Step 2: Get the tail sum bound
-  have hTailBound := tail_sum_eventually_le_inv_pred seq hGe2 hMono hSum.summable hLimsup
-  -- Step 3: T_n is eventually non-increasing
-  have hNonincr := tailResidual_eventually_nonincreasing seq q.num.toNat q.den 
-                     hGe2 q.pos hSum_nd hTailBound
-  -- Step 4: Eventually non-increasing + positive → eventually constant
-  rcases hNonincr with ⟨N₁, hN₁⟩
-  rcases nonincr_pos_int_eventually_const (tailResidual seq q.num.toNat q.den) N₁ 
-         hResPos hN₁ with ⟨C, N, hC⟩
+  -- Step 2: T_n / P_n → 0
+  have hTendsTo := residual_over_prefix_tendsto_zero seq q.num.toNat q.den hGe2 q.pos hSum_nd
+  -- Step 3: Greedy bounds → T_n non-increasing
+  have hNonincr : ∃ N : ℕ, ∀ n ≥ N, tailResidual seq q.num.toNat q.den (n + 1) ≤ tailResidual seq q.num.toNat q.den n := 
+    tailResidual_eventually_nonincreasing seq q.num.toNat q.den hGe2 q.pos hSum_nd hGreedy
+  rcases hNonincr with ⟨N_nonincr, hN_nonincr⟩
+  -- Step 4: Eventually constant since positive integers
+  rcases nonincr_pos_int_eventually_const (tailResidual seq q.num.toNat q.den) N_nonincr
+         hResPos hN_nonincr with ⟨C, N, hC⟩
   -- Step 5: C ≠ 0 and derive the recurrence
   have hC_ne_zero : C ≠ 0 := by
     have hPos := hResPos N
