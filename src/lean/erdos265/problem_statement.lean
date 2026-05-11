@@ -111,6 +111,22 @@ lemma shifted_seq_lockin (seq : ℕ → ℕ) (N : ℕ)
   exact_mod_cast h_z_final
 
 /--
+  **The Full Chain** (proven in residual_growth_bound.lean)
+  
+  limsup > 1 + rational sum → eventually Sylvester recurrence.
+  The proof chains: limit extraction → asymptotic squeeze → integer rigidity → recurrence.
+  
+  **Status**: Proven modulo `prefix_limit`, `tail_sum_limit`, `limsup_gt_one_extract_limit`,
+  and `residual_pos_of_rational_sum` (all sorry-tagged in residual_growth_bound.lean).
+-/
+theorem limsup_forces_sylvester_recurrence (seq : ℕ → ℕ) (q : ℚ) 
+    (_hMono : StrictMono seq) (_hGe2 : ∀ k, seq k ≥ 2)
+    (_hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ↑q)
+    (_hLimsup : limsup (fun k => (seq k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
+    ∃ N : ℕ, ∀ n ≥ N, seq (n + 1) + seq n = seq n * seq n + 1 := by
+  sorry  -- Full proof in residual_growth_bound.lean
+
+/--
   **Erdős 265 Ceiling Conjecture (Formal Statement)**
 
   Every Erdős 265 sequence satisfies limsup a_k^{1/2^k} ≤ 1.
@@ -125,14 +141,29 @@ theorem erdos_265 :
   by_contra h_contra
   push_neg at h_contra
   
-  -- From Erdos265_Sequence, we have the required rational limits
-  rcases h_seq with ⟨_h_mono, _h_ge2, ⟨_q1, _h_sum1⟩, ⟨_q2, _h_sum2⟩⟩
+  -- From Erdos265_Sequence, extract all components
+  rcases h_seq with ⟨h_mono, h_ge2, ⟨q1, h_sum1⟩, ⟨q2, h_sum2⟩⟩
   
-  -- The Asymptotic Squeeze dictates that doubly-exponential growth (L > 1) 
-  -- forces BOTH residuals (for a_n and a_n - 1) to be strictly bounded and constant.
-  have h_const_a : ∃ N : ℕ, ∀ n ≥ N, a (n + 1) + a n = a n * a n + 1 := by sorry
-  have h_const_b : ∃ N : ℕ, ∀ n ≥ N, a (n + 1) + 3 * a n = a n * a n + 4 := by sorry
+  -- Apply the full chain for ∑ 1/aₖ = q₁ (rational)
+  -- limsup > 1 + rational sum → eventually a_{n+1} + a_n = a_n² + 1
+  have h_const_a := limsup_forces_sylvester_recurrence a q1 h_mono h_ge2 h_sum1 h_contra
   
+  -- For the shifted sequence (aₖ - 1), we need a similar chain.
+  -- The sum ∑ 1/(aₖ - 1) = q₂ (rational), and we apply the same machinery
+  -- to derive: eventually (a_{n+1} - 1) + (a_n - 1) = (a_n - 1)² + 1
+  -- which expands to: a_{n+1} + 3·a_n = a_n² + 4
+  have h_shifted_recurrence : ∃ N : ℕ, ∀ n ≥ N, 
+      (a (n + 1) - 1) + (a n - 1) = (a n - 1) * (a n - 1) + 1 := by
+    -- Apply limsup_forces_sylvester_recurrence to the shifted sequence b_k = a_k - 1
+    -- with sum ∑ 1/b_k = q₂
+    sorry
+  rcases h_shifted_recurrence with ⟨Ns, h_s⟩
+  
+  -- Convert the shifted recurrence to the explicit form
+  have h_pos_ge_N : ∀ n ≥ Ns, a n ≥ 2 := fun n _ => h_ge2 n
+  have h_const_b : ∃ N : ℕ, ∀ n ≥ N, a (n + 1) + 3 * a n = a n * a n + 4 :=
+    ⟨Ns, shifted_seq_lockin a Ns h_s h_pos_ge_N⟩
+    
   rcases h_const_a with ⟨Na, h_a⟩
   rcases h_const_b with ⟨Nb, h_b⟩
   

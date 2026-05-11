@@ -132,11 +132,86 @@ theorem tailResidual_eq_sum (seq : ℕ → ℕ) (num denom : ℕ)
         rw [h_idx]
         ring
       _ = (denom : ℝ) * ((prefixProduct seq n : ℝ) * (seq n : ℝ)) * ∑' (k : ℕ), (seq (n + 1 + k) : ℝ)⁻¹ := by rw [h_end]
+lemma prefix_limit (seq : ℕ → ℕ) (limitL : ℝ)
+    (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL)) :
+    Tendsto (fun n => (prefixProduct seq n : ℝ) * limitL / (seq n : ℝ)) atTop (𝓝 1) := by
+  sorry
+
+lemma tail_sum_limit (seq : ℕ → ℕ) (limitL : ℝ) (hL_gt_1 : limitL > 1)
+    (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL)) :
+    Tendsto (fun n => (seq n : ℝ) * ∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) atTop (𝓝 1) := by
+  sorry
+
 theorem asymptoticSqueezeLimit (seq : ℕ → ℕ) (num denom : ℕ) (limitL : ℝ)
     (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
-    (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL)) :
+    (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL))
+    (hDenom : denom ≥ 1) (hSeq : ∀ k, seq k ≥ 2) (hL_gt_1 : limitL > 1) :
     Tendsto (fun n => (tailResidual seq num denom n : ℝ)) atTop (𝓝 (denom / limitL)) := by
-  sorry
+  have hSum_val : ∑' k, (1 : ℝ) / (seq k : ℝ) = (num : ℝ) / denom := hSum.tsum_eq
+  have hSummable : Summable (fun k => (1 : ℝ) / (seq k : ℝ)) := hSum.summable
+  have h_pos : ∀ k, seq k > 0 := by
+    intro k
+    have h2 := hSeq k
+    omega
+  
+  have h_eq : (fun n => (tailResidual seq num denom n : ℝ)) = 
+              (fun n => (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ))) := by
+    ext n
+    exact tailResidual_eq_sum seq num denom hSummable hSum_val h_pos hDenom n
+    
+  rw [h_eq]
+  
+  have h_pos_real : ∀ k, (seq k : ℝ) ≠ 0 := by
+    intro k
+    have h1 := hSeq k
+    exact_mod_cast (by omega : seq k ≠ 0)
+    
+  have hLimitL_ne_zero : limitL ≠ 0 := by linarith
+  
+  have h1 := prefix_limit seq limitL hLimsup
+  have h2 := tail_sum_limit seq limitL hL_gt_1 hLimsup
+  
+  have h_prod := Tendsto.mul h1 h2
+  have h_one_mul_one : (1 : ℝ) * 1 = 1 := by ring
+  rw [h_one_mul_one] at h_prod
+  
+  have h_prod_simp : Tendsto (fun n => (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ))) atTop (𝓝 1) := by
+    have h_eq2 : (fun n => ((prefixProduct seq n : ℝ) * limitL / (seq n : ℝ)) * ((seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)))) = 
+                 (fun n => (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ))) := by
+      ext n
+      have hn_ne_zero := h_pos_real n
+      calc
+        ((prefixProduct seq n : ℝ) * limitL / (seq n : ℝ)) * ((seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)))
+        _ = ((prefixProduct seq n : ℝ) * limitL) * ((seq n : ℝ)⁻¹) * (seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by
+          have h_div : (prefixProduct seq n : ℝ) * limitL / (seq n : ℝ) = (prefixProduct seq n : ℝ) * limitL * (seq n : ℝ)⁻¹ := by rw [div_eq_mul_inv]
+          rw [h_div]
+          ring
+        _ = ((prefixProduct seq n : ℝ) * limitL) * ((seq n : ℝ)⁻¹ * (seq n : ℝ)) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by ring
+        _ = ((prefixProduct seq n : ℝ) * limitL) * 1 * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by rw [inv_mul_cancel hn_ne_zero]
+        _ = (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by ring
+    rw [← h_eq2]
+    exact h_prod
+    
+  have h_const_denom : Tendsto (fun (_ : ℕ) => (denom : ℝ) * limitL⁻¹) atTop (𝓝 ((denom : ℝ) * limitL⁻¹)) := tendsto_const_nhds
+  
+  have h_final_prod := Tendsto.mul h_prod_simp h_const_denom
+  have h_one_mul_denom : (1 : ℝ) * ((denom : ℝ) * limitL⁻¹) = (denom : ℝ) * limitL⁻¹ := by ring
+  rw [h_one_mul_denom] at h_final_prod
+  
+  have h_final_eq : (fun n => (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((denom : ℝ) * limitL⁻¹)) = 
+                    (fun n => (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ))) := by
+    ext n
+    have h_inv : limitL * limitL⁻¹ = 1 := mul_inv_cancel hLimitL_ne_zero
+    calc
+      (prefixProduct seq n : ℝ) * limitL * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((denom : ℝ) * limitL⁻¹)
+      _ = (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * (limitL * limitL⁻¹) := by ring
+      _ = (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * 1 := by rw [h_inv]
+      _ = (denom : ℝ) * (prefixProduct seq n : ℝ) * (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) := by ring
+      
+  have h_final_target : (denom : ℝ) * limitL⁻¹ = (denom : ℝ) / limitL := by rw [div_eq_mul_inv]
+  rw [← h_final_target]
+  rw [← h_final_eq]
+  exact h_final_prod
 
 /-- 
   **Topological Integer Rigidity**
@@ -212,7 +287,7 @@ theorem limsupGtOneImpliesResidualBounded
     (hLimsup : Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL)) :
     ∃ B : ℕ, ∀ k, tailResidual seq num denom k ≤ (B : ℤ) := by
   -- 1. Apply the asymptotic calculus limit (tailResidual ⟶ denom/limitL)
-  have hConv := asymptoticSqueezeLimit seq num denom limitL hSum hLimsup
+  have hConv := asymptoticSqueezeLimit seq num denom limitL hSum hLimsup _hDenom _hSeq _hLimitL_gt_1
   
   -- 2. Apply integer topological rigidity (Convergence implies Eventually Constant)
   rcases integerConvergenceRigidity 
@@ -279,4 +354,74 @@ theorem constant_residual_implies_sylvester (seq : ℕ → ℕ) (num denom : ℕ
       _ = (seq n : ℤ) * (seq n : ℤ) + 1 := by ring
       
   exact_mod_cast h_final
+
+/--
+  **Limit Extraction from Limsup**
+  
+  For an Erdős 265 sequence with limsup > 1, extract a concrete limit L > 1.
+  
+  **Status**: sorry. This requires either proving the limit exists for this class
+  of sequences, or extracting a convergent subsequence and extending.
+-/
+lemma limsup_gt_one_extract_limit (seq : ℕ → ℕ)
+    (_hMono : StrictMono seq) (_hGe2 : ∀ k, seq k ≥ 2)
+    (hLimsup : limsup (fun k => (seq k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
+    ∃ limitL : ℝ, limitL > 1 ∧ 
+      Tendsto (fun k => (seq k : ℝ) ^ ((1 : ℝ) / 2 ^ k)) atTop (𝓝 limitL) := by
+  sorry
+
+/--
+  **Residual Positivity**
+  
+  For a sequence ≥ 2 with rational sum p/q, the tail residuals are positive integers.
+  
+  **Status**: sorry. Requires showing the tail sum identity gives T_n = q·P_n·(tail sum) > 0.
+-/
+lemma residual_pos_of_rational_sum (seq : ℕ → ℕ) (q : ℚ) 
+    (_hGe2 : ∀ k, seq k ≥ 2)
+    (_hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ↑q) :
+    q.num > 0 ∧ q.den ≥ 1 ∧ 
+    (∀ k, tailResidual seq q.num.toNat q.den k > 0) := by
+  sorry
+
+/-- 
+  **The Full Chain: limsup > 1 + rational sum → eventually Sylvester recurrence**
+  
+  This is the complete wiring from the analytical hypothesis to the algebraic conclusion.
+  Every step in the chain is either proven or tagged with an honest sorry.
+-/
+theorem limsup_forces_sylvester_recurrence (seq : ℕ → ℕ) (q : ℚ) 
+    (hMono : StrictMono seq) (hGe2 : ∀ k, seq k ≥ 2)
+    (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ↑q)
+    (hLimsup : limsup (fun k => (seq k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop > 1) :
+    ∃ N : ℕ, ∀ n ≥ N, seq (n + 1) + seq n = seq n * seq n + 1 := by
+  -- Step 1: Extract a limit L > 1
+  rcases limsup_gt_one_extract_limit seq hMono hGe2 hLimsup with ⟨limitL, hL_gt_1, hTendsto⟩
+  -- Step 2: Get the rational sum as num/denom with positivity
+  rcases residual_pos_of_rational_sum seq q hGe2 hSum with ⟨hq_num_pos, hq_den_ge1, hResPos⟩
+  -- Step 3: Rewrite the HasSum in num/denom form
+  have hSum_nd : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((q.num.toNat : ℝ) / q.den) := by
+    have hq_eq : (q : ℝ) = (q.num.toNat : ℝ) / (q.den : ℝ) := by
+      have h_num : (q.num.toNat : ℤ) = q.num := Int.toNat_of_nonneg (le_of_lt hq_num_pos)
+      rw [Rat.cast_def]
+      congr 1
+      exact_mod_cast h_num.symm
+    rw [hq_eq] at hSum
+    exact hSum
+  -- Step 4: Apply the asymptotic squeeze → T_n → denom/L
+  have hConv := asymptoticSqueezeLimit seq q.num.toNat q.den limitL 
+                  hSum_nd hTendsto hq_den_ge1 hGe2 hL_gt_1
+  -- Step 5: Integer convergence rigidity → T_n eventually constant
+  rcases integerConvergenceRigidity (tailResidual seq q.num.toNat q.den) 
+         (q.den / limitL) hConv with ⟨C, N, hC⟩
+  -- Step 6: C ≠ 0 (since residuals are positive)
+  have hC_ne_zero : C ≠ 0 := by
+    have hPos := hResPos N
+    have hCN := hC N (le_refl N)
+    rw [hCN] at hPos
+    omega
+  -- Step 7: Derive the recurrence
+  have hDenom_pos : q.den > 0 := by omega
+  exact ⟨N, constant_residual_implies_sylvester seq q.num.toNat q.den C N hC hC_ne_zero hDenom_pos⟩
+
 end
