@@ -392,13 +392,48 @@ lemma hasSum_pos_of_ge_two (seq : ℕ → ℕ) (q : ℚ)
   exact h_tsum_pos
 
 /--
-  **Status**: sorry. Requires the tail-sum identity T_n = denom·P_n·Σ > 0.
+  Tail residuals are positive integers when the sum is positive and the sequence is ≥ 2.
+  Proof: by the identity T_k = denom · P_k · Σ_{j≥k} 1/a_j, all factors are positive.
 -/
+lemma prefixProduct_pos (seq : ℕ → ℕ) (h_pos : ∀ j, seq j > 0) (k : ℕ) :
+    prefixProduct seq k > 0 := by
+  induction k with
+  | zero => simp [prefixProduct]
+  | succ n ih => 
+    simp [prefixProduct]
+    exact ⟨ih, h_pos n⟩
+
 lemma tailResidual_pos_inductive (seq : ℕ → ℕ) (num denom : ℕ) 
-    (_hGe2 : ∀ k, seq k ≥ 2) (_hNum : num > 0) (_hDenom : denom ≥ 1)
-    (_hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
+    (hGe2 : ∀ k, seq k ≥ 2) (hNum : num > 0) (hDenom : denom ≥ 1)
+    (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
     (k : ℕ) : tailResidual seq num denom k > 0 := by
-  sorry
+  have hSummable := hSum.summable
+  have hSum_val := hSum.tsum_eq
+  have h_pos : ∀ j, seq j > 0 := by intro j; have := hGe2 j; omega
+  have h_eq := tailResidual_eq_sum seq num denom hSummable hSum_val h_pos hDenom k
+  have h_denom_pos : (denom : ℝ) > 0 := by exact_mod_cast (show (0 : ℕ) < denom by omega)
+  have h_prefix_pos : (prefixProduct seq k : ℝ) > 0 := by
+    exact_mod_cast prefixProduct_pos seq h_pos k
+  have h_tail_sum_pos : ∑' j, (1 : ℝ) / (seq (k + j) : ℝ) > 0 := by
+    have h_summable_shifted : Summable (fun j => (1 : ℝ) / (seq (k + j) : ℝ)) := by
+      have : Summable (fun j => (1 : ℝ) / (seq (j + k) : ℝ)) := (summable_nat_add_iff k).mpr hSummable
+      have h_comm : (fun j => (1 : ℝ) / (seq (j + k) : ℝ)) = (fun j => (1 : ℝ) / (seq (k + j) : ℝ)) := by
+        ext j; rw [add_comm j k]
+      rw [h_comm] at this
+      exact this
+    have h_nonneg : ∀ j, (0 : ℝ) ≤ (1 : ℝ) / (seq (k + j) : ℝ) := by
+      intro j; positivity
+    have h_first_pos : (0 : ℝ) < (1 : ℝ) / (seq (k + 0) : ℝ) := by
+      rw [add_zero]
+      apply div_pos (zero_lt_one)
+      exact_mod_cast (h_pos k)
+    exact tsum_pos h_summable_shifted h_nonneg 0 h_first_pos
+  -- Combine: (T_k : ℝ) = denom · P_k · tail_sum > 0
+  have h_real_pos : (tailResidual seq num denom k : ℝ) > 0 := by
+    rw [h_eq]
+    exact mul_pos (mul_pos h_denom_pos h_prefix_pos) h_tail_sum_pos
+  -- Lift from ℝ positivity to ℤ positivity
+  exact_mod_cast h_real_pos
 
 lemma residual_pos_of_rational_sum (seq : ℕ → ℕ) (q : ℚ) 
     (hGe2 : ∀ k, seq k ≥ 2)
