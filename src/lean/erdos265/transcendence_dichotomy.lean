@@ -82,130 +82,54 @@ lemma transcendental_implies_irrational (x : ℂ) (h : Transcendental ℚ x) :
     · simp
   exact h h_alg
 
-/-! ### Proof that F is not a rational function -/
+/-! ### Proof that F is not a rational function
+  
+  We must rule out that F is a rational function P/Q.
+  The previous proof in this file assumed `Continuous F` over all of ℂ, which
+  vacuously forced Q to have no roots, restricting the search space to polynomials
+  and dodging the actual mathematical difficulty of rational functions with poles.
 
-/-- A continuous function vanishing on a dense set vanishes everywhere. -/
-lemma continuous_vanish_of_dense (f : ℂ → ℂ) (hf : Continuous f) (S : Set ℂ) (hS : Dense S)
-    (hfS : ∀ w ∈ S, f w = 0) : ∀ w, f w = 0 := by
-  intro w
-  have h_closed : IsClosed {x | f x = 0} := isClosed_eq hf continuous_const
-  have h_closure : closure S ⊆ {x | f x = 0} :=
-    h_closed.closure_subset_iff.mpr (fun x hx => hfS x hx)
-  rw [hS.closure_eq] at h_closure
-  exact h_closure (Set.mem_univ w)
+  To honestly rule out rational functions, we must perform the **Mahler Pole Chain**
+  argument:
+  1. Suppose P/Q(w) - P/Q(phi(w)) = w/(1+w)
+  2. As w → -1, the RHS has a simple pole.
+  3. Since phi(-1) = 1/3, the LHS term P/Q(phi(w)) evaluates to P/Q(1/3).
+  4. If Q(1/3) ≠ 0, then P/Q(1/3) is finite, forcing P/Q(w) to have a pole at w = -1.
+  5. Thus Q(-1) = 0.
+  6. Let r be a preimage of -1 (so phi(r) = -1). Since r ≠ -1, w/(1+w) is finite at r.
+  7. But P/Q(phi(w)) evaluates to P/Q(-1) = ∞. Thus P/Q(w) must also be ∞ at r to cancel it.
+  8. This means Q(r) = 0.
+  9. This generates an infinite binary tree of preimages, all of which must be roots of Q.
+  10. A polynomial Q cannot have infinitely many roots, hence contradiction.
 
-/--
-  **F·Q = P everywhere.**
-  If F is continuous and agrees with P/Q where Q ≠ 0, then F·Q = P on all of ℂ.
-  This is the key step that "extends" the rational identity past the poles.
+  This requires a substantial library for rational function pole orders and limits,
+  or a complex algebraic formalization tracking roots of polynomials through preimages.
+  We leave it as an explicit gap.
 -/
-lemma FQ_eq_P (P Q : Polynomial ℂ) (F : ℂ → ℂ)
-    (hF_cont : Continuous F) (hQ_ne : Q ≠ 0)
-    (h_rat : ∀ w, Q.eval w ≠ 0 → F w = (P.eval w) / (Q.eval w)) :
-    ∀ w, F w * Q.eval w = P.eval w := by
-  -- g(w) = F(w)·Q(w) - P(w) is continuous
-  have hg_cont : Continuous (fun w => F w * Q.eval w - P.eval w) :=
-    (hF_cont.mul (Polynomial.continuous Q)).sub (Polynomial.continuous P)
-  -- g vanishes where Q(w) ≠ 0
-  have hg_zero : ∀ w, Q.eval w ≠ 0 → F w * Q.eval w - P.eval w = 0 := by
-    intro w hQw
-    rw [h_rat w hQw, div_mul_cancel (P.eval w) hQw, sub_self]
-  -- {w | Q(w) ≠ 0} is dense (complement of finitely many roots)
-  have h_dense : Dense {w : ℂ | Q.eval w ≠ 0} := by
-    have hfin : {w : ℂ | Q.eval w = 0}.Finite := by
-      have hroots := Q.rootSet_finite ℂ
-      refine hroots.subset ?_
-      intro w (hw : Q.eval w = 0)
-      simp only [rootSet, Finset.mem_coe, Multiset.mem_toFinset, mem_aroots]
-      exact ⟨hQ_ne, hw⟩
-    exact hfin.countable.dense_compl ℂ
-  -- By dense vanishing: g = 0 everywhere
-  have h_vanish := continuous_vanish_of_dense _ hg_cont _ h_dense (fun w hw => hg_zero w hw)
-  intro w
-  exact sub_eq_zero.mp (h_vanish w)
-
-/--
-  **Q has no roots.**
-  From F·Q = P and coprimality: at any root z of Q, P(z) = 0,
-  contradicting IsCoprime P Q.
--/
-lemma Q_no_roots (P Q : Polynomial ℂ) (F : ℂ → ℂ)
-    (hF_cont : Continuous F) (hQ_ne : Q ≠ 0) (h_coprime : IsCoprime P Q)
-    (h_rat : ∀ w, Q.eval w ≠ 0 → F w = (P.eval w) / (Q.eval w))
-    (z : ℂ) (hz : Q.eval z = 0) :
-    False := by
-  have h_FQ := FQ_eq_P P Q F hF_cont hQ_ne h_rat z
-  rw [hz, mul_zero] at h_FQ
-  have hPz : P.eval z = 0 := h_FQ.symm
-  have hP_dvd : (X - C z) ∣ P := dvd_iff_isRoot.mpr hPz
-  have hQ_dvd : (X - C z) ∣ Q := dvd_iff_isRoot.mpr hz
-  exact not_isUnit_X_sub_C z (h_coprime.isUnit_of_dvd' hP_dvd hQ_dvd)
-
-/--
-  **Q is a nonzero constant.**
-  Over ℂ (algebraically closed), a nonzero polynomial with no roots has degree 0.
--/
-lemma Q_is_constant (P Q : Polynomial ℂ) (F : ℂ → ℂ)
-    (hF_cont : Continuous F) (hQ_ne : Q ≠ 0) (h_coprime : IsCoprime P Q)
-    (h_rat : ∀ w, Q.eval w ≠ 0 → F w = (P.eval w) / (Q.eval w)) :
-    Q.natDegree = 0 := by
-  by_contra h_deg
-  have h_deg_ne : Q.degree ≠ 0 := by
-    rw [Polynomial.degree_eq_natDegree hQ_ne]; exact_mod_cast h_deg
-  obtain ⟨z, hz⟩ := IsAlgClosed.exists_root Q h_deg_ne
-  exact Q_no_roots P Q F hF_cont hQ_ne h_coprime h_rat z hz
 
 /--
   **F is not a rational function.**
-
-  Complete proof using the continuity + density + FTA chain.
-  Requires `Continuous F` — justified since the actual Mahler function
-  is analytic (hence continuous) on the unit disk.
+  
+  The Mahler function cannot be a rational function due to the infinite pole
+  chain forced by the functional equation.
 -/
-lemma F_is_not_rational (F : ℂ → ℂ) (hF : SatisfiesMahlerEquation F) (hF_cont : Continuous F) :
+lemma F_is_not_rational (F : ℂ → ℂ) (hF : SatisfiesMahlerEquation F) :
     ¬ ∃ (P Q : Polynomial ℂ), IsRationalFunction F P Q := by
-  intro ⟨P, Q, hQ_ne, h_coprime, h_rat⟩
-  -- Q is constant
-  have hQ_const := Q_is_constant P Q F hF_cont hQ_ne h_coprime h_rat
-  have hQ_eq : Q = C (Q.coeff 0) := Polynomial.eq_C_of_natDegree_eq_zero hQ_const
-  have hc_ne : Q.coeff 0 ≠ 0 := by
-    intro h0; apply hQ_ne; rw [hQ_eq, h0, map_zero]
-  -- Q(w) = c ≠ 0 for ALL w
-  have hQ_eval : ∀ w, Q.eval w ≠ 0 := by
-    intro w; rw [hQ_eq, eval_C]; exact hc_ne
-  -- Mahler equation at w = 1 (valid since 1 ≠ -1 and D(1) = 1 ≠ 0)
-  have h1ne : (1 : ℂ) ≠ -1 := by norm_num
-  have hD1 : (1 : ℂ) - 1 + 1^2 ≠ 0 := by norm_num
-  have h_mahler := hF 1 h1ne hD1
-  -- φ(1) = 1
-  have h_phi : phi 1 = 1 := by unfold phi; norm_num
-  rw [h_phi] at h_mahler
-  -- h_mahler : F 1 = 1/(1+1) + F 1
-  -- Now both F 1 terms are the same. Substitute F(1) = P(1)/Q(1).
-  have hF1 := h_rat 1 (hQ_eval 1)
-  rw [hF1] at h_mahler
-  -- P(1)/Q(1) = 1/(1+1) + P(1)/Q(1), subtract to get 0 = 1/2
-  have h1 : eval 1 P / eval 1 Q - eval 1 P / eval 1 Q = 0 := sub_self _
-  have h3 : eval 1 P / eval 1 Q - eval 1 P / eval 1 Q =
-    1 / (1 + 1) + eval 1 P / eval 1 Q - eval 1 P / eval 1 Q :=
-    congrArg (· - eval 1 P / eval 1 Q) h_mahler
-  have h4 : (1 : ℂ) / (1 + 1) + eval 1 P / eval 1 Q - eval 1 P / eval 1 Q = 1 / (1 + 1) := by ring
-  rw [h1, h4] at h3
-  revert h3; norm_num
+  sorry
 
 /--
   **The Resolution of the Rs Case**
 -/
 theorem erdos265_irrational_Rs (F : ℂ → ℂ) (hF : SatisfiesMahlerEquation F)
     (h_analytic : AnalyticOn ℂ F (Metric.ball 0 1))
-    (h_F_zero : F 0 = 0) (h_F_diff : DifferentiableAt ℂ F 0) (hF_cont : Continuous F) :
+    (h_F_zero : F 0 = 0) (h_F_diff : DifferentiableAt ℂ F 0) :
     F (1/2) ∉ Set.range ((↑) : ℚ → ℂ) := by
   apply transcendental_implies_irrational
   apply nishioka_transcendence F (1/2) hF h_analytic
   · exact phi_super_attracting
   · exact h_F_zero
   · exact h_F_diff
-  · exact F_is_not_rational F hF hF_cont
+  · exact F_is_not_rational F hF
   · -- 1/2 is algebraic over ℚ
     use 2 * X - 1
     constructor
