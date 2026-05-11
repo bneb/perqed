@@ -69,10 +69,35 @@ lemma transcendental_implies_irrational (x : ℂ) (h : Transcendental ℚ x) :
     · simp
   exact h h_alg
 
-/-- Step 3: Evaluating the second derivative at `w=1` forces `1 = 1/2`, a contradiction. -/
+/--
+  **F is not a rational function.**
+  
+  Proof: Evaluate the Mahler equation at `w = 1`. Since `φ(1) = 1`, the equation becomes
+  `F(1) = 1/2 + F(1)`, which gives `0 = 1/2` — a contradiction. This argument works
+  regardless of whether `Q(1) = 0` (where Lean's `x/0 = 0` convention makes both sides
+  evaluate to `0 = 1/2`) or `Q(1) ≠ 0` (standard field arithmetic).
+-/
 lemma F_is_not_rational (F : ℂ → ℂ) (hF : SatisfiesMahlerEquation F) : 
     ¬ ∃ (P Q : Polynomial ℂ), Q ≠ 0 ∧ IsCoprime P Q ∧ ∀ w, F w = (P.eval w) / (Q.eval w) := by
-  sorry
+  intro ⟨P, Q, _, _, h_rat⟩
+  -- Evaluate the Mahler equation at w = 1
+  have h1ne : (1 : ℂ) ≠ -1 := by norm_num
+  have hD1 : (1 : ℂ) - 1 + 1^2 ≠ 0 := by norm_num
+  have h_eval := hF 1 h1ne hD1
+  -- Substitute F = P/Q
+  rw [h_rat, h_rat] at h_eval
+  -- Use φ(1) = 1
+  have h_phi : phi 1 = 1 := by unfold phi; norm_num
+  rw [h_phi] at h_eval
+  -- h_eval : P.eval 1 / Q.eval 1 = 1/(1+1) + P.eval 1 / Q.eval 1
+  -- Subtract P.eval 1 / Q.eval 1 from both sides to get 0 = 1/2
+  have h1 : eval 1 P / eval 1 Q - eval 1 P / eval 1 Q = 0 := sub_self _
+  have h3 : eval 1 P / eval 1 Q - eval 1 P / eval 1 Q =
+    1 / (1 + 1) + eval 1 P / eval 1 Q - eval 1 P / eval 1 Q :=
+    congrArg (· - eval 1 P / eval 1 Q) h_eval
+  have h4 : (1 : ℂ) / (1 + 1) + eval 1 P / eval 1 Q - eval 1 P / eval 1 Q = 1 / (1 + 1) := by ring
+  rw [h1, h4] at h3
+  revert h3; norm_num
 
 /--
   **The Resolution of the Rs Case**
