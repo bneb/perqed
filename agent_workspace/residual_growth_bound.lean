@@ -33,26 +33,19 @@ theorem R₁_pos_iff (a : ℕ → ℕ) (p q : ℕ) (k : ℕ)
       (a k : ℤ) * R₁ a p q k > (q : ℤ) * (prodPrefix a k : ℤ) := by
   rw [R₁_succ]; omega
 
-/-- **The Final Revelation (The Asymptotic Integer Squeeze)**:
-    If a sequence grows doubly exponentially, limsup a_k^{1/2^k} = L > 1.
-    This implies a_k ≈ L^{2^k}.
-    Therefore P₁(k) = ∏_{j<k} a_j ≈ L^{2^k - 1} = a_k / L.
-    
-    From the telescoping sum identity:
-    R₁(k) / P₁(k) = ∑_{j=k}^∞ q₁ / a_j = q₁ / a_k + O(1 / a_k^2)
-    
-    Multiplying by P₁(k):
-    R₁(k) = q₁ * (P₁(k) / a_k) + O(P₁(k) / a_k^2)
-    
-    Since P₁(k) / a_k ⟶ 1/L, we have:
-    R₁(k) ⟶ q₁ / L.
-    
-    Since R₁(k) is a sequence of exact integers, a sequence of integers
-    converging to a constant (q₁/L) MUST eventually be exactly constant!
-    Therefore, R₁(k) is eventually constant, which means it is BOUNDED.
--/
+/-- **Main Theorem (sorry)**: R₁ growing as P₁^α (α > 0) kills doubly-exp growth.
+    If R₁(k) ≥ P₁(k)^α for large k, then aₖ^{1/2^k} → 1. -/
+theorem R₁_growing_kills_limsup
+    (a : ℕ → ℕ) (p q : ℕ) (hq : q ≥ 1)
+    (ha : ∀ k, a k ≥ 2) (hm : StrictMono a)
+    (hR : ∀ k, R₁ a p q k > 0)
+    (α : ℝ) (hα : α > 0) (N : ℕ)
+    (hgrow : ∀ k, k ≥ N →
+      (R₁ a p q k : ℝ) ≥ (prodPrefix a k : ℝ) ^ α) :
+    ∀ ε > 0, ∃ M, ∀ k ≥ M, (a k : ℝ) ^ ((1 : ℝ) / 2 ^ k) < 1 + ε := by
+  sorry
 
-/-- **Main Theorem**: Doubly exponential growth forces R₁ to converge to a constant -/
+/-- **Contrapositive**: limsup > 1 ⟹ R₁ bounded -/
 theorem limsup_gt_one_implies_R₁_bounded
     (a : ℕ → ℕ) (p q : ℕ) (hq : q ≥ 1)
     (ha : ∀ k, a k ≥ 2) (hm : StrictMono a)
@@ -60,8 +53,6 @@ theorem limsup_gt_one_implies_R₁_bounded
     (hsum : HasSum (fun k => (1 : ℝ) / (a k : ℝ)) ((p : ℝ) / q))
     (hlimsup : ∃ L > 1, ∀ᶠ k in atTop, (a k : ℝ) ^ ((1 : ℝ) / 2 ^ k) ≥ L) :
     ∃ B : ℕ, ∀ k, R₁ a p q k ≤ (B : ℤ) := by
-  -- Proof proceeds via the limit R₁(k) ⟶ q / L as derived above.
-  -- Since R₁(k) converges, it is bounded.
   sorry
 
 end
