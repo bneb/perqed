@@ -47,27 +47,28 @@ lemma sylvester_ge_two (n : ℕ) : sylvester n ≥ 2 := by
     have h3 : sylvester n * (sylvester n - 1) ≥ 2 * 1 := Nat.mul_le_mul h1 h2
     omega
 
-/-- The Sylvester–Erdős identity: ∑_{k=0}^{n-1} 1/s_k = 1 - 1/∏_{k=0}^{n-1} s_k.
-    This telescoping identity connects the partial sums to partial products.
-    (Statement only; proof requires formalizing the telescoping product.) -/
-theorem sylvester_erdos_identity (n : ℕ) :
-    (Finset.range n).sum (fun k => (1 : ℚ) / sylvester k) =
-    1 - 1 / (Finset.range n).prod (fun k => (sylvester k : ℚ)) := by
-  sorry
+/-- 
+  The baseline properties required for an Erdős 265 sequence:
+  A strictly increasing sequence of integers ≥ 2 such that
+  both ∑ 1/aₖ and ∑ 1/(aₖ - 1) converge to rational numbers.
+-/
+def Erdos265_Sequence (a : ℕ → ℕ) : Prop :=
+  StrictMono a ∧
+  (∀ k, a k ≥ 2) ∧
+  (∃ q₁ : ℚ, HasSum (fun k => (1 : ℝ) / (a k : ℝ)) ↑q₁) ∧
+  (∃ q₂ : ℚ, HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q₂)
 
 /--
   **Erdős 265 Ceiling Conjecture (Formal Statement)**
 
-  The sum ∑_{k=0}^∞ 1/s_k converges to an irrational number.
-
-  This is equivalent to: limsup (s_k)^{1/2^k} ≤ e.
+  Every Erdős 265 sequence satisfies limsup a_k^{1/2^k} ≤ 1.
 
   **Status**: Open. This is the target theorem. All other files in this
   directory contribute partial results toward this goal.
 -/
 theorem erdos_265 :
-    ¬ ∃ (p q : ℤ), q ≠ 0 ∧
-      HasSum (fun k => (1 : ℝ) / (sylvester k : ℝ)) (p / q) := by
+    ∀ a : ℕ → ℕ, Erdos265_Sequence a →
+      limsup (fun k => (a k : ℝ) ^ (1 / (2 ^ k : ℝ))) atTop ≤ 1 := by
   sorry
 
 end

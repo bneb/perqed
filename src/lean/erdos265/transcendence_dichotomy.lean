@@ -47,9 +47,11 @@ lemma phi_super_attracting : phi 0 = 0 := by
 
 /--
   **Nishioka's Theorem (Formally Stubbed for Lean 4)**
+  Requires F to be analytic on the open unit disk.
 -/
 theorem nishioka_transcendence (F : ℂ → ℂ) (α : ℂ)
     (hF : SatisfiesMahlerEquation F)
+    (h_analytic : AnalyticOn ℂ F (Metric.ball 0 1))
     (h_super : phi 0 = 0)
     (h_F_zero : F 0 = 0)
     (h_F_diff : DifferentiableAt ℂ F 0)
@@ -195,10 +197,11 @@ lemma F_is_not_rational (F : ℂ → ℂ) (hF : SatisfiesMahlerEquation F) (hF_c
   **The Resolution of the Rs Case**
 -/
 theorem erdos265_irrational_Rs (F : ℂ → ℂ) (hF : SatisfiesMahlerEquation F)
+    (h_analytic : AnalyticOn ℂ F (Metric.ball 0 1))
     (h_F_zero : F 0 = 0) (h_F_diff : DifferentiableAt ℂ F 0) (hF_cont : Continuous F) :
     F (1/2) ∉ Set.range ((↑) : ℚ → ℂ) := by
   apply transcendental_implies_irrational
-  apply nishioka_transcendence F (1/2) hF
+  apply nishioka_transcendence F (1/2) hF h_analytic
   · exact phi_super_attracting
   · exact h_F_zero
   · exact h_F_diff
