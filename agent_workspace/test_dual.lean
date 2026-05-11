@@ -3,15 +3,6 @@ import Mathlib.Data.Real.Basic
 import problem_statement
 import residual_growth_bound
 
-/-!
-# Erdős 265: The Final Assembly
-
-This file contains the final assembly of the Erdős 265 Ceiling Conjecture.
-By bridging the greedy forces theorem with the shifted sequence logic, we 
-establish that the sequence must simultaneously lock into two contradictory 
-algebraic recurrences.
--/
-
 open Filter Topology
 
 lemma hasSum_shift {f : ℕ → ℝ} {q : ℝ} (hSum : HasSum f q) :
@@ -24,18 +15,13 @@ lemma hasSum_shift {f : ℕ → ℝ} {q : ℝ} (hSum : HasSum f q) :
   rw [h_simp] at h_iff
   exact h_iff.mp hSum
 
-/--
-  **BRIDGE LEMMA**: Dual greedy forces dual Sylvester recurrence
-  
-  Applying the primary greedy lock-in to the shifted sequence c_k = a_{k+1} - 1.
--/
 theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum : HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q)
     (hGreedy : IsGreedy a) :
     ∃ N : ℕ, ∀ n ≥ N,
       (a (n + 1) - 1) + (a n - 1) = (a n - 1) * (a n - 1) + 1 := by
-  obtain ⟨c, hc_eq_def⟩ : ∃ f : ℕ → ℕ, f = fun k => a (k + 1) - 1 := ⟨_, rfl⟩
+  generalize hc_eq_def : (fun k => a (k + 1) - 1) = c
   
   have hc_ge2 : ∀ k, c k ≥ 2 := by
     intro k
@@ -52,7 +38,7 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
         _ ≥ a k + 1 := Nat.add_le_add_right h_bound 1
         _ ≥ 2 + 1 := Nat.add_le_add_right hak 1
         _ = 3 := rfl
-    have hc_def : c k = a (k + 1) - 1 := congr_fun hc_eq_def k
+    have hc_def : c k = a (k + 1) - 1 := (congr_fun hc_eq_def k).symm
     clear hG hGreedy
     omega
 
@@ -62,12 +48,15 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
     have hc_ge_2 : c k ≥ 2 := hc_ge2 k
     
     have hac : a (k + 1) = c k + 1 := by
-      have hc_def : c k = a (k + 1) - 1 := congr_fun hc_eq_def k
+      have hc_def : c k = a (k + 1) - 1 := (congr_fun hc_eq_def k).symm
       have ha_ge2 : a (k + 1) ≥ 2 := hGe2 (k + 1)
       clear hG hGreedy; omega
       
     have hac1 : a (k + 2) = c (k + 1) + 1 := by
-      have hc_def : c (k + 1) = a (k + 2) - 1 := congr_fun hc_eq_def (k + 1)
+      have hc_def : c (k + 1) = a (k + 2) - 1 := by
+        have h1 := (congr_fun hc_eq_def (k + 1)).symm
+        change c (k + 1) = a (k + 1 + 1) - 1 at h1
+        exact h1
       have ha_ge2 : a (k + 2) ≥ 2 := hGe2 (k + 2)
       clear hG hGreedy; omega
       
@@ -114,7 +103,7 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
   have hc_sum : HasSum (fun k => (1 : ℝ) / (c k : ℝ)) ↑q_shift := by
     have h_eq : (fun k => (1 : ℝ) / (c k : ℝ)) = fun k => (1 : ℝ) / ((a (k + 1) : ℝ) - (1 : ℝ)) := by
       ext k
-      have hc_def : c k = a (k + 1) - 1 := congr_fun hc_eq_def k
+      have hc_def : c k = a (k + 1) - 1 := (congr_fun hc_eq_def k).symm
       have ha_ge1 : a (k + 1) ≥ 1 := by
         have : a (k + 1) ≥ 2 := hGe2 (k + 1)
         omega
@@ -126,8 +115,8 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
     rw [h_eq]
     
     have h_shift := hasSum_shift hSum
-    have h_cast : (q_shift : ℝ) = (q : ℝ) - (1 : ℝ) / ((a 0 : ℝ) - (1 : ℝ)) := by
-      have h_q_shift_eq : q_shift = q - (1 : ℚ) / ((a 0 : ℚ) - (1 : ℚ)) := h_q_shift
+    have h_cast : (q_shift : ℝ) = (q : ℝ) - 1 / ((a 0 : ℝ) - 1) := by
+      have h_q_shift_eq : q_shift = q - (1 : ℚ) / ((a 0 : ℚ) - 1) := h_q_shift
       rw [h_q_shift_eq]
       push_cast
       rfl
@@ -143,43 +132,14 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
   have hn_sub : n - 1 ≥ N := by clear hGreedy; omega
   have hN_apply := hN (n - 1) hn_sub
   have h_c_n1 : c (n - 1) = a n - 1 := by
-    have h_def : c (n - 1) = a (n - 1 + 1) - 1 := congr_fun hc_eq_def (n - 1)
+    have h_def : c (n - 1) = a (n - 1 + 1) - 1 := (congr_fun hc_eq_def (n - 1)).symm
     have : n - 1 + 1 = n := by clear hGreedy; omega
     rw [this] at h_def
     exact h_def
   have h_c_n : c (n - 1 + 1) = a (n + 1) - 1 := by
-    have h_def : c n = a (n + 1) - 1 := congr_fun hc_eq_def n
+    have h_def : c n = a (n + 1) - 1 := (congr_fun hc_eq_def n).symm
     have : n - 1 + 1 = n := by clear hGreedy; omega
     rw [this]
     exact h_def
   rw [← h_c_n, ← h_c_n1]
   exact hN_apply
-
-/--
-  **THE MAIN THEOREM**
-  
-  There is no sequence of integers that satisfies all conditions of the Erdős 265 
-  Ceiling Conjecture (in the greedy regime).
--/
-theorem no_erdos265_sequence (a : ℕ → ℕ)
-    (h : Erdos265_Sequence a)
-    (hGreedy : IsGreedy a)
-    (hDual : DualRational a) : False := by
-  obtain ⟨hGe2, ⟨q₁, hSum1⟩⟩ := h
-  obtain ⟨q₂, hSum2⟩ := hDual
-  
-  -- Primary lock-in: rational ∑ 1/aₖ → Sylvester recurrence
-  rcases greedy_forces_sylvester_recurrence a q₁ hGe2 hSum1 (fun k => hGreedy k) with ⟨N₁, hN₁⟩
-  
-  -- Dual lock-in: rational ∑ 1/(aₖ-1) → dual Sylvester recurrence
-  rcases greedy_forces_dual_sylvester_recurrence a q₂ hGe2 hSum2 hGreedy with ⟨N₂, hN₂⟩
-  
-  -- Convert dual recurrence to explicit polynomial form
-  have hDualRec : ∀ n ≥ N₂, a (n + 1) + 3 * a n = a n * a n + 4 :=
-    fun n hn => shifted_seq_lockin a N₂ hN₂ (fun n _ => hGe2 n) n hn
-    
-  -- Combine at N = max N₁ N₂
-  let N := max N₁ N₂
-  exact dual_lockin_contradiction a N
-    (fun n hn => hN₁ n (le_trans (le_max_left _ _) hn))
-    (fun n hn => hDualRec n (le_trans (le_max_right _ _) hn))

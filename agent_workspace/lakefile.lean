@@ -1,17 +1,15 @@
 import Lake
 open Lake DSL
 
-package «perqed_proofs» where
+package «agent_workspace» where
   -- add package configuration options here
 
 @[default_target]
-lean_lib «PerqedProofs» where
-  -- add library configuration options here
-
-lean_lib VerifiedVault where
-  srcDir := "verified_lib"
+lean_lib «agent_workspace» where
+  srcDir := "."
+  roots := #[`problem_statement, `residual_growth_bound, `erdos265_main, `dual_constraint_collapse, `sylvester_irrational, `universal_balance]
 
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4.git" @ "v4.6.0"
-lean_lib erdos265 where
-  srcDir := "../src/lean"
+
+

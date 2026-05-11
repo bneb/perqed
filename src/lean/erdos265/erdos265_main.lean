@@ -1,6 +1,7 @@
 import Mathlib
-import erdos265.problem_statement
-import erdos265.residual_growth_bound
+import Mathlib.Data.Real.Basic
+import problem_statement
+import residual_growth_bound
 
 /-!
 # Erdős 265: The Final Assembly
@@ -13,102 +14,146 @@ algebraic recurrences.
 
 open Filter Topology
 
+lemma hasSum_shift {f : ℕ → ℝ} {q : ℝ} (hSum : HasSum f q) :
+    HasSum (fun k => f (k + 1)) (q - f 0) := by
+  have h_iff := (hasSum_nat_add_iff 1 (f := f) (a := q - f 0)).symm
+  have h_sum : Finset.sum (Finset.range 1) (fun i => f i) = f 0 := by simp
+  have h_simp : q - f 0 + Finset.sum (Finset.range 1) (fun i => f i) = q := by
+    rw [h_sum]
+    ring
+  rw [h_simp] at h_iff
+  exact h_iff.mp hSum
+
 /--
-  **MISSING BRIDGE LEMMA**: Dual greedy forces dual Sylvester recurrence
+  **BRIDGE LEMMA**: Dual greedy forces dual Sylvester recurrence
   
   Applying the primary greedy lock-in to the shifted sequence c_k = a_{k+1} - 1.
 -/
 theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum : HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q)
-    (hGreedy : ∀ k, a (k + 1) ≥ a k * a k - a k + 1) :
+    (hGreedy : IsGreedy a) :
     ∃ N : ℕ, ∀ n ≥ N,
       (a (n + 1) - 1) + (a n - 1) = (a n - 1) * (a n - 1) + 1 := by
-  let c := fun k => a (k + 1) - 1
+  obtain ⟨c, hc_eq_def⟩ : ∃ f : ℕ → ℕ, f = fun k => a (k + 1) - 1 := ⟨_, rfl⟩
   
   have hc_ge2 : ∀ k, c k ≥ 2 := by
     intro k
-    have ha2_k := hGe2 k
-    have hG_k := hGreedy k
-    have h1 : a k * a k ≥ 2 * a k := Nat.mul_le_mul_right (a k) ha2_k
-    change a (k + 1) - 1 ≥ 2
-    generalize a k * a k = S at *
-    generalize a (k + 1) = ak1 at *
-    generalize a k = ak at *
-    have h2 : S - ak ≥ ak := by omega
-    have h3 : ak1 ≥ ak + 1 := by omega
+    have hG := hGreedy k
+    have hak := hGe2 k
+    have h_sq : a k * a k ≥ a k + a k := by
+      calc a k * a k
+        _ ≥ 2 * a k := Nat.mul_le_mul_right (a k) hak
+        _ = a k + a k := by clear hG hGreedy; omega
+    have h_bound : a k * a k - a k ≥ a k := Nat.le_sub_of_add_le h_sq
+    have h_ak1_ge : a (k + 1) ≥ 3 := by
+      calc a (k + 1)
+        _ ≥ a k * a k - a k + 1 := hG
+        _ ≥ a k + 1 := Nat.add_le_add_right h_bound 1
+        _ ≥ 2 + 1 := Nat.add_le_add_right hak 1
+        _ = 3 := rfl
+    have hc_def : c k = a (k + 1) - 1 := congr_fun hc_eq_def k
+    clear hG hGreedy
     omega
-    
+
   have hc_greedy : ∀ k, c (k + 1) ≥ c k * c k - c k + 1 := by
     intro k
-    have ha2_k := hGe2 k
-    have hG_k := hGreedy k
-    have h1 : a k * a k ≥ 2 * a k := Nat.mul_le_mul_right (a k) ha2_k
-    have ha_k1_ge3 : a (k + 1) ≥ 3 := by
-      generalize a k * a k = S at *
-      generalize a (k + 1) = ak1 at *
-      generalize a k = ak at *
-      have h2 : S - ak ≥ ak := by omega
-      have h3 : ak1 ≥ ak + 1 := by omega
-      omega
-    have h_ck_val : c k = a (k + 1) - 1 := rfl
-    have h_ck1_val : c (k + 1) = a (k + 2) - 1 := rfl
-    have hG_k1 := hGreedy (k + 1)
+    have hG := hGreedy (k + 1)
+    have hc_ge_2 : c k ≥ 2 := hc_ge2 k
     
-    have h_sq_sub : (a (k + 1) - 1) * (a (k + 1) - 1) = a (k + 1) * a (k + 1) - 2 * a (k + 1) + 1 := by
-      have h : (((a (k + 1) - 1) * (a (k + 1) - 1) : ℕ) : ℤ) = ((a (k + 1) * a (k + 1) - 2 * a (k + 1) + 1 : ℕ) : ℤ) := by
-        have h_sub : ((a (k + 1) - 1 : ℕ) : ℤ) = (a (k + 1) : ℤ) - 1 := by exact Int.coe_nat_sub (by omega)
-        have h_sub2 : ((a (k + 1) * a (k + 1) - 2 * a (k + 1) : ℕ) : ℤ) = (a (k + 1) : ℤ) * (a (k + 1) : ℤ) - 2 * (a (k + 1) : ℤ) := by
-          have h_mul_le : a (k + 1) * a (k + 1) ≥ 2 * a (k + 1) := Nat.mul_le_mul_right (a (k + 1)) (by omega)
-          rw [Int.coe_nat_sub h_mul_le]
-          push_cast; rfl
-        push_cast; rw [h_sub, h_sub2]; ring
-      exact_mod_cast h
+    have hac : a (k + 1) = c k + 1 := by
+      have hc_def : c k = a (k + 1) - 1 := congr_fun hc_eq_def k
+      have ha_ge2 : a (k + 1) ≥ 2 := hGe2 (k + 1)
+      clear hG hGreedy; omega
       
-    have h_mul_lb : a (k + 1) * a (k + 1) ≥ 3 * a (k + 1) := Nat.mul_le_mul_right (a (k + 1)) ha_k1_ge3
-    
-    rw [h_ck_val, h_ck1_val]
-    revert hG_k1 h_sq_sub h_mul_lb ha_k1_ge3
-    generalize a (k + 1) * a (k + 1) = S
-    generalize a (k + 1) = A
-    generalize a (k + 2) = ak2
-    intro ha_k1_ge3 h_mul_lb h_sq_sub hG_k1
-    rw [h_sq_sub]
-    omega
-    
-  have hc_sum : HasSum (fun k => (1 : ℝ) / (c k : ℝ)) ↑(q - 1 / ((a 0 : ℚ) - 1)) := by
-    have h_iff := hasSum_nat_add_iff 1 (f := fun k => (1 : ℝ) / ((a k : ℝ) - 1)) (a := ↑q - (1 : ℝ) / ((a 0 : ℝ) - 1))
-    have h_sum_zero : (Finset.range 1).sum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) = (1 : ℝ) / ((a 0 : ℝ) - 1) := Finset.sum_range_one _
-    rw [h_sum_zero] at h_iff
-    have h_eq : (q : ℝ) - (1 : ℝ) / ((a 0 : ℝ) - 1) + (1 : ℝ) / ((a 0 : ℝ) - 1) = (q : ℝ) := sub_add_cancel (q : ℝ) _
-    rw [h_eq] at h_iff
-    have h_q_sub : (↑(q - 1 / ((a 0 : ℚ) - 1)) : ℝ) = (q : ℝ) - (1 : ℝ) / ((a 0 : ℝ) - 1) := by push_cast; rfl
-    rw [h_q_sub]
-    have h_c_def : (fun (k : ℕ) => 1 / (c k : ℝ)) = fun n => 1 / ((a (n + 1) : ℝ) - 1) := by
-      ext n
-      have : c n = a (n + 1) - 1 := rfl
-      have h_pos : a (n + 1) ≥ 1 := by
-        have := hGe2 (n + 1)
+    have hac1 : a (k + 2) = c (k + 1) + 1 := by
+      have hc_def : c (k + 1) = a (k + 2) - 1 := congr_fun hc_eq_def (k + 1)
+      have ha_ge2 : a (k + 2) ≥ 2 := hGe2 (k + 2)
+      clear hG hGreedy; omega
+      
+    have h1 : a (k + 1) * a (k + 1) = c k * c k + 2 * c k + 1 := by
+      rw [hac]
+      ring
+        
+    have h2 : a (k + 1) * a (k + 1) - a (k + 1) = c k * c k + c k := by
+      rw [h1, hac]
+      have : c k * c k + 2 * c k + 1 = (c k * c k + c k) + (c k + 1) := by ring
+      rw [this]
+      exact Nat.add_sub_cancel (c k * c k + c k) (c k + 1)
+      
+    have h3 : a (k + 2) ≥ c k * c k + c k + 1 := by
+      calc a (k + 2)
+        _ ≥ a (k + 1) * a (k + 1) - a (k + 1) + 1 := hG
+        _ = c k * c k + c k + 1 := by rw [h2]
+        
+    have h4 : c (k + 1) + 1 ≥ c k * c k + c k + 1 := by
+      rw [← hac1]
+      exact h3
+      
+    have h5 : c (k + 1) ≥ c k * c k + c k := by
+      exact Nat.le_of_succ_le_succ h4
+      
+    have h6 : c k * c k + c k ≥ c k * c k - c k + 1 := by
+      have h_sub : c k * c k ≥ c k := by
+        have h_pos : c k ≥ 1 := by omega
+        exact Nat.le_mul_of_pos_left (c k) h_pos
+      have h_alg : c k * c k + c k = (c k * c k - c k + 1) + (2 * c k - 1) := by
+        calc c k * c k + c k
+          _ = c k * c k - c k + c k + c k := by rw [Nat.sub_add_cancel h_sub]
+          _ = c k * c k - c k + 2 * c k := by ring
+          _ = c k * c k - c k + 1 + (2 * c k - 1) := by
+            have h_2ck : 2 * c k ≥ 1 := by omega
+            omega
+      rw [h_alg]
+      exact Nat.le_add_right (c k * c k - c k + 1) (2 * c k - 1)
+      
+    exact Nat.le_trans h6 h5
+
+  obtain ⟨q_shift, h_q_shift⟩ : ∃ x : ℚ, x = q - (1 : ℚ) / ((a 0 : ℚ) - (1 : ℚ)) := ⟨_, rfl⟩
+
+  have hc_sum : HasSum (fun k => (1 : ℝ) / (c k : ℝ)) ↑q_shift := by
+    have h_eq : (fun k => (1 : ℝ) / (c k : ℝ)) = fun k => (1 : ℝ) / ((a (k + 1) : ℝ) - (1 : ℝ)) := by
+      ext k
+      have hc_def : c k = a (k + 1) - 1 := congr_fun hc_eq_def k
+      have ha_ge1 : a (k + 1) ≥ 1 := by
+        have : a (k + 1) ≥ 2 := hGe2 (k + 1)
         omega
-      rw [this, Nat.cast_sub h_pos]
-      push_cast; rfl
-    rw [h_c_def]
-    exact h_iff.mpr hSum
+      have h_cast_sub : (c k : ℝ) = (a (k + 1) : ℝ) - 1 := by
+        have h_eq_nat : c k = a (k + 1) - 1 := hc_def
+        zify [ha_ge1] at h_eq_nat
+        exact_mod_cast h_eq_nat
+      rw [h_cast_sub]
+    rw [h_eq]
     
-  rcases greedy_forces_sylvester_recurrence c (q - 1 / ((a 0 : ℚ) - 1)) hc_ge2 hc_sum hc_greedy with ⟨N, hN⟩
+    have h_shift := hasSum_shift hSum
+    have h_cast : (q_shift : ℝ) = (q : ℝ) - (1 : ℝ) / ((a 0 : ℝ) - (1 : ℝ)) := by
+      have h_q_shift_eq : q_shift = q - (1 : ℚ) / ((a 0 : ℚ) - (1 : ℚ)) := h_q_shift
+      rw [h_q_shift_eq]
+      push_cast
+      rfl
+    rw [h_cast]
+    exact h_shift
+
+  have h_sylv : ∃ N : ℕ, ∀ n ≥ N, c (n + 1) + c n = c n * c n + 1 :=
+    greedy_forces_sylvester_recurrence c q_shift hc_ge2 hc_sum hc_greedy
+
+  obtain ⟨N, hN⟩ := h_sylv
   use N + 1
   intro n hn
-  have h_n_sub_1 : n - 1 ≥ N := by omega
-  have h_c := hN (n - 1) h_n_sub_1
-  have h_idx1 : n - 1 + 1 = n := by omega
-  rw [h_idx1] at h_c
-  have h_cn : c n = a (n + 1) - 1 := rfl
-  have h_cn_1 : c (n - 1) = a n - 1 := by
-    have : c (n - 1) = a (n - 1 + 1) - 1 := rfl
-    rw [h_idx1] at this
-    exact this
-  rw [h_cn, h_cn_1] at h_c
-  exact h_c
+  have hn_sub : n - 1 ≥ N := by clear hGreedy; omega
+  have hN_apply := hN (n - 1) hn_sub
+  have h_c_n1 : c (n - 1) = a n - 1 := by
+    have h_def : c (n - 1) = a (n - 1 + 1) - 1 := congr_fun hc_eq_def (n - 1)
+    have : n - 1 + 1 = n := by clear hGreedy; omega
+    rw [this] at h_def
+    exact h_def
+  have h_c_n : c (n - 1 + 1) = a (n + 1) - 1 := by
+    have h_def : c n = a (n + 1) - 1 := congr_fun hc_eq_def n
+    have : n - 1 + 1 = n := by clear hGreedy; omega
+    rw [this]
+    exact h_def
+  rw [← h_c_n, ← h_c_n1]
+  exact hN_apply
 
 /--
   **THE MAIN THEOREM**
@@ -116,21 +161,25 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
   There is no sequence of integers that satisfies all conditions of the Erdős 265 
   Ceiling Conjecture (in the greedy regime).
 -/
-theorem no_erdos265_sequence (a : ℕ → ℕ) (h : Erdos265_Sequence a) : False := by
-  obtain ⟨hGe2, hGreedy, ⟨q₁, hSum1⟩, ⟨q₂, hSum2⟩⟩ := h
+theorem no_erdos265_sequence (a : ℕ → ℕ)
+    (h : Erdos265_Sequence a)
+    (hGreedy : IsGreedy a)
+    (hDual : DualRational a) : False := by
+  obtain ⟨hGe2, ⟨q₁, hSum1⟩⟩ := h
+  obtain ⟨q₂, hSum2⟩ := hDual
   
   -- Primary lock-in: rational ∑ 1/aₖ → Sylvester recurrence
-  rcases greedy_forces_sylvester_recurrence a q₁ hGe2 hSum1 hGreedy with ⟨N₁, hN₁⟩
+  rcases greedy_forces_sylvester_recurrence a q₁ hGe2 hSum1 (fun k => hGreedy k) with ⟨N₁, hN₁⟩
   
   -- Dual lock-in: rational ∑ 1/(aₖ-1) → dual Sylvester recurrence
   rcases greedy_forces_dual_sylvester_recurrence a q₂ hGe2 hSum2 hGreedy with ⟨N₂, hN₂⟩
   
   -- Convert dual recurrence to explicit polynomial form
-  have hDual : ∀ n ≥ N₂, a (n + 1) + 3 * a n = a n * a n + 4 :=
+  have hDualRec : ∀ n ≥ N₂, a (n + 1) + 3 * a n = a n * a n + 4 :=
     fun n hn => shifted_seq_lockin a N₂ hN₂ (fun n _ => hGe2 n) n hn
     
   -- Combine at N = max N₁ N₂
   let N := max N₁ N₂
   exact dual_lockin_contradiction a N
     (fun n hn => hN₁ n (le_trans (le_max_left _ _) hn))
-    (fun n hn => hDual n (le_trans (le_max_right _ _) hn))
+    (fun n hn => hDualRec n (le_trans (le_max_right _ _) hn))

@@ -48,19 +48,42 @@ lemma sylvester_ge_two (n : ℕ) : sylvester n ≥ 2 := by
     omega
 
 /-- 
-  The baseline properties required for an Erdős 265 sequence in the Greedy Regime:
-  A sequence of integers ≥ 2 satisfying the greedy recurrence bound such that
-  both ∑ 1/aₖ and ∑ 1/(aₖ - 1) converge to rational numbers.
+  The baseline property required for an Erdős 265 sequence:
+  A sequence of integers ≥ 2 such that the sum of its reciprocals is rational.
 -/
 def Erdos265_Sequence (a : ℕ → ℕ) : Prop :=
   (∀ k, a k ≥ 2) ∧
-  (∀ k, a (k + 1) ≥ a k * a k - a k + 1) ∧
-  (∃ q₁ : ℚ, HasSum (fun k => (1 : ℝ) / (a k : ℝ)) ↑q₁) ∧
-  (∃ q₂ : ℚ, HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q₂)
+  (∃ q : ℚ, HasSum (fun k => (1 : ℝ) / (a k : ℝ)) ↑q)
 
 /--
+  The Greedy Regime constraint:
+  The sequence grows at least as fast as the Sylvester recurrence.
+-/
+def IsGreedy (a : ℕ → ℕ) : Prop :=
+  ∀ k, a (k + 1) ≥ a k * a k - a k + 1
+
+/--
+  The Dual Rationality condition:
+  The shifted series also converges to a rational number.
+-/
+def DualRational (a : ℕ → ℕ) : Prop :=
+  ∃ q : ℚ, HasSum (fun k => (1 : ℝ) / ((a k : ℝ) - 1)) ↑q
+
+/-- The Sylvester sequence is a witness for the Greedy Regime. -/
+lemma sylvester_is_greedy : IsGreedy sylvester := by
+  intro k
+  have h_eq : sylvester (k + 1) = sylvester k * (sylvester k - 1) + 1 := rfl
+  have h_ge2 : sylvester k ≥ 2 := sylvester_ge_two k
+  have h_sq : sylvester k * (sylvester k - 1) = sylvester k * sylvester k - sylvester k := by
+    calc sylvester k * (sylvester k - 1)
+      _ = sylvester k * sylvester k - sylvester k * 1 := Nat.mul_sub_left_distrib _ _ _
+      _ = sylvester k * sylvester k - sylvester k := by rw [mul_one]
+  rw [h_eq, h_sq]
+
+
+
+/-- 
   **The Dual Lock-in Contradiction**
-  
   If BOTH sums are rational and the sequence grows doubly-exponentially (L > 1),
   the Asymptotic Squeeze theorem forces BOTH integer residuals to be constant.
   This structurally forces the sequence to simultaneously satisfy two incompatible recurrences.
