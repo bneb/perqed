@@ -35,12 +35,14 @@ We resolved this by reviving legacy formalization logic and pushing it forward i
 
 ## Final Result: The Definitive Status of Erdős Problem #265
 
-By systematically mapping the continuous topological spaces down into discrete Lean 4 structures, we have successfully and honestly advanced Erdős Problem #265. The final resolution is a fascinating split between the affirmative and the negative:
+By systematically mapping the continuous topological spaces down into discrete Lean 4 structures, we have successfully formalized the critical algebraic bounds of Erdős Problem #265. However, a rigorous Red Team analysis of our formalization revealed a profound lesson in the necessity of **Honest Entry Points**. 
+
+The final resolution is a fascinating split between the affirmatively proven, the negatively proven, and the genuinely open mathematical frontier:
 
 1. **The Existence Question is PROVED IN THE AFFIRMATIVE**: Relying on the probabilistic topology established by Kovač and Tao, we know that doubly-exponential sequences that perfectly satisfy both rationality constraints physically exist.
-2. **The Ceiling Conjecture is PROVED IN THE NEGATIVE (DISPROVED)**: The Erdős Ceiling Conjecture hypothesized that the growth rate of such sequences must be capped at $\limsup a_n^{1/2^n} \le 1$. Our Lean 4 formalization definitively disproves this by mathematically annihilating the possibility of growth rates slower than double-exponential:
-   - **The Greedy Regime** is locked by the Asymptotic Integer Squeeze, terminating in a parity paradox.
-   - **The Sub-Greedy Domain** is algebraically mapped into the Universal Balance Contradiction.
-   - **Irregular Oscillators** (sequences taking arbitrary "waste steps") are mathematically trapped by the Pure Recurrence bound. Even if they wildly oscillate, their bounded exact coupling parameter acts as a mathematical ratchet, forcing quadratic step-growth $a_{N+1} \ge \frac{1}{\sqrt{K}} a_N^2$. This guarantees inescapable double-exponential growth ($\limsup > 1$).
+2. **The Greedy Regime is PROVED IN THE NEGATIVE**: We successfully proved that no sequence can satisfy the constraints while growing as fast as the Sylvester sequence. The Asymptotic Integer Squeeze forces such sequences into a parity paradox.
+3. **The Sub-Greedy Domain remains GENUINELY OPEN**: While we have formally verified powerful constraints that govern this domain—specifically the Exact Coupling Collapse (`dual_constraint_collapse.lean`), the Universal Balance Contradiction (`universal_balance.lean`), and the Pure Recurrence bound (`subgreedy_bounds.lean`)—these remain isolated algebraic truths. 
 
-Every single gap is verified with zero non-constructive axioms. Our session today culminated in integrating the final bridge lemmas, stabilizing the automated solver timeouts with explicit algebraic bounds, wiring together the `universal_balance` Diophantine paradox, and writing entirely novel, sorry-free formalization for the pure recurrence of the exact coupling variable. Erdős 265's ceiling conjecture is formally dead.
+We discovered that we had inadvertently moved the goalposts by assuming `IsGreedy` as a premise in our main theorem. By removing this assumption to restore the unadulterated Erdős entry point, the build broke, exposing the true mathematical gap: **We have not yet proven that the dual rationality constraints structurally force the exact coupling parameter $C_N$ to be bounded for sub-greedy sequences.**
+
+The Erdős Ceiling Conjecture is not formally dead. It is alive, well, and mathematically cornered in the sub-greedy domain. The isolated lemmas are ready, but the connective analytical tissue proving that dual rationality strictly bounds the coupling variable is the final, unconquered mountain of Erdős Problem 265.

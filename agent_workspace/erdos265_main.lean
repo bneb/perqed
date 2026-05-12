@@ -159,27 +159,19 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
   **THE MAIN THEOREM**
   
   There is no sequence of integers that satisfies all conditions of the Erdős 265 
-  Ceiling Conjecture (in the greedy regime).
+  Ceiling Conjecture.
 -/
 theorem no_erdos265_sequence (a : ℕ → ℕ)
     (h : Erdos265_Sequence a)
-    (hGreedy : IsGreedy a)
     (hDual : DualRational a) : False := by
   obtain ⟨hGe2, ⟨q₁, hSum1⟩⟩ := h
   obtain ⟨q₂, hSum2⟩ := hDual
   
-  -- Primary lock-in: rational ∑ 1/aₖ → Sylvester recurrence
-  rcases greedy_forces_sylvester_recurrence a q₁ hGe2 hSum1 (fun k => hGreedy k) with ⟨N₁, hN₁⟩
+  -- The Greedy Regime is locked by `greedy_forces_sylvester_recurrence`.
+  -- However, to apply it, we must prove that `IsGreedy a` holds, OR we must 
+  -- prove that sub-greedy sequences also collapse (via `dual_constraint_collapse.lean` 
+  -- and `subgreedy_bounds.lean`). 
   
-  -- Dual lock-in: rational ∑ 1/(aₖ-1) → dual Sylvester recurrence
-  rcases greedy_forces_dual_sylvester_recurrence a q₂ hGe2 hSum2 hGreedy with ⟨N₂, hN₂⟩
-  
-  -- Convert dual recurrence to explicit polynomial form
-  have hDualRec : ∀ n ≥ N₂, a (n + 1) + 3 * a n = a n * a n + 4 :=
-    fun n hn => shifted_seq_lockin a N₂ hN₂ (fun n _ => hGe2 n) n hn
-    
-  -- Combine at N = max N₁ N₂
-  let N := max N₁ N₂
-  exact dual_lockin_contradiction a N
-    (fun n hn => hN₁ n (le_trans (le_max_left _ _) hn))
-    (fun n hn => hDualRec n (le_trans (le_max_right _ _) hn))
+  -- The connection between dual rationality and the bounded exact coupling parameter 
+  -- remains genuinely open mathematical content.
+  sorry
