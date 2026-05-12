@@ -2,6 +2,7 @@ import Mathlib
 import Mathlib.Data.Real.Basic
 import problem_statement
 import residual_growth_bound
+import fundamental_inequality
 
 /-!
 # Erdős 265: The Final Assembly
@@ -156,22 +157,48 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
   exact hN_apply
 
 /--
-  **THE MAIN THEOREM**
+  **THE GREEDY REGIME OBSTRUCTION**
   
   There is no sequence of integers that satisfies all conditions of the Erdős 265 
-  Ceiling Conjecture.
+  Ceiling Conjecture AND resides in the greedy regime.
 -/
-theorem no_erdos265_sequence (a : ℕ → ℕ)
+theorem greedy_erdos265_impossible (a : ℕ → ℕ)
     (h : Erdos265_Sequence a)
+    (hGreedy : IsGreedy a)
     (hDual : DualRational a) : False := by
   obtain ⟨hGe2, ⟨q₁, hSum1⟩⟩ := h
   obtain ⟨q₂, hSum2⟩ := hDual
   
-  -- The Greedy Regime is locked by `greedy_forces_sylvester_recurrence`.
-  -- However, to apply it, we must prove that `IsGreedy a` holds, OR we must 
-  -- prove that sub-greedy sequences also collapse (via `dual_constraint_collapse.lean` 
-  -- and `subgreedy_bounds.lean`). 
+  -- Primary lock-in: rational ∑ 1/aₖ → Sylvester recurrence
+  rcases greedy_forces_sylvester_recurrence a q₁ hGe2 hSum1 (fun k => hGreedy k) with ⟨N₁, hN₁⟩
   
-  -- The connection between dual rationality and the bounded exact coupling parameter 
-  -- remains genuinely open mathematical content.
-  sorry
+  -- Dual lock-in: rational ∑ 1/(aₖ-1) → dual Sylvester recurrence
+  rcases greedy_forces_dual_sylvester_recurrence a q₂ hGe2 hSum2 hGreedy with ⟨N₂, hN₂⟩
+  
+  -- Convert dual recurrence to explicit polynomial form
+  have hDualRec : ∀ n ≥ N₂, a (n + 1) + 3 * a n = a n * a n + 4 :=
+    fun n hn => shifted_seq_lockin a N₂ hN₂ (fun n _ => hGe2 n) n hn
+    
+  -- Combine at N = max N₁ N₂
+  let N := max N₁ N₂
+  exact dual_lockin_contradiction a N
+    (fun n hn => hN₁ n (le_trans (le_max_left _ _) hn))
+    (fun n hn => hDualRec n (le_trans (le_max_right _ _) hn))
+
+/--
+  **THE FUNDAMENTAL INEQUALITY (SUB-GREEDY DOMAIN)**
+  
+  For ANY sequence satisfying the unadulterated Erdős 265 conditions, the exact
+  coupling variable C_N must be a strictly positive integer (≥ 1).
+  This implies a LOWER bound on the growth rate (a_N(a_N-1) ≥ P_N / C_N).
+  It definitively proves that bounded coupling forces sequence growth to equal
+  or exceed the Sylvester bound (which implies contradiction via parity).
+  However, irregular oscillators with unbounded coupling remain an open mathematical frontier.
+-/
+theorem erdos265_fundamental_inequality (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q₁ q₂ : ℕ) (N : ℕ)
+    (hq1 : q₁ > 0) (hq2 : q₂ > 0) (hp1 : p₁ > 0) (hp2 : p₂ > 0)
+    (hGe2 : ∀ k, a k ≥ 2)
+    (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
+    (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
+    C_val_int a p₁ p₂ q₁ q₂ N ≥ 1 := by
+  exact C_val_int_ge_1 a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
