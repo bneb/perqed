@@ -33,7 +33,7 @@ structure ErdosSequences (k : ℕ) : Prop where
   prefixProductSuccessor : prefixProduct (k + 1) = prefixProduct k * seq k
   shiftedPrefixProductSuccessor : 
     shiftedPrefixProduct (k + 1) = shiftedPrefixProduct k * (seq k - 1)
-  tailResidualSuccessor : 
+  tail_residual_successor : 
     tailResidual (k + 1) = seq k * tailResidual k - denom * prefixProduct k
 
 /-- 
@@ -56,7 +56,7 @@ def ExactCoupling (k : ℕ) : Prop :=
   Because `limitL` is an infinite product, this equality implies the impossible 
   condition that `∏_{j=k}^∞ seq_j / (seq_j - 1) = 1`, which contradicts `seq_j ≥ 2`.
 -/
-theorem inductiveCollapse (k : ℕ)
+theorem inductive_collapse (k : ℕ)
     (h_seq : ErdosSequences seq prefixProduct shiftedPrefixProduct tailResidual denom k)
     (h_k : ExactCoupling prefixProduct shiftedPrefixProduct tailResidual denom limitL k)
     (h_k1 : ExactCoupling prefixProduct shiftedPrefixProduct tailResidual denom limitL (k + 1))

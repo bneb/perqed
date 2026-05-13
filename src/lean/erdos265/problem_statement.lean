@@ -73,17 +73,69 @@ def DualRational (a : ℕ → ℕ) : Prop :=
 lemma sylvester_is_greedy : IsGreedy sylvester := by
   intro k
   have h_eq : sylvester (k + 1) = sylvester k * (sylvester k - 1) + 1 := rfl
-  have h_ge2 : sylvester k ≥ 2 := sylvester_ge_two k
   have h_sq : sylvester k * (sylvester k - 1) = sylvester k * sylvester k - sylvester k := by
     calc sylvester k * (sylvester k - 1)
       _ = sylvester k * sylvester k - sylvester k * 1 := Nat.mul_sub_left_distrib _ _ _
       _ = sylvester k * sylvester k - sylvester k := by rw [mul_one]
   rw [h_eq, h_sq]
 
+/-- A simple geometric sequence to witness the Erdos265Sequence baseline property. -/
+def geomSeq (k : ℕ) : ℕ := 2^(k+1)
 
+lemma geomSeq_ge_two (k : ℕ) : geomSeq k ≥ 2 := by
+  dsimp [geomSeq]
+  have h1 : k + 1 ≥ 1 := by omega
+  have h2 : 2 > 0 := by decide
+  exact Nat.pow_le_pow_of_le_right h2 h1
+
+lemma geomSeq_sum : HasSum (fun k => (1 : ℝ) / (geomSeq k : ℝ)) (1 : ℝ) := by
+  have h_eq : (fun k => (1 : ℝ) / (geomSeq k : ℝ)) = fun k => (1 / 2 : ℝ) * (1 / 2 : ℝ)^k := by
+    ext k
+    dsimp [geomSeq]
+    push_cast
+    have : (2 : ℝ)^(k+1) = 2 * 2^k := by ring
+    rw [this]
+    ring
+  rw [h_eq]
+  have h_geom := hasSum_geometric_of_lt_one (r := (1/2 : ℝ)) (by norm_num) (by norm_num)
+  have h_geom_mul := h_geom.mul_left (1/2 : ℝ)
+  have h_val : (1/2 : ℝ) * (1 - 1/2)⁻¹ = 1 := by norm_num
+  rw [h_val] at h_geom_mul
+  exact h_geom_mul
+
+/-- Witness for the Erdős 265 baseline condition (Inhabitation). -/
+lemma geomSeq_is_erdos265 : Erdos265Sequence geomSeq := by
+  constructor
+  · exact geomSeq_ge_two
+  · use (1 : ℚ)
+    exact_mod_cast geomSeq_sum
+
+/-- A simple shifted geometric sequence to witness the DualRational property. -/
+def geomSeqShifted (k : ℕ) : ℕ := 2^(k+1) + 1
+
+lemma geomSeqShifted_sum : HasSum (fun k => (1 : ℝ) / ((geomSeqShifted k : ℝ) - 1)) (1 : ℝ) := by
+  have h_eq : (fun k => (1 : ℝ) / ((geomSeqShifted k : ℝ) - 1)) = fun k => (1 / 2 : ℝ) * (1 / 2 : ℝ)^k := by
+    ext k
+    dsimp [geomSeqShifted]
+    push_cast
+    have : (2 : ℝ)^(k+1) + 1 - 1 = 2 * 2^k := by ring
+    rw [this]
+    ring
+  rw [h_eq]
+  have h_geom := hasSum_geometric_of_lt_one (r := (1/2 : ℝ)) (by norm_num) (by norm_num)
+  have h_geom_mul := h_geom.mul_left (1/2 : ℝ)
+  have h_val : (1/2 : ℝ) * (1 - 1/2)⁻¹ = 1 := by norm_num
+  rw [h_val] at h_geom_mul
+  exact h_geom_mul
+
+/-- Witness for the DualRational condition (Inhabitation). -/
+lemma geomSeqShifted_is_dual_rational : DualRational geomSeqShifted := by
+  use (1 : ℚ)
+  exact_mod_cast geomSeqShifted_sum
 
 /-- 
   **The Dual Lock-in Contradiction**
+
   If BOTH sums are rational and the sequence grows doubly-exponentially (L > 1),
   the Asymptotic Squeeze theorem forces BOTH integer residuals to be constant.
   This structurally forces the sequence to simultaneously satisfy two incompatible recurrences.

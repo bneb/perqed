@@ -167,18 +167,18 @@ lemma beta_n_summable (n : ℕ) : Summable (fun k => (1 : ℝ) / (b (k + n) + 1)
     exact le_of_lt (beta_term_pos (k + n))
   · exact sum_range_shifted_bound n
 
-noncomputable def beta_n (n : ℕ) : ℝ :=
+noncomputable def betaN (n : ℕ) : ℝ :=
   ∑' (k : ℕ), (1 : ℝ) / (b (k + n) + 1)
 
-lemma beta_n_pos (n : ℕ) : 0 < beta_n n := by
+lemma beta_n_pos (n : ℕ) : 0 < betaN n := by
   have h_summable := beta_n_summable n
   exact tsum_pos h_summable (fun k => le_of_lt (beta_term_pos (k + n))) 0 (beta_term_pos (0 + n))
 
-lemma beta_n_le (n : ℕ) : beta_n n ≤ (1 : ℝ) / (b n - 1) := by
+lemma beta_n_le (n : ℕ) : betaN n ≤ (1 : ℝ) / (b n - 1) := by
   have h := beta_n_summable n
   exact tsum_le_of_sum_range_le h (sum_range_shifted_bound n)
 
-lemma sum_split (n : ℕ) : (∑' k, (1 : ℝ) / (b k + 1)) = (S n : ℝ) + beta_n n := by
+lemma sum_split (n : ℕ) : (∑' k, (1 : ℝ) / (b k + 1)) = (S n : ℝ) + betaN n := by
   have h_summable := beta_n_summable 0
   have h_eq : (fun k => (1 : ℝ) / (b (k + 0) + 1)) = (fun k => (1 : ℝ) / (b k + 1)) := by
     ext k
@@ -384,22 +384,22 @@ lemma tendsto_r : Filter.Tendsto r Filter.atTop (𝓝 0) := by
       
   exact (Filter.tendsto_add_atTop_iff_nat 3).1 h_tendsto_shifted
 
-theorem Rs_irrational : Irrational (∑' k : ℕ, (1 : ℝ) / (b k + 1)) := by
+theorem sylvester_sum_irrational : Irrational (∑' k : ℕ, (1 : ℝ) / (b k + 1)) := by
   intro h_rat
   rcases h_rat with ⟨q, hq_eq⟩
   
-  have hB_pos : ∀ (n : ℕ), 0 < (q.den : ℝ) * (D n : ℝ) * beta_n n := by
+  have hB_pos : ∀ (n : ℕ), 0 < (q.den : ℝ) * (D n : ℝ) * betaN n := by
     intro n
     have h1 : (0 : ℝ) < q.den := by exact_mod_cast q.den_pos
     have h2 : (0 : ℝ) < D n := by exact_mod_cast (D_pos n)
-    have h3 : 0 < beta_n n := beta_n_pos n
+    have h3 : 0 < betaN n := beta_n_pos n
     positivity
     
-  have hB_bound : ∀ (n : ℕ), (q.den : ℝ) * (D n : ℝ) * beta_n n ≤ 2 * (q.den : ℝ) * r n := by
+  have hB_bound : ∀ (n : ℕ), (q.den : ℝ) * (D n : ℝ) * betaN n ≤ 2 * (q.den : ℝ) * r n := by
     intro n
-    have hb : beta_n n ≤ 1 / (b n - 1 : ℝ) := beta_n_le n
+    have hb : betaN n ≤ 1 / (b n - 1 : ℝ) := beta_n_le n
     calc
-      (q.den : ℝ) * (D n : ℝ) * beta_n n ≤ (q.den : ℝ) * (D n : ℝ) * (1 / (b n - 1 : ℝ)) := by
+      (q.den : ℝ) * (D n : ℝ) * betaN n ≤ (q.den : ℝ) * (D n : ℝ) * (1 / (b n - 1 : ℝ)) := by
         apply mul_le_mul_of_nonneg_left hb
         have h1 : (0 : ℝ) < q.den := by exact_mod_cast q.den_pos
         have h2 : (0 : ℝ) < D n := by exact_mod_cast (D_pos n)
@@ -422,7 +422,7 @@ theorem Rs_irrational : Irrational (∑' k : ℕ, (1 : ℝ) / (b k + 1)) := by
         dsimp [r]
         ring
         
-  have hB_lt_one : ∃ N, ∀ n ≥ N, (q.den : ℝ) * (D n : ℝ) * beta_n n < 1 := by
+  have hB_lt_one : ∃ N, ∀ n ≥ N, (q.den : ℝ) * (D n : ℝ) * betaN n < 1 := by
     have h_lim : Filter.Tendsto (fun n => 2 * (q.den : ℝ) * r n) Filter.atTop (𝓝 (2 * (q.den : ℝ) * 0)) := by
       exact Filter.Tendsto.const_mul (2 * (q.den : ℝ)) tendsto_r
     have h_lim_zero : Filter.Tendsto (fun n => 2 * (q.den : ℝ) * r n) Filter.atTop (𝓝 0) := by
@@ -442,13 +442,13 @@ theorem Rs_irrational : Irrational (∑' k : ℕ, (1 : ℝ) / (b k + 1)) := by
     have h4 : 2 * (q.den : ℝ) * r n ≤ |2 * (q.den : ℝ) * r n| := le_abs_self _
     linarith
     
-  have hB_int : ∀ (n : ℕ), ∃ z : ℤ, (q.den : ℝ) * (D n : ℝ) * beta_n n = (z : ℝ) := by
+  have hB_int : ∀ (n : ℕ), ∃ z : ℤ, (q.den : ℝ) * (D n : ℝ) * betaN n = (z : ℝ) := by
     intro n
-    have h_sum_split : (∑' (k : ℕ), 1 / ((b k : ℝ) + 1)) = (S n : ℝ) + beta_n n := sum_split n
-    have h_beta_eq : beta_n n = (q : ℝ) - (S n : ℝ) := by
+    have h_sum_split : (∑' (k : ℕ), 1 / ((b k : ℝ) + 1)) = (S n : ℝ) + betaN n := sum_split n
+    have h_beta_eq : betaN n = (q : ℝ) - (S n : ℝ) := by
       rw [← hq_eq] at h_sum_split
       linarith
-    have h_B_eq : (q.den : ℝ) * (D n : ℝ) * beta_n n = (q.num : ℝ) * (D n : ℝ) - (q.den : ℝ) * ((D n : ℝ) * (S n : ℝ)) := by
+    have h_B_eq : (q.den : ℝ) * (D n : ℝ) * betaN n = (q.num : ℝ) * (D n : ℝ) - (q.den : ℝ) * ((D n : ℝ) * (S n : ℝ)) := by
       rw [h_beta_eq]
       have h_q_eq : (q : ℝ) * (q.den : ℝ) = (q.num : ℝ) := by exact_mod_cast q.mul_den_eq_num
       calc
@@ -466,8 +466,8 @@ theorem Rs_irrational : Irrational (∑' k : ℕ, (1 : ℝ) / (b k + 1)) := by
   rcases hB_lt_one with ⟨N, hN⟩
   let n := max N 1
   have hnN : n ≥ N := le_max_left N 1
-  have h1 : 0 < (q.den : ℝ) * (D n : ℝ) * beta_n n := hB_pos n
-  have h2 : (q.den : ℝ) * (D n : ℝ) * beta_n n < 1 := hN n hnN
+  have h1 : 0 < (q.den : ℝ) * (D n : ℝ) * betaN n := hB_pos n
+  have h2 : (q.den : ℝ) * (D n : ℝ) * betaN n < 1 := hN n hnN
   rcases hB_int n with ⟨z, hz⟩
   rw [hz] at h1 h2
   
