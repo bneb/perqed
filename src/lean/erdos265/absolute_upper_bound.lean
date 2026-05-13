@@ -22,7 +22,10 @@ lemma strict_mono_inv_bound (k : ℕ) (hMono : StrictMono a) (hGe2 : ∀ j, a j 
   have h_le_real : (a k : ℝ) + 1 ≤ (a (k + 1) : ℝ) := by exact_mod_cast h_le
   have h_le_real2 : (a k : ℝ) ≤ (a (k + 1) : ℝ) - 1 := by linarith
   have ha_ge2 : a k ≥ 2 := hGe2 k
+  have ha_real : (a k : ℝ) ≥ 2 := by exact_mod_cast ha_ge2
   have ha_pos : (a k : ℝ) > 0 := by linarith
+  have hb_ge2 : a (k+1) ≥ 2 := hGe2 (k+1)
+  have hb_real : (a (k+1) : ℝ) ≥ 2 := by exact_mod_cast hb_ge2
   have hb_pos : (a (k + 1) : ℝ) - 1 > 0 := by linarith
   exact one_div_le_one_div_of_le ha_pos h_le_real2
 
