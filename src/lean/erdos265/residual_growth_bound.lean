@@ -40,7 +40,7 @@ def tailResidual (seq : ℕ → ℕ) (num denom : ℕ) : ℕ → ℤ
              (denom : ℤ) * (prefixProduct seq n : ℤ)
 
 /-- The recurrence holds definitionally by construction -/
-theorem tailResidualSuccessor (seq : ℕ → ℕ) (num denom : ℕ) (k : ℕ) :
+theorem tail_residual_successor (seq : ℕ → ℕ) (num denom : ℕ) (k : ℕ) :
     tailResidual seq num denom (k + 1) = 
       (seq k : ℤ) * tailResidual seq num denom k - (denom : ℤ) * (prefixProduct seq k : ℤ) :=
   rfl
@@ -53,7 +53,7 @@ theorem tailResidualPosIff (seq : ℕ → ℕ) (num denom : ℕ) (k : ℕ)
     (_hResPos : tailResidual seq num denom k > 0) :
     tailResidual seq num denom (k + 1) > 0 ↔
       (seq k : ℤ) * tailResidual seq num denom k > (denom : ℤ) * (prefixProduct seq k : ℤ) := by
-  rw [tailResidualSuccessor]; omega
+  rw [tail_residual_successor]; omega
 
 /-- 
   **The Asymptotic Squeeze Calculus Limit**
@@ -68,7 +68,7 @@ theorem tailResidualPosIff (seq : ℕ → ℕ) (num denom : ℕ) (k : ℕ)
   growth rates and telescoping sum asymptotics in Mathlib's real analysis library.
 -/
 
-theorem tailResidual_eq_sum (seq : ℕ → ℕ) (num denom : ℕ)
+theorem tail_residual_eq_sum (seq : ℕ → ℕ) (num denom : ℕ)
     (hSum : Summable (fun k => (1 : ℝ) / (seq k : ℝ)))
     (hSum_val : ∑' k, (1 : ℝ) / (seq k : ℝ) = (num : ℝ) / denom)
     (h_pos : ∀ k, seq k > 0) (hDenom : denom ≥ 1)
@@ -140,7 +140,7 @@ theorem constant_residual_implies_sylvester (seq : ℕ → ℕ) (num denom : ℕ
   intro n hn
   have h1 : tailResidual seq num denom n = C := h_const n hn
   have h2 : tailResidual seq num denom (n + 1) = C := h_const (n + 1) (by omega)
-  have h_rec := tailResidualSuccessor seq num denom n
+  have h_rec := tail_residual_successor seq num denom n
   rw [h1, h2] at h_rec
   
   have h_P : (denom : ℤ) * (prefixProduct seq n : ℤ) = C * (seq n - 1 : ℤ) := by
@@ -149,7 +149,7 @@ theorem constant_residual_implies_sylvester (seq : ℕ → ℕ) (num denom : ℕ
       _ = C * ((seq n : ℤ) - 1) := by ring
       
   have h3 : tailResidual seq num denom (n + 2) = C := h_const (n + 2) (by omega)
-  have h_rec2 := tailResidualSuccessor seq num denom (n + 1)
+  have h_rec2 := tail_residual_successor seq num denom (n + 1)
   rw [h2, h3] at h_rec2
   
   have h_P2 : (denom : ℤ) * (prefixProduct seq (n + 1) : ℤ) = C * (seq (n + 1) - 1 : ℤ) := by
@@ -222,7 +222,7 @@ lemma tailResidual_pos_inductive (seq : ℕ → ℕ) (num denom : ℕ)
   have hSummable := hSum.summable
   have hSum_val := hSum.tsum_eq
   have h_pos : ∀ j, seq j > 0 := by intro j; have := hGe2 j; omega
-  have h_eq := tailResidual_eq_sum seq num denom hSummable hSum_val h_pos hDenom k
+  have h_eq := tail_residual_eq_sum seq num denom hSummable hSum_val h_pos hDenom k
   have h_denom_pos : (denom : ℝ) > 0 := by exact_mod_cast (show (0 : ℕ) < denom by omega)
   have h_prefix_pos : (prefixProduct seq k : ℝ) > 0 := by
     exact_mod_cast prefixProduct_pos seq h_pos k
@@ -371,7 +371,7 @@ lemma residual_over_prefix_tendsto_zero (seq : ℕ → ℕ) (num denom : ℕ)
               ∑' k, (1 : ℝ) / (seq (n + k) : ℝ) := by
     intro n
     have h_pn_pos : (prefixProduct seq n : ℝ) > 0 := by exact_mod_cast prefixProduct_pos seq h_pos n
-    have h_id := tailResidual_eq_sum seq num denom hSummable hSum_val h_pos hDenom n
+    have h_id := tail_residual_eq_sum seq num denom hSummable hSum_val h_pos hDenom n
     have hd_pos : (denom : ℝ) > 0 := by exact_mod_cast (by omega : denom > 0)
     have hd_pn_pos : (denom : ℝ) * (prefixProduct seq n : ℝ) > 0 := mul_pos hd_pos h_pn_pos
     have h_eq2 : (tailResidual seq num denom n : ℝ) = (∑' k, (1 : ℝ) / (seq (n + k) : ℝ)) * ((denom : ℝ) * prefixProduct seq n : ℝ) := by
@@ -453,7 +453,7 @@ lemma seq_tendsto_inv (seq : ℕ → ℕ) (hGe2 : ∀ k, seq k ≥ 2) (hGreedy :
   If the sequence satisfies the greedy condition a_{k+1} ≥ a_k^2 - a_k + 1,
   the residual T_n satisfies T_{n+1} ≤ T_n.
 -/
-lemma tailResidual_eventually_nonincreasing (seq : ℕ → ℕ) (num denom : ℕ) 
+lemma tail_residual_eventually_nonincreasing (seq : ℕ → ℕ) (num denom : ℕ) 
     (hGe2 : ∀ k, seq k ≥ 2) (hDenom : denom ≥ 1)
     (hSum : HasSum (fun k => (1 : ℝ) / (seq k : ℝ)) ((num : ℝ) / denom))
     (hGreedy : ∀ k, seq (k + 1) ≥ seq k * seq k - seq k + 1) :
@@ -623,7 +623,7 @@ theorem greedy_forces_sylvester_recurrence (seq : ℕ → ℕ) (q : ℚ)
   have hTendsTo := residual_over_prefix_tendsto_zero seq q.num.toNat q.den hGe2 q.pos hSum_nd
   -- Step 3: Greedy bounds → T_n non-increasing
   have hNonincr : ∃ N : ℕ, ∀ n ≥ N, tailResidual seq q.num.toNat q.den (n + 1) ≤ tailResidual seq q.num.toNat q.den n := 
-    tailResidual_eventually_nonincreasing seq q.num.toNat q.den hGe2 q.pos hSum_nd hGreedy
+    tail_residual_eventually_nonincreasing seq q.num.toNat q.den hGe2 q.pos hSum_nd hGreedy
   rcases hNonincr with ⟨N_nonincr, hN_nonincr⟩
   -- Step 4: Eventually constant since positive integers
   rcases nonincr_pos_int_eventually_const (tailResidual seq q.num.toNat q.den) N_nonincr

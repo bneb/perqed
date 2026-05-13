@@ -27,21 +27,21 @@ noncomputable section
 
 variable (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q₁ q₂ : ℕ)
 
-def P1_N (N : ℕ) : ℝ := (range N).prod (fun i => (a i : ℝ))
-def P2_N (N : ℕ) : ℝ := (range N).prod (fun i => ((a i : ℝ) - 1))
+def prefixProdUnshifted (N : ℕ) : ℝ := (range N).prod (fun i => (a i : ℝ))
+def prefixProdShifted (N : ℕ) : ℝ := (range N).prod (fun i => ((a i : ℝ) - 1))
 
-def R1_val (p₁ : ℤ) (q₁ : ℕ) (N : ℕ) : ℝ := (q₁ : ℝ) * P1_N a N * (p₁ / q₁ - (range N).sum (fun i => 1 / (a i : ℝ)))
-def R2_val (p₂ : ℤ) (q₂ : ℕ) (N : ℕ) : ℝ := (q₂ : ℝ) * P2_N a N * (p₂ / q₂ - (range N).sum (fun i => 1 / ((a i : ℝ) - 1)))
+def residualUnshifted (p₁ : ℤ) (q₁ : ℕ) (N : ℕ) : ℝ := (q₁ : ℝ) * prefixProdUnshifted a N * (p₁ / q₁ - (range N).sum (fun i => 1 / (a i : ℝ)))
+def residualShifted (p₂ : ℤ) (q₂ : ℕ) (N : ℕ) : ℝ := (q₂ : ℝ) * prefixProdShifted a N * (p₂ / q₂ - (range N).sum (fun i => 1 / ((a i : ℝ) - 1)))
 
-def C_val (p₁ p₂ : ℤ) (q₁ q₂ : ℕ) (N : ℕ) : ℝ := (q₁ : ℝ) * R2_val a p₂ q₂ N * P1_N a N - (q₂ : ℝ) * R1_val a p₁ q₁ N * P2_N a N
+def exactCouplingVal (p₁ p₂ : ℤ) (q₁ q₂ : ℕ) (N : ℕ) : ℝ := (q₁ : ℝ) * residualShifted a p₂ q₂ N * prefixProdUnshifted a N - (q₂ : ℝ) * residualUnshifted a p₁ q₁ N * prefixProdShifted a N
 
-lemma C_val_series_identity (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
+lemma exact_coupling_series_identity (N : ℕ) (_hq1 : q₁ > 0) (_hq2 : q₂ > 0)
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
     (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    C_val a p₁ p₂ q₁ q₂ N = (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * 
+    exactCouplingVal a p₁ p₂ q₁ q₂ N = (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * 
       ∑' k, (1 / (((a (k + N) : ℝ) - 1) * (a (k + N) : ℝ))) := by
-  unfold C_val R1_val R2_val
+  unfold exactCouplingVal residualUnshifted residualShifted
   
   have h_sum1_eq : p₁ / q₁ - (range N).sum (fun i => 1 / (a i : ℝ)) = ∑' k, 1 / (a (k + N) : ℝ) := by
     have h_split := sum_add_tsum_nat_add N hSum1.summable
@@ -51,16 +51,15 @@ lemma C_val_series_identity (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
     have h_split := sum_add_tsum_nat_add N hSum2.summable
     linarith [hSum2.tsum_eq]
     
-  have h_alg : (q₁ : ℝ) * ((q₂ : ℝ) * P2_N a N * (p₂ / q₂ - (range N).sum (fun i => 1 / ((a i : ℝ) - 1)))) * P1_N a N -
-               (q₂ : ℝ) * ((q₁ : ℝ) * P1_N a N * (p₁ / q₁ - (range N).sum (fun i => 1 / (a i : ℝ)))) * P2_N a N =
-               (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * 
+  have h_alg : (q₁ : ℝ) * ((q₂ : ℝ) * prefixProdShifted a N * (p₂ / q₂ - (range N).sum (fun i => 1 / ((a i : ℝ) - 1)))) * prefixProdUnshifted a N -
+               (q₂ : ℝ) * ((q₁ : ℝ) * prefixProdUnshifted a N * (p₁ / q₁ - (range N).sum (fun i => 1 / (a i : ℝ)))) * prefixProdShifted a N =
+               (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * 
                  ((p₂ / q₂ - (range N).sum (fun i => 1 / ((a i : ℝ) - 1))) - (p₁ / q₁ - (range N).sum (fun i => 1 / (a i : ℝ)))) := by ring
                  
   rw [h_alg, h_sum1_eq, h_sum2_eq]
   
   have h_tsum_sub : (∑' k, 1 / ((a (k + N) : ℝ) - 1)) - (∑' k, 1 / (a (k + N) : ℝ)) = 
                     ∑' k, (1 / ((a (k + N) : ℝ) - 1) - 1 / (a (k + N) : ℝ)) := by
-    have h_sub_summable := Summable.sub (summable_nat_add_iff N |>.mpr hSum2.summable) (summable_nat_add_iff N |>.mpr hSum1.summable)
     exact (tsum_sub (summable_nat_add_iff N |>.mpr hSum2.summable) (summable_nat_add_iff N |>.mpr hSum1.summable)).symm
     
   rw [h_tsum_sub]
@@ -80,28 +79,28 @@ lemma C_val_series_identity (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
     
   rw [h_tsum_eq]
 
-def P1_N_int (N : ℕ) : ℤ := (range N).prod (fun i => (a i : ℤ))
-def P2_N_int (N : ℕ) : ℤ := (range N).prod (fun i => ((a i : ℤ) - 1))
+def prefixProdUnshiftedInt (N : ℕ) : ℤ := (range N).prod (fun i => (a i : ℤ))
+def prefixProdShiftedInt (N : ℕ) : ℤ := (range N).prod (fun i => ((a i : ℤ) - 1))
 
-def C_val_int (N : ℕ) : ℤ :=
-  (q₁ : ℤ) * tailResidual (fun k => a k - 1) p₂.toNat q₂ N * P1_N_int a N -
-  (q₂ : ℤ) * tailResidual a p₁.toNat q₁ N * P2_N_int a N
+def exactCouplingInt (N : ℕ) : ℤ :=
+  (q₁ : ℤ) * tailResidual (fun k => a k - 1) p₂.toNat q₂ N * prefixProdUnshiftedInt a N -
+  (q₂ : ℤ) * tailResidual a p₁.toNat q₁ N * prefixProdShiftedInt a N
 
-lemma P1_eq_prefixProduct (N : ℕ) : P1_N a N = (prefixProduct a N : ℝ) := by
+lemma P1_eq_prefixProduct (N : ℕ) : prefixProdUnshifted a N = (prefixProduct a N : ℝ) := by
   induction N with
-  | zero => simp [P1_N, prefixProduct]
+  | zero => simp [prefixProdUnshifted, prefixProduct]
   | succ n ih =>
-    unfold P1_N at *
+    unfold prefixProdUnshifted at *
     rw [prod_range_succ]
     unfold prefixProduct
     push_cast
     rw [ih]
 
-lemma P2_eq_prefixProduct_shift (N : ℕ) (hGe2 : ∀ k, a k ≥ 2) : P2_N a N = (prefixProduct (fun k => a k - 1) N : ℝ) := by
+lemma P2_eq_prefixProduct_shift (N : ℕ) (hGe2 : ∀ k, a k ≥ 2) : prefixProdShifted a N = (prefixProduct (fun k => a k - 1) N : ℝ) := by
   induction N with
-  | zero => simp [P2_N, prefixProduct]
+  | zero => simp [prefixProdShifted, prefixProduct]
   | succ n ih =>
-    unfold P2_N at *
+    unfold prefixProdShifted at *
     rw [prod_range_succ]
     unfold prefixProduct
     have ha_ge1 : a n ≥ 1 := by have := hGe2 n; omega
@@ -111,28 +110,28 @@ lemma P2_eq_prefixProduct_shift (N : ℕ) (hGe2 : ∀ k, a k ≥ 2) : P2_N a N =
     push_cast
     rfl
 
-lemma P1_int_eq (N : ℕ) : (P1_N_int a N : ℝ) = P1_N a N := by
-  unfold P1_N_int P1_N
+lemma P1_int_eq (N : ℕ) : (prefixProdUnshiftedInt a N : ℝ) = prefixProdUnshifted a N := by
+  unfold prefixProdUnshiftedInt prefixProdUnshifted
   push_cast
   rfl
 
-lemma P2_int_eq (N : ℕ) (hGe2 : ∀ k, a k ≥ 2) : (P2_N_int a N : ℝ) = P2_N a N := by
-  unfold P2_N_int P2_N
+lemma P2_int_eq (N : ℕ) (_hGe2 : ∀ k, a k ≥ 2) : (prefixProdShiftedInt a N : ℝ) = prefixProdShifted a N := by
+  unfold prefixProdShiftedInt prefixProdShifted
   push_cast
   rfl
 
 lemma R1_val_eq_tailResidual (N : ℕ) (hq1 : q₁ > 0) (hp1 : p₁ > 0)
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁)) :
-    R1_val a p₁ q₁ N = (tailResidual a p₁.toNat q₁ N : ℝ) := by
+    residualUnshifted a p₁ q₁ N = (tailResidual a p₁.toNat q₁ N : ℝ) := by
   have h_pos : ∀ k, a k > 0 := fun k => by have := hGe2 k; omega
   have h_sum1_eq : p₁ / q₁ - (range N).sum (fun i => 1 / (a i : ℝ)) = ∑' k, 1 / (a (k + N) : ℝ) := by
     have h_split := sum_add_tsum_nat_add N hSum1.summable
     linarith [hSum1.tsum_eq]
-  unfold R1_val
+  unfold residualUnshifted
   rw [h_sum1_eq]
   have h_p1_eq : (p₁.toNat : ℝ) = p₁ := by exact_mod_cast (Int.toNat_of_nonneg (by omega))
-  have h_tail := tailResidual_eq_sum a p₁.toNat q₁ hSum1.summable (by
+  have h_tail := tail_residual_eq_sum a p₁.toNat q₁ hSum1.summable (by
     rw [h_p1_eq]
     exact hSum1.tsum_eq
   ) h_pos (by omega) N
@@ -147,12 +146,12 @@ lemma R1_val_eq_tailResidual (N : ℕ) (hq1 : q₁ > 0) (hp1 : p₁ > 0)
 lemma R2_val_eq_tailResidual (N : ℕ) (hq2 : q₂ > 0) (hp2 : p₂ > 0)
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    R2_val a p₂ q₂ N = (tailResidual (fun k => a k - 1) p₂.toNat q₂ N : ℝ) := by
+    residualShifted a p₂ q₂ N = (tailResidual (fun k => a k - 1) p₂.toNat q₂ N : ℝ) := by
   have h_pos : ∀ k, a k - 1 > 0 := fun k => by have := hGe2 k; omega
   have h_sum2_eq : p₂ / q₂ - (range N).sum (fun i => 1 / ((a i : ℝ) - 1)) = ∑' k, 1 / ((a (k + N) : ℝ) - 1) := by
     have h_split := sum_add_tsum_nat_add N hSum2.summable
     linarith [hSum2.tsum_eq]
-  unfold R2_val
+  unfold residualShifted
   rw [h_sum2_eq]
   have h_p2_eq : (p₂.toNat : ℝ) = p₂ := by exact_mod_cast (Int.toNat_of_nonneg (by omega))
 
@@ -167,7 +166,7 @@ lemma R2_val_eq_tailResidual (N : ℕ) (hq2 : q₂ > 0) (hp2 : p₂ > 0)
     rw [this]
     exact hSum2
 
-  have h_tail := tailResidual_eq_sum (fun k => a k - 1) p₂.toNat q₂ h_sum2_alt.summable h_sum2_alt.tsum_eq h_pos (by omega) N
+  have h_tail := tail_residual_eq_sum (fun k => a k - 1) p₂.toNat q₂ h_sum2_alt.summable h_sum2_alt.tsum_eq h_pos (by omega) N
   
   have h_shift_eq : ∑' (k : ℕ), 1 / (((fun j => a j - 1) (N + k) : ℕ) : ℝ) = ∑' (k : ℕ), 1 / ((a (k + N) : ℝ) - 1) := by
     congr 1
@@ -179,44 +178,42 @@ lemma R2_val_eq_tailResidual (N : ℕ) (hq2 : q₂ > 0) (hp2 : p₂ > 0)
     rw [h_eq]
     
   rw [h_shift_eq] at h_tail
-  have h_P2 : P2_N a N = (prefixProduct (fun k => a k - 1) N : ℝ) := P2_eq_prefixProduct_shift a N hGe2
+  have h_P2 : prefixProdShifted a N = (prefixProduct (fun k => a k - 1) N : ℝ) := P2_eq_prefixProduct_shift a N hGe2
   rw [h_P2]
   exact h_tail.symm
 
-lemma C_val_eq_C_val_int (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
+lemma exact_coupling_eq_int (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
     (hp1 : p₁ > 0) (hp2 : p₂ > 0)
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
     (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    C_val a p₁ p₂ q₁ q₂ N = (C_val_int a p₁ p₂ q₁ q₂ N : ℝ) := by
-  unfold C_val C_val_int
+    exactCouplingVal a p₁ p₂ q₁ q₂ N = (exactCouplingInt a p₁ p₂ q₁ q₂ N : ℝ) := by
+  unfold exactCouplingVal exactCouplingInt
   push_cast
-  have hp1_eq : P1_N a N = (P1_N_int a N : ℝ) := (P1_int_eq a N).symm
-  have hp2_eq : P2_N a N = (P2_N_int a N : ℝ) := (P2_int_eq a N hGe2).symm
-  have hr1_eq : R1_val a p₁ q₁ N = (tailResidual a p₁.toNat q₁ N : ℝ) := R1_val_eq_tailResidual a p₁ q₁ N hq1 hp1 hGe2 hSum1
-  have hr2_eq : R2_val a p₂ q₂ N = (tailResidual (fun k => a k - 1) p₂.toNat q₂ N : ℝ) := R2_val_eq_tailResidual a p₂ q₂ N hq2 hp2 hGe2 hSum2
+  have hp1_eq : prefixProdUnshifted a N = (prefixProdUnshiftedInt a N : ℝ) := (P1_int_eq a N).symm
+  have hp2_eq : prefixProdShifted a N = (prefixProdShiftedInt a N : ℝ) := (P2_int_eq a N hGe2).symm
+  have hr1_eq : residualUnshifted a p₁ q₁ N = (tailResidual a p₁.toNat q₁ N : ℝ) := R1_val_eq_tailResidual a p₁ q₁ N hq1 hp1 hGe2 hSum1
+  have hr2_eq : residualShifted a p₂ q₂ N = (tailResidual (fun k => a k - 1) p₂.toNat q₂ N : ℝ) := R2_val_eq_tailResidual a p₂ q₂ N hq2 hp2 hGe2 hSum2
   simp only [hp1_eq, hp2_eq, hr1_eq, hr2_eq]
 
-lemma C_val_pos (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
+lemma exact_coupling_pos (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
     (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    C_val a p₁ p₂ q₁ q₂ N > 0 := by
-  have h_id := C_val_series_identity a p₁ p₂ q₁ q₂ N hq1 hq2 hGe2 hSum1 hSum2
-  have hq1_real : (q₁ : ℝ) > 0 := by exact_mod_cast hq1
-  have hq2_real : (q₂ : ℝ) > 0 := by exact_mod_cast hq2
-  have hp1_pos : P1_N a N > 0 := by
+    exactCouplingVal a p₁ p₂ q₁ q₂ N > 0 := by
+  have h_id := exact_coupling_series_identity a p₁ p₂ q₁ q₂ N hq1 hq2 hGe2 hSum1 hSum2
+  have hp1_pos : prefixProdUnshifted a N > 0 := by
     apply Finset.prod_pos
     intro i _
     have : a i ≥ 2 := hGe2 i
     exact_mod_cast (by omega : a i > 0)
-  have hp2_pos : P2_N a N > 0 := by
+  have hp2_pos : prefixProdShifted a N > 0 := by
     apply Finset.prod_pos
     intro i _
     have : a i ≥ 2 := hGe2 i
     have ha_real : (a i : ℝ) ≥ 2 := by exact_mod_cast this
     linarith
-  have h_front_pos : (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N > 0 := by
+  have h_front_pos : (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N > 0 := by
     positivity
   have h_summable : Summable (fun k => 1 / (((a (k + N) : ℝ) - 1) * (a (k + N) : ℝ))) := by
     have h_sub_summable := Summable.sub (summable_nat_add_iff N |>.mpr hSum2.summable) (summable_nat_add_iff N |>.mpr hSum1.summable)
@@ -245,15 +242,17 @@ lemma C_val_pos (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
   rw [h_id]
   exact mul_pos h_front_pos h_tsum_pos
 
-lemma C_val_int_ge_1 (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
+lemma exact_coupling_int_ge_one (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0)
     (hp1 : p₁ > 0) (hp2 : p₂ > 0)
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
     (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    C_val_int a p₁ p₂ q₁ q₂ N ≥ 1 := by
-  have h_pos := C_val_pos a p₁ p₂ q₁ q₂ N hq1 hq2 hGe2 hSum1 hSum2
-  have h_eq := C_val_eq_C_val_int a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
+    exactCouplingInt a p₁ p₂ q₁ q₂ N ≥ 1 := by
+  have h_pos := exact_coupling_pos a p₁ p₂ q₁ q₂ N hq1 hq2 hGe2 hSum1 hSum2
+  have h_eq := exact_coupling_eq_int a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
   rw [h_eq] at h_pos
-  have h_int_pos : C_val_int a p₁ p₂ q₁ q₂ N > 0 := by exact_mod_cast h_pos
+  have h_int_pos : exactCouplingInt a p₁ p₂ q₁ q₂ N > 0 := by exact_mod_cast h_pos
   omega
+
+
 

@@ -94,7 +94,7 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
           _ = c k * c k - c k + c k + c k := by rw [Nat.sub_add_cancel h_sub]
           _ = c k * c k - c k + 2 * c k := by ring
           _ = c k * c k - c k + 1 + (2 * c k - 1) := by
-            have h_2ck : 2 * c k ≥ 1 := by omega
+            have _h_2ck : 2 * c k ≥ 1 := by omega
             omega
       rw [h_alg]
       exact Nat.le_add_right (c k * c k - c k + 1) (2 * c k - 1)
@@ -154,7 +154,7 @@ theorem greedy_forces_dual_sylvester_recurrence (a : ℕ → ℕ) (q : ℚ)
   Ceiling Conjecture AND resides in the greedy regime.
 -/
 theorem greedy_erdos265_impossible (a : ℕ → ℕ)
-    (h : Erdos265_Sequence a)
+    (h : Erdos265Sequence a)
     (hGreedy : IsGreedy a)
     (hDual : DualRational a) : False := by
   obtain ⟨hGe2, ⟨q₁, hSum1⟩⟩ := h
@@ -188,5 +188,5 @@ theorem erdos265_fundamental_inequality (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q�
     (hGe2 : ∀ k, a k ≥ 2)
     (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
     (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    C_val_int a p₁ p₂ q₁ q₂ N ≥ 1 := by
-  exact C_val_int_ge_1 a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
+    exactCouplingInt a p₁ p₂ q₁ q₂ N ≥ 1 := by
+  exact exact_coupling_int_ge_one a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2

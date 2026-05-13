@@ -27,7 +27,7 @@ second-order linear recurrence over $C_N$.
   By advancing the system one step, we can perfectly eliminate the growing 
   product $P_N$, yielding a pure recurrence linking only $C$ and $X$.
 -/
-lemma C_pure_recurrence (C : ℕ → ℝ) (X : ℕ → ℝ) (P : ℕ → ℝ)
+lemma coupling_pure_recurrence (C : ℕ → ℝ) (X : ℕ → ℝ) (P : ℕ → ℝ)
     (h_P_succ : ∀ N, P (N + 1) = P N * X N)
     (h_C_succ : ∀ N, C (N + 1) = X N * C N - P N) :
     ∀ N, C (N + 2) + X N ^ 2 * C N = (X (N + 1) + X N) * C (N + 1) := by

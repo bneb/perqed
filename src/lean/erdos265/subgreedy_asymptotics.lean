@@ -19,7 +19,7 @@ By the Monotone Convergence Theorem, this sequence MUST converge to a limit $L \
 open Filter Topology Finset
 
 /-- The sequence of partial product ratios. -/
-noncomputable def prod_ratio (a : ℕ → ℕ) (N : ℕ) : ℝ :=
+noncomputable def prodRatio (a : ℕ → ℕ) (N : ℕ) : ℝ :=
   (Finset.range N).prod (fun i => 1 - 1 / (a i : ℝ))
 
 /-- The terms of the product are in (0, 1] -/
@@ -36,29 +36,29 @@ lemma prod_terms_bounds (a : ℕ → ℕ) (hGe2 : ∀ k, a k ≥ 2) (k : ℕ) :
 
 /-- The partial products are bounded below by 0. -/
 lemma prod_ratio_nonneg (a : ℕ → ℕ) (hGe2 : ∀ k, a k ≥ 2) (N : ℕ) :
-    0 ≤ prod_ratio a N := by
-  unfold prod_ratio
+    0 ≤ prodRatio a N := by
+  unfold prodRatio
   apply Finset.prod_nonneg
   intro i _
   exact (prod_terms_bounds a hGe2 i).1
 
 /-- The partial products are monotonically decreasing (antitone). -/
 lemma prod_ratio_antitone (a : ℕ → ℕ) (hGe2 : ∀ k, a k ≥ 2) :
-    Antitone (prod_ratio a) := by
+    Antitone (prodRatio a) := by
   apply antitone_nat_of_succ_le
   intro n
-  have h_eq : prod_ratio a (n + 1) = prod_ratio a n * (1 - 1 / (a n : ℝ)) := by
-    unfold prod_ratio
+  have h_eq : prodRatio a (n + 1) = prodRatio a n * (1 - 1 / (a n : ℝ)) := by
+    unfold prodRatio
     exact Finset.prod_range_succ (fun i => 1 - 1 / (a i : ℝ)) n
   rw [h_eq]
-  have h_nonneg : 0 ≤ prod_ratio a n := prod_ratio_nonneg a hGe2 n
+  have h_nonneg : 0 ≤ prodRatio a n := prod_ratio_nonneg a hGe2 n
   have h_term_bound : 1 - 1 / (a n : ℝ) ≤ 1 := by
     have h_bounds := prod_terms_bounds a hGe2 n
     linarith
   calc
-    prod_ratio a n * (1 - 1 / (a n : ℝ))
-      ≤ prod_ratio a n * 1 := mul_le_mul_of_nonneg_left h_term_bound h_nonneg
-    _ = prod_ratio a n := mul_one _
+    prodRatio a n * (1 - 1 / (a n : ℝ))
+      ≤ prodRatio a n * 1 := mul_le_mul_of_nonneg_left h_term_bound h_nonneg
+    _ = prodRatio a n := mul_one _
 
 /-- 
   **The Limit Witness**
@@ -66,14 +66,14 @@ lemma prod_ratio_antitone (a : ℕ → ℕ) (hGe2 : ∀ k, a k ≥ 2) :
   This mathematically inhabits the limit $L$ without assuming it.
 -/
 theorem product_ratio_converges (a : ℕ → ℕ) (hGe2 : ∀ k, a k ≥ 2) :
-    ∃ L : ℝ, L ≥ 0 ∧ Tendsto (prod_ratio a) atTop (𝓝 L) := by
-  have h_bdd : BddBelow (Set.range (prod_ratio a)) := by
+    ∃ L : ℝ, L ≥ 0 ∧ Tendsto (prodRatio a) atTop (𝓝 L) := by
+  have h_bdd : BddBelow (Set.range (prodRatio a)) := by
     use 0
     rintro x ⟨N, rfl⟩
     exact prod_ratio_nonneg a hGe2 N
   have h_anti := prod_ratio_antitone a hGe2
-  have h_inf_ge : 0 ≤ iInf (prod_ratio a) := by
+  have h_inf_ge : 0 ≤ iInf (prodRatio a) := by
     apply le_ciInf
     intro N
     exact prod_ratio_nonneg a hGe2 N
-  exact ⟨iInf (prod_ratio a), h_inf_ge, tendsto_atTop_ciInf h_anti h_bdd⟩
+  exact ⟨iInf (prodRatio a), h_inf_ge, tendsto_atTop_ciInf h_anti h_bdd⟩

@@ -25,8 +25,8 @@ lemma strict_mono_inv_bound (k : ℕ) (hMono : StrictMono a) (hGe2 : ∀ j, a j 
   have ha_real : (a k : ℝ) ≥ 2 := by exact_mod_cast ha_ge2
   have ha_pos : (a k : ℝ) > 0 := by linarith
   have hb_ge2 : a (k+1) ≥ 2 := hGe2 (k+1)
-  have hb_real : (a (k+1) : ℝ) ≥ 2 := by exact_mod_cast hb_ge2
-  have hb_pos : (a (k + 1) : ℝ) - 1 > 0 := by linarith
+  have _hb_real : (a (k+1) : ℝ) ≥ 2 := by exact_mod_cast hb_ge2
+  have _hb_pos : (a (k + 1) : ℝ) - 1 > 0 := by linarith
   exact one_div_le_one_div_of_le ha_pos h_le_real2
 
 lemma partial_sum_bound (m N : ℕ) (hGe2 : ∀ k, a k ≥ 2) (hMono : StrictMono a) :
@@ -66,14 +66,14 @@ lemma tsum_telescope_bound (N : ℕ) (hGe2 : ∀ k, a k ≥ 2) (hMono : StrictMo
     apply eventually_atTop.mpr
     use 1
     intro m hm
-    have h_m_pos : m ≥ 1 := hm
+    have _h_m_pos : m ≥ 1 := hm
     let m' := m - 1
     have hm_eq : m' + 1 = m := by omega
     rw [← hm_eq]
     have h_bound := partial_sum_bound a (m - 1) N hGe2 hMono
     have h_strict_bound : 1 / ((a N : ℝ) - 1) - 1 / (a (m - 1 + N) : ℝ) ≤ 1 / ((a N : ℝ) - 1) := by
       have ha_ge2 : a (m - 1 + N) ≥ 2 := hGe2 (m - 1 + N)
-      have ha_real : (a (m - 1 + N) : ℝ) ≥ 2 := by exact_mod_cast ha_ge2
+      have _ha_real : (a (m - 1 + N) : ℝ) ≥ 2 := by exact_mod_cast ha_ge2
       have ha_pos : 1 / (a (m - 1 + N) : ℝ) > 0 := by positivity
       linarith
     exact le_trans h_bound h_strict_bound
@@ -84,23 +84,23 @@ theorem sequence_absolute_upper_bound (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0
     (hp1 : p₁ > 0) (hp2 : p₂ > 0) (hGe2 : ∀ k, a k ≥ 2) (hMono : StrictMono a)
     (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
     (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    (a N : ℝ) - 1 ≤ (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N := by
-  have h_fund := C_val_int_ge_1 a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
-  have h_C_eq := C_val_eq_C_val_int a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
-  have h_fund_real : (C_val_int a p₁ p₂ q₁ q₂ N : ℝ) ≥ 1 := by exact_mod_cast h_fund
+    (a N : ℝ) - 1 ≤ (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N := by
+  have h_fund := exact_coupling_int_ge_one a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
+  have h_C_eq := exact_coupling_eq_int a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
+  have h_fund_real : (exactCouplingInt a p₁ p₂ q₁ q₂ N : ℝ) ≥ 1 := by exact_mod_cast h_fund
   rw [← h_C_eq] at h_fund_real
-  have h_C_id := C_val_series_identity a p₁ p₂ q₁ q₂ N hq1 hq2 hGe2 hSum1 hSum2
+  have h_C_id := exact_coupling_series_identity a p₁ p₂ q₁ q₂ N hq1 hq2 hGe2 hSum1 hSum2
   rw [h_C_id] at h_fund_real
   
   have h_tsum_bound := tsum_telescope_bound a p₁ p₂ q₁ q₂ N hGe2 hMono hSum1 hSum2
-  have h_front_pos : (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N > 0 := by
-    have hp1_pos : P1_N a N > 0 := by
+  have h_front_pos : (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N > 0 := by
+    have hp1_pos : prefixProdUnshifted a N > 0 := by
       apply Finset.prod_pos
       intro i _
       have : a i ≥ 2 := hGe2 i
       have ha_real : (a i : ℝ) ≥ 2 := by exact_mod_cast this
       linarith
-    have hp2_pos : P2_N a N > 0 := by
+    have hp2_pos : prefixProdShifted a N > 0 := by
       apply Finset.prod_pos
       intro i _
       have : a i ≥ 2 := hGe2 i
@@ -108,12 +108,12 @@ theorem sequence_absolute_upper_bound (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0
       linarith
     positivity
     
-  have h_mul_bound : (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * ∑' k, (1 / (((a (k + N) : ℝ) - 1) * (a (k + N) : ℝ))) ≤ 
-                     (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * (1 / ((a N : ℝ) - 1)) := by
+  have h_mul_bound : (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * ∑' k, (1 / (((a (k + N) : ℝ) - 1) * (a (k + N) : ℝ))) ≤ 
+                     (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * (1 / ((a N : ℝ) - 1)) := by
     apply mul_le_mul_of_nonneg_left h_tsum_bound
     exact le_of_lt h_front_pos
     
-  have h_bound2 : 1 ≤ (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * (1 / ((a N : ℝ) - 1)) := by
+  have h_bound2 : 1 ≤ (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * (1 / ((a N : ℝ) - 1)) := by
     linarith
     
   have haN_pos : (a N : ℝ) - 1 > 0 := by
@@ -121,7 +121,7 @@ theorem sequence_absolute_upper_bound (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0
     have ha_real : (a N : ℝ) ≥ 2 := by exact_mod_cast this
     linarith
     
-  have h_bound3 : 1 * ((a N : ℝ) - 1) ≤ ((q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * (1 / ((a N : ℝ) - 1))) * ((a N : ℝ) - 1) := by
+  have h_bound3 : 1 * ((a N : ℝ) - 1) ≤ ((q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * (1 / ((a N : ℝ) - 1))) * ((a N : ℝ) - 1) := by
     apply mul_le_mul_of_nonneg_right h_bound2
     exact le_of_lt haN_pos
     
@@ -130,12 +130,12 @@ theorem sequence_absolute_upper_bound (N : ℕ) (hq1 : q₁ > 0) (hq2 : q₂ > 0
       _ = ((a N : ℝ) - 1) / ((a N : ℝ) - 1) := by ring
       _ = 1 := div_self (ne_of_gt haN_pos)
     
-  have h_bound4 : (a N : ℝ) - 1 ≤ (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N := by
+  have h_bound4 : (a N : ℝ) - 1 ≤ (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N := by
     calc (a N : ℝ) - 1
       _ = 1 * ((a N : ℝ) - 1) := by ring
-      _ ≤ ((q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * (1 / ((a N : ℝ) - 1))) * ((a N : ℝ) - 1) := h_bound3
-      _ = (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * ((1 / (((a N : ℝ) - 1))) * (((a N : ℝ) - 1))) := by ring
-      _ = (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N * 1 := by rw [h_cancel]
-      _ = (q₁ : ℝ) * (q₂ : ℝ) * P1_N a N * P2_N a N := by ring
+      _ ≤ ((q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * (1 / ((a N : ℝ) - 1))) * ((a N : ℝ) - 1) := h_bound3
+      _ = (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * ((1 / (((a N : ℝ) - 1))) * (((a N : ℝ) - 1))) := by ring
+      _ = (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N * 1 := by rw [h_cancel]
+      _ = (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N := by ring
       
   exact h_bound4

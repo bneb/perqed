@@ -51,7 +51,7 @@ lemma sylvester_ge_two (n : ℕ) : sylvester n ≥ 2 := by
   The baseline property required for an Erdős 265 sequence:
   A sequence of integers ≥ 2 such that the sum of its reciprocals is rational.
 -/
-def Erdos265_Sequence (a : ℕ → ℕ) : Prop :=
+def Erdos265Sequence (a : ℕ → ℕ) : Prop :=
   (∀ k, a k ≥ 2) ∧
   (∃ q : ℚ, HasSum (fun k => (1 : ℝ) / (a k : ℝ)) ↑q)
 
