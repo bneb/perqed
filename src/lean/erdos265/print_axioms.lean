@@ -5,6 +5,7 @@ import universal_balance
 import subgreedy_bounds
 import subgreedy_asymptotics
 import absolute_upper_bound
+import valuation_growth
 
 #print axioms greedy_erdos265_impossible
 #print axioms sylvester_sum_irrational
@@ -14,3 +15,5 @@ import absolute_upper_bound
 #print axioms subgreedy_quadratic_growth
 #print axioms product_ratio_converges
 #print axioms sequence_absolute_upper_bound
+#print axioms C_valuation_growth
+#print axioms C_exponential_lower_bound
