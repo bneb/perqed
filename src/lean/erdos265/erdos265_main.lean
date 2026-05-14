@@ -3,6 +3,12 @@ import Mathlib.Data.Real.Basic
 import problem_statement
 import residual_growth_bound
 import fundamental_inequality
+import absolute_upper_bound
+import universal_balance
+import subgreedy_bounds
+import subgreedy_asymptotics
+import dual_constraint_collapse
+import sylvester_sum_irrational
 
 open Filter Topology Finset
 
@@ -190,3 +196,19 @@ theorem erdos265_fundamental_inequality (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q�
     (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
     exactCouplingInt a p₁ p₂ q₁ q₂ N ≥ 1 := by
   exact exact_coupling_int_ge_one a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
+
+/--
+  **THE SYLVESTER CEILING**
+  
+  For ANY sequence satisfying the Erdős 265 conditions, the growth is strictly
+  capped by the Sylvester rate. Specifically, $a_N(a_N-1) \le (q_1 q_2) \cdot P_N \cdot P'_N$.
+  This identifies the Sylvester growth rate ($\beta = 2$) as the absolute 
+  asymptotic boundary.
+-/
+theorem erdos265_ceiling_result (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q₁ q₂ : ℕ) (N : ℕ)
+    (hq1 : q₁ > 0) (hq2 : q₂ > 0) (hp1 : p₁ > 0) (hp2 : p₂ > 0)
+    (hGe2 : ∀ k, a k ≥ 2) (hMono : StrictMono a)
+    (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
+    (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
+    (a N : ℝ) - 1 ≤ (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N := by
+  exact sequence_absolute_upper_bound a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hMono hSum1 hSum2

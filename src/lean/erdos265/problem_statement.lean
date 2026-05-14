@@ -12,10 +12,11 @@ connect back to.
   s_{n+1} = s_n · (s_n - 1) + 1
 
 ## Erdős 265 Ceiling Conjecture
-  limsup (s_k)^{1/2^k} ≤ e    (where e = exp 1)
+  limsup (a_k)^{1/2^k} ≤ 1
 
-Equivalently (via the Sylvester–Erdős identity):
-  ∑_{k=0}^∞ 1/s_k is irrational.
+While the Sylvester sequence reciprocal sum converges to exactly 1 (a rational number),
+the conjecture asks whether any sequence can be simultaneous rational for BOTH 
+the unshifted and shifted reciprocal sums without its growth being bounded.
 -/
 
 open Filter Topology
