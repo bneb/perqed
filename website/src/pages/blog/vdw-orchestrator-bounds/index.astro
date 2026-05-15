@@ -2,27 +2,24 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p><em>We implemented dynamic CLI-driven orchestration to decompose and execute search strategies for Van der Waerden partition boundaries natively.</em></p>
+<p><em>We have implemented a dynamic orchestration layer to decompose and execute search strategies for Van der Waerden (VdW) partition boundaries.</em></p>
 
 <h2>Overview</h2>
-<p>Extremal combinatorics resists standard heuristic testing. While basic graph bounds operate on standard adjacency matrices, locating monochromatic-free partitions for arithmetic sequences (such as $W(5, 3) > 170$) requires a unique topology. </p>
+<p>Extremal combinatorics problems, such as determining Van der Waerden numbers, present significant challenges for standard heuristic search. While graph-theoretic bounds often operate on adjacency matrices, locating monochromatic-free partitions for arithmetic progressions (e.g., $W(5, 3) > 170$) requires a specialized topological representation. </p>
 
-<p>Our goal was to eliminate rigid, hardcoded search environments and establish a generalized local optimizer. From a single terminal command, the system needed to structurally map out the mathematics and independently execute a proof search:</p>
-<blockquote>
-<p><code>bun run src/cli/perqed.ts --prompt="Hunt for the Van Der Waerden boundary W(5, 3) > 170"</code></p>
-</blockquote>
+<p>The objective was to transition from rigid, hardcoded search environments to a generalized Hub-and-Spoke orchestration model. In this framework, the central Architect hub structurally maps the mathematical constraints and delegates specific sub-tasks to specialized spokes.</p>
 
-<h2>Implementation Mechanics</h2>
-<p>We adapted the Perqed orchestrator to autonomously handle 1D integer-partition networks by extending the <code>ARCHITECT</code> node.</p>
+<h2>Architecture and Implementation</h2>
+<p>The Perqed orchestrator was extended to handle 1D integer-partition networks by refining the Architect's decomposition logic and adding specialized optimization spokes.</p>
 
 <ol>
-<li><strong>Topological Extraction</strong>: The <code>ARCHITECT</code> processes the terminal target and isolates the constraints. The problem is contextualized as a defined parameterization: <code>domain_size=171</code>, <code>num_partitions=5</code>, and a monochromatic sequence target of <code>vdw_length=3</code>. </li>
-<li><strong>Algebraic Skeletonization</strong>: Instead of random generation, the system creates declarative JavaScript rules reflecting fundamental algebraic symmetries (e.g., periodic modular constraints). This initializes the search grid with a high-density, mathematical baseline.</li>
-<li><strong>Local Search Cascade</strong>: Using the algebraic skeleton as a structural warm-start, the pipeline acknowledges the limitations of pure symmetry and immediately hands off the setup to a parallel Simulated Annealing engine. The optimizer is then free to aggressively mutate constraints until confirming the Energy = 0 witness.</li>
-<li><strong>Resilient Validation</strong>: Because formal verification in Lean 4 frequently halts due to index arithmetic abstractions, the orchestrator automatically degrades to relaxed type signatures and empirical verification constraints to maintain the core hunt without locking the background thread.</li>
+<li><strong>Constraint Decomposition</strong>: The Architect processes the high-level research goal and isolates the combinatorial parameters. For a target like $W(k, r)$, it defines the domain size, the number of partitions ($k$), and the target progression length ($r$).</li>
+<li><strong>Algebraic Initialization</strong>: Instead of purely stochastic initialization, the system utilizes an <strong>Algebraic Spoke</strong> to generate declarative rules based on modular symmetries. This provides a high-density structural baseline for the search.</li>
+<li><strong>Hybrid Search Execution</strong>: The Architect delegates the refined search space to a <strong>Heuristic Spoke</strong>, which utilizes Simulated Annealing (SA) to navigate the partition landscape. The SA engine mutates the initial algebraic skeleton to minimize the "energy" (the count of monochromatic progressions).</li>
+<li><strong>Verification and Formalization</strong>: Upon locating a potential witness (Energy = 0), the results are passed to the <strong>Verification Spoke</strong>. Due to the computational complexity of formalizing large-scale index arithmetic in Lean 4, the system utilizes a tiered approach: empirical validation of the witness followed by targeted formal verification of the underlying combinatorial properties.</li>
 </ol>
 
-<p>The orchestrator now algorithmically extracts combinatorial targets, layers algebraic scaffolding, and converges on localized optimization pipelines—quietly running in the background without manual scripting overrides. It maps abstract constraints into bounded searches, and it works.</p>
+<p>This Hub-and-Spoke model allows the system to autonomously map abstract constraints into bounded search spaces, leveraging both algebraic symmetry and heuristic optimization to find witnesses for complex extremal bounds.</p>
 `;
 ---
 
@@ -46,6 +43,7 @@ const blogContent = `
   </article>
 
 </BaseLayout>
+
 
 <style>
   .article {

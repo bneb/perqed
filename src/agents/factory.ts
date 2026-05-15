@@ -2,7 +2,7 @@
  * Hybrid Roster: AgentFactory — Signals-Based Specialist Instantiation
  *
  * 4-Tier Escalation:
- *   TACTICIAN (local Ollama)  → default tactic spray
+ *   TACTICIAN (local Ollama)  → default tactic generation
  *   REASONER  (Gemini cloud)  → tactical unblocking
  *   ARCHITECT (Gemini cloud)  → structural planning
  *   HUMAN     (manual input)  → human-in-the-loop
@@ -260,4 +260,6 @@ Do NOT use 'tactic_sequence' or 'tactics'. Use 'lean_tactics'.`
       return escalationLevel >= 3 ? "gemini-3.1-pro-preview" : "gemini-3.1-flash-lite-preview";
     }
   }
+}
+
 }

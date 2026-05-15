@@ -132,8 +132,12 @@ CRITICAL REQUIREMENTS:
       }
       
     } catch (e) {
-      console.warn(`[RedTeam] Python execution crashed or Lean verification failed structurally.`);
+      console.warn(`[RedTeam] Python execution failed or Lean verification failed structurally.`);
       return { status: "VERIFIED_BULLETPROOF" };
+    }
+  }
+}
+OF" };
     }
   }
 }

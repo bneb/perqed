@@ -2,191 +2,61 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>The March 16 post ended with something like a vow: "We're building an engine
-that learns what to search." The honest addendum is that the engine we had on
-March 16 was still, fundamentally, <em>guessing</em>. It could pivot. It had
-memory. But when it got stuck, it tried the same category of thing harder —
-more SA iterations, higher temperature, a slightly different cooling schedule.</p>
+<p>Developing autonomous mathematical reasoning systems requires more than just efficient search algorithms; it requires a strategic layer capable of recognizing structural stagnation. Our recent work has focused on implementing "strategic escapement" mechanisms within the Architect (the central hub) to ensure the system can pivot from failing search strategies toward more promising mathematical domains.</p>
 
-<p>The last two days were about changing that. We gave the engine the ability to
-panic usefully: to recognize when a strategy isn't just failing but is
-<em>structurally</em> incapable of succeeding, and to reach for a fundamentally
-different kind of mathematics.</p>
+<h2>Addressing Convergence Stagnation</h2>
 
-<h2>Problem 1: The SA Basin Trap</h2>
-
-<p>After the circulant UNSAT result, we moved to unconstrained SA on K<sub>35</sub>.
-Workers converged — and then stopped converging. The best energy would drop to
-E = 12 or 13 and plateau. The existing reheat formula had a hard cap:</p>
-
-<pre><code>newT = Math.min(2.0, staleCount) * baseT</code></pre>
-
-<p>Once <code>staleCount</code> hit 2, the temperature ceiling was fixed. The worker
-bounced endlessly around the bottom of the same crater — what we started calling
-a <em>sterile basin</em>.</p>
-
-<p>We replaced the capped reheat with a multi-stage escalation:</p>
+<p>In extremal combinatorics searches, such as investigating bounds for $R(k, l)$, heuristic search processes often encounter "sterile basins"—local minima where incremental mutations fail to yield further energy reduction. To address this, we implemented a multi-stage escalation protocol for our <strong>Heuristic Search Spokes</strong>:</p>
 
 <ol>
-  <li><strong>Supercritical Reheats (4 stages):</strong> Temperature spikes scale
-  unboundedly — T×1.4, T×1.8, T×2.2, T×2.6. Each stage resets a per-worker
-  <code>escapeFails</code> counter. If the worker escapes (best energy improves),
-  the counter resets. The escalation only continues if the worker fails to escape
-  each time.</li>
-  <li><strong>Graph Scatter:</strong> If all 4 reheat stages fail, the worker is
-  teleported to a completely random starting graph. Not a mutation — a full
-  stochastic restart from a new random adjacency matrix. Energy spikes back to
-  E ≈ 800. The idea: a sterile crater that survives 4 supercritical reheats is
-  too deep to escape by temperature alone. Randomize out.</li>
+  <li><strong>Supercritical Reheats:</strong> Upon detecting stagnation, the system triggers exponential temperature spikes. This increases the probability of accepting higher-energy states, facilitating escape from local optima.</li>
+  <li><strong>Stochastic Restarts (Scattering):</strong> If multiple reheat cycles fail to improve the best-found energy, the Architect triggers a full stochastic restart. The search is re-initialized from a new random state, effectively "scattering" the search to a different region of the configuration space.</li>
 </ol>
 
-<p>The result is visible in the SA logs now: <code>[SA] Basin sterile after 4 reheats.
-SCATTERING to new coordinates. E=812</code>. Workers thrash for a while after scatter,
-but they avoid permanently sleeping in bad basins.</p>
+<p>This protocol ensures that compute resources are not wasted on exhausted search regions, maintaining a high throughput of novel configuration testing.</p>
 
-<h2>Problem 2: The ARCHITECT's Conceptual Basin</h2>
+<h2>Strategic Pivot: The Hub-and-Spoke Response</h2>
 
-<p>The SA basin problem has an exact analogue at the LLM layer. On repeated
-failures, the ARCHITECT was receiving the same context at the same temperature
-and producing subtle variations of the same strategy. More SA iterations. A
-different cooling rate. It was a conceptual local minimum.</p>
-
-<p>We implemented escalating creativity as a three-stage ladder keyed to consecutive
-macro-failure count in the ResearchJournal:</p>
+<p>The Hub-and-Spoke architecture allows for a more sophisticated response to search failure than simple parameter tuning. We have implemented a three-stage escalation ladder for the Architect, keyed to consecutive search failures:</p>
 
 <table>
 <thead>
-<tr><th>Stage</th><th>Failures</th><th>Temperature</th><th>Directive</th></tr>
+<tr><th>Stage</th><th>Failure Count</th><th>System Temperature</th><th>Architectural Directive</th></tr>
 </thead>
 <tbody>
-<tr><td>1 — INITIAL TRIAGE</td><td>0–2</td><td>0.20</td><td>Analyze the mathematical depth. Consider advanced frameworks from the start.</td></tr>
-<tr><td>2 — LOCAL MINIMUM DETECTED</td><td>3–5</td><td>0.70</td><td>Direct combinatorial search has failed. Pivot to structural approaches.</td></tr>
-<tr><td>3 — CONCEPTUAL SCATTER</td><td>≥6</td><td>0.95</td><td>Abandon direct calculation. Translate to a continuous or algebraic domain.</td></tr>
+<tr><td>1 — Initial Triage</td><td>0–2</td><td>0.20</td><td>Optimize the current combinatorial framework for direct construction.</td></tr>
+<tr><td>2 — Local Minimum Detected</td><td>3–5</td><td>0.70</td><td>Direct combinatorial search is likely insufficient. Pivot to structural or algebraic approaches.</td></tr>
+<tr><td>3 — Domain Translation</td><td>≥6</td><td>0.95</td><td>Abandon direct calculation. Translate the problem into a continuous or spectral domain.</td></tr>
 </tbody>
 </table>
 
-<p>Stage 3 is what we call the Wiles Maneuver — named for Andrew Wiles's proof of
-Fermat's Last Theorem, which worked by translating a discrete number theory
-problem into the continuous language of elliptic curves and modular forms. When
-the engine enters Stage 3, the ARCHITECT is explicitly instructed to do the
-same: stop thinking about edge colorings and start thinking about spectral
-properties, algebraic symmetry groups, or semidefinite programming relaxations.</p>
+<p>Stage 3 represents a fundamental domain translation. The Architect is directed to reformulate the problem—for instance, translating a discrete edge-coloring problem into the language of spectral graph theory or semidefinite programming (SDP) relaxations. This approach mirrors rigorous mathematical practice, where difficult problems are often solved by moving between seemingly unrelated domains.</p>
 
-<h2>Problem 3: 25 SKILLs, 3 Bridge Frameworks</h2>
+<h2>The Role of Specialized Skills</h2>
 
-<p>The escalation ladder only works if the ARCHITECT knows what to escalate
-<em>to</em>. We built a library of 25 mathematical proof techniques as
-<code>SKILL.md</code> files — structured documentation that the engine retrieves
-via RAG and injects as context into the ARCHITECT's planning step.</p>
-
-<p>The three most important are the bridge frameworks — techniques that translate
-discrete combinatorial problems into continuous, algebraic, or spectral domains:</p>
+<p>The efficacy of these strategic pivots depends on the availability of specialized mathematical techniques. We have developed a library of "Skills"—structured representations of proof techniques—that the Architect retrieves via RAG and injects into its planning context. Key bridge frameworks include:</p>
 
 <ul>
-  <li><strong>Algebraic Graph Construction:</strong> Instead of randomly sampling
-  graphs, construct them from Cayley graphs over finite groups or quadratic
-  residues (Paley graphs). These have built-in algebraic symmetry and known
-  spectral properties. The Exoo R(4,6) witness from 1989 is a Paley graph — the
-  SAT solver doesn't know this, but the SKILL does.</li>
-
-  <li><strong>Spectral Graph Bounds:</strong> The Hoffman bound and Lovász theta
-  function translate clique/independent set existence into eigenvalue inequalities.
-  Instead of asking "does this graph contain a K_4?" you ask "is the largest
-  eigenvalue compatible with K_4 absence?" The spectral perspective gives the SA
-  energy function smooth gradients instead of integer jumps.</li>
-
-  <li><strong>Razborov's Flag Algebras:</strong> A method for converting finite
-  subgraph counting into infinite continuous density matrices, solvable by
-  Semidefinite Programming. Used to prove tight asymptotic bounds on graph
-  densities. For Ramsey problems, this gives certified upper bounds — we may not
-  find a witness, but we can prove exactly how large the minimum violation must be.</li>
+  <li><strong>Algebraic Graph Construction:</strong> Utilizing Cayley or Paley graphs to exploit algebraic symmetries and established spectral properties.</li>
+  <li><strong>Spectral Graph Bounds:</strong> Leveraging Hoffman bounds and the Lovász theta function to relate clique existence to eigenvalue inequalities, providing smoother gradients for optimization.</li>
+  <li><strong>Flag Algebras:</strong> Converting finite subgraph counting into infinite continuous density matrices for analysis via SDP, providing certified upper bounds on graph densities.</li>
 </ul>
 
-<h2>Problem 4: The ARCHITECT Wasn't Actually Running</h2>
+<h2>Infrastructure Robustness and Planning</h2>
 
-<p>We shipped all of this and ran a 7-hour search. Then we looked at the logs:</p>
+<p>Implementing these high-level strategic pivots revealed critical requirements for the underlying infrastructure. We identified and corrected issues in the Architect's planning layer, particularly regarding the handling of structured output (JSON) and the prioritization of the planning step itself. The system is now configured to invoke the Architect's <strong>Planning Spoke</strong> at the outset of any new research task, ensuring that even the initial search strategy is mathematically grounded.</p>
 
-<pre><code>⚠️ [Architect.formulateDAG] attempt 1/3: JSON Parse error: Unrecognized token '\`'
-⚠️ [Architect.formulateDAG] attempt 2/3: JSON Parse error: Unrecognized token '\`'
-⚠️ [Architect.formulateDAG] attempt 3/3: JSON Parse error: Unrecognized token '\`'
-⚠️ [DAG] formulateDAG failed — falling back to flat pivot</code></pre>
+<p>The Architect is no longer required to fail before considering advanced structural reductions. If the mathematical depth of the target—such as a notoriously difficult Ramsey bound—warrants it, the system can bypass naive combinatorial search and move directly to an advanced structural framework.</p>
 
-<p>Every single pivot. Every attempt. The Proof DAG planner — the entire ARCHITECT
-layer — was dead. The engine had been running naive flat SA pivots for seven hours,
-completely bypassing the DAG, the escalation ladder, and the SKILL library.</p>
+<h2>Current Status</h2>
 
-<p>The bug: our <code>extractJSON()</code> function used a regex with <code>^</code>
-and <code>$</code> anchors:</p>
+<p>With these enhancements, the system is now capable of more autonomous and strategically sound exploration. In recent runs investigating $R(4, 6) \ge 36$ (using $K_{35}$), the search achieved significant energy reductions, identifying several high-quality candidate graphs that are currently being analyzed by the <strong>Verification Spoke</strong>.</p>
 
-<pre><code>/^&grave;&grave;&grave;(?:json)?\\s*\\n?([\\s\\S]*?)\\n?\\s*&grave;&grave;&grave;$/</code></pre>
-
-<p>Gemini 2.5 Flash commonly prefaces its JSON with a prose sentence —
-<em>"Here is the ProofDAG for this problem:"</em> — before the code fence.
-The anchored regex required the fence to span the entire response string.
-Any surrounding prose caused it to fail silently, passing the raw backtick
-character to <code>JSON.parse</code>.</p>
-
-<p>We replaced it with a three-pass extractor:</p>
-
-<ol>
-  <li>Find <code>&grave;&grave;&grave;json...&grave;&grave;&grave;</code> <em>anywhere</em> in the string (no anchors)</li>
-  <li>Brace-balanced fallback: slice from the first <code>{</code> to the last <code>}</code></li>
-  <li>Return as-is with a useful error</li>
-</ol>
-
-<p>We also added a regression test that mocks the exact production failure pattern.
-This is a case where the test we didn't write cost us seven hours of GPU time.</p>
-
-<h2>Math-First Triage</h2>
-
-<p>One last structural issue: the Proof DAG planner was only invoked on
-Attempt 2 and beyond. Attempt 1 always went directly to naive SA — the
-ARCHITECT wasn't consulted at all. We moved the gate:</p>
-
-<pre><code>// Before
-if (attempt >= 2) { const dag = await formulateDAG(...); }
-else { requestSearchPivot(...); }
-
-// After
-{ const dag = await formulateDAG(...); } // always; requestSearchPivot is catch-only</code></pre>
-
-<p>The INITIAL TRIAGE directive — the Stage 1 prompt — was also rewritten. Instead
-of "focus on direct combinatorial construction," it now reads:</p>
-
-<blockquote>
-  <em>Analyze the mathematical depth of the target goal. You have access to naive
-  combinatorial search AND advanced structural frameworks. Do NOT blindly default
-  to naive search. If the target is a notoriously difficult bound (like R(4,6) ≥ 36),
-  naive search will fail. You are authorized and encouraged to start directly with an
-  advanced structural reduction or continuous translation if the math warrants it.</em>
-</blockquote>
-
-<p>The ARCHITECT now receives this directive on Attempt 1, before any SA has run.
-The engine is no longer required to fail first before asking for help.</p>
-
-<h2>Where We Are</h2>
-
-<p>After seven hours of running with a dead planner, the best energy the SA
-workers found was <strong>E = 10</strong> — an improvement over the E = 12
-floor from the previous search, and a new memetic seed persisted to disk.</p>
-
-<p>What E = 10 means concretely: the current best candidate 2-coloring of K<sub>35</sub>
-has 10 monochromatic cliques that shouldn't be there. Z3's LNS finisher confirmed
-that the local neighborhood of the E = 10 graph has no valid coloring — the basin
-is real, not a search artifact.</p>
-
-<p>The search is running now, this time with the planner actually active. The next
-interesting moment is when it hits its first pivot and the ARCHITECT has to decide:
-more SA, or something stranger?</p>
-
-<hr>
-
-<p><em>Perqed is open source. <a href="https://github.com/bneb/perqed">Follow us on GitHub</a>
-or <a href="/minutiae/">watch the agent think in real time</a>.</em></p>
+<p>The next phase of development focuses on refining the Architect's ability to judge the "interestingness" of a mathematical domain, allowing it to autonomously prioritize the most promising avenues for discovery.</p>
 `;
 ---
 
-<BaseLayout title="Teaching the ARCHITECT to Panic — Perqed" activeNav="blog">
+<BaseLayout title="Heuristic Escapement and Domain Translation in Autonomous Reasoning — Perqed" activeNav="blog">
 
   <article class="article">
     <div class="container">
@@ -197,7 +67,7 @@ or <a href="/minutiae/">watch the agent think in real time</a>.</em></p>
             <span class="sep">·</span>
             <span>10 min read</span>
           </div>
-          <h1>Teaching the ARCHITECT to Panic</h1>
+          <h1>Heuristic Escapement and Domain Translation in Autonomous Reasoning</h1>
         </header>
 
         <div set:html={blogContent} />

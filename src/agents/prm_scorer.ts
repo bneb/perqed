@@ -48,7 +48,7 @@ export function scoreCandidates(
       ...topK.map(k => jaccardNgram(c.rule_js, k.rule_js, 3))
     ));
 
-    // Diversity: extra credit if island is under-represented in current top-10
+    // Diversity: score bonus if island is under-represented in current top-10
     const diversity_bonus = top10Islands.has(island) ? 0 : 0.3;
 
     // Drift penalty: −1 if this is an EXACT duplicate of any known failure

@@ -73,12 +73,12 @@ export class IdeatorAgent {
     
     let secondPaper = null;
     if (crossPollinate) {
-      console.log(`[Ideation] Cross-Pollination Crucible ACTIVE. Searching for orthogonal paper...`);
+      console.log(`[Ideation] Cross-Pollination mode active. Searching for orthogonal paper...`);
       let pool = await librarian.searchDatabase("algebraic structure topology isomorphism graph combinatorial", { limit: 20 });
       let distinctPool = pool.filter(p => p.id !== seedPaper?.id);
       if (distinctPool.length > 0) {
         secondPaper = distinctPool[Math.floor(Math.random() * Math.min(5, distinctPool.length))];
-        console.log(`[Ideation] Selected Secondary Crucible Seed: "${secondPaper?.paperTitle || 'Unknown'}"`);
+        console.log(`[Ideation] Selected Secondary Seed: "${secondPaper?.paperTitle || 'Unknown'}"`);
       }
     }
 
@@ -137,7 +137,7 @@ Prompt: "${prompt}"`,
     let graveyardWarning = "";
     if (failures.length > 0) {
       const formattedFailures = failures.map(f => `- ${f.failureReason}: ${f.hypothesisSignature}`).join("\n");
-      graveyardWarning = `\n\n### ⚠️ GRAVEYARD CONTEXT ⚠️\nThe following hypotheses have already been rigorously proven UNSAT or mathematically bankrupt by the Z3 exact solver. YOU ARE STRICTLY PROHIBITED from proposing any exact boundary overlapping with these trajectories. If a previous bounding assumption failed, you MUST natively pivot your structural approach (e.g., transition from Circulant symmetries to Paley architectures, or escalate N).\n${formattedFailures}`;
+      graveyardWarning = `\n\n### ⚠️ FAILURE HISTORY ⚠️\nThe following hypotheses have already been proven inconsistent or unproductive by the SMT solver. Avoid proposing any boundary overlapping with these trajectories. If a previous bounding assumption failed, adjust your structural approach (e.g., transition from Circulant symmetries to Paley architectures, or escalate N).\n${formattedFailures}`;
     }
 
     const schema = {
@@ -163,7 +163,7 @@ Prompt: "${prompt}"`,
       required: ["seed_paper", "extension_hypothesis", "domains_to_probe", "lean_target_sketch", "novelty_classification"],
     };
 
-    const systemPrompt = `You are an elite mathematical architect.
+    const systemPrompt = `You are an expert mathematical architect.
 THE USER HAS ISSUED THE FOLLOWING ORCHESTRATION DIRECTIVE:
 "${prompt}"
 
@@ -176,16 +176,16 @@ arXiv ID: ${arxivId}
 Abstract: ${abstract}
 ${crossPollinate && title2 ? `
 ---
-CRUCIBLE CROSS-POLLINATION ACTIVE:
+CROSS-POLLINATION MODE ACTIVE:
 You must also read this secondary paper from an orthogonal domain:
 
 Title: ${title2}
 arXiv ID: ${arxivId2}
 Abstract: ${abstract2}
 
-ORTHOGONALITY DIRECTIVE ("THINK BIG & AUTONOMOUS"):
-Groundbreaking PhD-level mathematics happens by importing the algebraic machinery of Domain A into the topological landscape of Domain B (Functorial Translation). 
-You must synthesize these TWO completely distinct papers. Find the structural isomorphism between them, and formulate a novel hypothesis that uses the secondary paper's machinery to shatter constraints or generalize mechanisms in the primary paper.` : ""}
+ORTHOGONALITY DIRECTIVE:
+Groundbreaking mathematics often results from importing the algebraic machinery of Domain A into the topological landscape of Domain B (Functorial Translation). 
+You must synthesize these TWO distinct papers. Find the structural isomorphism between them, and formulate a novel hypothesis that uses the secondary paper's machinery to resolve constraints or generalize mechanisms in the primary paper.` : ""}
 
 YOUR TASK:
 1. Identify a potential extension related to this exact paper(s).

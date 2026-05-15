@@ -1,6 +1,6 @@
 # Perqed Mathematical Library
 
-This library contains pristine, machine-verified mathematical proofs discovered or formalized by the Perqed engine.
+This library contains machine-verified mathematical proofs discovered or formalized by the Perqed engine.
 
 ## Standards
 

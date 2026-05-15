@@ -2,7 +2,7 @@ export interface CliArgs {
   prompt?: string;
   configPath?: string;
   noconfirm: boolean;
-  /** Force ARCHITECT into Wiles Mode (Conceptual Scatter) from iteration 0. */
+  /** Force ARCHITECT into Wiles Mode (Conceptual Diversification) from iteration 0. */
   wiles: boolean;
   /** Override the maximum number of architect replanning pivots (default 5). */
   maxPivots: number;

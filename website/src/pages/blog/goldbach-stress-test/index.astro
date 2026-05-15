@@ -14,13 +14,13 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
             <span class="sep">&middot;</span>
             <span>12 min read</span>
           </div>
-          <h1>Stress-Testing an AI Mathematician</h1>
-          <p class="paper-ref">A post-mortem of our orchestration loops decomposing the Goldbach conjecture in Lean 4.</p>
+          <h1>Exploratory Benchmarking: The Goldbach Conjecture</h1>
+          <p class="paper-ref">A post-mortem of our orchestration loops decomposing the Goldbach conjecture in Lean 4 as a historical case study.</p>
         </header>
 
-        <p>To build a "Mathematician in a Box" &mdash; an autonomous pipeline capable of literature review, empirical exploration, and formal proof &mdash; you can't test it on easy problems. We needed a stress test that would brutally expose the limits of our orchestration loops. We pointed the engine at the Goldbach conjecture precisely <em>because</em> it is too hard.</p>
+        <p>To develop a robust autonomous pipeline capable of literature review, empirical exploration, and formal proof, it must be evaluated against significant mathematical challenges. The Goldbach conjecture was utilized as an exploratory benchmark precisely <em>because</em> of its complexity, serving as a rigorous test for our orchestration loops.</p>
         
-        <p>The system was designed to bridge unconnected mathematical domains. When we unleashed the autonomous explorer agent on the prime geodesic theorem to see if hyperbolic geometry could control prime sums, it ran into a famous obstruction: the multiplicative-additive chasm.</p>
+        <p>The system was designed to bridge unconnected mathematical domains. When the autonomous explorer agent was deployed on the prime geodesic theorem to evaluate if hyperbolic geometry could control prime sums, it encountered the multiplicative-additive obstruction.</p>
 
         <h2>The N&middot;log&sup2;N Phase Transition</h2>
 
@@ -46,13 +46,13 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 
         <p>The correlation exhibits a long "burn-in" period due to local resonances at shifts that are multiples of small primes, but as N scales, the ratio predictably crosses below 10% and continues dropping.</p>
 
-        <h2>The Ledger is Clean</h2>
+        <h2>The Verification is Complete</h2>
 
-        <p>With the feedback loops tightened and the vacuous theorems eliminated, the final decomposition was complete.</p>
+        <p>With the feedback loops refined and the vacuous theorems eliminated, the decomposition process reached its conclusion.</p>
 
         <div class="chart-wrap tall"><canvas id="chart-decomp"></canvas></div>
 
-        <p>The formalization reduced the entire Goldbach conjecture down to exactly one open axiom: the positivity of the Rankin-Selberg convolution, a result that has been proven since 1940 but not yet formalized in Mathlib4. The tunnel from Goldbach to established mathematics is complete.</p>
+        <p>The formalization reduced the Goldbach conjecture to a single open axiom: the positivity of the Rankin-Selberg convolution, a result established in 1940 but not yet formalized in Mathlib4. The logical mapping from Goldbach to established mathematical foundations is finalized.</p>
 
         <div class="stat-grid">
           <div class="stat-card">

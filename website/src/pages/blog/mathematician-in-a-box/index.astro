@@ -2,35 +2,30 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>When you build an AI research lab, the first major hurdle isn't getting it to write math—it's getting it to <em>stop inventing it</em>.</p>
+<p>The primary challenge in developing autonomous mathematical research agents is ensuring rigorous grounding. Without a formal verification loop, large language models (LLMs) tend to generate plausible but logically ungrounded conjectures.</p>
 
-<p>Our initial autonomous pipeline was brilliant but structurally flawed. When given a prompt like "Find a recent arXiv paper on random graphs and extend it," the Architect (a Gemini inference engine) would hallucinate a structurally complete paper—complete with a fake arXiv ID, an abstract, and a plausible-sounding hypothesis.</p>
+<p>Our initial pipeline demonstrated significant heuristic capability but lacked structural constraints. The Architect (our central hub) could generate structurally complete research outlines—including citations and abstracts—that were nevertheless hallucinatory. To contribute to actual mathematical literature, we moved to a Hub-and-Spoke architecture that enforces strict evidentiary requirements.</p>
 
-<p>It was executing the scientific method in a completely ungrounded universe. To build a system that contributes to actual mathematical literature, we had to sever the hallucination.</p>
+<h2>Grounding via the Librarian Spoke</h2>
 
-<h2>The Fix: The RAG Bridge</h2>
+<p>The solution involves a strict Retrieval-Augmented Generation (RAG) framework. The Architect is interfaced with the <strong>Librarian</strong>, a specialized spoke powered by a local LanceDB vector store containing a curated subset of the arXiv corpus.</p>
 
-<p>The solution was a strict Retrieval-Augmented Generation (RAG) patch. Instead of prompting the LLM with a blank slate at a creative <code>temperature: 0.7</code>, we wired the Architect directly to our <strong>ArxivLibrarian</strong>, powered by a local LanceDB vector store.</p>
-
-<p>The pipeline now follows a cold, hard protocol:</p>
+<p>The workflow follows a deterministic protocol:</p>
 <ol>
-  <li><strong>Query LanceDB</strong>: For a given prompt, the Librarian embeds the query and fetches the top 10 most relevant, actual peer-reviewed papers.</li>
-  <li><strong>Stochastic Selection</strong>: It stochastically samples one of the top matches to guarantee diverse starting points across continuous cron runs.</li>
-  <li><strong>Hard-Grounding</strong>: The Architect's prompt is completely rewritten to inject the real Title, arXiv ID, and Abstract, accompanied by a strict directive: <em>"Do not invent a new paper. Base your entire analysis strictly on the paper provided above."</em></li>
+  <li><strong>Query Execution</strong>: The Librarian embeds the research query and retrieves the most relevant peer-reviewed literature.</li>
+  <li><strong>Stochastic Sampling</strong>: Relevant documents are sampled to provide diverse starting points for parallel research branches.</li>
+  <li><strong>Contextual Injecton</strong>: The Architect's prompt is constrained by the retrieved paper's title, arXiv ID, and abstract. The model is directed to base its analysis strictly on the provided context, operating at a low temperature (0.1) to prioritize precision over creative variance.</li>
 </ol>
-<p>At an icy <code>temperature: 0.1</code>, the Architect behaves less like a sci-fi author and more like a rigorous graduate student.</p>
 
-<h2>The Breakthrough: Escaping the Asymptotic Trap</h2>
+<h2>Falsification and the Explorer Spoke</h2>
 
-<p>Once grounded to reality, the pipeline pulled actual papers like <em>"A limit theorem for small cliques in inhomogeneous random graphs"</em> (arXiv:1903.10570).</p>
+<p>Once grounded, the system can investigate specific claims. For instance, when analyzing literature on random graphs (e.g., arXiv:1903.10570), the Architect hypothesized specific fluctuation regimes for the $p = 1/\\sqrt{n}$ critical density limit in 4-cycles ($C_4$).</p>
 
-<p>The Architect extended the paper's findings on cliques to hypothesize about 4-cycles ($C_4$), predicting specific fluctuation regimes for the $p = 1/\\sqrt{n}$ critical density limit.</p>
+<p>The <strong>Explorer</strong> spoke then executed a battery of empirical tests—utilizing Python-based computational statistics and random matrix theory—to test the hypothesis. In this instance, the quantitative predictions were found to be empirically flawed at scale.</p>
 
-<p>The <strong>Explorer</strong> sub-agent spun up Python scripts across 7 domains (computational statistics, random matrix theory, etc.) and empirically found the quantitative predictions to be flawed. The hypothesis was asymptotically false.</p>
+<p>This empirical feedback is critical. While LLMs struggle with general infinite limits, we utilize a <strong>Computational Fast-Path</strong>: the system targets <em>finite, computable failing bounds</em>. These counterexamples are then passed to the Lean 4 formalization spoke.</p>
 
-<p>This is where the heuristic applies. LLMs notoriously struggle to formally prove infinite limits or asymptotic bounds in Lean 4. To solve this, we injected a <strong>Computational Fast-Path Heuristic</strong>: a strict <code>native_decide</code> constraint forcing the Architect to target <em>finite, computable failing bounds</em> instead of general uncomputable limits.</p>
-
-<p>In response to the empirical Python failure, the AI dropped this exact theorem onto the Lean 4 MCTS Prover:</p>
+<p>Following the empirical failure, the system generated a Lean 4 theorem to formalize the boundary condition:</p>
 
 <pre><code class="language-lean">theorem c4_variance_falsification_N64 :
   let n : ℕ := 64 in
@@ -38,38 +33,28 @@ const blogContent = `
   variance_subgraph_count (cycle_graph 4) n (fun (_ _ : Fin 64) => p) &gt; (n ^ 3 : ℚ) / 2
 </code></pre>
 
-<p>Look at the numbers: $N = 64$ and $p = 1/8$. The critical density threshold for a 4-cycle is exactly $p = 1/\\sqrt{N}$. The AI explicitly calculated $1/\\sqrt{64} = 1/8$ and hardcoded the exact mathematical boundary condition as a finite test case.</p>
+<p>By targeting $N = 64$ and $p = 1/8$ (where $1/\\sqrt{64} = 1/8$), the system reduced a complex asymptotic question to a finite, decidable computation. The Lean 4 kernel then leveraged <code>native_decide</code> and <code>norm_num</code> to verify the falsification.</p>
 
-<p>Because it retreated to a finite bound, the MCTS Prover could immediately leverage the <code>norm_num</code> and <code>decide</code> tactics to computationally smash the threshold without needing complex logical induction.</p>
+<h2>Verification and the Red Team</h2>
 
-<h2>The Red Team Audit</h2>
+<p>In our Hub-and-Spoke model, the <strong>Red Team</strong> agent serves as a final verification spoke. When the Architect attempts to formalize findings, the Red Team subjects the candidate theorems to rigorous audit.</p>
 
-<p>We ran the pipeline again on a new topic: <em>"Template-Based Graph Clustering"</em> (arXiv:2107.019994). The hypothesis was robustly confirmed empirically by 8 different Python tests.</p>
-
-<p>But when the Architect tried to formalize the findings, every single Lean 4 candidate was brutally shot down by our internal <strong>Red Team</strong> agent.</p>
-
-<p>The Red Team's audit log read like a rejection letter from a top-tier journal:</p>
+<p>The Red Team's evaluation criteria include:</p>
 <ul>
-  <li>It literally constructed a custom bipartite counterexample graph $K_{X,Y}$ to mathematically prove one conjecture false.</li>
-  <li>It rejected two bounds as "trivial and known", citing standard Cauchy-Schwarz variance minimization.</li>
-  <li>It rejected a technically correct theorem because the <em>description</em> oversold the implications of the bound.</li>
+  <li><strong>Counterexample Construction</strong>: Attempting to find specific mathematical objects that violate the conjecture.</li>
+  <li><strong>Novelty Detection</strong>: Comparing the bound against known results (e.g., standard applications of Cauchy-Schwarz).</li>
+  <li><strong>Scope Validation</strong>: Ensuring the formal statement does not overreach the empirical evidence.</li>
 </ul>
 
-<p>The pipeline successfully terminated its own run because the output was not novel, true, and properly scoped.</p>
+<p>This multi-agent verification ensures that the pipeline only produces outputs that are novel, formally verified, and properly scoped.</p>
 
-<h2>The Road Ahead</h2>
+<h2>Conclusion</h2>
 
-<p>Perqed is essentially functioning as an autonomous, verifiable, neuro-symbolic pipeline applying the Scientific Method.</p>
-
-<p>It reads live literature, writes empirical C/Python tests, falsifies its own hypotheses, and translates those exact failing boundaries into formally verified Lean 4 mathematics.</p>
-
-<p>We've added a 30-second DevOps patch so the pipeline automatically generates its own <code>lakefile.lean</code>, runs <code>lake update</code> to pull <code>Mathlib</code>, and bootstraps its environment with zero configuration.</p>
-
-<p>The system is isolated and ready. Now we let it run.</p>
+<p>Perqed operates as a neuro-symbolic pipeline applying a formalized version of the scientific method. By integrating live literature retrieval, empirical testing, and formal verification into a Hub-and-Spoke architecture, we move beyond simple text generation toward verifiable mathematical discovery.</p>
 `;
 ---
 
-<BaseLayout title="Mathematician in a Box: RAG, Red Teams, and Falsification — Perqed" activeNav="blog">
+<BaseLayout title="Automated Mathematical Reasoning: RAG, Red Teams, and Falsification — Perqed" activeNav="blog">
 
   <article class="article">
     <div class="container">
@@ -80,7 +65,7 @@ const blogContent = `
             <span class="sep">·</span>
             <span>6 min read</span>
           </div>
-          <h1>Building a Mathematician in a Box: RAG, Red Teams, and Falsification</h1>
+          <h1>Automated Mathematical Reasoning: RAG, Red Teams, and Falsification</h1>
         </header>
 
         <div set:html={blogContent} />
@@ -89,6 +74,7 @@ const blogContent = `
   </article>
 
 </BaseLayout>
+
 
 <style>
   .article {

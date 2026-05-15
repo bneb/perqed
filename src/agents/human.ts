@@ -12,23 +12,24 @@ export class HumanAgent {
    */
   async generateMove(contextStr: string): Promise<AgentResponse> {
     console.log("\n========================================================");
-    console.log("            🚨 HUMAN-IN-THE-LOOP OVERRIDE 🚨              ");
+    console.log("            HUMAN-IN-THE-LOOP INTERVENTION              ");
     console.log("========================================================");
     console.log(contextStr);
     console.log("========================================================\n");
 
     const rl = readline.createInterface({ input, output });
     
-    // We safely pause and wait. To prevent zombie Wasm/Node processes if the human
-    // forces a SIGINT (Ctrl+C), we bind an AbortController to safely close the Readline lock.
+    // We safely pause and wait. To prevent persistent background processes
+    // if the human forces a SIGINT (Ctrl+C), we bind an AbortController 
+    // to safely close the Readline lock.
     const ac = new AbortController();
     const sigintHandler = () => {
-       console.log("\n[HumanAgent] SIGINT received. Force-closing readline lock...");
+       console.log("\n[HumanAgent] SIGINT received. Closing interactive session...");
        ac.abort();
     };
     process.once("SIGINT", sigintHandler);
 
-    let answer = "sorry";
+    let answer = "unknown";
     try {
        answer = await rl.question("Enter Lean 4 Tactic > ", { signal: ac.signal });
     } catch (err: any) {

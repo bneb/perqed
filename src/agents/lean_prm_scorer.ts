@@ -84,7 +84,7 @@ export class LeanPRMScorer {
       // Semantic Error Classification
       const errLower = afterState.toLowerCase();
       
-      // 1. Tactic/Logic Failure or Fundamental Type Mismatch (Hard dead-end)
+      // 1. Tactic/Logic Failure or Fundamental Type Mismatch (Invalid path)
       if (
         errLower.includes("tactic 'exact' failed") ||
         errLower.includes("unsolved goals") ||

@@ -79,12 +79,37 @@ if [ ! -d ".lake" ]; then
 fi
 echo "✅ Lean environment ready."
 
-# 7. Execution
-if [ $# -eq 0 ]; then
-  echo ""
-  echo "💡 Usage:"
-  echo "   $0 --prompt=\"Your theorem here\""
-  echo "   $0 --config=path/to/run_config.json"
+# 7. Installation (Optional)
+if [ "$1" == "--install" ]; then
+  echo "📦 Installing Perqed as a global CLI..."
+  
+  # Build the binary
+  bun build ./src/cli/perqed.ts --compile --outfile perqed
+  
+  # Ensure /usr/local/bin exists
+  sudo mkdir -p /usr/local/bin
+  
+  # Symlink to /usr/local/bin
+  sudo ln -sf "$(pwd)/perqed" /usr/local/bin/perqed
+  
+  echo "✅ Binary symlinked to /usr/local/bin/perqed"
+  
+  # Set PERQED_HOME in .zshrc or .bashrc if not already there
+  SHELL_CONFIG=""
+  if [ -f "$HOME/.zshrc" ]; then SHELL_CONFIG="$HOME/.zshrc";
+  elif [ -f "$HOME/.bashrc" ]; then SHELL_CONFIG="$HOME/.bashrc"; fi
+  
+  if [ -n "$SHELL_CONFIG" ]; then
+    if ! grep -q "PERQED_HOME" "$SHELL_CONFIG"; then
+      echo "export PERQED_HOME=\"$(pwd)\"" >> "$SHELL_CONFIG"
+      echo "✅ Added PERQED_HOME to $SHELL_CONFIG"
+      echo "💡 Run 'source $SHELL_CONFIG' or restart your terminal to complete installation."
+    else
+      echo "ℹ️  PERQED_HOME already set in $SHELL_CONFIG"
+    fi
+  fi
+  
+  echo "🎉 Installation complete! You can now run 'perqed' from any directory."
   exit 0
 fi
 

@@ -85,8 +85,12 @@ export class AgencyRegistry {
       return JSON.parse(readFileSync(configPath, "utf8"));
     }
 
-    // Search up from CWD for agency.json
+    // Search logic:
+    // 1. Explicit path (if provided)
+    // 2. PERQED_HOME environment variable
+    // 3. Search up from CWD for agency.json
     const candidates = [
+      ...(process.env.PERQED_HOME ? [join(process.env.PERQED_HOME, "agency.json")] : []),
       join(process.cwd(), "agency.json"),
       join(process.cwd(), "..", "agency.json"),
     ];

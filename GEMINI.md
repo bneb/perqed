@@ -1,7 +1,7 @@
 # Perqed Architecture: Hub and Spoke Model
 
 ## Overview
-Perqed is a neuro-symbolic research lab organized around a **Hub-and-Spoke** model. This architecture separates stable automation tools and verified knowledge from the chaotic exploration of unsolved mathematics.
+Perqed is a neuro-symbolic research lab organized around a **Hub-and-Spoke** model. This architecture separates stable automation tools and verified knowledge from the exploratory investigation of unsolved mathematics.
 
 ## 1. The Hub: Core Engine & Verified Library
 
@@ -21,10 +21,18 @@ Perqed is a neuro-symbolic research lab organized around a **Hub-and-Spoke** mod
 - **Isolation**: Each workspace is a self-contained research project. It should contain its own:
   - `RESEARCH_LOG.md`: A non-linear journal of attempts and failures.
   - `data/`: Local empirical findings (graph adjacency matrices, prime distributions).
-  - `lakefile.lean`: A workspace-specific Lean configuration that may include "dirty" proofs (with `sorry`) during the exploration phase.
+  - `lakefile.lean`: A workspace-specific Lean configuration.
+- **Version Control (Jujutsu)**: Researchers are encouraged to use **Jujutsu (jj)** for mathematical exploration. It provides automatic commits and non-linear history tracking, suitable for experimental hypothesis testing.
+  - **Onboarding**: Run `./scripts/onboard_jj.sh` to initialize `jj` in your current repository.
 - **Promotion Workflow**: Once a proof is finalized and verified in a workspace, it is refactored into a clean, reusable module and moved to the `library/` hub.
 
-## 3. Trust Boundaries & Security
+## 3. Trusted Substrates: The Trytet Engine
+
+- **Overview**: Perqed uses the **Trytet Engine** (Rust-based Wasm substrate) for sandboxed empirical investigation.
+- **Integration**: The engine is embedded in `.bin/tet` and managed via `src/execution/`.
+- **Automatic Updates**: Running `perqed` will automatically attempt to rebuild the Trytet core if the sibling repository `../trytet` is found.
+
+## 4. Trust Boundaries & Security
 
 - **Trust Base**: The Lean kernel and the `library/` directory represent the trusted core. Everything in `workspaces/` is considered untrusted/experimental.
 - **Data Locality**: To ensure portability, agents must prioritize writing empirical data (like LanceDB tables or local JSON logs) to the active workspace directory, not the root.

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, copyFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export class TrytetInstaller {
@@ -7,14 +7,15 @@ export class TrytetInstaller {
    * Resolves the path to the `tet` binary, actively building it via `cargo`
    * if it doesn't exist and the neighboring repository is available.
    */
-  static resolveBinary(): string {
+  static resolveBinary(engineRoot?: string): string {
+    const root = engineRoot || process.env.PERQED_HOME || process.cwd();
+
     // 1. Env Override
     if (process.env.TRYTET_BIN_PATH && existsSync(process.env.TRYTET_BIN_PATH)) {
       return process.env.TRYTET_BIN_PATH;
     }
 
-    const cwd = process.cwd();
-    const localBinDir = join(cwd, ".bin");
+    const localBinDir = join(root, ".bin");
     const localBinFile = join(localBinDir, "tet");
 
     // 2. Local Embedded Cache
@@ -29,7 +30,7 @@ export class TrytetInstaller {
     }
 
     // 4. Fallback Auto-Builder
-    const trytetDir = join(cwd, "..", "trytet");
+    const trytetDir = resolve(root, "..", "trytet");
     const cargoToml = join(trytetDir, "Cargo.toml");
 
     if (existsSync(cargoToml)) {
@@ -59,7 +60,7 @@ export class TrytetInstaller {
     }
 
     throw new Error(
-      "[TrytetInstaller] CRITICAL: The `tet` binary could not be found, and ../trytet does not exist to build from source. Please ensure Trytet is installed."
+      "[TrytetInstaller] The `tet` binary could not be found, and ../trytet does not exist to build from source. Please ensure Trytet is installed."
     );
   }
 }

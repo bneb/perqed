@@ -1,14 +1,14 @@
 /**
- * Hybrid Roster: AgentRouter — Signal-Based Specialist Selection
+ * Signal-Based Specialist Selection
  *
  * Pure function. No I/O, no side effects. Analyzes telemetry
  * signals to determine which specialist should handle the next move.
  *
  * 4-Tier Escalation (evaluated top-to-bottom):
  *   1. Initial state (no attempts)                → ARCHITECT (build proof plan)
- *   2. Middle-Out tripwires (budget/stuck)         → ARCHITECT (forced strategic review)
+ *   2. Escalation triggers (budget/stuck)         → ARCHITECT (forced strategic review)
  *   3. 3+ local failures / stuck / multigoal      → ARCHITECT (tactical/structural rethink)
- *   4. Default                                     → PROVER (fast tactic spray)
+ *   4. Default                                     → PROVER (automated tactic application)
  *
  * The ARCHITECT handles both global tree health and local unblocking.
  * Gemini tier selection is handled by the AgentFactory, not the router.
@@ -36,7 +36,7 @@ export class AgentRouter {
       return "ARCHITECT";
     }
 
-    // ── Priority 2: Middle-Out Tripwires — deterministic forced escalation ──
+    // ── Priority 2: Escalation Triggers — deterministic forced escalation ──
     if (signals.totalProverCalls >= MAX_TACTIC_ATTEMPTS) {
       return "ARCHITECT";
     }

@@ -19,4 +19,4 @@ This directory contains experimental workspaces for specific mathematical proble
 1. **Initialize**: Create a new subdirectory for the problem.
 2. **Explore**: Use the Perqed CLI to run automated searches or literature reviews.
 3. **Formalize**: Draft Lean 4 proofs within the workspace.
-4. **Promote**: Once a proof is verified and "clean", refactor it into the top-level `library/` folder.
+4. **Promote**: Once a proof is verified and structured, refactor it into the top-level `library/` folder.

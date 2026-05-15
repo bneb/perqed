@@ -73,7 +73,7 @@ export interface EvidenceReport {
   /** Domains that produced anomalous/interesting signal. */
   anomalies: string[];
   /** Domains that were cleanly falsified (null results). */
-  kills: string[];
+  falsifications: string[];
 }
 
 // ── Red Team ─────────────────────────────────────────────────────────────────

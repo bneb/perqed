@@ -2,145 +2,60 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>Imagine a 3D grid that wraps around in every direction — a torus. Every
-vertex has three outgoing edges: one along each axis. The question is whether
-you can color those edges with three colors so that each color, taken alone,
-traces a single Hamiltonian cycle through the entire graph. This is the
-Directed Hamiltonian Torus Decomposition problem, posed by
-<a href="https://www-cs-faculty.stanford.edu/~knuth/papers/claude-cycles.pdf">Knuth</a>
-in early 2026.</p>
+<p>The Directed Hamiltonian Torus Decomposition problem, proposed by Knuth in early 2026, investigates whether a three-dimensional toroidal grid can be partitioned into three Hamiltonian cycles, each corresponding to a distinct edge color. While constructions for all odd grid sizes and even sizes $m \ge 8$ have been established, the $m=4$ and $m=6$ cases remained open until recently. We successfully identified valid decompositions for both cases, verified by the Lean 4 kernel.</p>
 
-<p>Claude Opus 4.6 <a href="https://www-cs-faculty.stanford.edu/~knuth/papers/claude-cycles.pdf">found a construction</a>
-for all odd grid sizes, Ho Boon Suan directed GPT-5.4 Pro to solve even sizes ≥ 8, and
-Aquino-Michaels further explored that construction — but the
-small even cases, 4×4×4 and 6×6×6, fell through the cracks. We found
-valid decompositions for both, and the Lean 4 kernel
-<a href="https://github.com/bneb/perqed/blob/main/projects/torus-decomposition/paper/torus_decomposition.pdf">proves they work</a>.</p>
+<p>This post details the engineering methodology utilized to navigate a search space of approximately $6^{215} \approx 10^{167}$ states and the subsequent formal verification process.</p>
 
-<p>But the paper skips the most interesting engineering problem: how do you actually
-<em>find</em> a working configuration when the search space is
-6<sup>215</sup> ≈ 10<sup>167</sup> states?</p>
+<h2>Constraint Modeling and Hub-and-Spoke Orchestration</h2>
 
-<h2>The Bottleneck: O(N) Energy Evaluation</h2>
+<p>To address this problem, we utilized a Hub-and-Spoke architecture. The central Architect hub decomposed the problem into two primary components: a high-throughput <strong>Heuristic Search Spoke</strong> and a rigorous <strong>Formal Verification Spoke</strong>.</p>
 
-<p>Simulated Annealing needs an energy function it can evaluate millions of times.
-For this problem, each evaluation has to check whether three color subgraphs form
-valid Hamiltonian cycles across all <em>m</em>³ vertices.</p>
+<p>The Heuristic Spoke employs Simulated Annealing (SA) to minimize an energy function representing violations of the Hamiltonian property. A critical challenge was the computational complexity of the energy evaluation.</p>
 
-<p>The naive approach recomputes the entire board on every mutation: trace all
-three color graphs, count components, check in-degrees. For <em>m</em>=6 that's
-216 vertices × 3 colors per evaluation. At millions of iterations, this is a
-death sentence for throughput.</p>
+<h2>Energy Function Optimization: $O(N) \to O(1)$</h2>
 
-<h2>Getting the Energy Function Right</h2>
+<p>A naive energy evaluation requires a full traversal of all color subgraphs to verify Hamiltonian properties, resulting in $O(m^3)$ complexity per mutation. For $m=6$ (216 vertices), this overhead significantly limits search throughput.</p>
 
-<p>Before optimizing speed, we had to get correctness right — and the first
-version was subtly wrong.</p>
-
-<p>Each color subgraph has out-degree 1 at every vertex by construction (each
-vertex assigns exactly one outgoing arc per color). But the <em>in-degree</em>
-is not guaranteed. A functional graph with variable in-degree can have directed
-cycles with trees feeding into them. Our first energy function counted only the
-number of cycles per color and happily assigned <em>E</em> = 0 to
-non-Hamiltonian topologies.</p>
-
-<p>The fix: count weakly connected components <em>and</em> vertices with
-in-degree ≠ 1. The energy becomes:</p>
+<p>The refined energy function $E(\sigma)$ accounts for both connectivity and degree constraints:</p>
 
 <pre><code>E(σ) = Σ (components_c - 1) + Σ (vertices with in-degree ≠ 1)</code></pre>
 
-<p>This is zero if and only if each color subgraph is a single Hamiltonian cycle.
-No false zeros.</p>
-
-<h2>The 12× Speedup: O(N) → O(1)</h2>
-
-<p>The SA mutation operator is simple: pick a random vertex, change its
-permutation to one of five alternatives, accept or reject via Metropolis.</p>
-
-<p>The baseline engine recomputed <em>E</em> from scratch on every mutation.
-The incremental engine changed a single vertex, updated the affected in-degree
-counts in O(1), and recounted cycles only for the colors touched by that
-vertex. Rejected mutations were rolled back in place — no allocations, no
-copies.</p>
-
-<p>This turned an O(<em>m</em>³) evaluation into an O(1) delta update.</p>
+<p>This function reaches zero if and only if each color subgraph is a single Hamiltonian cycle. To optimize performance, we implemented an incremental update mechanism. Each mutation (a local permutation change at a single vertex) triggers an $O(1)$ update to in-degree counts and a localized re-evaluation of connected components. This incremental approach achieved a $12\times$ increase in iteration frequency compared to full recomputation.</p>
 
 <table>
 <thead>
-<tr><th>Case</th><th>Engine</th><th>Time to solution</th></tr>
+<tr><th>Case</th><th>Evaluation Method</th><th>Time to Solution (seconds)</th></tr>
 </thead>
 <tbody>
-<tr><td><em>m</em>=4</td><td>Baseline (full recompute)</td><td>93 s</td></tr>
-<tr><td><em>m</em>=4</td><td>Incremental (O(1) delta)</td><td>3.1 s</td></tr>
-<tr><td><em>m</em>=6</td><td>Incremental (O(1) delta)</td><td>99.5 s</td></tr>
+<tr><td>$m=4$</td><td>Baseline (Full Recompute)</td><td>93.0</td></tr>
+<tr><td>$m=4$</td><td>Incremental (Delta Update)</td><td>3.1</td></tr>
+<tr><td>$m=6$</td><td>Incremental (Delta Update)</td><td>99.5</td></tr>
 </tbody>
 </table>
 
-<p>Same algorithm, same hyperparameters. The only difference was per-iteration
-throughput. To validate the incremental engine, we ran a 300,000-step fuzz test
-asserting exact agreement with full recalculation at every mutation.
-Zero discrepancies.</p>
+<h2>Non-Monotonic Cooling Schedules</h2>
 
-<h2>The Cooling Schedule</h2>
+<p>The energy landscape for torus decomposition is characterized by deep local minima. Standard exponential cooling often stalls when two colors achieve Hamiltonian states while the third remains fragmented. To overcome this, we implemented a non-monotonic schedule that triggers a "reheat" phase upon detecting energy stagnation. The reheat magnitude is proportional to the current best energy, facilitating escape from local optima without discarding progress toward global convergence.</p>
 
-<p>Standard exponential cooling stalls on this problem. The energy landscape has
-deep local minima — states where two colors form perfect Hamiltonian cycles but
-the third fragments. A monotonic schedule gets trapped.</p>
+<h2>Formal Verification via the Lean 4 Spoke</h2>
 
-<p>We used non-monotonic cooling: when the best energy stagnates for <em>W</em>
-iterations, reset the temperature to max(1, <em>E</em><sub>best</sub><sup>2/5</sup>)
-and double the stagnation window. The reheat is proportional to the current best
-energy — gentle near the goal, aggressive when far away.</p>
+<p>In accordance with our neuro-symbolic approach, the Heuristic Spoke acts as an oracle, providing a witness that is then independently verified by the <strong>Verification Spoke</strong>. This separation ensures that the validity of the proof is independent of the search implementation.</p>
 
-<p>The same parameters (T₀ = 50, α = 0.999998, <em>E</em><sup>2/5</sup> reheat)
-solved both <em>m</em>=4 and <em>m</em>=6 without any per-problem tuning.</p>
+<p>The Lean 4 kernel verifies the witness by checking pairwise injectivity and orbital properties for each color subgraph. For the $m=6$ case, the kernel performs 46,656 comparisons. This process required increasing the <code>maxHeartbeats</code> limit to $4 \times 10^8$, with verification completing in 57 seconds on an Apple M4 processor.</p>
 
-<h2>Bridging TypeScript to Lean 4</h2>
+<h2>Conclusion</h2>
 
-<p>A heuristic search engine written in TypeScript is fast, but it is not a proof.
-Runtime bugs, off-by-one errors, or edge cases in the energy function could
-produce witnesses that <em>look</em> valid but aren't.</p>
-
-<p>That's why the final step is a clean handoff to Lean 4. The TypeScript engine
-acts as an oracle: it does the heavy lifting to find the array, then outputs the
-raw witness. That witness is hardcoded into a Lean script, and Lean's
-<code>decide</code> tactic verifies the topology from first principles. The
-search engine and the proof share zero code.</p>
-
-<p>For <em>m</em>=6, the kernel checks 46,656 pairwise injectivity comparisons per
-color and verifies 216-step orbits. We had to set <code>maxHeartbeats</code> to
-4 × 10<sup>8</sup> (roughly 100× the default) to give the kernel enough time.
-It compiles in 57 seconds on an Apple M4.</p>
-
-<h2>What I Learned</h2>
-
-<p><strong>Energy function design matters more than schedule tuning.</strong>
-A wrong energy function means the search converges to the wrong thing.
-No amount of cooling schedule wizardry fixes that.</p>
-
-<p><strong>Incremental evaluation is the scaling lever.</strong>
-The 12× throughput gain from O(1) delta updates was worth more than any
-hyperparameter change. For <em>m</em>=6, the baseline engine would have needed
-hours.</p>
-
-<p><strong>The search and the proof are independent artifacts.</strong>
-The solver can be wrong, buggy, or nondeterministic. The Lean kernel doesn't
-care — it only checks the witness. This separation is the entire point of
-formal verification, and it's liberating as an engineer: you can be fast and
-sloppy in the search, as long as you're rigorous in the proof.</p>
+<p>The successful decomposition of the $m=4$ and $m=6$ tori demonstrates the efficacy of combining high-performance heuristic search with formal verification. By optimizing energy evaluation throughput and utilizing a Hub-and-Spoke model for architectural separation, we can solve combinatorial problems that are otherwise computationally intractable.</p>
 
 <hr>
 
 <p><em>The formal paper is available as a
 <a href="https://github.com/bneb/perqed/blob/main/projects/torus-decomposition/paper/torus_decomposition.pdf">PDF</a>.
-The SA engine is in
-<a href="https://github.com/bneb/perqed/tree/main/projects/torus-decomposition/src">src/</a>,
-and the Lean 4 proofs are in
-<a href="https://github.com/bneb/perqed/tree/main/projects/torus-decomposition/lean">lean/</a>.</em></p>
+The SA engine and Lean 4 proofs are accessible in the project repository.</em></p>
 `;
 ---
 
-<BaseLayout title="Finding Needles in a 6^215 Haystack — Perqed" activeNav="blog">
+<BaseLayout title="Heuristic Search for Hamiltonian Torus Decompositions — Perqed" activeNav="blog">
 
   <article class="article">
     <div class="container">
@@ -151,7 +66,7 @@ and the Lean 4 proofs are in
             <span class="sep">·</span>
             <span>8 min read</span>
           </div>
-          <h1>Finding Needles in a 6<sup>215</sup> Haystack</h1>
+          <h1>Heuristic Search for Hamiltonian Torus Decompositions</h1>
           <p class="paper-ref">📄 Our paper: <a href="https://github.com/bneb/perqed/blob/main/projects/torus-decomposition/paper/torus_decomposition.pdf"><em>Machine-Checked Proofs of the m=4 and m=6 Directed Hamiltonian Torus Decompositions</em></a></p>
         </header>
 
@@ -161,6 +76,7 @@ and the Lean 4 proofs are in
   </article>
 
 </BaseLayout>
+
 
 <style>
   .article {

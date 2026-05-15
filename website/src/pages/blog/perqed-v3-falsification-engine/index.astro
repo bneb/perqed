@@ -2,34 +2,34 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p><em>An overview of our update shifting Perqed from a formal verification wrapper into an autonomous hypothesis engine backed by native empirical validation.</em></p>
+<p><em>This post outlines the transition of Perqed from a formal verification wrapper into an autonomous hypothesis engine backed by native empirical validation and Hub-and-Spoke orchestration.</em></p>
 
-<h2>The Crucible: Intersecting Orthogonal Domains</h2>
-<p>Our previous orchestrator (v2.0) excelled at confirming known combinatorial bounds via targeted simulated annealing. To move into generating unmapped mathematical conjectures, we implemented a cross-pollination mechanism.</p>
+<h2>Architectural Evolution: The Hub-and-Spoke Model</h2>
+<p>Our previous iteration (v2.0) was focused on confirming established combinatorial bounds via targeted simulated annealing. To enable the generation of novel mathematical conjectures, we have transitioned to a Hub-and-Spoke architecture that facilitates interdisciplinary synthesis and rigorous falsification.</p>
 
-<p>Rather than running a linear literature search, the <code>IdeatorAgent</code> now queries a local LanceDB vector store to ingest a primary paper and intentionally pairs it with a structurally sound but conceptually distant domain. </p>
+<p>In this model, the <strong>Architect</strong> (the central hub) coordinates specialized spokes to ingest literature, generate hypotheses, and execute empirical tests. The <strong>Librarian Spoke</strong> provides the raw material by retrieving structurally diverse papers from a local LanceDB vector store, enabling the Architect to pair conceptually distant domains for synthesis.</p>
 
-<p>In a recent execution probing maximal graph clique bounds, the system ingested a fractional matching paper and bridged it with a secondary retrieval on Hopf Algebras in Quantum Field Theory. By forcing the abstraction into orthogonal domains, the agent bypassed standard textbook replication and yielded a mathematically novel synthesis structure.</p>
+<p>For example, in a recent execution exploring maximal graph clique bounds, the system synthesized techniques from fractional matching literature with algebraic structures derived from Hopf Algebras. This interdisciplinary approach allows the Architect to move beyond standard textbook replication.</p>
 
-<h2>The Falsification Loop: Enforcing Rigor</h2>
-<p>LLMs natively struggle with empirical constraints and prefer hallucinating plausible logic over failing. We implemented a strict execution boundary to correct this.</p>
+<h2>The Falsification Loop: Empirical Rigor</h2>
+<p>Ensuring the validity of generated conjectures requires a robust falsification loop. We have implemented a multi-stage execution boundary to enforce this rigor:</p>
 
 <ol>
-<li><strong>Sandboxed Execution</strong>: The engine now writes and executes its probing scripts within a heavily isolated local Python environment pre-configured with <code>sympy</code>, <code>scipy</code>, <code>networkx</code>, and <code>z3-solver</code>.</li>
-<li><strong>Automated Error Correction</strong>: When an agent's code fails due to syntax or strict dependency issues, the <code>ExplorerAgent</code> drops into a <code>try/catch</code> repair loop. It reads the local traceback and patches its own implementation before returning execution output.</li>
-<li><strong>Selective Skill Injection</strong>: We mapped 38 specialized mathematical tools (from homological techniques to specific SMT encodings) to their relevant domains. A Domain Affinity Mapper now filters and injects only the necessary techniques into the context window, avoiding JSON truncation and keeping the execution tightly focused on the relevant algebra.</li>
+<li><strong>Sandboxed Empirical Validation</strong>: The <strong>Explorer Spoke</strong> executes probing scripts within an isolated Python environment pre-configured with mathematical libraries such as <code>SymPy</code>, <code>SciPy</code>, <code>NetworkX</code>, and <code>Z3</code>. This allows for rapid empirical testing of hypotheses against finite cases.</li>
+<li><strong>Automated Self-Correction</strong>: The Explorer Spoke is equipped with an error-recovery loop. If an empirical test fails due to implementation issues, the spoke analyzes the traceback and refines the test code before re-executing.</li>
+<li><strong>Specialized Skill Injection</strong>: We have mapped 38 specialized mathematical techniques to their respective domains. The Architect utilizes a Domain Affinity Mapper to inject only the relevant skills into the context of the active spoke, ensuring efficient context utilization and focused execution.</li>
 </ol>
 
-<h2>Empirical Rejection</h2>
-<p>The engine is intentionally designed to falsify its own work. If a generated hypothesis contradicts the established transcendence of an even zeta value, the pipeline doesn't force a hallucinated formal proof. The Sympy script simply flags the counter-example in the empirical pass, and the system discards the hypothesis.</p>
+<h2>Falsification as a First-Class Citizen</h2>
+<p>The engine is designed to prioritize falsification over verification. If a hypothesis is contradicted by empirical evidence—such as a counter-example identified by a SymPy script—the system discards the conjecture before attempting a costly formal proof.</p>
 
-<p>During a recent run analyzing Quandle colorings mapped to Torus knots, the engine correctly identified a combinatorial explosion in its test logic. Unwilling to assert an uncomputable result, the orchestrator analyzed its finite-field computations and yielded an unexpected integer-partition constraint as a clean, open Number Theory conjecture. </p>
+<p>In a recent run analyzing Quandle colorings in the context of torus knots, the Explorer Spoke identified a combinatorial explosion that rendered the initial hypothesis uncomputable. The Architect subsequently refined the research objective, yielding a more focused integer-partition constraint as a tractable open conjecture.</p>
 
-<p>It fails fast, proves its failures empirically, and narrows the scope to what is actually solvable.</p>
+<p>By failing fast and verifying failures empirically, Perqed narrows its research focus to solvable problems, ensuring that the formal verification spoke is only utilized for high-confidence hypotheses.</p>
 `;
 ---
 
-<BaseLayout title="Perqed v3.0: Autonomous Falsification and Interdisciplinary Synthesis — Perqed" activeNav="blog">
+<BaseLayout title="Perqed v3.0: Autonomous Falsification and Hub-and-Spoke Orchestration — Perqed" activeNav="blog">
 
   <article class="article">
     <div class="container">
@@ -40,7 +40,7 @@ const blogContent = `
             <span class="sep">·</span>
             <span>4 min read</span>
           </div>
-          <h1>Perqed v3.0: Autonomous Falsification and Interdisciplinary Synthesis</h1>
+          <h1>Perqed v3.0: Autonomous Falsification and Hub-and-Spoke Orchestration</h1>
         </header>
 
         <div set:html={blogContent} />
@@ -49,6 +49,7 @@ const blogContent = `
   </article>
 
 </BaseLayout>
+
 
 <style>
   .article {

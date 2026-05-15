@@ -71,12 +71,12 @@ export class ConjecturerAgent {
       evidenceSection = `\n\n## Empirical Investigation Results\n\n` +
         `**Synthesis:** ${evidence.synthesis}\n\n` +
         `**Domains with detected signal:** ${evidence.anomalies.join(", ") || "none"}\n\n` +
-        `**Domains falsified:** ${evidence.kills.join(", ") || "none"}\n\n` +
+        `**Domains falsified:** ${evidence.falsifications.join(", ") || "none"}\n\n` +
         `Ground your conjectures in these empirical findings. Prefer theorems that explain or generalize the detected signals.`;
     }
 
     const prompt =
-      `You are an elite mathematical researcher. Review the following recent excerpts from arXiv:\n\n` +
+      `You are an expert mathematical researcher. Review the following recent excerpts from arXiv:\n\n` +
       `${literatureContext}${evidenceSection}\n\n` +
       `Synthesize these concepts. Formulate 5 completely novel, unproven, but highly plausible Lean 4 theorems ` +
       `inspired by this research. They must be syntactically valid Lean 4 and mathematically non-trivial.\n\n` +

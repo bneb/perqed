@@ -2,31 +2,27 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>Procedural <code>await</code> chains are fine if you’re casually scripting a weekend project. But if you’re orchestrating an autonomous mathematical research lab, they’re a liability.</p>
+<p>As autonomous mathematical research systems scale, procedural orchestration becomes increasingly difficult to maintain and verify. Relying on complex <code>await</code> chains and nested loops introduces non-deterministic behavior that can compromise the integrity of the research pipeline.</p>
 
-<p>The original orchestration layer of Perqed was a monolithic, 463-line class filled with deeply nested <code>while</code> loops, brittle prompt injection, and ad-hoc error recovery. Sure, it got the job done, but it was tedious to maintain and essentially impossible to formally verify. When you're running neuro-symbolic Monte Carlo Tree Search against the Lean 4 kernel, building your orchestration layer on top of spaghetti code shouldn't be the bottleneck.</p>
+<p>To address these challenges, we transitioned Perqed's orchestration layer from a monolithic procedural implementation to a reactive state machine using <strong>XState v5</strong>. This architectural shift provides a formal framework for managing the research lifecycle—from literature-based ideation to empirical validation and formal verification.</p>
 
-<h2>The Obvious Solution: Reactive XState v5</h2>
+<h2>State Machine Topology</h2>
 
-<p>The fix was trivial, really: we just ripped out the procedural logic entirely and replaced it with a strictly typed, 10-state reactive state machine using <strong>XState v5</strong>.</p>
+<p>The updated orchestration logic is represented as a Directed Acyclic Graph (DAG) of state transitions. This approach ensures that the entire research process is deterministic and auditable. We have mapped the core research flow into a 10-state topology that explicitly handles successful transitions, falsification forks, and execution plateaus.</p>
 
-<p>Instead of a tangled web of asynchronous calls, the entire research lifecycle—from literature ideation to empirical sandboxing, SMT-LIB2 resolution, and formal verification—is now a clean, mathematical Directed Acyclic Graph (DAG).</p>
+<h2>Actor-Model Implementation</h2>
 
-<h2>Actor-Model Purity</h2>
+<p>Each component of the system—such as the <code>Librarian</code>, <code>Explorer</code>, and <code>Formalist</code>—is encapsulated as an isolated actor using XState's <code>fromPromise</code> API. These actors are stateless, receiving structured input and returning typed output, while the central Hub manages the transition logic.</p>
 
-<p>We neatly wrapped the existing agents into 8 isolated <code>fromPromise</code> actors. The actors hold zero mutable state. They simply receive structured inputs and return typed outputs, letting the state machine handle the transition logic completely detached from the agents themselves.</p>
+<p>This decoupling allows for robust error handling. For instance, if the <code>Validation</code> actor identifies an invalid syntax tree, the Hub captures the error, increments a retry counter, and re-routes the execution to the <code>Ideation</code> node. Similarly, if the <code>Explorer</code> identifies an energy plateau, the system can automatically transition to an SMT-based resolution node to evaluate the subspace using Z3.</p>
 
-<p>Need to handle a hallucinated Lean 4 syntax tree? Expected. The <code>Validation</code> actor throws, the machine catches it, increments a strongly-typed <code>ideaRetries</code> counter, and gracefully cycles back to the <code>Ideation</code> node. No sweat.</p>
+<h2>Verification and Testing</h2>
 
-<p>If the Empirical Sandbox detects a structural plateau instead of a clean counter-example, the state machine effortlessly routes the context to the <code>SMT_Resolution</code> node to query Z3 before it even thinks about escalating back to Lean. It's fully deterministic by design.</p>
+<p>The transition to a formal state machine has significantly improved our ability to verify the orchestration logic. By utilizing XState's <code>.provide()</code> API, we can inject mocked actors into the state machine, allowing for exhaustive testing of the topology without external dependencies.</p>
 
-<h2>TDD Topology Verification</h2>
+<p>Our validation suite verifies all 10 states and their associated transitions—including edge cases and terminal failure states—within a controlled environment. This ensures that the Hub-and-Spoke coordination remains consistent and resilient across diverse research tasks.</p>
 
-<p>Because the orchestration is now represented as pure state transitions, testing it was almost too easy. We spun up an 8-test suite using Bun and XState's <code>.provide()</code> API to inject mocked actors without spinning up expensive LLMs.</p>
-
-<p>We completely verified the 10-state topology—mapping the happy paths, falsification forks, plateaus, and terminal failure states—in exactly 95 milliseconds with zero API calls. 8 topology bounds checked. 8 tests green.</p>
-
-<p>The Mathematician is no longer just in the box. Now it’s running on a mathematically sound, self-healing track.</p>
+<p>By implementing a mathematically sound orchestration layer, we have established a robust foundation for autonomous mathematical discovery.</p>
 `;
 ---
 

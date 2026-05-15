@@ -2,29 +2,29 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>As the Perqed research pipeline shifted from single-agent proof runs to a full XState neuro-symbolic multi-agent orchestrator, a silent infrastructure problem surfaced: <strong>55 gigabytes of disk exhaustion</strong>.</p>
+<p>As the Perqed research pipeline shifted from single-agent proof runs to a Hub-and-Spoke neuro-symbolic orchestrator, a silent infrastructure problem surfaced: <strong>55 gigabytes of disk exhaustion</strong>.</p>
 
 <h2>The 525MB Mathlib Storage Leak</h2>
 
-<p>Every time the XState machine spawned a new sandbox directory (<code>run_xxxx</code>) to let an agent propose and compile Lean 4 tactics, it required an active environment. By design, Lean's package manager (<code>lake</code>) built an isolated, independent clone of the entire <code>Mathlib</code> library natively in the sandbox.</p>
+<p>Every time the orchestration machine spawned a new sandbox directory (<code>run_xxxx</code>) to let an agent propose and compile Lean 4 tactics, it required an active environment. By design, Lean's package manager (<code>lake</code>) built an isolated, independent clone of the entire <code>Mathlib</code> library natively in the sandbox.</p>
 
-<p>At <strong>525 MB</strong> per run, and with hundreds of autonomous loops executing over the last week, the local SSD was rapidly crippled.</p>
+<p>At <strong>525 MB</strong> per run, and with hundreds of autonomous loops executing over the last week, the local SSD was rapidly depleted.</p>
 
 <p>The fix wasn't to disable the strict isolation sandboxing. Instead, we re-architected the <code>LeanBridge</code> execution layer to leverage strict <strong>Bubblewrap (<code>bwrap</code>) Read-Only Binds</strong>.</p>
 
-<p>We fixed a path-routing segment bug in the orchestrator so the execution engine correctly extracts the true global project root. From there, we explicitly pass <code>--ro-bind-try /global/.lake /sandbox/.lake</code> to dynamically graft the global Mathlib cache straight into the isolated <code>run_xxxx</code> sandbox at runtime.</p>
+<p>We corrected a path-routing segment in the orchestrator so the execution engine correctly identifies the global project root. From there, we explicitly pass <code>--ro-bind-try /global/.lake /sandbox/.lake</code> to dynamically graft the global Mathlib cache straight into the isolated <code>run_xxxx</code> sandbox at runtime.</p>
 
-<p>The executing agents get sub-millisecond, zero-latency access to the compiled Mathlib abstractions, but because the filesystem overlay is mounted strictly as read-only, they remain physically unable to corrupt the shared cache. Isolation is perfectly preserved. Memory duplication overhead drops to exactly zero.</p>
+<p>The executing agents get sub-millisecond, zero-latency access to the compiled Mathlib abstractions, but because the filesystem overlay is mounted strictly as read-only, they remain physically unable to corrupt the shared cache. Isolation is preserved. Memory duplication overhead is eliminated.</p>
 
 <h2>Centralized Agency Topologies</h2>
 
-<p>Simultaneously, we realized our typescript codebase was littered with hardcoded model targets—<code>gemma:4b</code> here, <code>deepseek-prover-v2:7b</code> there. If a model was dynamically uninstalled to free up system memory, the pipeline would crash inexplicably deep in the graph execution trace.</p>
+<p>Simultaneously, we identified that the codebase contained hardcoded model targets—<code>gemma:4b</code> here, <code>deepseek-prover-v2:7b</code> there. If a model was dynamically uninstalled to free up system memory, the pipeline would fail during execution.</p>
 
-<p>We introduced a centralized, authoritative <code>agency.json</code> Registry. Now, the <code>FormalistAgent</code>, <code>IdeatorAgent</code>, <code>ScribeAgent</code>, and every node in the DAG graph resolves its neural reasoning and compilation capabilities strictly through the cohesive <code>AgencyRegistry</code>.</p>
+<p>We introduced a centralized, authoritative <code>agency.json</code> Registry. Now, the <code>FormalistAgent</code>, <code>IdeatorAgent</code>, <code>ScribeAgent</code>, and every node in the DAG resolves its neural reasoning and compilation capabilities strictly through the cohesive <code>AgencyRegistry</code>.</p>
 
-<p>In one swift command, we deleted the obsolete Prover weights (freeing massive disk space), migrated our <code>L0_thinker</code> topology natively to <code>deepseek-r1:8b</code>, and introduced <code>qwen2.5-coder</code> as the high-fidelity <code>L0_typist</code> without changing a single line of application source code.</p>
+<p>Through a single configuration update, we removed obsolete weights, migrated our <code>L0_thinker</code> topology natively to <code>deepseek-r1:8b</code>, and introduced <code>qwen2.5-coder</code> as the high-fidelity <code>L0_typist</code> without modifying application source code.</p>
 
-<p>A resilient neuro-symbolic engine doesn't just need mathematics—it needs robust, zero-toil DevOps.</p>
+<p>A resilient neuro-symbolic engine requires robust infrastructure management alongside mathematical rigor.</p>
 `;
 ---
 

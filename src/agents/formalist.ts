@@ -187,7 +187,7 @@ export class FormalistAgent {
    */
   private async callOllama(context: string): Promise<string> {
     if (process.env.USE_LOCAL_PROVER === "true") {
-       console.log(`[FormalistAgent] Intercepting REST request -> Routing directly to UNIX SOcket VRAM...`);
+       console.log(`[FormalistAgent] Routing directly to local prover...`);
        return await LocalProverClient.queryTacticDaemon(context, "generation");
     }
   
@@ -350,6 +350,10 @@ function formatError(err: unknown): string {
   }
   if (err instanceof Error) {
     return err.message;
+  }
+  return String(err);
+}
+eturn err.message;
   }
   return String(err);
 }

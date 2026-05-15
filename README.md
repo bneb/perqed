@@ -25,7 +25,7 @@ The `library/` directory contains verified, `sorry`-free Lean 4 proofs. It is a 
 ### 3. The Spokes: Experimental Workspaces
 The `workspaces/` directory contains isolated, project-specific environments for mathematical exploration.
 - **Erdős 265**: Formal resolution of the Erdős Ceiling Conjecture.
-- **Goldbach**: Experimental "cracking" of the Goldbach conjecture via spectral and cryptographic probes.
+- **Goldbach**: Experimental investigation of the Goldbach conjecture via spectral and cryptographic probes.
 
 ## Getting Started
 
@@ -42,7 +42,7 @@ Perqed includes a fully autonomous research orchestration loop powered by an **X
 2. **Planning**: Formulates a concrete, plausible extension hypothesis inspired by the seed literature.
 3. **Empirical Investigation**: The Explorer agent synthesizes Python scripts and analyzes them explicitly within the **Trytet Engine v3.0** WebAssembly sandbox. This completely replaces classical OS subprocess models with a mathematically constrained, verifiable virtual file system (gated via Ed25519 Cryptographic Fuel Vouchers), empirically resolving constraints before any formal pathing.
 4. **Conjecture Generation**: Synthesizes the literature context and empirical evidence into precise Lean 4 theorem signatures.
-5. **Adversarial Red-Teaming**: An independent Red Team auditor attempts to poke holes in the conjecture. Conjectures that are too broad or easily falsified are either rejected or forcefully weakened (up to 3 rounds of iterative revision).
+5. **Adversarial Red-Teaming**: An independent Red Team auditor attempts to identify weaknesses or counter-examples in the conjecture. Conjectures that are too broad or easily falsified are either rejected or iteratively refined (up to 3 rounds of revision).
 6. **Formal Verification**: Approved conjectures are sent to the MCTS proof engine to attempt formal Lean 4 verification using zero-copy `bwrap` Linux namespace caching (or dynamically failing back to native compilation on Darwin macOS environments to bypass virtualization overhead).
 
 To run the pipeline:
@@ -180,7 +180,7 @@ The classic mode bypasses the autonomous research front-end entirely. It sets up
 
 | Role | Engine / Model | Tier | Purpose |
 |------|----------------|------|---------| 
-| **Sandbox** | `Trytet Engine v3.0` | Local (Wasm) | Deterministic execution of empirical probes (Voucher metered) |
+| **Sandbox** | `Trytet Engine v3.0` | Local (Wasm) | Deterministic execution of empirical probes (resource metered) |
 | **Tactician** | `deepseek-prover-v2:7b-q8` | Local | Lean 4 tactic generation |
 | **Reasoner** | `gemini-2.5-flash` | Cloud (free) | Strategic unblock after tactic failures |
 | **Architect** | `gemini-2.5-flash` → `gemini-3.1-pro-preview` | Cloud | Proof planning, directives (escalates on failure) |
@@ -223,5 +223,14 @@ perqed/
 
 
 ## License
+
+MIT
+IT
+
+
+MIT
+T
+IT
+
 
 MIT

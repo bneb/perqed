@@ -61,19 +61,23 @@ export class TrytetClient {
   }
 
   private resolveWasmPayload(imageName: string): number[] {
-    const localBinPath = path.join(process.cwd(), ".bin", imageName);
+    // Attempt to locate ENGINE_ROOT via environment variable or current directory.
+    // PERQED_HOME is expected to be set for global installations.
+    const engineRoot = process.env.PERQED_HOME || process.cwd();
+    
+    const localBinPath = path.join(engineRoot, ".bin", imageName);
     if (fs.existsSync(localBinPath)) {
       return Array.from(fs.readFileSync(localBinPath));
     }
 
-    // Trytet's test fixture fallback if evaluating Trytet core locally
+    // Fallback to test fixtures if local binary is missing
     const trytetFixturePath = path.join(process.cwd(), "..", "trytet", "tests", "fixtures", "python_mock.wasm");
     if (fs.existsSync(trytetFixturePath)) {
        return Array.from(fs.readFileSync(trytetFixturePath));
     }
 
-    // Since Trytet V3 strictly requires `.wasm` byte payloads but we have no registry, we throw.
-    throw new Error(`CRITICAL: Trytet requires a raw Wasm payload for '${imageName}', but it was not found in .bin/${imageName}.`);
+    // Trytet V3 requires raw Wasm payloads; fail if not found.
+    throw new Error(`Trytet requires a raw Wasm payload for '${imageName}', but it was not found in .bin/${imageName}.`);
   }
 
   public async executeWasm(req: TrytetExecutionRequest): Promise<TrytetExecutionResponse> {
@@ -178,7 +182,7 @@ export class TrytetClient {
                timestamp: Date.now()
             }]
          })
-      }).catch(() => { /* Silent fail */ });
+      }).catch(() => { /* Ignore telemetry ingestion failures */ });
 
       return {
         exitCode,
@@ -202,7 +206,7 @@ export class TrytetClient {
                timestamp: Date.now()
             }]
          })
-      }).catch(() => {});
+      }).catch(() => { /* Ignore telemetry ingestion failures */ });
 
       if (e.name === "AbortError") {
          return { exitCode: 1, stdout: "", stderr: "", timedOut: true };

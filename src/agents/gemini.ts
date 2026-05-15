@@ -7,7 +7,7 @@
  * Three model tiers:
  *   Tier 1: gemini-2.5-flash              — Free / base reasoning
  *   Tier 2: gemini-3.1-flash-lite-preview — Paid flash fallback
- *   Tier 3: gemini-3.1-pro-preview        — Break glass (thinking mode)
+ *   Tier 3: gemini-3.1-pro-preview        — Advanced reasoning
  */
 
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";

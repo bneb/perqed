@@ -49,7 +49,7 @@ export class ProgramDatabase {
     
     if (this.pool.has(key)) {
       const existing = this.pool.get(key)!;
-      // Replace if score is higher, OR if scores are equal but new code is shorter (Occam's Razor)
+      // Replace if score is higher, or if scores are equal but new code is shorter
       if (program.score > existing.score || (program.score === existing.score && program.code.length < existing.code.length * 0.9)) {
         this.pool.set(key, program);
       }

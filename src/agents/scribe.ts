@@ -57,7 +57,7 @@ Requirements:
 3. Include a Title, Author (Perqed Autonomous Engine), Abstract, Introduction, Hypothesis Evolution, Empirical Evidence, and Conclusion.
 4. If there is an approved conjecture, format it in a formal Theorem environment.
 5. If there is a formal trace provided, write the Proof narratively. Explain *why* the formal tactics work in informal math terms. If there is no trace, state the theorem remains an open conjecture.
-6. The Hypothesis Evolution section must highlight how the hypothesis iteratively dodged counter-examples based on the the refinement telemetry, if present.
+6. The Hypothesis Evolution section must highlight how the hypothesis iteratively addressed counter-examples based on the refinement telemetry, if present.
 7. Output ONLY the raw LaTeX string. Do not use markdown code blocks (\`\`\`latex). Just the raw code.
 
 Here is the data from the autonomous run:
@@ -73,7 +73,7 @@ ${plan.extension_hypothesis}
 ## Empirical Investigation
 Domains Probed: ${plan.domains_to_probe.join(", ")}
 Anomalies: ${evidence.anomalies.join(", ") || "none"}
-Kills: ${evidence.kills.join(", ") || "none"}
+Falsifications: ${evidence.falsifications.join(", ") || "none"}
 Synthesis: ${JSON.stringify(evidence.synthesis)}
 
 ## Final Approved Conjecture (after ${redTeamHistory.length} red team rounds)

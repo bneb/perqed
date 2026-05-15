@@ -48,10 +48,10 @@ DO NOT attempt to prove the theorem. You MUST use the 'sorry' tactic for all pro
 Ensure all necessary Mathlib imports are included at the top of the file.
 Generate ONLY the valid Lean 4 code inside a markdown block. No conversational text.
 
-### ⚠️ CRITICAL MATHLIB4 RESTRICTIONS ⚠️
+### Mathlib4 Restrictions
 You are operating under a strict Lean 4 Mathlib environment. You must obey these rules:
-1. **NO IMAGINARY IMPORTS:** Do NOT attempt to import specialized combinatorial graph modules. Modules like \`Mathlib.Combinatorics.SimpleGraph.Circulant\` or \`Mathlib.Combinatorics.Graph.Circulant\` DO NOT EXIST.
-2. **NO AUTOMORPHISM HALLUCINATIONS:** The structure of Mathlib4 has shifted. You MUST NOT try to call \`SimpleGraph.autGroup\` or import \`Mathlib.Combinatorics.SimpleGraph.Aut\`. It does not exist in our library tree. If you need graph symmetries, strictly use raw integer modulus adjacency.
+1. **Valid Imports Only:** Do not attempt to import specialized combinatorial graph modules. Modules like \`Mathlib.Combinatorics.SimpleGraph.Circulant\` or \`Mathlib.Combinatorics.Graph.Circulant\` are not available.
+2. **No Automorphism Modules:** The structure of Mathlib4 has shifted. Do not try to call \`SimpleGraph.autGroup\` or import \`Mathlib.Combinatorics.SimpleGraph.Aut\`. It does not exist in our library tree. If you need graph symmetries, use raw integer modulus adjacency.
 3. **MANUAL CONSTRUCTION:** If the informal math describes a specialized graph (e.g., a Circulant Graph, Paley Graph, or Ramsey Witness), you MUST manually construct its adjacency logic from fundamental types. 
 4. **PRIMITIVES:** To model finite graphs, use \`ZMod N\`, \`Fin N\`, basic \`Matrix\`, or raw Adjacency Relations (\`(i j : ZMod N) -> Prop\`). Define the generating sets explicitly.
 5. **SIMPLEGRAPH INITIALIZATION:** Because Mathlib4 has changed, you must initialize graphs EXACTLY using 'where' clauses (like \`SimpleGraph V where Adj := adj; symm := by sorry; loopless := by sorry\`). Do NOT use \`SimpleGraph.mk\`, \`SimpleGraph.from_rel\`, or any function application.
@@ -134,7 +134,7 @@ ${sketch}
     };
 
     try {
-       console.log(`[Sketcher] Launching 3 parallel Competitive Sketchers for MCTS Formalization...`);
+       console.log(`[Sketcher] Launching 3 parallel workers for MCTS Formalization...`);
        return await Promise.any([runWorker(1), runWorker(2), runWorker(3)]);
     } catch (e) {
        throw new Error("SketcherAgent failed to produce a compiling Lean 4 syntax skeleton after all parallel workers exhausted their retries.");

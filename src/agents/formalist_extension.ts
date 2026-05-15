@@ -81,7 +81,7 @@ export async function emitObstructionLemma(
     `    (g : SimpleGraph (Fin ${n}))`,
     `    (h : ∀ e ∈ ${label}, e ∈ g.edgeSet) :`,
     `    ¬ IsValidWitness g := by`,
-    `  -- TODO: Replace with Tactician spray or manual proof`,
+    `  -- TODO: Replace with automated tactic application or manual proof`,
     `  sorry`,
     ``,
   ].join("\n");

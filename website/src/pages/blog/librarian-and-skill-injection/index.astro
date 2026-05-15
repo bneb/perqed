@@ -2,78 +2,35 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>On March 18, we gave the ARCHITECT the ability to panic. When a Simulated Annealing search
-hit an energy floor, it could recognize the trap, halt the process, and formulate an
-entirely new DAG strategy. It was a huge leap in autonomy, but we realized almost immediately
-that we had just pushed the bottleneck up one level.</p>
+<p>In our March 18 update, we implemented a failure-recovery mechanism for the ARCHITECT. When a Simulated Annealing search reaches an energy plateau, the system can now identify the stagnation, halt the process, and formulate a revised strategy. This represents a significant improvement in the system's operational autonomy.</p>
 
-<p>The engine was still, fundamentally, <em>guessing</em>. It was extremely capable of searching a
-problem space, and highly resilient in pivoting when stuck, but it didn't actually
-<em>know</em> anything about mathematics beyond what a base LLM hallucinated.</p>
+<p>While the engine demonstrated resilience in pivoting, it remained dependent on the underlying LLM's latent mathematical knowledge. To address this, we have transitioned Perqed from a specialized solver into a generalized mathematical reasoning platform that integrates literature retrieval and formal proof techniques into its search process.</p>
 
-<p>Over the last 24 hours, we changed that. Perqed is no longer a dedicated graph-coloring engine.
-It's a generalized mathematical reasoning platform that actively searches literature, reads
-formal proof techniques, and applies them to arbitrary problem domains.</p>
+<h2>Generalized Domain Support</h2>
 
-<h2>Beyond Graph Coloring: Universalizing the Engine</h2>
+<p>The first structural advancement was decoupling the engine from specific combinatorial domains. We transitioned from specialized graph-theoretic solvers to supporting arbitrary mathematical structures, using <code>schur_partition</code> as an exploratory benchmark.</p>
 
-<p>The first structural change was decoupling the engine from the Ramsey problem domain.
-We moved from pure <code>graph_coloring</code> to supporting arbitrary mathematical structures, starting
-with <code>schur_partition</code>.</p>
+<p>The objective: evaluate Schur Number lower bounds (e.g., S(6) ≥ 537) by identifying valid partitions. This required the ARCHITECT to dynamically generate evaluation functions for arbitrary partitions. We introduced the <code>partition_sa_search</code> node, allowing the ARCHITECT to synthesize JavaScript scoring functions for the high-speed Simulated Annealing loop.</p>
 
-<p>The test case: proving Schur Number S(6) ≥ 537 by exhibiting a valid 6-coloring.
-This introduced entirely new challenges. How does an LLM write an energy function for an
-arbitrary partition rather than an adjacency matrix? We added the <code>partition_sa_search</code>
-DAG node, effectively forcing the ARCHITECT to write JavaScript evaluation functions on the fly
-that the fast SA loop could consume.</p>
+<p>During development, we identified an edge case where the ARCHITECT generated logic that incorrectly reported zero violations due to a missing <code>return</code> statement. We addressed this by integrating an <code>ObstructionDetector</code> into the evaluation loop to validate the integrity of dynamically generated functions.</p>
 
-<p>This led to one of our favorite engine bugs so far: the ARCHITECT generated a rule that instantly
-achieved <strong>E = 0</strong> indicating a perfect witness. The problem? The drafted JavaScript
-omitted a <code>return</code> statement. The SA worker evaluated 537 undefined buckets and scored
-it as a perfect zero-violation partition. We wired an <code>ObstructionDetector</code> into the main
-SA loop to catch these false-positive mathematical sleights of hand.</p>
+<h2>Skill Injection Framework</h2>
 
-<h2>Universal Skill Injection</h2>
+<p>To move beyond reliance on model weights for strategy formulation, we implemented the <strong>SkillLibrary</strong>. This system indexes over 30 formal mathematical techniques (e.g., <code>bijections</code>, <code>pigeonhole_principle</code>, <code>explicit_construction</code>) within the <code>.agents/skills/</code> directory.</p>
 
-<p>Even with domain decoupling, the ARCHITECT was still relying on its training weights to generate
-algebraic rules, leading to naive periodic assignments (e.g., <code>(i-1) % 6</code>) that failed
-instantly. It needed to learn actual techniques.</p>
+<p>The orchestration Hub now performs semantic relevance matching against the target conjecture and injects the most relevant skills into the model context. This provides a grounded basis for DAG formulation and MCTS verification.</p>
 
-<p>We built the <strong>SkillLibrary</strong>, which scans a designated <code>.agents/skills/</code> directory
-containing over 30 formal mathematical proof techniques (e.g., <code>bijections</code>,
-<code>pigeonhole_principle</code>, <code>explicit_construction</code>). The engine now performs
-relevance overlap matching against the current target (e.g., "Schur partition sum-free") and
-injects the raw text of the 3 most relevant skills directly into the LLM context prior to
-DAG formulation and MCTS verification.</p>
+<h2>The Librarian: Literature Grounding</h2>
 
-<p>We stopped asking the LLM to invent techniques, and started forcing it to read them.</p>
+<p>To further ground the reasoning process, we introduced the <strong>Librarian</strong> component, which utilizes a LanceDB vector store to index academic literature.</p>
 
-<h2>The Librarian Stage: Grounding in Reality</h2>
+<p>During the transition to a standalone <code>bun</code> executable, we resolved a filesystem resolution issue where <code>import.meta.dir</code> evaluated to an internal <code>/$bunfs/...</code> path, preventing database initialization. By utilizing <code>process.cwd()</code>, we ensured the system can initialize its local storage within the user's active workspace.</p>
 
-<p>If the engine reads skills, it should also read literature. Enter the <strong>Librarian Stage</strong>.
-We wired a LanceDB vector store into the pipeline to ingest mathematical papers.</p>
-
-<p>But when we tried to bundle Perqed into a standalone <code>bun</code> executable, the whole stage
-silently dropped dead with an infuriating <code>Read-only file system (os error 30)</code>.
-It turned out <code>import.meta.dir</code> evaluates to an internal <code>/$bunfs/...</code> path
-when compiled, trapping the LanceDB initialization. A quick pivot to <code>process.cwd()</code>
-resolved the trap, allowing the executable to drop its database natively in the user's workspace.</p>
-
-<p>To make the Librarian bulletproof, we also stripped away naive zero-vector threshold checks
-that required LLM/Ollama uptime, replacing them with a purely offline JSON sidecar. We added a
-<code>seed_literature.json</code> corpus containing 240+ arXiv abstracts across 7 domains (Schur,
-Turán, Razborov flag algebras). Now, before the ARCHITECT even begins formulation, it has
-hundreds of relevant academic papers embedded in its context window.</p>
+<p>The Librarian's robustness was enhanced by replacing model-dependent threshold checks with a local <code>seed_literature.json</code> corpus containing over 240 arXiv abstracts across domains such as Ramsey Theory and Razborov flag algebras. This ensures the ARCHITECT has access to relevant academic context prior to strategy formulation.</p>
 
 <h2>Conclusion</h2>
 
-<p>The delta from March 18 to March 19 isn't just a list of features. It's a phase shift in
-the engine's cognitive loop.</p>
-
-<p>Perqed now has the capacity to <strong>search</strong> (Simulated Annealing), <strong>prove</strong> (Lean 4),
-<strong>plan</strong> (DAG scaling), <strong>panic</strong> (triage and replan), and crucially,
-<strong>read</strong> (Librarian RAG + Universal Skill Injection). It is no longer just a
-fast brute-forcer — it is a mathematically grounded researcher.</p>
+<p>The recent updates represent a significant evolution in the system's cognitive architecture. Perqed now integrates search (Simulated Annealing), formal verification (Lean 4), strategic planning (DAG orchestration), and literature-based grounding (Librarian). The result is a mathematically grounded system capable of autonomous research across diverse domains.</p>
 `;
 ---
 

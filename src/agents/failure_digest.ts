@@ -1,5 +1,5 @@
 /**
- * Middle-Out: FailureDigest — Deterministic Context Compression
+ * FailureDigest — Deterministic Context Compression
  *
  * Pure function. No LLM calls. Extracts a structured summary
  * from routing signals and attempt logs when a tripwire fires.

@@ -7,8 +7,8 @@
  *   3. Compiles/runs each script in a sandboxed subprocess.
  *   4. Synthesizes all results into a structured EvidenceReport.
  *
- * This reproduces the "69-crack forensic gauntlet" pattern from the
- * Goldbach exploration, but fully AI-driven and prompt-adaptive.
+ * This performs a comprehensive multi-domain diagnostic suite, 
+ * fully AI-driven and prompt-adaptive.
  */
 
 import { Type, type Schema } from "@google/genai";
@@ -73,9 +73,9 @@ export class ExplorerAgent {
     const results = await this.runAll(scripts);
 
     console.log(`[Explorer] Synthesizing evidence...`);
-    const { synthesis, anomalies, kills } = await this.synthesize(hypothesis, results);
+    const { synthesis, anomalies, falsifications } = await this.synthesize(hypothesis, results);
 
-    return { hypothesis, results, synthesis, anomalies, kills };
+    return { hypothesis, results, synthesis, anomalies, falsifications };
   }
 
   /**
@@ -192,10 +192,10 @@ export class ExplorerAgent {
     const matchedSkills = this.matchSkillsByDomains(domains);
     const skillIndex = loadSkillsIndex(this.skillsRoot, matchedSkills);
     const skillInjection = skillIndex
-      ? `\nYou are aware of the following advanced mathematical capabilities and scripts within our local agentic codebase that can be leveraged during your exploration framework:\n${skillIndex}\n\nUse this knowledge appropriately to wield complex computational paradigms (for instance, structuring your script to load our local SMT solver, or explicitly writing a simulated annealing search loop for a combinatorial space). \nCRITICAL: Do not let this list serve as a crutch or limit your novel exploration. If a domain is best probed through pure linear algebra or brute-force code, do so instead of shoehorning a skill.\n`
+      ? `\nYou are aware of the following mathematical capabilities and scripts within our local codebase that can be leveraged during your exploration framework:\n${skillIndex}\n\nUse this knowledge appropriately to utilize complex computational methods (for instance, structuring your script to load our local SMT solver, or explicitly writing a simulated annealing search loop for a combinatorial space). \nCRITICAL: Do not let this list limit your novel exploration. If a domain is best probed through pure linear algebra or brute-force code, do so instead of applying a skill unnecessarily.\n`
       : "";
 
-    const prompt = `You are an elite computational mathematician designing empirical tests.
+    const prompt = `You are an expert computational mathematician designing empirical tests.
 
 HYPOTHESIS: ${hypothesis}
 
@@ -204,11 +204,11 @@ DOMAINS TO PROBE: ${domainList}
 For each domain, write a self-contained empirical investigation script that:
 1. Tests whether the hypothesis has hidden structure in that domain.
 2. Outputs clear numerical or boolean results to stdout.
-3. Is COMPLETELY SELF-CONTAINED. You are strictly ENCOURAGED to use robust scientific libraries: SymPy, NumPy, SciPy, or plain logic. DO NOT IMPLORE HEAVY NATIVE LIBRARIES (e.g., Z3) OR SAGEMATH. The Python code runs in a highly restricted WebAssembly WASI Sandbox; avoid C-extensions where possible.
+3. Is COMPLETELY SELF-CONTAINED. You are encouraged to use robust scientific libraries: SymPy, NumPy, SciPy, or plain logic. DO NOT USE HEAVY NATIVE LIBRARIES (e.g., Z3) OR SAGEMATH. The Python code runs in a highly restricted WebAssembly WASI Sandbox; avoid C-extensions where possible.
 4. Uses a "Robustness Wrapper": Python scripts should wrap their core logic in a try/except block to catch and report specific mathematical or runtime errors cleanly.
 5. Runs in under 20 seconds on a modern machine.
 6. Ends with a one-line verdict: "SIGNAL DETECTED" or "HYPOTHESIS FALSIFIED IN THIS DOMAIN".
-CRITICAL: If the state space is too large to exhaustively check within 20 seconds (e.g. Ramsey Graph Search, Circulant cliques > N=30), do NOT output "FALSIFIED" if your script simply times out or fails to randomly stumble into a witness. You MUST output "SIGNAL DETECTED". We have a dedicated Z3 hardware solver that will handle the plateau downstream. Only emit "FALSIFIED" if you mathematically prove a strict counter-example exists.
+CRITICAL: If the state space is too large to exhaustively check within 20 seconds (e.g. Ramsey Graph Search, Circulant cliques > N=30), do NOT output "FALSIFIED" if your script simply times out or fails to randomly stumble into a witness. You MUST output "SIGNAL DETECTED". We have a dedicated Z3 solver instance that will handle the complexity downstream. Only emit "FALSIFIED" if you mathematically prove a strict counter-example exists.
 
 Do not cut any corners. Use a test driven approach with red-to-green workflows.
 
@@ -357,15 +357,15 @@ Generate exactly one script per domain. Keep scripts under 150 lines.`;
   private async synthesize(
     hypothesis: string,
     results: ScriptResult[],
-  ): Promise<{ synthesis: string; anomalies: string[]; kills: string[] }> {
+  ): Promise<{ synthesis: string; anomalies: string[]; falsifications: string[] }> {
     const schema: Schema = {
       type: Type.OBJECT,
       properties: {
         synthesis: { type: Type.STRING },
         anomalies: { type: Type.ARRAY, items: { type: Type.STRING } },
-        kills: { type: Type.ARRAY, items: { type: Type.STRING } },
+        falsifications: { type: Type.ARRAY, items: { type: Type.STRING } },
       },
-      required: ["synthesis", "anomalies", "kills"],
+      required: ["synthesis", "anomalies", "falsifications"],
     };
 
     const resultsText = results
@@ -384,7 +384,7 @@ ${resultsText}
 
 Synthesize the findings. Identify:
 - anomalies: domains where unexpected structure or signal was detected (list domain names)
-- kills: domains where the hypothesis was cleanly falsified (list domain names)
+- falsifications: domains where the hypothesis was cleanly falsified (list domain names)
 - synthesis: a concise 2-3 paragraph academic summary of what was found
 
 Be skeptical. A non-zero result is not automatically a signal.`;
@@ -403,7 +403,7 @@ Be skeptical. A non-zero result is not automatically a signal.`;
       return {
         synthesis: "Synthesis unavailable.",
         anomalies: [],
-        kills: results.map((r) => r.domain),
+        falsifications: results.map((r) => r.domain),
       };
     }
 
@@ -411,14 +411,14 @@ Be skeptical. A non-zero result is not automatically a signal.`;
       return JSON.parse(response.text) as {
         synthesis: string;
         anomalies: string[];
-        kills: string[];
+        falsifications: string[];
       };
     } catch (err: any) {
       console.warn(`[Explorer] Warning: JSON parse failed during synthesis: ${err.message}`);
       return {
         synthesis: "Synthesis unavailable due to LLM response truncation.",
         anomalies: [],
-        kills: results.map((r) => r.domain),
+        falsifications: results.map((r) => r.domain),
       };
     }
   }

@@ -6,23 +6,23 @@ const blogContent = `
 
 <p>The feedback was, almost verbatim: <em>"The repository that you link to contains code about Goldbach, not code on the topic of the paper."</em></p>
 
-<p>Honestly? Totally fair.</p>
+<p>This critique was valid.</p>
 
-<p>When you've been working inside a mono-repo for months, you develop a certain flavor of structural blindness. To me, Perqed is a general-purpose formalization platform, and the Torus proofs were just the latest application living peacefully in <code>projects/torus-decomposition/</code>. Meanwhile, I had left a hundred scripts from a weekend Goldbach Conjecture binge sitting indiscriminately in the root <code>src/c/</code> folder.</p>
+<p>When working within a mono-repo for extended periods, structural clarity can become obscured. Perqed is a general-purpose formalization platform, and the Torus proofs were the most recent application within <code>projects/torus-decomposition/</code>. However, numerous scripts from historical Goldbach Conjecture experiments remained in the root <code>src/c/</code> folder.</p>
 
-<p>So, a reviewer drops into the repo looking for an elegant Lean 4 grid topology, and instead they find a chaotic spread of analytic number theory experiments. Naturally, they assume I submitted the wrong URL and bounce.</p>
+<p>A reviewer examining the repository for Lean 4 grid topology would instead encounter a variety of analytic number theory experiments, leading to the assumption that the provided URL was incorrect.</p>
 
 <h2>The Fix</h2>
 
-<p>This is a classic "works on my machine" oversight applied to academic citations. We pushed a structured layout update:</p>
+<p>This was a preventable organizational oversight. We have implemented a structured layout update:</p>
 
 <ul>
-<li><strong>Quarantined the Goldbach tests:</strong> They now live out of sight where they belong, so reviewers don't assume they stumbled into the wrong project.</li>
+<li><strong>Classified Goldbach tests as historical benchmarks:</strong> These experiments have been moved to a dedicated directory to ensure the repository focus remains on current research.</li>
 <li><strong>Aligned documentation pointers:</strong> We updated the README to point explicitly to the Torus Decomposition artifacts. </li>
-<li><strong>Added Even-m Formalization:</strong> The reviewer also smartly suggested a formal generalization of the even-<em>m ≥ 8</em> closed-form rule. We natively transcompiled Ho Boon Suan's empirical construction into our TypeScript engine and pushed an Open Conjecture framework into Lean to satisfy it.</li>
+<li><strong>Added Even-m Formalization:</strong> The reviewer also suggested a formal generalization of the even-<em>m ≥ 8</em> closed-form rule. We natively transcompiled Ho Boon Suan's empirical construction into our TypeScript engine and integrated an Open Conjecture framework into Lean to satisfy it.</li>
 </ul>
 
-<p>It's always the unforced errors that get you. The Lean 4 kernel took 57 seconds to verify 10<sup>167</sup> Torus permutations perfectly with zero hiccups, but we tripped on folder organization. Lesson learned. We'll be submitting v2 later this week.</p>
+<p>Organizational clarity is as critical as technical correctness. The Lean 4 kernel verified 10<sup>167</sup> Torus permutations without issue, but the submission was hindered by repository structure. We will be submitting v2 later this week.</p>
 `;
 ---
 

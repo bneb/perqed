@@ -13,8 +13,58 @@
  *   - GEMINI_API_KEY in environment or .env
  */
 
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+
+// ──────────────────────────────────────────────
+// Engine Root Discovery
+// ──────────────────────────────────────────────
+
+/**
+ * Attempts to find the Perqed engine root (where library/, crates/, etc. live).
+ * 1. Checks PERQED_HOME environment variable.
+ * 2. Resolves the real path of the executable and looks for GEMINI.md.
+ * 3. Crawls up from the current directory.
+ */
+function findEngineRoot(): string {
+  if (process.env.PERQED_HOME) return resolve(process.env.PERQED_HOME);
+
+  // Try to find it relative to the binary
+  try {
+    let execPath = realpathSync(process.argv[0]);
+    let curr = dirname(execPath);
+    while (curr !== dirname(curr)) {
+      if (existsSync(join(curr, "GEMINI.md")) && existsSync(join(curr, "library"))) {
+        return curr;
+      }
+      curr = dirname(curr);
+    }
+  } catch {
+    // realpathSync might fail if argv[0] is not a file
+  }
+
+  // Final fallback: crawl up from CWD
+  let curr = process.cwd();
+  while (curr !== dirname(curr)) {
+    if (existsSync(join(curr, "GEMINI.md")) && existsSync(join(curr, "library"))) {
+      return curr;
+    }
+    curr = dirname(curr);
+  }
+
+  return process.cwd();
+}
+
+const ENGINE_ROOT = findEngineRoot();
+console.log(`🚀 [Perqed] Engine Root: ${ENGINE_ROOT}`);
+
+// Update path resolutions to use ENGINE_ROOT where appropriate
+const CORE_SKILLS_ROOT = join(ENGINE_ROOT, ".agents", "skills");
+const CANONICAL_DB_PATH = join(ENGINE_ROOT, "data", "perqed.lancedb");
+const AGENCY_CONFIG_PATH = join(ENGINE_ROOT, "agency.json");
+
+// ... rest of imports and interfaces
 import { getAgencyRegistry } from "../agency";
 import { JsonHandler } from "../utils/json_handler";
 import { WorkspaceManager } from "../workspace";
@@ -370,7 +420,7 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
   let skillContext = "";
   try {
     const { SkillLibrary } = await import("../skills/skill_library");
-    const skillsRoot = join(process.cwd(), ".agents", "skills");
+    const skillsRoot = CORE_SKILLS_ROOT;
     const skillLib = await SkillLibrary.loadAll(skillsRoot);
     if (skillLib.size() > 0) {
       skillContext = "\n\n" + skillLib.getSummaryBlock(prompt, 3);
@@ -388,14 +438,14 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
     const { extractSearchQuery, keywordLiteratureFallback, formatLibraryMatch } =
       await import("../librarian/librarian_utils");
 
-    // Bug 4: normalise the raw prompt before embedding — strips code blocks,
+    // Normalize the raw prompt before embedding — strips code blocks,
     // JSON, markdown structure so the embedding reflects math semantics only.
     const searchQuery = extractSearchQuery(prompt);
 
-    // Bug 1: use the same absolute DB path as the seeder in executeRun().
+    // Use the same absolute DB path as the seeder in executeRun().
     // Use process.cwd() instead of import.meta.dir to avoid read-only $bunfs
     // errors when running as a compiled standalone binary.
-    const canonicalDbPath = join(process.cwd(), "data", "perqed.lancedb");
+    const canonicalDbPath = CANONICAL_DB_PATH;
     const embedder = new LocalEmbedder();
     const db = new VectorDatabase(canonicalDbPath);
     await db.initialize();
@@ -404,7 +454,7 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
     if (queryVector.length > 0) {
       const matches = await db.search(queryVector, 5);
       if (matches.length > 0) {
-        // Bug 2: type-aware rendering — [Paper] for ARXIV, [Lemma] for MATHLIB
+        // Type-aware rendering — [Paper] for ARXIV, [Lemma] for MATHLIB
         libraryContext = "\n\n## Relevant Literature (from vector DB)\n\n";
         matches.forEach((m, i) => {
           libraryContext += formatLibraryMatch(m, i + 1) + "\n\n";
@@ -413,7 +463,7 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
       }
     }
 
-    // Bug 5: if vector search is unavailable or returns nothing, fall back to
+    // If vector search is unavailable or returns nothing, fall back to
     // the curated offline corpus in seed_literature.json — no Ollama required.
     if (!libraryContext) {
       libraryContext = keywordLiteratureFallback(searchQuery);
@@ -433,11 +483,6 @@ async function formulate(prompt: string, apiKey: string, wilesMode: boolean = fa
     }
     const result = await model.generateContent(p);
     let text = result.response.text().trim();
-
-    try {
-      const fs = await import("fs");
-      fs.appendFileSync("/tmp/perqed_llm_debug.jsonl", JSON.stringify({ timestamp: new Date().toISOString(), model: provider.model, step: "doFormulate", rawText: text }) + "\n");
-    } catch (e) { }
 
     const jsonString = JsonHandler.extractAndRepair(text);
     return JSON.parse(jsonString) as RunConfig;
@@ -717,7 +762,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   let enrichedDomainSkills = config.domain_skills_md;
   try {
     const { SkillLibrary } = await import("../skills/skill_library");
-    const skillsRoot = join(process.cwd(), ".agents", "skills");
+    const skillsRoot = CORE_SKILLS_ROOT;
     const skillLib = await SkillLibrary.loadAll(skillsRoot);
     if (skillLib.size() > 0) {
       const contextText = `${config.problem_description} ${config.theorem_signature}`;
@@ -754,7 +799,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
   console.log("═══════════════════════════════════════════════\n");
 
   // ── Background Library Seeding (non-blocking) ──────────────────────────────
-  const DB_PATH = join(process.cwd(), "data", "perqed.lancedb");
+  const DB_PATH = CANONICAL_DB_PATH;
   void (async () => {
     try {
       // Dynamic query expansion for domain-specific literature seeding
@@ -846,8 +891,8 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
           console.log(`   🧬 [FunSearch] Injecting ${programDb.topKDiverse(5).length} best programs from prior runs`);
         }
 
-        // ── Fast-path: For Schur partitions iteration 1, use the Gaussian norm seed directly ──
-        // The ARCHITECT consistently ignores prompt-recommended seeds and generates weak rules.
+        // Fast-path: For Schur partitions iteration 1, use the Gaussian norm seed directly.
+        // Provides a stable baseline when ARCHITECT rule generation is under-constrained.
         let explicitGoal = targetGoal;
         const sc = config.search_config;
         if (isPartitionProblem && sc && "num_partitions" in sc && "domain_size" in sc) {
@@ -984,7 +1029,6 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
               return { note: result };
             },
             algebraic_graph_construction: async (node) => {
-              console.log("DEBUG: Entered algebraic_graph_construction for", node.id);
               console.log(`   ⚙️  Compiling Edge Rule for node ${node.id}...`);
               const algConfig = node.config as any;
               const algR = algConfig.r ?? (config.search_config as any)?.r ?? 4;
@@ -1992,7 +2036,7 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
             availableSkills,
             allJournalEntries,
             journal,
-            wilesMode,    // --wiles: force Wiles Mode (Conceptual Scatter) from iteration 0
+            wilesMode,    // --wiles: force Wiles Mode (Conceptual Diversification) from iteration 0
           );
 
 
@@ -2369,130 +2413,10 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 }
 
 // ──────────────────────────────────────────────
-// Geodesic Audit — Hyperbolic Bridge Proof Status
-// ──────────────────────────────────────────────
-
-/**
- * `perqed geodesic-audit`
- *
- * Runs `lake build GoldbachGeodesic` in src/lean/ and parses the output
- * to emit a per-theorem sorry count and open-frontier report.
- *
- * Requires: `lake` (Lean 4 build tool) installed and on PATH.
- */
-async function runGeodesicAudit(): Promise<void> {
-  const { spawnSync } = await import("node:child_process");
-  const { readFileSync } = await import("node:fs");
-  const leanDir = join(process.cwd(), "src", "lean");
-  const leanFile = join(leanDir, "GoldbachGeodesic.lean");
-
-  console.log("╔═══════════════════════════════════════════════════╗");
-  console.log("║  🔭 PERQED — Geodesic Audit (Hyperbolic Bridge)   ║");
-  console.log("╚═══════════════════════════════════════════════════╝\n");
-
-  // ── Check prerequisites ──────────────────────────────────────────────────
-  const lakeCheck = spawnSync("which", ["lake"], { encoding: "utf-8" });
-  if (lakeCheck.status !== 0) {
-    console.error("❌ `lake` not found. Install Lean 4 via elan: https://leanprover.github.io/lean4/doc/setup.html");
-    process.exit(1);
-  }
-
-  // ── Parse sorry count from GoldbachGeodesic.lean directly ────────────────
-  // This gives an instant static analysis even without lake build.
-  let sorryCount = 0;
-  const theoremSorries: Record<string, number> = {};
-  let currentTheorem = "<top-level>";
-
-  try {
-    const source = readFileSync(leanFile, "utf-8");
-    const lines = source.split("\n");
-    for (const line of lines) {
-      const thmMatch = line.match(/^(?:theorem|def|noncomputable def)\s+(\w+)/);
-      if (thmMatch) currentTheorem = thmMatch[1]!;
-      if (line.includes("exact sorry") || line.trim() === "sorry") {
-        sorryCount++;
-        theoremSorries[currentTheorem] = (theoremSorries[currentTheorem] ?? 0) + 1;
-      }
-    }
-  } catch (e: any) {
-    console.error(`❌ Could not read ${leanFile}: ${e.message}`);
-    process.exit(1);
-  }
-
-  // ── Static Sorry Report ──────────────────────────────────────────────────
-  console.log("📊 Static Analysis (sorry count per theorem):\n");
-
-  const OPEN_FRONTIER = "geodesic_to_additive_bridge";
-  const rows = Object.entries(theoremSorries).map(([name, count]) => ({
-    name,
-    count,
-    marker: name === OPEN_FRONTIER ? " ⭐ OPEN FRONTIER" : "",
-  }));
-
-  // Sort: open frontier last, then by count desc
-  rows.sort((a, b) => {
-    if (a.name === OPEN_FRONTIER) return 1;
-    if (b.name === OPEN_FRONTIER) return -1;
-    return b.count - a.count;
-  });
-
-  const maxNameLen = Math.max(...rows.map(r => r.name.length), 20);
-  console.log(`  ${"Theorem".padEnd(maxNameLen)}  sorry  Status`);
-  console.log(`  ${"─".repeat(maxNameLen)}  ─────  ──────────────────`);
-  for (const { name, count, marker } of rows) {
-    const status = name === OPEN_FRONTIER
-      ? "🚧 Open mathematical problem"
-      : count === 0 ? "✅ Clean" : "⏳ Stub (sorry)";
-    console.log(`  ${name.padEnd(maxNameLen)}  ${String(count).padStart(5)}  ${status}${marker}`);
-  }
-
-  console.log(`\n  Total sorry stubs: ${sorryCount}`);
-  console.log(`  Type errors:       0  (static parse — run lake build to confirm)\n`);
-
-  // ── Dependency graph ─────────────────────────────────────────────────────
-  console.log("📐 Dependency Graph (what blocks what):\n");
-  console.log("  spectralGap (def)");
-  console.log("    └── prime_geodesic_theorem");
-  console.log("          └── spectral_gap_error_improvement");
-  console.log("                └── prime_geodesic_pair_count_lower_bound");
-  console.log("                      └── prime_geodesic_pairs_exist");
-  console.log("                            └── geodesic_to_additive_bridge  ⭐");
-  console.log("                                  └── [Goldbach Conjecture]\n");
-
-  // ── Attempt lake build ───────────────────────────────────────────────────
-  console.log("🔨 Attempting `lake build GoldbachGeodesic` in src/lean/ ...\n");
-  const result = spawnSync("lake", ["build", "GoldbachGeodesic"], {
-    cwd: leanDir,
-    encoding: "utf-8",
-    timeout: 300_000, // 5 min — Mathlib first build is slow
-  });
-
-  if (result.status === 0) {
-    console.log("✅ Lean build succeeded — no type errors.\n");
-  } else {
-    console.log("⚠️  Lake build output:");
-    if (result.stdout) console.log(result.stdout.slice(0, 2000));
-    if (result.stderr) console.log(result.stderr.slice(0, 2000));
-    console.log("\n💡 If Mathlib has not been fetched yet, run: cd src/lean && lake exe cache get");
-  }
-
-  console.log("╔═══════════════════════════════════════════════════╗");
-  console.log("║  Audit complete. Fill sorry stubs to make progress ║");
-  console.log("╚═══════════════════════════════════════════════════╝\n");
-}
-
-// ──────────────────────────────────────────────
 // Main — Single Flow
 // ──────────────────────────────────────────────
 
 async function main() {
-  // Subcommand dispatch — check before GEMINI_API_KEY validation
-  const subcommand = process.argv[2];
-  if (subcommand === "geodesic-audit") {
-    await runGeodesicAudit();
-    return;
-  }
-
   const args = parseArgs();
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -2506,7 +2430,7 @@ async function main() {
     const { AutoCurriculumDaemon } = await import("../librarian/auto_curriculum");
     const daemon = new AutoCurriculumDaemon({
       apiKey,
-      verifiedLibDir: join(process.cwd(), "verified_lib"),
+      verifiedLibDir: join(ENGINE_ROOT, "library"),
     });
     console.log("🤖 [perqed] --daemon flag detected — launching Auto-Curriculum Daemon");
     console.log("   Press Ctrl+C to stop.\n");

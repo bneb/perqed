@@ -12,7 +12,7 @@ export class TrytetDaemon {
       const timeoutId = setTimeout(() => controller.abort(), 1000);
       const res = await fetch(`${endpoint}/health`, { signal: controller.signal });
       clearTimeout(timeoutId);
-      // Trytet's standalone mode returns 503 HTTP natively when offline mode avoids OCI registries
+      // Standalone mode returns 503 HTTP when OCI registries are bypassed in offline mode.
       return res.ok || res.status === 503;
     } catch {
       return false;
@@ -33,11 +33,12 @@ export class TrytetDaemon {
     this.bootLock = (async () => {
       console.log("[TrytetDaemon] Engine offline at port 3000. Booting native daemon...");
       
-      // Auto-resolve or compile the tet executable
-      const binaryPath = TrytetInstaller.resolveBinary();
+      const engineRoot = process.env.PERQED_HOME || process.cwd();
+      const binaryPath = TrytetInstaller.resolveBinary(engineRoot);
 
       // Prepare workspace logging
-      const logPath = join(process.cwd(), "agent_workspace", ".trytet.log");
+      const workspaceDir = process.cwd();
+      const logPath = join(workspaceDir, ".trytet.log");
       const outContent = openSync(logPath, "a");
 
       // Spawn detached
@@ -48,13 +49,13 @@ export class TrytetDaemon {
 
       child.unref();
 
-      console.log(`[TrytetDaemon] Spawned Trytet metrics daemon (PID: ${child.pid}). Waiting for endpoints to become responsive...`);
+      console.log(`[TrytetDaemon] Spawned Trytet engine daemon (PID: ${child.pid}). Waiting for endpoints to become responsive...`);
 
       // Exponential backoff check
       for (let attempts = 0; attempts < 10; attempts++) {
         await new Promise(r => setTimeout(r, 500));
         if (await this.isHealthy(endpoint)) {
-          console.log("[TrytetDaemon] Engine is HOT and accepting Wasm workloads.");
+          console.log("[TrytetDaemon] Engine is ready and accepting Wasm workloads.");
           return;
         }
       }
