@@ -2,213 +2,104 @@
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 
 const blogContent = `
-<p>In our March 18 update, we implemented a failure-recovery mechanism for the ARCHITECT. When a Simulated Annealing search reaches an energy plateau, the system can now identify the stagnation, halt the process, and formulate a revised strategy. This represents a significant improvement in the system's operational autonomy.</p>
+<p>Autonomous mathematical reasoning requires grounding in established academic literature and the ability to utilize specialized proof techniques. We have implemented the <strong>Librarian</strong> and <strong>Skill Injection</strong> frameworks to provide this grounding and strategic depth.</p>
 
-<p>While the engine demonstrated resilience in pivoting, it remained dependent on the underlying LLM's latent mathematical knowledge. To address this, we have transitioned Perqed from a specialized solver into a generalized mathematical reasoning platform that integrates literature retrieval and formal proof techniques into its search process.</p>
+<h2>The Librarian: Literature Grounding via LanceDB</h2>
+<p>The Librarian component facilitates the retrieval of relevant academic context from a local vector store (LanceDB). This store indexes a curated corpus of mathematical abstracts and full-text papers, particularly in the domains of extremal combinatorics and analytic number theory.</p>
 
-<h2>Generalized Domain Support</h2>
-
-<p>The first structural advancement was decoupling the engine from specific combinatorial domains. We transitioned from specialized graph-theoretic solvers to supporting arbitrary mathematical structures, using <code>schur_partition</code> as an exploratory benchmark.</p>
-
-<p>The objective: evaluate Schur Number lower bounds (e.g., S(6) ≥ 537) by identifying valid partitions. This required the ARCHITECT to dynamically generate evaluation functions for arbitrary partitions. We introduced the <code>partition_sa_search</code> node, allowing the ARCHITECT to synthesize JavaScript scoring functions for the high-speed Simulated Annealing loop.</p>
-
-<p>During development, we identified an edge case where the ARCHITECT generated logic that incorrectly reported zero violations due to a missing <code>return</code> statement. We addressed this by integrating an <code>ObstructionDetector</code> into the evaluation loop to validate the integrity of dynamically generated functions.</p>
+<p>During implementation, we addressed several filesystem resolution challenges within the <code>bun</code> runtime. Specifically, we resolved issues where <code>import.meta.dir</code> evaluated to internal virtual paths, preventing database initialization. By transitioning to <code>process.cwd()</code> based resolution, we ensured consistent access to local literature stores across diverse execution environments. The current corpus includes over 240 high-signal arXiv abstracts, providing a robust foundation for strategic planning.</p>
 
 <h2>Skill Injection Framework</h2>
+<p>To reduce reliance on the latent mathematical knowledge of model weights, we developed a structured <strong>SkillLibrary</strong>. This system indexes over 30 formalized mathematical techniques, including <code>pigeonhole_principle</code>, <code>explicit_construction</code>, and <code>spectral_graph_bounds</code>. These skills are stored as structured markdown in the <code>.agents/skills/</code> directory.</p>
 
-<p>To move beyond reliance on model weights for strategy formulation, we implemented the <strong>SkillLibrary</strong>. This system indexes over 30 formal mathematical techniques (e.g., <code>bijections</code>, <code>pigeonhole_principle</code>, <code>explicit_construction</code>) within the <code>.agents/skills/</code> directory.</p>
+<p>The orchestration Hub utilizes semantic relevance matching to identify the most appropriate techniques for a given conjecture. These skills are then injected into the model context, providing a grounded basis for Directed Acyclic Graph (DAG) formulation and Monte Carlo Tree Search (MCTS) verification. This ensures that the Architect's planning phase is informed by rigorous mathematical frameworks rather than generic reasoning patterns.</p>
 
-<p>The orchestration Hub now performs semantic relevance matching against the target conjecture and injects the most relevant skills into the model context. This provides a grounded basis for DAG formulation and MCTS verification.</p>
+<h2>Universal Domain Support</h2>
+<p>The integration of the Librarian and SkillLibrary has enabled Perqed to transition from specialized solvers to a generalized reasoning platform. We have successfully demonstrated this by evaluating Schur Number lower bounds, where the Architect was required to dynamically generate evaluation logic for arbitrary partitions. The Librarian provided the necessary historical context, while Skill Injection provided the strategic framework for the search.</p>
 
-<h2>The Librarian: Literature Grounding</h2>
-
-<p>To further ground the reasoning process, we introduced the <strong>Librarian</strong> component, which utilizes a LanceDB vector store to index academic literature.</p>
-
-<p>During the transition to a standalone <code>bun</code> executable, we resolved a filesystem resolution issue where <code>import.meta.dir</code> evaluated to an internal <code>/$bunfs/...</code> path, preventing database initialization. By utilizing <code>process.cwd()</code>, we ensured the system can initialize its local storage within the user's active workspace.</p>
-
-<p>The Librarian's robustness was enhanced by replacing model-dependent threshold checks with a local <code>seed_literature.json</code> corpus containing over 240 arXiv abstracts across domains such as Ramsey Theory and Razborov flag algebras. This ensures the ARCHITECT has access to relevant academic context prior to strategy formulation.</p>
-
-<h2>Conclusion</h2>
-
-<p>The recent updates represent a significant evolution in the system's cognitive architecture. Perqed now integrates search (Simulated Annealing), formal verification (Lean 4), strategic planning (DAG orchestration), and literature-based grounding (Librarian). The result is a mathematically grounded system capable of autonomous research across diverse domains.</p>
+<p>By combining literature-based grounding with formalized skill retrieval, we ensure that Perqed's research output is both novel and mathematically rigorous.</p>
 `;
 ---
 
-<BaseLayout title="The Engine Reads Mathematics Now — Blog" activeNav="blog">
-  <article class="blog-post">
-    <div class="container blog-container">
-      <header class="post-header">
-        <a href="/blog/" class="back-link">← Back to all posts</a>
-        <div class="post-meta">
-          <time>March 19, 2026</time>
-          <span class="tag">architecture</span>
-          <span class="tag">rag</span>
-          <span class="tag">llm</span>
-        </div>
-        <h1 class="post-title">The Engine Reads Mathematics Now</h1>
-        <p class="post-subtitle">From graph coloring to universal domains: how we taught Perqed to read academic papers, inject mathematical skills, and escape the read-only $bunfs trap.</p>
-      </header>
+<BaseLayout title="Librarian and Skill Injection: Grounding Autonomous Reasoning — Perqed" activeNav="blog">
 
-      <div class="post-content" set:html={blogContent} />
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="back-link-container">
+            <a href="/blog/" class="back-link">← Back to Technical Journal</a>
+          </div>
+          <div class="article-meta">
+            <time>March 19, 2026</time>
+            <span class="sep">·</span>
+            <span>6 min read</span>
+          </div>
+          <h1>Librarian and Skill Injection: Grounding Autonomous Reasoning</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
     </div>
   </article>
+
 </BaseLayout>
 
 <style>
-  .blog-post {
-    padding: 60px 0 100px;
+  .article {
+    padding: 64px 0 80px;
   }
 
-  .blog-container {
-    max-width: 720px;
-    margin: 0 auto;
+  .back-link-container {
+    margin-bottom: 32px;
   }
 
   .back-link {
-    display: inline-block;
     font-family: var(--font-mono);
     font-size: 0.85rem;
     color: var(--text-muted);
     text-decoration: none;
-    margin-bottom: 32px;
-    transition: color 0.2s ease;
   }
 
   .back-link:hover {
-    color: var(--text-primary);
+    color: var(--accent);
   }
 
-  .post-header {
-    margin-bottom: 48px;
+  .article-header {
+    margin-bottom: 40px;
   }
 
-  .post-meta {
+  .article-meta {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
     margin-bottom: 16px;
-    flex-wrap: wrap;
   }
 
-  .post-meta time {
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
+  .sep {
     color: var(--text-muted);
   }
 
-  .tag {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    background: var(--accent-purple-subtle);
-    color: var(--accent-purple);
-    padding: 4px 12px;
-    border-radius: 100px;
-    font-weight: 500;
-  }
-
-  .post-title {
-    font-family: var(--font-serif);
-    font-size: 2.8rem;
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -0.025em;
-    margin-bottom: 16px;
-    color: var(--text-primary);
-  }
-
-  .post-subtitle {
-    font-size: 1.2rem;
-    color: var(--text-secondary);
-    line-height: 1.6;
-    max-width: 600px;
-  }
-
-  .post-content {
-    font-size: 1.1rem;
-    line-height: 1.75;
-    color: var(--text-primary);
-  }
-
-  .post-content :global(h2) {
-    font-family: var(--font-serif);
-    font-size: 1.8rem;
+  .article :global(h2) {
+    font-size: 1.5rem;
     font-weight: 600;
-    margin: 48px 0 24px;
-    letter-spacing: -0.02em;
+    margin-top: 40px;
+    margin-bottom: 20px;
   }
 
-  .post-content :global(h3) {
-    font-size: 1.3rem;
-    font-weight: 600;
-    margin: 32px 0 16px;
-  }
-
-  .post-content :global(p) {
+  .article :global(p) {
     margin-bottom: 24px;
+    line-height: 1.7;
   }
 
-  .post-content :global(ul), .post-content :global(ol) {
-    margin-bottom: 24px;
-    padding-left: 24px;
-  }
-
-  .post-content :global(li) {
-    margin-bottom: 8px;
-  }
-
-  .post-content :global(a) {
-    color: var(--accent);
-    text-decoration: none;
-    font-weight: 500;
-  }
-
-  .post-content :global(a:hover) {
-    text-decoration: underline;
-    text-underline-offset: 4px;
-  }
-
-  .post-content :global(code) {
+  .article :global(code) {
     font-family: var(--font-mono);
-    font-size: 0.85em;
-    background: var(--background-highlight);
-    padding: 2px 6px;
+    font-size: 0.9em;
+    background: var(--bg-secondary);
+    padding: 2px 4px;
     border-radius: 4px;
-    color: var(--accent-green);
-  }
-
-  .post-content :global(pre) {
-    background: var(--background-card);
-    border: 1px solid var(--border-color);
-    padding: 20px;
-    border-radius: 8px;
-    overflow-x: auto;
-    margin: 32px 0;
-  }
-
-  .post-content :global(pre code) {
-    background: transparent;
-    padding: 0;
-    color: inherit;
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
-
-  .post-content :global(strong) {
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .post-content :global(blockquote) {
-    border-left: 3px solid var(--accent);
-    padding-left: 20px;
-    margin: 32px 0;
-    font-style: italic;
-    color: var(--text-secondary);
-  }
-
-  @media (max-width: 640px) {
-    .blog-post { padding: 40px 0 80px; }
-    .post-title { font-size: 2.2rem; }
-    .post-subtitle { font-size: 1.1rem; }
   }
 </style>

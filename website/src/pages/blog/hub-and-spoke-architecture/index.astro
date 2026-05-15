@@ -1,0 +1,92 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>The evolution of Perqed from a formal verification wrapper into an autonomous hypothesis engine necessitated a fundamental architectural shift. The current implementation utilizes a Hub-and-Spoke model to facilitate interdisciplinary synthesis and rigorous empirical falsification.</p>
+
+<h2>Architectural Topology: The Hub-and-Spoke Model</h2>
+<p>In the v3.0 architecture, the <strong>Architect</strong> serves as the central orchestration hub, coordinating specialized spokes to ingest literature, formulate hypotheses, and execute computational validation. This decoupling ensures that strategic planning is isolated from the specific mechanics of empirical search or formal proof.</p>
+
+<p>The <strong>Librarian Spoke</strong> provides grounding by retrieving structurally diverse academic literature from a local vector store (LanceDB). This enables the Architect to synthesize conjectures by pairing techniques from conceptually distant domains—for instance, applying spectral graph theory invariants to solve discrete coloring problems.</p>
+
+<h2>The Falsification Pipeline: Empirical Rigor</h2>
+<p>To maintain mathematical integrity, Perqed prioritizes falsification over verification. Conjectures are subjected to an automated multi-stage evaluation loop before any formal proof is attempted:</p>
+
+<ol>
+<li><strong>Sandboxed Empirical Execution</strong>: The <strong>Explorer Spoke</strong> generates and executes probing scripts within isolated environments. These environments are pre-configured with a comprehensive suite of mathematical libraries, including <code>SymPy</code>, <code>SciPy</code>, <code>NetworkX</code>, and <code>Z3</code>.</li>
+<li><strong>Automated Self-Correction</strong>: If an empirical test fails due to implementation errors, the spoke performs a diagnostic analysis of the traceback, refines the test logic, and re-executes. This loop ensures that falsification is based on mathematical truth rather than transient execution errors.</li>
+<li><strong>Dynamic Skill Injection</strong>: The system utilizes a Domain Affinity Mapper to inject relevant mathematical "skills"—formalized representations of proof techniques—into the active spoke's context. This minimizes context pollution and focuses the model on the most appropriate strategic frameworks.</li>
+</ol>
+
+<h2>Falsification as a Strategic Priority</h2>
+<p>The engine's primary objective is the rapid identification of counter-examples. If a hypothesis is contradicted by empirical evidence—such as a specific graph identified as a counter-example via a Python script—the system immediately discards the conjecture. This "fail-fast" approach ensures that the high-latency formal verification spoke (Lean 4) is reserved exclusively for high-confidence conjectures.</p>
+
+<p>By integrating empirical search, literature grounding, and formal verification within a unified Hub-and-Spoke framework, Perqed achieves a level of autonomous mathematical discovery that exceeds simple search-based methodologies.</p>
+`;
+---
+
+<BaseLayout title="Hub-and-Spoke Orchestration: The Perqed v3.0 Architecture — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>April 3, 2026</time>
+            <span class="sep">·</span>
+            <span>5 min read</span>
+          </div>
+          <h1>Hub-and-Spoke Orchestration: The Perqed v3.0 Architecture</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(h2) {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 40px;
+    margin-bottom: 20px;
+  }
+
+  .article :global(p) {
+    margin-bottom: 24px;
+    line-height: 1.7;
+  }
+
+  .article :global(ol) {
+    margin-bottom: 24px;
+    padding-left: 20px;
+  }
+
+  .article :global(li) {
+    margin-bottom: 12px;
+  }
+</style>

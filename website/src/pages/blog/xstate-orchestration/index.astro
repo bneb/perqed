@@ -4,29 +4,24 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 const blogContent = `
 <p>As autonomous mathematical research systems scale, procedural orchestration becomes increasingly difficult to maintain and verify. Relying on complex <code>await</code> chains and nested loops introduces non-deterministic behavior that can compromise the integrity of the research pipeline.</p>
 
-<p>To address these challenges, we transitioned Perqed's orchestration layer from a monolithic procedural implementation to a reactive state machine using <strong>XState v5</strong>. This architectural shift provides a formal framework for managing the research lifecycle—from literature-based ideation to empirical validation and formal verification.</p>
+<p>To address these challenges, we have transitioned Perqed's orchestration layer to a reactive state machine using <strong>XState v5</strong>. This architectural shift provides a formal framework for managing the research lifecycle—from literature-based ideation to empirical validation and formal verification.</p>
 
 <h2>State Machine Topology</h2>
-
-<p>The updated orchestration logic is represented as a Directed Acyclic Graph (DAG) of state transitions. This approach ensures that the entire research process is deterministic and auditable. We have mapped the core research flow into a 10-state topology that explicitly handles successful transitions, falsification forks, and execution plateaus.</p>
+<p>The orchestration logic is represented as a Directed Acyclic Graph (DAG) of state transitions. This approach ensures that the entire research process is deterministic and auditable. We have mapped the core research flow into a 10-state topology that explicitly handles successful transitions, falsification forks, and execution plateaus.</p>
 
 <h2>Actor-Model Implementation</h2>
+<p>Each component of the system—including the <code>Librarian</code>, <code>Explorer</code>, and <code>Formalist</code>—is encapsulated as an isolated actor using XState's <code>fromPromise</code> API. These actors are stateless, receiving structured input and returning typed output, while the central Hub manages the transition logic.</p>
 
-<p>Each component of the system—such as the <code>Librarian</code>, <code>Explorer</code>, and <code>Formalist</code>—is encapsulated as an isolated actor using XState's <code>fromPromise</code> API. These actors are stateless, receiving structured input and returning typed output, while the central Hub manages the transition logic.</p>
+<p>This decoupling facilitates robust error recovery. For instance, if the <code>Validation</code> actor identifies an invalid syntax tree, the Hub captures the event, increments a retry counter, and re-routes execution to the <code>Ideation</code> node. Similarly, if the <code>Explorer</code> identifies a search plateau, the system can automatically transition to an SMT-based resolution node to evaluate the subspace using Z3.</p>
 
-<p>This decoupling allows for robust error handling. For instance, if the <code>Validation</code> actor identifies an invalid syntax tree, the Hub captures the error, increments a retry counter, and re-routes the execution to the <code>Ideation</code> node. Similarly, if the <code>Explorer</code> identifies an energy plateau, the system can automatically transition to an SMT-based resolution node to evaluate the subspace using Z3.</p>
-
-<h2>Verification and Testing</h2>
-
-<p>The transition to a formal state machine has significantly improved our ability to verify the orchestration logic. By utilizing XState's <code>.provide()</code> API, we can inject mocked actors into the state machine, allowing for exhaustive testing of the topology without external dependencies.</p>
-
-<p>Our validation suite verifies all 10 states and their associated transitions—including edge cases and terminal failure states—within a controlled environment. This ensures that the Hub-and-Spoke coordination remains consistent and resilient across diverse research tasks.</p>
+<h2>Formal Verification of Orchestration</h2>
+<p>The transition to a formal state machine significantly improves the verifiability of the orchestration logic. By utilizing XState's <code>.provide()</code> API, we can inject mocked actors into the state machine, enabling exhaustive testing of the topology without external dependencies. Our validation suite verifies all 10 states and their associated transitions—including edge cases and terminal failure states—within a controlled environment, ensuring that Hub-and-Spoke coordination remains consistent across diverse research tasks.</p>
 
 <p>By implementing a mathematically sound orchestration layer, we have established a robust foundation for autonomous mathematical discovery.</p>
 `;
 ---
 
-<BaseLayout title="Reactive Math: Migrating Perqed to XState v5 — Perqed" activeNav="blog">
+<BaseLayout title="Reactive Proof Search: Orchestration via XState v5 — Perqed" activeNav="blog">
 
   <article class="article">
     <div class="container">
@@ -35,9 +30,9 @@ const blogContent = `
           <div class="article-meta">
             <time>March 31, 2026</time>
             <span class="sep">·</span>
-            <span>3 min read</span>
+            <span>5 min read</span>
           </div>
-          <h1>Reactive Math: Migrating Perqed's Core to XState v5</h1>
+          <h1>Reactive Proof Search: Orchestration via XState v5</h1>
         </header>
 
         <div set:html={blogContent} />
@@ -70,50 +65,23 @@ const blogContent = `
     color: var(--text-muted);
   }
 
-  .article :global(blockquote) {
-    border-left: 3px solid var(--accent);
-    padding-left: 16px;
-    margin: 24px 0;
-    color: var(--text-secondary);
-    font-style: italic;
-  }
-
-  .article :global(table) {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 24px 0;
-    font-size: 0.9rem;
-  }
-
-  .article :global(th) {
-    text-align: left;
+  .article :global(h2) {
+    font-size: 1.5rem;
     font-weight: 600;
-    padding: 10px 16px;
-    border-bottom: 2px solid var(--border-color);
-    font-size: 0.84rem;
-    color: var(--text-secondary);
+    margin-top: 40px;
+    margin-bottom: 20px;
   }
 
-  .article :global(td) {
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--border-subtle);
-    vertical-align: top;
+  .article :global(p) {
+    margin-bottom: 24px;
+    line-height: 1.7;
   }
 
-  .article :global(tr:last-child td) {
-    border-bottom: none;
-  }
-
-  @media (max-width: 640px) {
-    .article { padding: 32px 0 48px; }
-
-    .article :global(table) {
-      font-size: 0.8rem;
-    }
-
-    .article :global(th),
-    .article :global(td) {
-      padding: 8px 10px;
-    }
+  .article :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--bg-secondary);
+    padding: 2px 4px;
+    border-radius: 4px;
   }
 </style>

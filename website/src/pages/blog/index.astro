@@ -2,263 +2,126 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="Blog — Perqed" activeNav="blog">
+<BaseLayout title="Technical Journal — Perqed" activeNav="blog">
 
   <section class="blog-header">
     <div class="container">
-      <p class="eyebrow">Blog</p>
-      <h1 class="header-title">Build log</h1>
+      <p class="eyebrow">Technical Journal</p>
+      <h1 class="header-title">The Perqed Engine</h1>
       <p class="header-desc">
-        Milestones, deep-dives, and lessons from building an autonomous proof engine.
+        Formal research logs detailing the development of an autonomous neuro-symbolic hypothesis engine.
       </p>
     </div>
   </section>
 
   <section class="blog-list">
     <div class="container">
-      <article class="post-card">
-        <div class="post-meta">
-          <time>April 07, 2026</time>
-          <span class="tag">architecture</span>
-          <span class="tag">mcts</span>
-          <span class="tag">rag</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/adversarial-trees-and-polite-infrastructure/">Adversarial Trees and Polite Infrastructure</a>
-        </h2>
-        <p class="post-excerpt">
-          Why we abandoned raw LLM generation in favor of Lakatosian feedback loops, local LanceDB vectors, and native UNIX sockets.
-        </p>
-        <a class="read-link" href="/blog/adversarial-trees-and-polite-infrastructure/">Read post →</a>
-      </article>
-
+      
       <article class="post-card">
         <div class="post-meta">
           <time>April 4, 2026</time>
-          <span class="tag">architecture</span>
           <span class="tag">infrastructure</span>
-          <span class="tag">cryptography</span>
+          <span class="tag">wasm</span>
         </div>
         <h2 class="post-title">
-          <a href="/blog/migrating-to-trytet-v3/">Migrating to Trytet v3.0 & Cryptographic Fuel Bounds</a>
+          <a href="/blog/hyper-ephemeral-wasm-infrastructure/">Hyper-Ephemeral Wasm Infrastructure and Hardened Agency Topologies</a>
         </h2>
         <p class="post-excerpt">
-          How we replaced our execution backend with Trytet v3.0, integrated Ed25519 deterministic fuel validation natively via TypeScript, and resolved IPv6/Linux-Bwrap overhead anomalies systematically.
+          Implementation details of our zero-copy sandbox strategy, global cache binding, and cryptographic fuel validation via Trytet v3.0.
         </p>
-        <a class="read-link" href="/blog/migrating-to-trytet-v3/">Read post →</a>
+        <a class="read-link" href="/blog/hyper-ephemeral-wasm-infrastructure/">Read technical log →</a>
       </article>
 
       <article class="post-card">
         <div class="post-meta">
           <time>April 3, 2026</time>
           <span class="tag">architecture</span>
-          <span class="tag">neuro-symbolic</span>
           <span class="tag">falsification</span>
         </div>
         <h2 class="post-title">
-          <a href="/blog/perqed-v3-falsification-engine/">Perqed v3.0: Autonomous Falsification and Interdisciplinary Synthesis</a>
+          <a href="/blog/hub-and-spoke-architecture/">Hub-and-Spoke Orchestration: The Perqed v3.0 Architecture</a>
         </h2>
         <p class="post-excerpt">
-          An overview of our update shifting Perqed from a formal verification wrapper into an autonomous hypothesis engine backed by native empirical validation.
+          An analysis of the central Architect hub's coordination of specialized spokes for interdisciplinary synthesis and rigorous empirical falsification.
         </p>
-        <a class="read-link" href="/blog/perqed-v3-falsification-engine/">Read post →</a>
-      </article>
-
-      <article class="post-card">
-        <div class="post-meta">
-          <time>April 2, 2026</time>
-          <span class="tag">combinatorics</span>
-          <span class="tag">optimization</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/vdw-orchestrator-bounds/">Orchestrating Combinatorial Searches for Van der Waerden Bounds</a>
-        </h2>
-        <p class="post-excerpt">
-          We implemented dynamic CLI-driven orchestration to decompose and execute search strategies for Van der Waerden partition boundaries natively.
-        </p>
-        <a class="read-link" href="/blog/vdw-orchestrator-bounds/">Read post →</a>
-      </article>
-
-      <article class="post-card">
-        <div class="post-meta">
-          <time>April 2, 2026</time>
-          <span class="tag">architecture</span>
-          <span class="tag">neuro-symbolic</span>
-          <span class="tag">lean4</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/zero-copy-tactical-reasoning/">Zero-Copy Tactical Reasoning: A Case Study</a>
-        </h2>
-        <p class="post-excerpt">
-          How our engine successfully routed an ArXiv paper into 7 empirical Python domains, passed the failure trace through an adversarial Red Team auditor, and translated <code>push_neg</code> directives natively down to zero-latency Lean 4 compilation bounds using bwrap.
-        </p>
-        <a class="read-link" href="/blog/zero-copy-tactical-reasoning/">Read post →</a>
-      </article>
-      <article class="post-card">
-        <div class="post-meta">
-          <time>April 2, 2026</time>
-          <span class="tag">architecture</span>
-          <span class="tag">devops</span>
-          <span class="tag">lean4</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/hardening-agency-topology/">The 55GB Leak: Zero-Copy Sandboxes and Agency Topologies</a>
-        </h2>
-        <p class="post-excerpt">
-          How we addressed a critical Mathlib storage leak by routing around the sandbox and <code>--ro-bind</code>ing the global cache, while unifying our model infrastructure into a localized <code>agency.json</code> Registry.
-        </p>
-        <a class="read-link" href="/blog/hardening-agency-topology/">Read post →</a>
+        <a class="read-link" href="/blog/hub-and-spoke-architecture/">Read technical log →</a>
       </article>
 
       <article class="post-card">
         <div class="post-meta">
           <time>March 31, 2026</time>
-          <span class="tag">architecture</span>
+          <span class="tag">orchestration</span>
           <span class="tag">xstate</span>
-          <span class="tag">reactive</span>
         </div>
         <h2 class="post-title">
-          <a href="/blog/xstate-orchestration/">Reactive Math: Migrating Perqed's Core to XState v5</a>
+          <a href="/blog/xstate-orchestration/">Reactive Proof Search: Orchestration via XState v5</a>
         </h2>
         <p class="post-excerpt">
-          We transitioned our neuro-symbolic engine to a reactive, 10-state DAG architecture to improve orchestration efficiency.
+          Formalizing the research lifecycle through a 10-state DAG architecture and actor-model implementation for deterministic execution.
         </p>
-        <a class="read-link" href="/blog/xstate-orchestration/">Read post →</a>
-      </article>
-      <article class="post-card">
-        <div class="post-meta">
-          <time>March 31, 2026</time>
-          <span class="tag">hackernews</span>
-          <span class="tag">academia</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/jar-rejection/">Rejected for Poor Repo Hygiene</a>
-        </h2>
-        <p class="post-excerpt">
-          How an organizational oversight involving historical Goldbach scripts affected our Journal of Automated Reasoning Torus Decomposition submission.
-        </p>
-        <a class="read-link" href="/blog/jar-rejection/">Read post →</a>
-      </article>
-
-      <article class="post-card">
-        <div class="post-meta">
-          <time>March 30, 2026</time>
-          <span class="tag">architecture</span>
-          <span class="tag">rag</span>
-          <span class="tag">lean4</span>
-          <span class="tag">neuro-symbolic</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/mathematician-in-a-box/">Building a Mathematician in a Box: RAG, Red Teams, and Falsification</a>
-        </h2>
-        <p class="post-excerpt">
-          How we integrated the ArxivLibrarian into the Architect to ground model outputs, established a Red Team for adversarial review, and optimized Lean 4 computational paths.
-        </p>
-        <a class="read-link" href="/blog/mathematician-in-a-box/">Read post →</a>
+        <a class="read-link" href="/blog/xstate-orchestration/">Read technical log →</a>
       </article>
 
       <article class="post-card">
         <div class="post-meta">
           <time>March 21, 2026</time>
-          <span class="tag">number-theory</span>
-          <span class="tag">lean4</span>
-          <span class="tag">spectral</span>
-          <span class="tag">fft</span>
+          <span class="tag">benchmarks</span>
+          <span class="tag">z3</span>
         </div>
         <h2 class="post-title">
-          <a href="/blog/goldbach-stress-test/">Exploratory Benchmarking: The Goldbach Conjecture</a>
+          <a href="/blog/exploratory-benchmarks/">Exploratory Benchmarking: From Goldbach to Z3 Solver Stacks</a>
         </h2>
         <p class="post-excerpt">
-          The Goldbach conjecture was utilized as an exploratory benchmark for our autonomous proof engine, encountering structural obstructions and mapping them to established mathematical foundations.
+          Calibrating the engine against historic obstructions and the integration of SMT-based resolution nodes for combinatorial boundary detection.
         </p>
-        <a class="read-link" href="/blog/goldbach-stress-test/">Read post →</a>
-      </article>
-      <article class="post-card">
-        <div class="post-meta">
-          <time>March 19, 2026</time>
-          <span class="tag">architecture</span>
-          <span class="tag">rag</span>
-          <span class="tag">llm</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/librarian-and-skill-injection/">Autonomous Mathematical Literature Analysis</a>
-        </h2>
-        <p class="post-excerpt">
-          From graph coloring to universal domains: how we enabled Perqed to analyze academic papers,
-          integrate mathematical skills, and optimize file system interactions.
-        </p>
-        <a class="read-link" href="/blog/librarian-and-skill-injection/">Read post →</a>
-      </article>
-      <article class="post-card">
-        <div class="post-meta">
-          <time>March 18, 2026</time>
-          <span class="tag">engineering</span>
-          <span class="tag">llm</span>
-          <span class="tag">ramsey</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/teaching-the-architect-to-panic/">Managing Search Stagnation in the Architect</a>
-        </h2>
-        <p class="post-excerpt">
-          Implementing fail-safe mechanisms for stalled search processes, including multi-stage basin escape and prioritized mathematical triage.
-        </p>
-        <a class="read-link" href="/blog/teaching-the-architect-to-panic/">Read post →</a>
+        <a class="read-link" href="/blog/exploratory-benchmarks/">Read technical log →</a>
       </article>
 
       <article class="post-card">
         <div class="post-meta">
-          <time>March 16, 2026</time>
-          <span class="tag">engineering</span>
-          <span class="tag">z3</span>
-          <span class="tag">architecture</span>
+          <time>March 19, 2026</time>
+          <span class="tag">rag</span>
+          <span class="tag">literature</span>
         </div>
         <h2 class="post-title">
-          <a href="/blog/how-we-got-our-stack/">We Got Stuck, and Then We Had an Architecture</a>
+          <a href="/blog/librarian-and-skill-injection/">Librarian and Skill Injection: Grounding Autonomous Reasoning</a>
         </h2>
         <p class="post-excerpt">
-          SA hit E=12 and wouldn't move. Instead of tuning hyperparameters, we asked the
-          right question: does a solution even exist? Z3 answered in seconds — UNSAT — and
-          we almost threw the result away. This is the story of how a stuck search run
-          became a solver stack.
+          Retrieving academic context via LanceDB and injecting formalized mathematical skills to minimize context pollution and improve strategic depth.
         </p>
-        <a class="read-link" href="/blog/how-we-got-our-stack/">Read post →</a>
+        <a class="read-link" href="/blog/librarian-and-skill-injection/">Read technical log →</a>
+      </article>
+
+      <article class="post-card">
+        <div class="post-meta">
+          <time>March 18, 2026</time>
+          <span class="tag">logic</span>
+          <span class="tag">search</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/heuristic-escapement/">Heuristic Escapement and Domain Translation in Autonomous Reasoning</a>
+        </h2>
+        <p class="post-excerpt">
+          Managing convergence stagnation through multi-stage escalation protocols and fundamental domain translation between discrete and continuous spaces.
+        </p>
+        <a class="read-link" href="/blog/heuristic-escapement/">Read technical log →</a>
       </article>
 
       <article class="post-card">
         <div class="post-meta">
           <time>March 15, 2026</time>
-          <span class="tag">engineering</span>
-          <span class="tag">simulated-annealing</span>
+          <span class="tag">results</span>
           <span class="tag">lean4</span>
         </div>
         <h2 class="post-title">
-          <a href="/blog/torus-decomposition/">Finding Needles in a 6<sup>215</sup> Haystack</a>
+          <a href="/blog/torus-decomposition/">Hamiltonian Torus Decompositions: Formal Results for m=4 and m=6</a>
         </h2>
         <p class="post-excerpt">
-          The paper proves the m=4 and m=6 torus decompositions are correct.
-          This post covers what the paper skips: the energy function bug, the
-          12× incremental speedup, and the TypeScript-to-Lean handoff.
+          Identifying valid decompositions in a 10<sup>167</sup> search space using O(1) incremental energy updates and Lean 4 formal verification.
         </p>
-        <a class="read-link" href="/blog/torus-decomposition/">Read post →</a>
+        <a class="read-link" href="/blog/torus-decomposition/">Read technical log →</a>
       </article>
 
-      <article class="post-card">
-        <div class="post-meta">
-          <time>March 14, 2026</time>
-          <span class="tag">milestone</span>
-          <span class="tag">lean4</span>
-          <span class="tag">deepseek-r1</span>
-          <span class="tag">prover-v2</span>
-        </div>
-        <h2 class="post-title">
-          <a href="/blog/first-autonomous-proof/">Two Autonomous Proofs, Two Paradigms</a>
-        </h2>
-        <p class="post-excerpt">
-          Two models prove n + m = m + n in Lean 4 — R1:8B as a strategist (77s, 1 shot) and
-          Prover-V2 as a speedrunner (33s, 7 iterations). Plus: the quantization trap.
-        </p>
-        <a class="read-link" href="/blog/first-autonomous-proof/">Read post →</a>
-      </article>
     </div>
   </section>
 
@@ -280,7 +143,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
   .header-desc {
     color: var(--text-secondary);
     font-size: 1.05rem;
-    max-width: 460px;
+    max-width: 520px;
   }
 
   .blog-list {
@@ -309,11 +172,11 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
   .tag {
     font-family: var(--font-mono);
     font-size: 0.68rem;
-    background: var(--accent-purple-subtle);
-    color: var(--accent-purple);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
     padding: 3px 10px;
     border-radius: 100px;
-    font-weight: 500;
+    border: 1px solid var(--border-color);
   }
 
   .post-title {
@@ -331,7 +194,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
   .post-title a:hover {
     color: var(--accent);
-    text-decoration: none;
   }
 
   .post-excerpt {
@@ -339,7 +201,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     font-size: 1rem;
     line-height: 1.7;
     margin-bottom: 12px;
-    max-width: 560px;
+    max-width: 600px;
   }
 
   .read-link {
@@ -351,7 +213,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
   .read-link:hover {
     text-decoration: underline;
-    text-underline-offset: 3px;
   }
 
   @media (max-width: 640px) {

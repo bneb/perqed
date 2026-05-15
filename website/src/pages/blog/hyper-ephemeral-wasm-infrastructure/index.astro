@@ -1,0 +1,91 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>The reliability of empirical validation within Perqed is contingent upon a deterministic and secure execution environment. We have finalized our transition to a hyper-ephemeral WebAssembly (Wasm) infrastructure, integrated with Trytet v3.0, and implemented a hardened agency topology to address resource management and security constraints.</p>
+
+<h2>The Trytet v3.0 Execution Layer</h2>
+<p>Our empirical verification loop now interfaces natively with Trytet v3.0, moving beyond legacy VFS proxies toward a direct Wasm bytecode deserialization model. This shift enables true zero-dependency execution of mathematical probes. The <code>TetExecutionRequest</code> format is mapped byte-for-byte in TypeScript, injecting Wasm-based computational matrices directly into the execution payload. This eliminates disk-based context reliance and ensures that the execution environment is identical across all nodes.</p>
+
+<h2>Cryptographic Fuel and Deterministic Validation</h2>
+<p>To enforce resource constraints and auditability, we utilize Ed25519-signed <code>FuelVouchers</code>. These cryptographic tokens are minted deterministically in-memory before every execution run, fulfilling the constraints of the underlying Rust-based <code>ed25519-dalek</code> implementation. This economic model prevents resource exhaustion and provides a verifiable audit trail for all computational experiments.</p>
+
+<h2>Hardening the Agency Topology</h2>
+<p>A critical challenge identified during development was a significant storage leak (exceeding 50GB) resulting from redundant Mathlib4 downloads within isolated sandboxes. We resolved this by implementing a <strong>Zero-Copy Sandbox</strong> strategy:</p>
+
+<ul>
+<li><strong>Global Cache Binding</strong>: Instead of replicating the Lean 4 toolchain and mathematical libraries for each execution, we utilize <code>--ro-bind</code> (read-only binding) to expose the global system cache to the sandbox. This preserves isolation while eliminating redundant storage overhead.</li>
+<li><strong>Agency Registry</strong>: We have unified our model infrastructure into a localized <code>agency.json</code> registry. This centralizes the configuration of model providers, inference endpoints, and execution parameters, ensuring consistency across the entire Hub-and-Spoke topology.</li>
+<li><strong>Deterministic Network Routing</strong>: To eliminate non-deterministic timeouts identified in multi-agent inference sequences, we transitioned to strict IPv4 resolution (<code>127.0.0.1</code>) for all local agent communication, bypassing internal abstraction faults in the runtime's network layer.</li>
+</ul>
+
+<h2>Infrastructure as a Verification Primitive</h2>
+<p>By treating infrastructure as a formal component of the verification pipeline, we ensure that empirical results are both reproducible and secure. The system can now execute thousands of independent probes—ranging from Ramsey graph colorings to complex SMT resolutions—with sub-millisecond setup times and guaranteed cryptographic integrity.</p>
+`;
+---
+
+<BaseLayout title="Hyper-Ephemeral Wasm Infrastructure and Hardened Agency Topologies — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>April 4, 2026</time>
+            <span class="sep">·</span>
+            <span>6 min read</span>
+          </div>
+          <h1>Hyper-Ephemeral Wasm Infrastructure and Hardened Agency Topologies</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(h2) {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 40px;
+    margin-bottom: 20px;
+  }
+
+  .article :global(p) {
+    margin-bottom: 24px;
+    line-height: 1.7;
+  }
+
+  .article :global(ul) {
+    margin-bottom: 24px;
+    padding-left: 20px;
+  }
+
+  .article :global(li) {
+    margin-bottom: 12px;
+  }
+</style>
