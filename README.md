@@ -7,47 +7,31 @@ Runs locally on Apple Silicon.
 ## Featured Results: Torus Decompositions
 If you are reviewing the paper *Machine-Checked Proofs of the m=4 and m=6 Directed Hamiltonian Torus Decompositions*, please find the corresponding Lean 4 kernel proofs and raw code below:
 
-- **Paper**: [`torus_decomposition.pdf`](projects/torus-decomposition/paper/arxiv/torus_decomposition.pdf)
-- **Lean proofs**: [`TorusTopologyM4.lean`](projects/torus-decomposition/paper/arxiv/anc/TorusTopologyM4.lean) ($m=4$) · [`TorusTopologyM6.lean`](projects/torus-decomposition/paper/arxiv/anc/TorusTopologyM6.lean) ($m=6$)
+- **Paper**: [`torus_decomposition.pdf`](workspaces/torus-decomposition/paper/arxiv/torus_decomposition.pdf)
+- **Lean proofs**: [`TorusTopologyM4.lean`](workspaces/torus-decomposition/paper/arxiv/anc/TorusTopologyM4.lean) ($m=4$) · [`TorusTopologyM6.lean`](workspaces/torus-decomposition/paper/arxiv/anc/TorusTopologyM6.lean) ($m=6$)
 
-*(Note: Perqed is a general automated reasoning system. The Torus-specific search engine and results have been neatly packaged into `projects/torus-decomposition/`.)*
+*(Note: Perqed is a general automated reasoning system. The Torus-specific search engine and results have been neatly packaged into `workspaces/torus-decomposition/`.)*
 
-## Architecture
+## Architecture: The Hub-and-Spoke Model
 
-```mermaid
-graph TD
-    subgraph "Autonomous Research Pipeline"
-        ARXIV["arXiv API"] --> CHUNK["TextChunker"]
-        CHUNK --> EMBED["Ollama nomic-embed-text"]
-        EMBED --> LANCE["LanceDB (Vector Store)"]
-        LANCE --> CONJ["ConjecturerAgent (Gemini)"]
-        CONJ --> GAUNTLET["Lean Syntax + Triviality Filter"]
-        GAUNTLET --> QUEUE["open_conjectures.json"]
-    end
+Perqed has been refactored into a scalable architecture designed for long-term mathematical research.
 
-    subgraph "MCTS Proof Engine"
-        QUEUE --> ORC["XState Research Machine"]
-        ORC --> ROUTER["AgentRouter"]
-        ROUTER -->|"default"| TACT["Tactician (DeepSeek Prover V2)"]
-        ROUTER -->|"3+ failures"| REASON["Reasoner (Gemini Flash)"]
-        ROUTER -->|"strategic"| ARCH["Architect (Gemini Pro)"]
-        LANCE -.->|"RAG context"| ARCH
+### 1. The Hub: The Perqed Engine
+The core automation engine is located in `src/` (TypeScript/Orchestration), `crates/` (Rust/Performance), and `ml/` (Models). It provides the CLI tools, agentic reasoning, and proof search algorithms.
 
-        ORC --> BATCH["getBestOpenNodes(3)"]
-        BATCH --> PALL["Promise.all()"]
-        PALL --> LEAN["Lean 4 Kernel"]
-        LEAN --> TREE["ProofTree (AND/OR)"]
-        TREE --> SCORER["TreeScorer"]
-        SCORER -->|"OR: max, AND: product"| TREE
-    end
+### 2. The Library: Mathematical Knowledge Base
+The `library/` directory contains verified, `sorry`-free Lean 4 proofs. It is a strictly curated package (`Perqed.*` namespace) where verified results are promoted for cumulative reuse.
 
-    subgraph "Learning & Publishing"
-        TREE -->|"SOLVED"| SFT["DatasetExtractor"]
-        SFT --> JSONL["sft_dataset.jsonl"]
-        TREE -->|"SOLVED"| SCRIBE["ScribeAgent (Gemini Pro)"]
-        SCRIBE --> TEX["draft_paper.tex (AMS-LaTeX)"]
-        LEAN -->|"verified"| VAULT["verified_lib/ (vault)"]
-    end
+### 3. The Spokes: Experimental Workspaces
+The `workspaces/` directory contains isolated, project-specific environments for mathematical exploration.
+- **Erdős 265**: Formal resolution of the Erdős Ceiling Conjecture.
+- **Goldbach**: Experimental "cracking" of the Goldbach conjecture via spectral and cryptographic probes.
+
+## Getting Started
+
+To run the unified engine:
+```bash
+./scripts/start_perqed.sh --prompt="Solve the open portion of Erdös #265"
 ```
 
 ## Autonomous Research Pipeline (Mathematician in a Box)
