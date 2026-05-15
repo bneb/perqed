@@ -23,6 +23,8 @@ export class WorkspaceManager {
     readonly verifiedLib: string;
     readonly labLog: string;
     readonly progress: string;
+    readonly stateOfPlay: string;
+    readonly tasks: string;
     readonly objective: string;
     readonly architectDirective: string;
     readonly proofSolution: string;
@@ -47,9 +49,11 @@ export class WorkspaceManager {
       domainSkills: join(runDir, "domain_skills"),
       scratch,
       verifiedLib,
-      labLog: join(runDir, "lab_log.md"),
-      progress: join(runDir, "current_progress.md"),
-      objective: join(runDir, "objective.md"),
+      labLog: join(runDir, "LAB_LOG.md"),
+      progress: join(runDir, "PROGRESS.md"),
+      stateOfPlay: join(runDir, "STATE_OF_PLAY.md"),
+      tasks: join(runDir, "TASKS.md"),
+      objective: join(runDir, "OBJECTIVE.md"),
       architectDirective: join(runDir, "domain_skills", "architect_directive.md"),
       proofSolution: join(runDir, "proof_solution.txt"),
       systemPrompts: join(globalConfig, "system_prompts.md"),
@@ -65,6 +69,12 @@ export class WorkspaceManager {
     await mkdir(this.paths.globalConfig, { recursive: true });
     await mkdir(this.paths.scratch, { recursive: true });
     await mkdir(this.paths.verifiedLib, { recursive: true });
+
+    // Initialize the Four Truths if they don't exist
+    if (!existsSync(this.paths.objective)) await Bun.write(this.paths.objective, "");
+    if (!existsSync(this.paths.stateOfPlay)) await Bun.write(this.paths.stateOfPlay, "# State of Play\n\nNo frontier established yet.");
+    if (!existsSync(this.paths.tasks)) await Bun.write(this.paths.tasks, "# Tasks\n\n- [ ] Establish mathematical frontier");
+    if (!existsSync(this.paths.labLog)) await Bun.write(this.paths.labLog, "# Lab Log\n\n");
 
     // DO NOT run `lake update` synchronously here.
     // Instead, symlink or copy from a pre-compiled global cache.
@@ -327,11 +337,19 @@ export class WorkspaceManager {
     const objective = await safeReadText(this.paths.objective, "No objective set.");
     sections.push(`## ULTIMATE OBJECTIVE\n${objective}`);
 
-    // 5. Current verified progress
+    // 5. State of Play (High-level frontier)
+    const stateOfPlay = await safeReadText(this.paths.stateOfPlay, "No state of play recorded.");
+    sections.push(`## STATE OF PLAY\n${stateOfPlay}`);
+
+    // 6. Active Tasks
+    const tasks = await safeReadText(this.paths.tasks, "No tasks listed.");
+    sections.push(`## ACTIVE TASKS\n${tasks}`);
+
+    // 7. Current verified progress
     const progress = await safeReadText(this.paths.progress, "No steps verified yet.");
     sections.push(`## CURRENT VERIFIED PROGRESS\n${progress}`);
 
-    // 6. Recent failures from lab log — tail-read to prevent overflow
+    // 8. Recent failures from lab log — tail-read to prevent overflow
     const labLogSection = await this.buildLabLogSection(charBudget, sections);
     sections.push(labLogSection);
 

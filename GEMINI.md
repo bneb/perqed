@@ -18,13 +18,15 @@ Perqed is a neuro-symbolic research lab organized around a **Hub-and-Spoke** mod
 ## 2. The Spokes: Experimental Workspaces (`workspaces/`)
 
 - **Responsibility**: Isolated environments for attacking specific problems (e.g., `workspaces/erdos265`).
-- **Isolation**: Each workspace is a self-contained research project. It should contain its own:
-  - `RESEARCH_LOG.md`: A non-linear journal of attempts and failures.
-  - `data/`: Local empirical findings (graph adjacency matrices, prime distributions).
-  - `lakefile.lean`: A workspace-specific Lean configuration.
-- **Version Control (Jujutsu)**: Researchers are encouraged to use **Jujutsu (jj)** for mathematical exploration. It provides automatic commits and non-linear history tracking, suitable for experimental hypothesis testing.
-  - **Onboarding**: Run `./scripts/onboard_jj.sh` to initialize `jj` in your current repository.
+- **Isolation**: Each workspace is a self-contained research project.
+- **Continuity Metadata (The "Four Truths")**: Every workspace must maintain these deterministic files to support project resumption:
+  1. `OBJECTIVE.md`: The ultimate mathematical goal or conjecture.
+  2. `STATE_OF_PLAY.md`: A high-level summary of the current mathematical frontier—what has been proven, what has been ruled out, and where the current "vice" is located.
+  3. `TASKS.md`: A prioritized list of immediate next steps, lemmas to prove, or empirical probes to run.
+  4. `LAB_LOG.md`: An append-only ledger of every execution attempt, including code, output, and failure analysis.
+- **Version Control (Jujutsu)**: Researchers are encouraged to use **Jujutsu (jj)** for mathematical exploration. It provides automatic commits and non-linear history tracking.
 - **Promotion Workflow**: Once a proof is finalized and verified in a workspace, it is refactored into a clean, reusable module and moved to the `library/` hub.
+
 
 ## 3. Trusted Substrates: The Trytet Engine
 

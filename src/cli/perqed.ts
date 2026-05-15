@@ -14,7 +14,7 @@
  */
 
 import { join, resolve, dirname } from "node:path";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync, readFileSync } from "node:fs";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 // ──────────────────────────────────────────────
@@ -752,10 +752,16 @@ async function requestSearchPivot(
 async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean = false, maxPivots: number = 5): Promise<void> {
   const workspaceBase = join(process.cwd(), "agent_workspace");
   const workspace = new WorkspaceManager(workspaceBase, config.run_name);
+  const isResuming = existsSync(workspace.paths.stateOfPlay);
   await workspace.init();
 
-  // Write objective + domain skills
-  await Bun.write(workspace.paths.objective, config.objective_md);
+  if (isResuming) {
+    console.log(`📡 [Perqed] Resuming workspace: ${config.run_name}`);
+    console.log(`🔬 [Diagnostic] Ingesting STATE_OF_PLAY and TASKS...`);
+  } else {
+    // Write initial objective
+    await Bun.write(workspace.paths.objective, config.objective_md);
+  }
   const skillsPath = join(workspace.paths.domainSkills, "problem_context.md");
   // Augment the ARCHITECT-generated domain_skills_md with SkillLibrary content
   // so the prover MCTS agent sees full proof-technique guidance.
@@ -2418,6 +2424,27 @@ async function executeRun(config: RunConfig, apiKey: string, wilesMode: boolean 
 
 async function main() {
   const args = parseArgs();
+
+  let prompt = args.prompt || "";
+  
+  // Auto-resume detection: if no prompt, but OBJECTIVE.md exists in CWD or agent_workspace/runs/main
+  if (!prompt && !args.configPath && !args.prompt_file) {
+    const cwdObjective = join(process.cwd(), "OBJECTIVE.md");
+    const workspaceObjective = join(process.cwd(), "agent_workspace", "runs", "main", "OBJECTIVE.md");
+    
+    if (existsSync(cwdObjective)) {
+      prompt = readFileSync(cwdObjective, "utf8");
+      console.log("📂 [AutoResume] Using OBJECTIVE.md from current directory.");
+    } else if (existsSync(workspaceObjective)) {
+      prompt = readFileSync(workspaceObjective, "utf8");
+      console.log("📂 [AutoResume] Resuming existing 'main' run in agent_workspace/");
+    }
+  }
+
+  if (!prompt && !args.configPath && !args.prompt_file) {
+    console.error("❌ No prompt or config provided. Use --prompt=\"...\" or --config=path/to/json");
+    process.exit(1);
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
