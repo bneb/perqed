@@ -25,7 +25,7 @@ The `library/` directory contains verified, `sorry`-free Lean 4 proofs. It is a 
 ### 3. The Spokes: Experimental Workspaces
 The `workspaces/` directory contains isolated, project-specific environments for mathematical exploration.
 - **Erdős 265**: Formal resolution of the Erdős Ceiling Conjecture.
-- **Goldbach**: Experimental investigation of the Goldbach conjecture via spectral and cryptographic probes.
+- **Torus Decomposition**: Directed Hamiltonian torus decompositions for $m=4$ and $m=6$.
 
 ## Getting Started
 
@@ -198,26 +198,19 @@ The classic mode bypasses the autonomous research front-end entirely. It sets up
 ```
 perqed/
 ├── src/
+│   ├── cli/                        # CLI Entrypoint (perqed.ts)
 │   ├── orchestration/              # XState v5 research state machine
-│   │   ├── machine.ts              # 10-state reactive machine
-│   │   ├── actors.ts               # 8 fromPromise actor wrappers
-│   │   ├── runner.ts               # Public API: runResearchMachine()
-│   │   └── types.ts                # Context, events, actor output types
-│   ├── orchestrator.ts             # MCTS proof loop (specialist routing + async batch)
-│   ├── tree.ts                     # ProofTree — AND/OR MCTS with value backpropagation
-│   ├── lean_bridge.ts              # Lean 4 subprocess (Zero-copy Bwrap/Native)
-│   ├── execution/                  # Trytet Engine v3.0 Cryptographic Wasm Sandboxing
-│   ├── lean_ast_validator.ts       # Mathlib definition guardrail
-│   ├── solver.ts                   # Native SMT-LIB2 bridge (Z3)
-│   ├── agents/                     # Router, formalist, conjecturer, scribe, red_team
-│   ├── math/optim/                 # Shared SA framework (IState, SimulatedAnnealing)
-│   └── cli.ts                      # CLI entry point
-├── projects/
-│   ├── torus-decomposition/        # Knuth m=4, m=6 — SA engine, Lean proofs, paper
-│   └── erdos-gyarfas/              # EG conjecture — graph search, Lean, Z3
-├── tests/
-│   └── orchestration/              # XState machine topology tests (8 tests)
-└── website/                        # perqed.com (Astro)
+│   ├── orchestrator.ts             # MCTS proof loop
+│   ├── lean_bridge.ts              # Lean 4 subprocess integration
+│   ├── execution/                  # Trytet Engine Wasm substrate
+│   └── agents/                     # LLM-based research agents
+├── library/                        # Cumulative verified Lean 4 proofs
+├── crates/                         # Performance-critical Rust modules
+├── ml/                             # Machine learning and surrogate models
+├── workspaces/                     # Isolated research spokes
+│   ├── erdos265/                   # Ahmes series resolution
+│   └── torus-decomposition/        # Hamiltonian cycles on the 3-torus
+└── website/                        # Technical Journal (Astro)
 ```
 
 
