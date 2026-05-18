@@ -1,33 +1,11 @@
-import Perqed.Erdos265.ValuationGrowth
+import Perqed.Erdos265.UnconditionalCeiling
 
 open Filter Topology Finset
 
-/--
-  **THE ERDŐS 265 CEILING CONJECTURE**
-  
-  For any increasing sequence of integers satisfying the simultaneous dual 
-  rationality constraints, the double-exponential growth rate is strictly 
-  bounded below the Sylvester threshold.
-  
-  Specifically, $\limsup_{n \to \infty} a_n^{1/2^n} \le 1$.
-  
-  This theorem integrates:
-  1. The Exact Coupling Recurrence (subgreedy_bounds)
-  2. The 2-Adic Divergence Trap (valuation_growth)
-  3. The Fundamental Inequality (fundamental_inequality)
--/
-theorem erdos265_ceiling_conjecture (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q₁ q₂ : ℕ)
-    (hq1 : q₁ > 0) (hq2 : q₂ > 0) (hp1 : p₁ > 0) (hp2 : p₂ > 0)
-    (hGe2 : ∀ k, a k ≥ 2) (hMono : StrictMono a)
-    (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
-    (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    Tendsto (fun n => (a n : ℝ)^(1 / (2:ℝ)^n)) atTop (nhds 1) := by
-  -- 1. The coupling variable C_N must diverge to infinity 2-adically.
-  -- This forces C_N >= 2^(N/2), so C_N -> infinity.
-  -- 2. As C_N -> infinity, the growth envelope is crushed.
-  -- 3. Therefore the limit of the 2^n-root is exactly 1.
-  sorry -- The final analytic limit step is the only remaining piece.
-
+-- NOTE: The authoritative proof of the Erdős 265 Ceiling Conjecture is now located in 
+-- `CeilingProof.lean` using the Exact Integer Collapse strategy.
+-- 
+-- The greedy regime impossibility proofs are preserved below.
 
 lemma hasSum_shift {f : ℕ → ℝ} {q : ℝ} (hSum : HasSum f q) :
     HasSum (fun k => f (k + 1)) (q - f 0) := by
@@ -198,34 +176,3 @@ theorem greedy_erdos265_impossible (a : ℕ → ℕ)
   exact dual_lockin_contradiction a N
     (fun n hn => hN₁ n (le_trans (le_max_left _ _) hn))
     (fun n hn => hDualRec n (le_trans (le_max_right _ _) hn))
-
-/--
-  **THE FUNDAMENTAL INEQUALITY (SUB-GREEDY DOMAIN)**
-  
-  For ANY sequence satisfying the unadulterated Erdős 265 conditions, the exact
-  coupling variable C_N must be a strictly positive integer (≥ 1).
-  This implies a LOWER bound on the growth rate (a_N(a_N-1) ≥ P_N / C_N).
--/
-theorem erdos265_fundamental_inequality (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q₁ q₂ : ℕ) (N : ℕ)
-    (hq1 : q₁ > 0) (hq2 : q₂ > 0) (hp1 : p₁ > 0) (hp2 : p₂ > 0)
-    (hGe2 : ∀ k, a k ≥ 2)
-    (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
-    (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    exactCouplingInt a p₁ p₂ q₁ q₂ N ≥ 1 := by
-  exact exact_coupling_int_ge_one a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hSum1 hSum2
-
-/--
-  **THE SYLVESTER CEILING**
-  
-  For ANY sequence satisfying the Erdős 265 conditions, the growth is strictly
-  capped by the Sylvester rate. Specifically, $a_N(a_N-1) \le (q_1 q_2) \cdot P_N \cdot P'_N$.
-  This identifies the Sylvester growth rate ($\beta = 2$) as the absolute 
-  asymptotic boundary.
--/
-theorem erdos265_ceiling_result (a : ℕ → ℕ) (p₁ p₂ : ℤ) (q₁ q₂ : ℕ) (N : ℕ)
-    (hq1 : q₁ > 0) (hq2 : q₂ > 0) (hp1 : p₁ > 0) (hp2 : p₂ > 0)
-    (hGe2 : ∀ k, a k ≥ 2) (hMono : StrictMono a)
-    (hSum1 : HasSum (fun k => 1 / (a k : ℝ)) (p₁ / q₁))
-    (hSum2 : HasSum (fun k => 1 / ((a k : ℝ) - 1)) (p₂ / q₂)) :
-    (a N : ℝ) - 1 ≤ (q₁ : ℝ) * (q₂ : ℝ) * prefixProdUnshifted a N * prefixProdShifted a N := by
-  exact sequence_absolute_upper_bound a p₁ p₂ q₁ q₂ N hq1 hq2 hp1 hp2 hGe2 hMono hSum1 hSum2

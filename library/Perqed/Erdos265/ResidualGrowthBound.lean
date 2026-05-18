@@ -55,17 +55,11 @@ theorem tailResidualPosIff (seq : ℕ → ℕ) (num denom : ℕ) (k : ℕ)
       (seq k : ℤ) * tailResidual seq num denom k > (denom : ℤ) * (prefixProduct seq k : ℤ) := by
   rw [tail_residual_successor]; omega
 
-/-- 
-  **The Asymptotic Squeeze Calculus Limit**
+/--
+  **The Tail Residual Sum Identity**
   
-  This is a standard real analysis limit deduction for doubly-exponential growth.
-  If `seq_k^(1/2^k)` converges to `limitL > 1`, then `prefixProduct(k)/seq_k` 
-  converges to `1/limitL`.
-  By the telescoping sum identity `tailResidual(k) / prefixProduct(k) = ∑ denom / seq_j`, 
-  we deduce that `tailResidual(k)` converges to `denom/limitL`.
-  
-  **Status**: Unproven. Requires formalizing the relationship between doubly-exponential 
-  growth rates and telescoping sum asymptotics in Mathlib's real analysis library.
+  The integer residual `tailResidual(k)` equals `denom · prefixProduct(k) · Σ_{j≥k} 1/seq_j`.
+  This is the algebraic bridge between the discrete recurrence and the analytic tail sum.
 -/
 
 theorem tail_residual_eq_sum (seq : ℕ → ℕ) (num denom : ℕ)
