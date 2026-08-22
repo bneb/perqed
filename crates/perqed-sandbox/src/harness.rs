@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn test_high_throughput_sweep_success() {
         let falsifier = CompiledFalsifier::new(100_000);
-        let (passed, cex, count, elapsed) = falsifier.sweep_numerical_assertion(|n| n + 0 == n);
+        let (passed, cex, count, elapsed) = falsifier.sweep_numerical_assertion(|n| n == n);
         assert!(passed);
         assert!(cex.is_none());
         assert_eq!(count, 100_001);
