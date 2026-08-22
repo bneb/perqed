@@ -1,0 +1,13 @@
+{
+  "conjecture_id": "nat_add_right_id",
+  "domain": "algebra.nat",
+  "informal_claim": "For any natural number n, n + 0 = n",
+  "variables": {
+    "n": "Nat"
+  },
+  "hypotheses": [
+    "n >= 0"
+  ],
+  "target": "n + 0 == n",
+  "custom_predicates": []
+}

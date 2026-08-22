@@ -1,0 +1,13 @@
+{
+  "conjecture_id": "conj_false_inequality",
+  "domain": "arithmetic",
+  "informal_claim": "For all integers x, x >= 2 implies x * x >= 100",
+  "variables": {
+    "x": "Int"
+  },
+  "hypotheses": [
+    "x >= 2"
+  ],
+  "target": "x * x >= 100",
+  "custom_predicates": []
+}

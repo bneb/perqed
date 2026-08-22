@@ -1,0 +1,24 @@
+# Rust
+target/
+Cargo.lock
+
+# Lean 4 / Lake
+.lake/
+lake-manifest.json
+*.olean
+*.ilean
+*.c
+*.setup.json
+*.o
+*.lock
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,35 @@
+[
+  {
+    "label": "thm:torus_hamiltonian",
+    "env_type": "theorem",
+    "raw_latex": "\\label{thm:torus_hamiltonian}\nLet $m \\ge 3$ and $d = 4$. Then the directed 4-torus $D_4(m)$ admits a directed Hamiltonian decomposition.",
+    "informal_claim": "%label:thm:torus_hamiltonian} Let m \\ge 3 and d = 4. Then the directed 4-torus D_4(m) admits a directed Hamiltonian decomposition.",
+    "hypotheses": [
+      "$m \\ge 3$ and $d = 4$"
+    ],
+    "conclusion": "\\label{thm:torus_hamiltonian}\nLet $m \\ge 3$ and $d = 4$. Then the directed 4-torus $D_4(m)$ admits a directed Hamiltonian decomposition.",
+    "source_file": "examples/paper.tex"
+  },
+  {
+    "label": "thm:nat_add_zero",
+    "env_type": "theorem",
+    "raw_latex": "\\label{thm:nat_add_zero}\nLet $n \\in \\mathbb{N}$. Then $n + 0 = n$.",
+    "informal_claim": "%label:thm:nat_add_zero} Let n \\in \\mathbb{N}. Then n + 0 = n.",
+    "hypotheses": [
+      "$n \\in \\mathbb{N}$"
+    ],
+    "conclusion": "\\label{thm:nat_add_zero}\nLet $n \\in \\mathbb{N}$. Then $n + 0 = n$.",
+    "source_file": "examples/paper.tex"
+  },
+  {
+    "label": "lem:nat_add_comm",
+    "env_type": "lemma",
+    "raw_latex": "\\label{lem:nat_add_comm}\nLet $a, b \\in \\mathbb{N}$. Then $a + b = b + a$.",
+    "informal_claim": "%label:lem:nat_add_comm} Let a, b \\in \\mathbb{N}. Then a + b = b + a.",
+    "hypotheses": [
+      "$a"
+    ],
+    "conclusion": "\\label{lem:nat_add_comm}\nLet $a, b \\in \\mathbb{N}$. Then $a + b = b + a$.",
+    "source_file": "examples/paper.tex"
+  }
+]

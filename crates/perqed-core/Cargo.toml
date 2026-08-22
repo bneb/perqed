@@ -1,0 +1,24 @@
+[package]
+name = "perqed-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+perqed-audit = { path = "../perqed-audit" }
+perqed-sandbox = { path = "../perqed-sandbox" }
+perqed-lean-client = { path = "../perqed-lean-client" }
+
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+reqwest.workspace = true
+regex.workspace = true
+chrono.workspace = true
+rand.workspace = true
+futures.workspace = true
+tempfile.workspace = true
