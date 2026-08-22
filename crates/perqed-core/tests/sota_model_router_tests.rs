@@ -91,3 +91,28 @@ fn test_red_to_green_optimal_triad_intelligence_per_dollar() {
     assert!(metrics.proofs_per_dollar > 10.0, "Proofs per dollar must exceed 10 (actual: {:.2})", metrics.proofs_per_dollar);
     assert!(metrics.intelligence_multiplier_vs_naive > 500.0, "Intelligence multiplier must exceed 500x (actual: {:.1}x)", metrics.intelligence_multiplier_vs_naive);
 }
+
+#[tokio::test]
+async fn test_red_to_green_gpt5_6_luna_sublemma_routing() {
+    let mut config = TierConfig::default();
+    config.tier2_fallback_model = "gpt-5.6-luna".to_string();
+    config.tier2_fallback_reasoning = "medium".to_string();
+
+    let router = TieredModelRouter::new(config);
+
+    // Test Sublemma decomposition task routing to GPT-5.6 Luna
+    let sublemma_res = router.dispatch(
+        TaskType::SublemmaDecomposition,
+        "Goal state: ⊢ ∀ a b : Nat, a + b = b + a. Decompose into sub-lemmas.",
+        "You are an expert formal theorem prover.",
+    ).await.unwrap();
+
+    assert!(!sublemma_res.is_empty());
+    assert!(
+        sublemma_res.contains("Lemma")
+            || sublemma_res.contains("sublemma")
+            || sublemma_res.contains("zero_add")
+            || sublemma_res.contains("succ_add")
+            || sublemma_res.contains("statement")
+    );
+}

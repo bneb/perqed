@@ -209,8 +209,8 @@ impl TieredModelRouter {
                 }
             }
 
-            // TIER 2: Fast structured extraction & invariant decomposition (Gemini 3.7 Flash -> GPT-5.6 Luna -> DeepSeek V4 Flash)
-            TaskType::LiteratureIngestAndPropose | TaskType::SublemmaDecomposition => {
+            // TIER 2A: Massive arXiv Literature Ingest & Global Recurrence Matching (Gemini 3.7 Flash -> GPT-5.6 Luna)
+            TaskType::LiteratureIngestAndPropose => {
                 if !self.config.gemini_api_key.is_empty() {
                     match self
                         .call_gemini_flash(prompt, system, 0.2, 4096)
@@ -236,20 +236,6 @@ impl TieredModelRouter {
                                 )
                                 .await
                                 .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
-                            } else if !self.config.deepseek_api_key.is_empty() {
-                                self.call_openai_compatible_endpoint(
-                                    "https://api.deepseek.com/v1",
-                                    &self.config.deepseek_api_key,
-                                    &self.config.tier2_deepseek_model,
-                                    prompt,
-                                    system,
-                                    0.2,
-                                    4096,
-                                    None,
-                                    None,
-                                )
-                                .await
-                                .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
                             } else {
                                 self.offline_heuristic_fallback(task, prompt)
                             }
@@ -269,6 +255,47 @@ impl TieredModelRouter {
                     )
                     .await
                     .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                } else {
+                    self.offline_heuristic_fallback(task, prompt)
+                }
+            }
+
+            // TIER 2B: High-Precision Sub-lemma Isolation & Autoformalization (GPT-5.6 Luna -> Gemini 3.7 Flash -> DeepSeek V4)
+            TaskType::SublemmaDecomposition => {
+                if !self.config.openai_api_key.is_empty() {
+                    match self
+                        .call_openai_compatible_endpoint(
+                            "https://api.openai.com/v1",
+                            &self.config.openai_api_key,
+                            &self.config.tier2_fallback_model,
+                            prompt,
+                            system,
+                            0.2,
+                            4096,
+                            Some(&self.config.tier2_fallback_reasoning),
+                            None,
+                        )
+                        .await
+                    {
+                        Ok(res) => res,
+                        Err(e) => {
+                            warn!(
+                                "[ROUTER WARN] Tier 2B GPT-5.6 Luna failed ({}). Falling back to Gemini 3.7 Flash...",
+                                e
+                            );
+                            if !self.config.gemini_api_key.is_empty() {
+                                self.call_gemini_flash(prompt, system, 0.2, 4096)
+                                    .await
+                                    .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                            } else {
+                                self.offline_heuristic_fallback(task, prompt)
+                            }
+                        }
+                    }
+                } else if !self.config.gemini_api_key.is_empty() {
+                    self.call_gemini_flash(prompt, system, 0.2, 4096)
+                        .await
+                        .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
                 } else if !self.config.deepseek_api_key.is_empty() {
                     self.call_openai_compatible_endpoint(
                         "https://api.deepseek.com/v1",

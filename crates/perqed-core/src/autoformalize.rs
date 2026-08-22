@@ -42,18 +42,18 @@ pub struct AutoformalizationResult {
 
 pub struct Autoformalizer {
     model_router: ModelRouter,
-    model_a: String, // Autoformalizer (e.g. deepseek-prover-v2 / gemini-2.5-flash / qwen2.5-math-72b)
-    model_b: String, // Back-translator (e.g. gemini-2.5-flash / claude-3-7-haiku / qwen2.5-coder-32b)
-    model_c: String, // Adversarial Diff Judge (e.g. deepseek-r1 / gemini-3.7-flash-thinking / gpt-5.6-luna)
+    model_a: String, // Autoformalizer Lean 4 generator (e.g. gpt-5.6-luna / deepseek-v4-flash)
+    model_b: String, // Back-translator (e.g. gemini-3.7-flash)
+    model_c: String, // Adversarial Diff Judge (e.g. gpt-5.6-luna / gpt-5.6-sol)
 }
 
 impl Autoformalizer {
     pub fn new(model_router: ModelRouter) -> Self {
         Self {
             model_router,
-            model_a: "gemini-2.5-flash".to_string(),
-            model_b: "gemini-2.5-flash".to_string(),
-            model_c: "gemini-2.5-flash".to_string(),
+            model_a: "gpt-5.6-luna".to_string(),
+            model_b: "gemini-3.7-flash".to_string(),
+            model_c: "gpt-5.6-luna".to_string(),
         }
     }
 
