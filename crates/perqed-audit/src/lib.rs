@@ -43,6 +43,17 @@ pub struct SpecLock {
     pub perqed_version: String,
 }
 
+/// One append-only run record in the prompt-keyed result ledger:
+/// `input_hash` is the SHA-256 of the canonicalized run input (conjecture or
+/// campaign spec), `verdict` is the stored outcome. Re-running the same input
+/// is detected by hash lookup instead of re-executing the pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RunRecord {
+    pub input_hash: String,
+    pub verdict: String,
+    pub created_at: DateTime<Utc>,
+}
+
 pub struct StatementHasher;
 
 impl StatementHasher {
@@ -201,6 +212,53 @@ impl ProvenanceLedger {
         }
         Ok(None)
     }
+
+    /// Path of the prompt-keyed run ledger (`runs.jsonl`).
+    pub fn get_runs_file<P: AsRef<Path>>(workspace_root: P) -> PathBuf {
+        Self::get_ledger_dir(workspace_root).join("runs.jsonl")
+    }
+
+    /// Append a run record keyed by the input's SHA-256. Append-only.
+    pub fn commit_run<P: AsRef<Path>>(
+        workspace_root: P,
+        input_hash: &str,
+        verdict: &str,
+    ) -> Result<(), AuditError> {
+        let record = RunRecord {
+            input_hash: input_hash.to_string(),
+            verdict: verdict.to_string(),
+            created_at: Utc::now(),
+        };
+        let ledger_dir = Self::get_ledger_dir(&workspace_root);
+        fs::create_dir_all(&ledger_dir)?;
+        let runs_file = ledger_dir.join("runs.jsonl");
+        let mut existing = fs::read_to_string(&runs_file).unwrap_or_default();
+        existing.push_str(&serde_json::to_string(&record)?);
+        existing.push('\n');
+        fs::write(&runs_file, existing)?;
+        Ok(())
+    }
+
+    /// Retrieve the most recent stored verdict for an input hash, if any.
+    /// The ledger is append-only, so the latest matching row wins.
+    pub fn lookup_run<P: AsRef<Path>>(
+        workspace_root: P,
+        input_hash: &str,
+    ) -> Result<Option<String>, AuditError> {
+        let runs_file = Self::get_runs_file(workspace_root);
+        if !runs_file.exists() {
+            return Ok(None);
+        }
+        let content = fs::read_to_string(&runs_file)?;
+        for line in content.lines().rev() {
+            if let Ok(record) = serde_json::from_str::<RunRecord>(line) {
+                if record.input_hash == input_hash {
+                    return Ok(Some(record.verdict));
+                }
+            }
+        }
+        Ok(None)
+    }
 }
 
 /// Hardened Axiom Whitelist Validator
@@ -265,6 +323,42 @@ mod tests {
         let hash2 = StatementHasher::compute_hash(code2);
         assert_eq!(hash1, hash2);
         assert_eq!(hash1.len(), 64);
+    }
+
+    #[test]
+    fn test_ledger_run_commit_and_lookup() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        // Unknown hash on an empty ledger: no record, not an error
+        assert!(ProvenanceLedger::lookup_run(tmp.path(), "never-run").unwrap().is_none());
+
+        ProvenanceLedger::commit_run(tmp.path(), "abc123", "verified").unwrap();
+        let cached = ProvenanceLedger::lookup_run(tmp.path(), "abc123").unwrap();
+        assert_eq!(cached.as_deref(), Some("verified"));
+
+        // Different hash must not collide
+        assert!(ProvenanceLedger::lookup_run(tmp.path(), "def456").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_ledger_run_latest_commit_wins() {
+        let tmp = tempfile::tempdir().unwrap();
+        ProvenanceLedger::commit_run(tmp.path(), "k", "first").unwrap();
+        ProvenanceLedger::commit_run(tmp.path(), "k", "second").unwrap();
+        assert_eq!(
+            ProvenanceLedger::lookup_run(tmp.path(), "k").unwrap().as_deref(),
+            Some("second"),
+            "re-running the same input must surface the most recent verdict"
+        );
+    }
+
+    #[test]
+    fn test_ledger_run_append_only_preserves_history() {
+        let tmp = tempfile::tempdir().unwrap();
+        ProvenanceLedger::commit_run(tmp.path(), "k", "one").unwrap();
+        ProvenanceLedger::commit_run(tmp.path(), "k", "two").unwrap();
+        let content = std::fs::read_to_string(ProvenanceLedger::get_runs_file(tmp.path())).unwrap();
+        assert_eq!(content.lines().count(), 2, "ledger is append-only");
     }
 
     #[test]

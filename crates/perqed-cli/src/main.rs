@@ -3,7 +3,8 @@
 //! Frontier-Grade Autonomous Theorem Discovery & Verification Engine
 
 use clap::{Parser, Subcommand};
-use perqed_audit::{LockManager, StatementHasher};
+use perqed_audit::{LockManager, ProvenanceLedger, StatementHasher};
+use perqed_sandbox::campaign::{run_campaign, CampaignReport, CampaignSpec};
 use perqed_core::conjecture::{ConjectureGenerator, SynthesisStrategy};
 use perqed_core::falsification::FalsificationGate;
 use perqed_core::ingestion::TexAstParser;
@@ -27,6 +28,11 @@ use tracing_subscriber::FmtSubscriber;
 struct Cli {
     #[arg(short, long, global = true, default_value = "info")]
     log_level: String,
+
+    /// Directed output directory for run artifacts (campaign reports,
+    /// pipeline results)
+    #[arg(short = 'o', long, global = true, default_value = "artifacts/runs")]
+    output_dir: PathBuf,
 
     #[command(subcommand)]
     command: Commands,
@@ -187,6 +193,17 @@ enum Commands {
         /// Path to input conjecture JSON or .tex source file
         #[arg(short, long)]
         input: PathBuf,
+    },
+
+    /// Run an autonomous discovery campaign over algebraic fields: generates
+    /// point sets in each field, verifies every certificate through the
+    /// harness gates, and records exact chromatic numbers and odd-cycle
+    /// verdicts (positive and negative) in the prompt-keyed ledger
+    Campaign {
+        /// Comma-separated field specs, e.g. "QQ[sqrt(2)],QQ[sqrt(3)]";
+        /// defaults to the standard sweep over sqrt(2), sqrt(3), cbrt(2), zeta_5
+        #[arg(long)]
+        fields: Option<String>,
     },
 
     /// Launch autonomous discovery campaign for a candidate conjecture configuration
@@ -671,6 +688,34 @@ async fn main() -> anyhow::Result<()> {
             println!("=======================================================\n");
         }
 
+        Commands::Campaign { fields } => {
+            let spec = match fields {
+                Some(csv) => CampaignSpec::parse_csv(&csv),
+                None => CampaignSpec::default(),
+            };
+            let report = run_campaign_command(&spec, &cli.output_dir, std::path::Path::new("."))?;
+            println!("\n=== CAMPAIGN REPORT ===");
+            println!("Spec hash: {}", report.spec_hash);
+            for entry in &report.entries {
+                let chi = entry
+                    .chromatic_number
+                    .map_or("—".to_string(), |c| c.to_string());
+                let odd = entry.odd_cycle.map_or("—".to_string(), |o| o.to_string());
+                println!(
+                    "  {}: {} points, {} edges, χ = {}, bipartite = {:?}, odd_cycle = {}",
+                    entry.field_spec, entry.point_count, entry.edge_count, chi, entry.bipartite, odd
+                );
+            }
+            println!("Max χ: {}", report.max_chromatic);
+            println!("Odd cycles in: {:?}", report.fields_with_odd_cycle);
+            println!(
+                "Report: {}",
+                cli.output_dir
+                    .join(format!("campaign_{}.json", report.spec_hash))
+                    .display()
+            );
+        }
+
         Commands::Pipeline { input } => {
             info!("Executing Frontier Autonomous Discovery & Verification Pipeline on: {}", input.display());
             let pipeline = FrontierPipeline::new(".");
@@ -698,8 +743,87 @@ async fn main() -> anyhow::Result<()> {
             println!("Kernel Audit Passed: {}", result.audit_report.kernel_audit_passed);
             println!("Publication Draft: artifacts/publications/{}_draft.tex", result.conjecture.conjecture_id);
             println!("=======================================================");
+
+            // Directed output: route the run's result into the output dir
+            fs::create_dir_all(&cli.output_dir)?;
+            let pipeline_summary = serde_json::json!({
+                "conjecture_id": result.conjecture.conjecture_id,
+                "informal_claim": result.conjecture.informal_claim,
+                "spec_sha256": result.autoformalization.spec_lock.sha256_hash,
+                "mcts_nodes_explored": result.proof_search.total_nodes_explored,
+                "proof_solved": result.proof_search.is_solved,
+                "kernel_audit_passed": result.audit_report.kernel_audit_passed,
+            });
+            let summary_path = cli
+                .output_dir
+                .join(format!("pipeline_{}.json", result.conjecture.conjecture_id));
+            fs::write(&summary_path, serde_json::to_string_pretty(&pipeline_summary)?)?;
+            info!("Pipeline summary written to: {}", summary_path.display());
         }
     }
 
     Ok(())
+}
+
+/// Run a campaign with prompt-keyed caching: an identical spec (same SHA-256)
+/// is served from the ledger + report file instead of re-executed.
+fn run_campaign_command(
+    spec: &CampaignSpec,
+    output_dir: &std::path::Path,
+    workspace_root: &std::path::Path,
+) -> anyhow::Result<CampaignReport> {
+    let hash = spec.hash();
+    let report_path = output_dir.join(format!("campaign_{hash}.json"));
+
+    if let Ok(Some(verdict)) = ProvenanceLedger::lookup_run(workspace_root, &hash) {
+        if report_path.exists() {
+            info!("Campaign cache hit (ledger verdict: {verdict})");
+            let content = fs::read_to_string(&report_path)?;
+            return Ok(serde_json::from_str(&content)?);
+        }
+    }
+
+    let report = run_campaign(spec);
+    fs::create_dir_all(output_dir)?;
+    fs::write(&report_path, serde_json::to_string_pretty(&report)?)?;
+    let summary = format!(
+        "campaign: {} fields, max χ = {}, odd cycles in {:?}",
+        report.entries.len(),
+        report.max_chromatic,
+        report.fields_with_odd_cycle
+    );
+    ProvenanceLedger::commit_run(workspace_root, &hash, &summary)?;
+    Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_campaign_command_writes_report_and_cache_hits() {
+        let tmp = tempdir().unwrap();
+        let out = tmp.path().join("runs");
+        let spec = CampaignSpec::parse_csv("QQ[sqrt(2)], QQ[sqrt(3)]");
+
+        let report1 = run_campaign_command(&spec, &out, tmp.path()).unwrap();
+        assert_eq!(report1.entries.len(), 2);
+        let report_path = out.join(format!("campaign_{}.json", report1.spec_hash));
+        assert!(report_path.exists(), "report must be written to the output dir");
+
+        // Second identical run: served from cache; the ledger must not grow
+        let report2 = run_campaign_command(&spec, &out, tmp.path()).unwrap();
+        assert_eq!(report1, report2, "cache hit must return the stored report");
+        let runs_file = ProvenanceLedger::get_runs_file(tmp.path());
+        let rows = fs::read_to_string(runs_file).unwrap();
+        assert_eq!(rows.lines().count(), 1, "cache hit must not append a ledger row");
+
+        // A different spec produces a different report and a second row
+        let spec3 = CampaignSpec::parse_csv("QQ[sqrt(2)]");
+        let report3 = run_campaign_command(&spec3, &out, tmp.path()).unwrap();
+        assert_ne!(report1.spec_hash, report3.spec_hash);
+        let rows = fs::read_to_string(ProvenanceLedger::get_runs_file(tmp.path())).unwrap();
+        assert_eq!(rows.lines().count(), 2);
+    }
 }

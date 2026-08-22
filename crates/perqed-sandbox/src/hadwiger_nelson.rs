@@ -100,14 +100,19 @@ impl UnitDistanceGraphQ2 {
         Ok(Point2DQ2::new(x, y))
     }
 
-    /// Computes exact chromatic number χ(G) by testing k = 1, 2, 3, 4, 5 ...
+    /// Computes exact chromatic number χ(G) by testing k = 1, 2, 3, ... via
+    /// the generic MRV/DSATUR checker (see [`crate::graph_color`]).
     pub fn compute_chromatic_number(&self) -> usize {
-        for k in 1..=self.vertex_count {
-            if self.solve_k_colorability(k).is_some() {
-                return k;
-            }
+        crate::graph_color::compute_chromatic_number(&self.to_adjacency())
+    }
+
+    fn to_adjacency(&self) -> Vec<HashSet<usize>> {
+        let mut adj: Vec<HashSet<usize>> = vec![HashSet::new(); self.vertex_count];
+        for &(u, v) in &self.edges {
+            adj[u].insert(v);
+            adj[v].insert(u);
         }
-        self.vertex_count
+        adj
     }
 
     /// Construct canonical 8-star unit distance graph in (ℚ[√2])²
@@ -129,90 +134,16 @@ impl UnitDistanceGraphQ2 {
         Self::construct_canonical_8star_graph()
     }
 
-    /// SAT Solver: Exact test if graph admits a valid k-coloring via MRV / DSATUR
-    /// Returns None if UNSAT (provably not k-colorable, χ > k), or Some(coloring) if SAT.
+    /// SAT Solver: Exact test if graph admits a valid k-coloring via the
+    /// generic MRV/DSATUR checker. Returns None if UNSAT (provably not
+    /// k-colorable, χ > k), or Some(coloring) if SAT.
     pub fn solve_k_colorability(&self, k: usize) -> Option<HashMap<usize, usize>> {
-        let num_vertices = self.vertex_count;
-        let mut assignment: HashMap<usize, usize> = HashMap::new();
-
-        // Pre-build adjacency list
-        let mut adj: Vec<HashSet<usize>> = vec![HashSet::new(); num_vertices];
-        for &(u, v) in &self.edges {
-            adj[u].insert(v);
-            adj[v].insert(u);
-        }
-
-        if self.dsatur_backtrack_k(&adj, &mut assignment, num_vertices, k) {
-            Some(assignment)
-        } else {
-            None
-        }
+        crate::graph_color::solve_k_colorability(&self.to_adjacency(), k)
     }
 
     /// SAT Solver: Test if graph admits a valid 4-coloring
     pub fn solve_4_colorability(&self) -> Option<HashMap<usize, usize>> {
         self.solve_k_colorability(4)
-    }
-
-    fn dsatur_backtrack_k(
-        &self,
-        adj: &[HashSet<usize>],
-        assignment: &mut HashMap<usize, usize>,
-        num_vertices: usize,
-        k: usize,
-    ) -> bool {
-        if assignment.len() == num_vertices {
-            return true;
-        }
-
-        // Pick unassigned vertex with MRV (minimum remaining legal colors)
-        let mut best_v = None;
-        let mut min_available = k + 1;
-        let mut best_colors = Vec::new();
-
-        for v in 0..num_vertices {
-            if assignment.contains_key(&v) {
-                continue;
-            }
-
-            let mut used_colors = vec![false; k];
-            for &nbr in &adj[v] {
-                if let Some(&c) = assignment.get(&nbr) {
-                    if c < k {
-                        used_colors[c] = true;
-                    }
-                }
-            }
-
-            let available: Vec<usize> = (0..k).filter(|&c| !used_colors[c]).collect();
-            if available.is_empty() {
-                return false;
-            }
-
-            if available.len() < min_available {
-                min_available = available.len();
-                best_v = Some(v);
-                best_colors = available;
-                if min_available == 1 {
-                    break;
-                }
-            }
-        }
-
-        let v = match best_v {
-            Some(v) => v,
-            None => return true,
-        };
-
-        for color in best_colors {
-            assignment.insert(v, color);
-            if self.dsatur_backtrack_k(adj, assignment, num_vertices, k) {
-                return true;
-            }
-            assignment.remove(&v);
-        }
-
-        false
     }
 }
 

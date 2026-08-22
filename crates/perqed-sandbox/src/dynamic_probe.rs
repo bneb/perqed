@@ -81,6 +81,10 @@ pub struct ProbeVerdict {
     pub sanity: Option<SanityCertificate>,
     /// Present iff the sanity gate rejected the claim.
     pub sanity_error: Option<SanityError>,
+    /// The edge set re-derived by the harness (exact unit-distance checks),
+    /// sorted — the verified graph downstream consumers may decide.
+    #[serde(default)]
+    pub rederived_adjacency: Vec<(usize, usize)>,
 }
 
 #[derive(Error, Debug)]
@@ -196,6 +200,7 @@ impl DynamicProbeVerifier {
                 edge_count: rederived.len(),
                 sanity: None,
                 sanity_error: None,
+                rederived_adjacency: sorted_edges(&rederived),
             });
         }
 
@@ -216,6 +221,7 @@ impl DynamicProbeVerifier {
                 edge_count: claimed.len(),
                 sanity: Some(sanity),
                 sanity_error: None,
+                rederived_adjacency: sorted_edges(&claimed),
             }),
             Err(e) => Ok(ProbeVerdict {
                 probe_id: cert.probe_id.clone(),
@@ -226,6 +232,7 @@ impl DynamicProbeVerifier {
                 edge_count: claimed.len(),
                 sanity: None,
                 sanity_error: Some(e),
+                rederived_adjacency: sorted_edges(&claimed),
             }),
         }
     }
@@ -277,6 +284,12 @@ pub async fn run_probe_binary(
         // kill_on_drop(true) reaps the child on drop
         Err(_) => Err(ProbeError::Timeout(timeout_duration)),
     }
+}
+
+fn sorted_edges(edges: &HashSet<(usize, usize)>) -> Vec<(usize, usize)> {
+    let mut v: Vec<(usize, usize)> = edges.iter().copied().collect();
+    v.sort_unstable();
+    v
 }
 
 /// Convenience for the outer loop: run a probe, verify its certificate.

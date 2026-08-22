@@ -1,6 +1,8 @@
+pub mod campaign;
 pub mod domain_synth;
 pub mod dynamic_probe;
 pub mod exact_math;
+pub mod graph_color;
 pub mod graph_sanity;
 pub mod hadwiger_nelson;
 pub mod harness;

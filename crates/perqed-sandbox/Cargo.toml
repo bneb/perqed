@@ -14,4 +14,6 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
+sha2.workspace = true
+hex.workspace = true
 regex = "1.10"
