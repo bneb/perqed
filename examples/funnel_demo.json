@@ -1,0 +1,57 @@
+[
+  {
+    "conjecture_id": "unifying_additive_identity",
+    "domain": "algebra.nat",
+    "informal_claim": "For any natural number n, n + 0 = n",
+    "hypotheses": [
+      "n >= 0"
+    ],
+    "target": "n + 0 == n",
+    "variables": {
+      "n": "Nat"
+    },
+    "custom_predicates": [],
+    "provenance_source": "OEIS:A000217"
+  },
+  {
+    "conjecture_id": "false_shallow_bound",
+    "domain": "algebra.nat",
+    "informal_claim": "For all natural numbers n >= 2, n^2 >= 100",
+    "hypotheses": [
+      "n >= 2"
+    ],
+    "target": "n * n >= 100",
+    "variables": {
+      "n": "Nat"
+    },
+    "custom_predicates": [],
+    "provenance_source": "AdversarialProber"
+  },
+  {
+    "conjecture_id": "vacuous_contradictory_premise",
+    "domain": "algebra.nat",
+    "informal_claim": "If n >= 10 and n <= 5, then n = 42",
+    "hypotheses": [
+      "n >= 10",
+      "n <= 5"
+    ],
+    "target": "n == 42",
+    "variables": {
+      "n": "Nat"
+    },
+    "custom_predicates": [],
+    "provenance_source": "VacuityTester"
+  },
+  {
+    "conjecture_id": "tautological_bloat",
+    "domain": "esoteric.subfield",
+    "informal_claim": "An ad-hoc complex identity with low mathematical unification across Mathlib",
+    "hypotheses": [],
+    "target": "(n + 1) * (n + 1) == n * n + 2 * n + 1",
+    "variables": {
+      "n": "Nat"
+    },
+    "custom_predicates": [],
+    "provenance_source": "LowRoiGenerator"
+  }
+]

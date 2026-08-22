@@ -242,7 +242,11 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::Falsify { conjecture } => {
             info!("Running Sandboxed Falsification Gate on: {}", conjecture.display());
-            let content = fs::read_to_string(&conjecture)?;
+            let content = if conjecture.exists() {
+                fs::read_to_string(&conjecture)?
+            } else {
+                conjecture.to_string_lossy().to_string()
+            };
             let conj: Conjecture = serde_json::from_str(&content)?;
 
             let runner = SandboxRunner::with_workspace_root(".");
