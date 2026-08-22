@@ -1,0 +1,55 @@
+{
+  "total_candidates": 4,
+  "falsified_count": 3,
+  "promoted_roi_count": 0,
+  "proofs_solved_count": 0,
+  "kernel_audited_count": 1,
+  "solve_rate_percent": 0.0,
+  "total_elapsed_seconds": 88.7931825,
+  "items": [
+    {
+      "conjecture_id": "unifying_additive_identity",
+      "domain": "algebra.nat",
+      "passed_falsification": true,
+      "roi_total": 6.293856189774725,
+      "is_promoted": false,
+      "proof_solved": false,
+      "kernel_audit_passed": true,
+      "elapsed_seconds": 78.014185417,
+      "error": null
+    },
+    {
+      "conjecture_id": "false_shallow_bound",
+      "domain": "algebra.nat",
+      "passed_falsification": false,
+      "roi_total": 0.0,
+      "is_promoted": false,
+      "proof_solved": false,
+      "kernel_audit_passed": false,
+      "elapsed_seconds": 0.165848541,
+      "error": "Falsification gate error: Conjecture falsified! Counterexample: Some({\"n\": String(\"8\")}), Reason: FALSIFIED: Counterexample found by Z3."
+    },
+    {
+      "conjecture_id": "vacuous_contradictory_premise",
+      "domain": "algebra.nat",
+      "passed_falsification": false,
+      "roi_total": 0.0,
+      "is_promoted": false,
+      "proof_solved": false,
+      "kernel_audit_passed": false,
+      "elapsed_seconds": 0.159126875,
+      "error": "Falsification gate error: Conjecture rejected as vacuous (H ⊢ ⊥): Hypotheses are contradictory (H ⊢ ⊥). Rejected as vacuous."
+    },
+    {
+      "conjecture_id": "tautological_bloat",
+      "domain": "esoteric.subfield",
+      "passed_falsification": false,
+      "roi_total": 0.0,
+      "is_promoted": false,
+      "proof_solved": false,
+      "kernel_audit_passed": false,
+      "elapsed_seconds": 10.453919042,
+      "error": "Autoformalization error: Adversarial diff rejected autoformalization: The 'Original Claim' is a meta-statement or commentary *about* a mathematical identity, describing its characteristics (ad-hoc, complex, low unification). It is not the identity itself.; The 'Reconstructed Claim' is an attempt to state a specific mathematical identity or theorem (e.g., `(n+1)^2 = ...`), but it is incomplete.; There is a fundamental semantic mismatch: the original claim describes properties of an identity, while the reconstructed claim attempts to articulate the identity itself. They are not comparable as equivalent mathematical statements or descriptions.; The reconstructed claim is truncated and does not form a complete mathematical statement, making a full comparison of its mathematical content impossible even if the original were a statement."
+    }
+  ]
+}

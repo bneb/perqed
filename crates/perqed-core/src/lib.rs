@@ -1,4 +1,5 @@
 pub mod autoformalize;
+pub mod benchmark;
 pub mod conjecture;
 pub mod dag;
 pub mod dual_engine;
@@ -14,6 +15,7 @@ pub mod tactic_generator;
 pub mod types;
 
 pub use autoformalize::{AutoformalizationResult, Autoformalizer};
+pub use benchmark::{BenchmarkItemResult, BenchmarkRunner, BenchmarkSummary};
 pub use conjecture::{ConjectureGenerator, SynthesisStrategy};
 pub use dag::{MathlibDag, MathlibNode};
 pub use dual_engine::{DecisionProcedure, DualEngineProver};

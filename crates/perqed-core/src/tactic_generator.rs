@@ -133,11 +133,29 @@ impl TacticGenerator {
         let mut list = Vec::new();
 
         if let Some(goal) = state.open_goals.first() {
-            // Implication goal -> intro
+            // Implication / Universal Quantifier goal -> intro
             if goal.contains("→") || goal.contains("forall") || goal.contains("∀") {
                 list.push(TacticCandidate {
-                    tactic_code: "intro h".to_string(),
+                    tactic_code: "intro n".to_string(),
+                    score: 0.98,
+                    generator_model: "heuristic_rule".to_string(),
+                    is_terminal: false,
+                });
+                list.push(TacticCandidate {
+                    tactic_code: "intro n; rfl".to_string(),
+                    score: 0.97,
+                    generator_model: "heuristic_rule".to_string(),
+                    is_terminal: true,
+                });
+                list.push(TacticCandidate {
+                    tactic_code: "intros".to_string(),
                     score: 0.95,
+                    generator_model: "heuristic_rule".to_string(),
+                    is_terminal: false,
+                });
+                list.push(TacticCandidate {
+                    tactic_code: "intro h".to_string(),
+                    score: 0.94,
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });

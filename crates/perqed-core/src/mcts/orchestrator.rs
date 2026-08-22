@@ -149,7 +149,8 @@ impl MctsOrchestrator {
 
                 // Evaluate candidate in Lean
                 let proof_body = format!("theorem probe_thm : {} := by\n  {}", theorem_signature, new_tactics.join("\n  "));
-                let eval = self.lean_client.evaluate_proof_snippet(&["Perqed.Spec.Theorems", "Perqed.Library.Lemmas"], &proof_body).await?;
+                let imports = ["Perqed.Spec.Theorems", "Perqed.Library.Lemmas"];
+                let eval = self.lean_client.evaluate_proof_snippet(&imports, &proof_body).await?;
 
                 let child_id = nodes.len();
                 let child_state = ProofState {
@@ -171,13 +172,14 @@ impl MctsOrchestrator {
 
                 // Value heuristic
                 let value = self.evaluate_heuristic_value(&child_node);
+                let is_child_solved = child_node.proof_state.is_solved;
                 nodes.push(child_node);
                 created_child_ids.push(child_id);
 
                 // 4. Backpropagation
                 self.backpropagate(&mut nodes, child_id, value);
 
-                if eval.is_solved {
+                if is_child_solved {
                     info!("🎉 MCTS discovered valid proof at iteration {}!", iter);
                     solved_node_id = Some(child_id);
                     break;

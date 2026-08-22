@@ -81,12 +81,23 @@ impl Autoformalizer {
             return Err(AutoformalizeError::AdversarialDiffRejected(diff_reason));
         }
 
-        // Step 4: Write Spec.lean to disk
-        let out_dir = output_dir.as_ref();
-        fs::create_dir_all(out_dir)?;
+        // Step 4: Write canonical specification to disk
+        fs::create_dir_all(output_dir.as_ref())?;
+        let spec_file_path = output_dir
+            .as_ref()
+            .join(format!("{}.lean", conjecture.conjecture_id));
 
-        let spec_file_name = format!("{}.lean", conjecture.conjecture_id);
-        let spec_file_path = out_dir.join(&spec_file_name);
+        // If file exists with read-only permissions from prior lock, reset permissions to write
+        if spec_file_path.exists() {
+            if let Ok(metadata) = fs::metadata(&spec_file_path) {
+                let mut perms = metadata.permissions();
+                if perms.readonly() {
+                    perms.set_readonly(false);
+                    let _ = fs::set_permissions(&spec_file_path, perms);
+                }
+            }
+        }
+
         fs::write(&spec_file_path, &spec_code)?;
 
         // Step 5: Canonicalize and create immutable SHA-256 spec.lock

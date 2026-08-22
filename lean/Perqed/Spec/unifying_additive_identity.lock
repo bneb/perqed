@@ -1,0 +1,10 @@
+{
+  "spec_file": "./lean/Perqed/Spec/unifying_additive_identity.lean",
+  "sha256_hash": "99877dba1edc52b7f5256c6e7f19a85740d152091e23cca41a254061d3d57576",
+  "canonical_len": 106,
+  "declarations": [
+    "unifying_additive_identity"
+  ],
+  "created_at": "2026-08-22T15:47:08.818281Z",
+  "perqed_version": "0.2.0"
+}

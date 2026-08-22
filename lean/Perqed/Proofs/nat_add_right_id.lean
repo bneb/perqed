@@ -8,6 +8,6 @@ import Perqed.Library.Lemmas
 namespace Perqed.Proofs
 
 theorem nat_add_right_id : ∀ (n : Nat), Perqed.Spec.nat_add_right_id n := by
-  exact Nat.add_zero
+  intro n; rfl
 
 end Perqed.Proofs

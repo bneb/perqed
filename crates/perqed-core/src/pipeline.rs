@@ -124,6 +124,9 @@ impl FrontierPipeline {
             &autoform_res.spec_lean_path,
         )?;
 
+        // Rebuild Lake environment to compile new specification module
+        let _ = self.lean_client.lake_build().await;
+
         info!("=== STEP 3: Dual-Engine MCTS Hybrid Proof Search ===");
         let tactic_gen = TacticGenerator::new(self.model_router.clone(), None);
         let library_dir = self.workspace_root.join("lean/Perqed/Library");

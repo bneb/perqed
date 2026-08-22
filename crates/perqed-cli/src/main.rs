@@ -140,6 +140,16 @@ enum Commands {
         list: bool,
     },
 
+    /// Run batch benchmark / discovery campaign over a dataset of conjectures
+    Benchmark {
+        /// Path to input benchmark dataset JSON file
+        #[arg(short, long)]
+        input: PathBuf,
+        /// Directory to write benchmark reports
+        #[arg(short, long, default_value = "artifacts/benchmarks")]
+        output: PathBuf,
+    },
+
     /// Emit verified Lean proof artifact and publication-grade LaTeX draft
     Publish {
         /// Theorem title
@@ -412,6 +422,34 @@ async fn main() -> anyhow::Result<()> {
             let db = perqed_sandbox::DeadEndsDb::new(".");
             println!("\n=== Dead Ends Database ===");
             println!("Total recorded falsified dead ends: {}", db.count());
+        }
+
+        Commands::Benchmark { input, output } => {
+            info!("Running Benchmark / Discovery Campaign on dataset: {}", input.display());
+            let content = fs::read_to_string(&input)?;
+            let conjectures: Vec<Conjecture> = if let Ok(list) = serde_json::from_str::<Vec<Conjecture>>(&content) {
+                list
+            } else if let Ok(single) = serde_json::from_str::<Conjecture>(&content) {
+                vec![single]
+            } else {
+                eprintln!("Failed to parse JSON benchmark dataset");
+                std::process::exit(1);
+            };
+
+            let runner = perqed_core::benchmark::BenchmarkRunner::new(".", output.to_str().unwrap_or("artifacts/benchmarks"));
+            let summary = runner.run_benchmark(&conjectures).await;
+
+            println!("\n=======================================================");
+            println!("📊 BENCHMARK CAMPAIGN SUMMARY");
+            println!("Total Candidates Evaluated: {}", summary.total_candidates);
+            println!("Falsified / Pruned Early:   {}", summary.falsified_count);
+            println!("Promoted by ROI Function:   {}", summary.promoted_roi_count);
+            println!("Formally Proved (MCTS):     {}", summary.proofs_solved_count);
+            println!("Passed Kernel Audit Gate:   {}", summary.kernel_audited_count);
+            println!("Solve Rate:                 {:.1}%", summary.solve_rate_percent);
+            println!("Total Elapsed Time:         {:.2}s", summary.total_elapsed_seconds);
+            println!("Report Saved to:            {}/benchmark_report.json", output.display());
+            println!("=======================================================");
         }
 
         Commands::Publish {
