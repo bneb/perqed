@@ -12,7 +12,7 @@ use perqed_sandbox::SandboxRunner;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Error, Debug)]
 pub enum PipelineError {
@@ -159,6 +159,13 @@ impl FrontierPipeline {
             .search_proof(&conjecture.conjecture_id, &target_signature)
             .await?;
 
+        if !proof_res.is_solved {
+            return Err(PipelineError::Failed(format!(
+                "MCTS proof search failed to solve conjecture '{}'. Proof search ended in incomplete/unsolved state.",
+                conjecture.conjecture_id
+            )));
+        }
+
         info!("=== STEP 4: Write Proof Artifact to Disk ===");
         let proofs_dir = self.workspace_root.join("lean/Perqed/Proofs");
         std::fs::create_dir_all(&proofs_dir)?;
@@ -183,7 +190,7 @@ impl FrontierPipeline {
         let expected_hash = autoform_res.spec_lock.sha256_hash.clone();
 
         // Run cold AuditSpec.lean with cryptographically wired expected hash check
-        let audit_output = self
+        let audit_output = match self
             .lean_client
             .run_audit_spec(
                 &proof_decl,
@@ -192,10 +199,15 @@ impl FrontierPipeline {
                 Some(&expected_hash),
             )
             .await
-            .unwrap_or_else(|e| {
-                warn!("Audit note: {}", e);
-                "Audit completed with standard axioms".to_string()
-            });
+        {
+            Ok(out) => out,
+            Err(e) => {
+                return Err(PipelineError::Failed(format!(
+                    "Kernel verification & anti-cheat audit gate failed: {}",
+                    e
+                )));
+            }
+        };
 
         // Run mandatory secondary kernel cross-check
         let _ = self

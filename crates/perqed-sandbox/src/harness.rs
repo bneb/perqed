@@ -72,13 +72,19 @@ pub fn canonicalize_expression(expr: &str) -> String {
         }
     }
 
-    let mut normalized = unified;
-    for (orig, canon) in &var_map {
-        let pattern = format!(r"\b{}\b", regex::escape(orig));
-        if let Ok(re) = Regex::new(&pattern) {
-            normalized = re.replace_all(&normalized, canon.as_str()).to_string();
-        }
-    }
+    let normalized = re_var
+        .replace_all(&unified, |caps: &regex::Captures| {
+            let var_name = &caps[0];
+            if builtins.contains(&var_name) {
+                var_name.to_string()
+            } else {
+                var_map
+                    .get(var_name)
+                    .cloned()
+                    .unwrap_or_else(|| var_name.to_string())
+            }
+        })
+        .to_string();
 
     normalized
 }

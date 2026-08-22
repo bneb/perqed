@@ -114,6 +114,9 @@ The proof was mechanically audited by the Lean 4 kernel reflection gate (\texttt
             proof_code = proof_code.trim(),
         );
 
+        // Validate LaTeX syntax integrity before persisting
+        Self::validate_latex_syntax(&latex_content)?;
+
         let draft_path = self.output_dir.join(format!("{}_draft.tex", theorem_name));
         fs::write(&draft_path, &latex_content)?;
         info!("Emitted publication LaTeX draft to {}", draft_path.display());
@@ -134,5 +137,38 @@ The proof was mechanically audited by the Lean 4 kernel reflection gate (\texttt
         };
 
         Ok(draft)
+    }
+
+    /// Validates basic structural syntax integrity of generated LaTeX source
+    pub fn validate_latex_syntax(latex: &str) -> Result<(), PublicationError> {
+        if !latex.contains(r"\documentclass") {
+            return Err(PublicationError::Template("Missing \\documentclass".to_string()));
+        }
+        if !latex.contains(r"\begin{document}") || !latex.contains(r"\end{document}") {
+            return Err(PublicationError::Template("Malformed document environment".to_string()));
+        }
+
+        // Check balanced environments
+        let re_begin = regex::Regex::new(r"\\begin\{([a-zA-Z*]+)\}").unwrap();
+        let re_end = regex::Regex::new(r"\\end\{([a-zA-Z*]+)\}").unwrap();
+
+        let begins: Vec<String> = re_begin
+            .captures_iter(latex)
+            .map(|c| c[1].to_string())
+            .collect();
+        let ends: Vec<String> = re_end
+            .captures_iter(latex)
+            .map(|c| c[1].to_string())
+            .collect();
+
+        if begins.len() != ends.len() {
+            return Err(PublicationError::Template(format!(
+                "Unbalanced LaTeX environments (\\begin count: {}, \\end count: {})",
+                begins.len(),
+                ends.len()
+            )));
+        }
+
+        Ok(())
     }
 }

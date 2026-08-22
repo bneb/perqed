@@ -94,6 +94,7 @@ impl MctsOrchestrator {
 
         let mut solved_node_id: Option<usize> = None;
         let mut isolated_sublemmas = Vec::new();
+        let mut active_premises = self.available_premises.clone();
 
         for iter in 0..self.config.max_iterations {
             if start_time.elapsed().as_secs() > self.config.timeout_seconds {
@@ -124,23 +125,77 @@ impl MctsOrchestrator {
                     selected_depth,
                     &nodes[selected_id].proof_state,
                 ) {
+                    let sublemma_premise = format!("Perqed.Library.{}", sublemma.name);
+                    if !active_premises.contains(&sublemma_premise) {
+                        active_premises.push(sublemma_premise);
+                    }
+                    let _ = self.sublemma_isolator.persist_sublemma(&sublemma);
                     isolated_sublemmas.push(sublemma.name.clone());
                 }
             }
 
-            // 2. Expansion: Generate candidate tactics
+            let mut created_child_ids = Vec::new();
+
+            // 2A. Fast Symbolic Decision Procedure Probing (Zero-LLM Fast-Path)
+            let fast_tactics = ["rfl", "intro n; rfl", "intro a b; rfl", "omega", "linarith", "ring", "simp", "aesop"];
+            let mut fast_solved = false;
+
+            for fast_tac in fast_tactics {
+                let mut test_tactics = nodes[selected_id].proof_state.cumulative_tactics.clone();
+                test_tactics.push(fast_tac.to_string());
+                let proof_body = format!("theorem probe_thm : {} := by\n  {}", theorem_signature, test_tactics.join("\n  "));
+                let imports = ["Perqed.Spec.Theorems", "Perqed.Library.Lemmas"];
+                if let Ok(eval) = self.lean_client.evaluate_proof_snippet(&imports, &proof_body).await {
+                    if eval.is_solved {
+                        let child_id = nodes.len();
+                        let child_state = ProofState {
+                            open_goals: vec![],
+                            hypotheses: vec![],
+                            is_solved: true,
+                            cumulative_tactics: test_tactics,
+                            search_depth: selected_depth + 1,
+                            raw_lean_state: eval.raw_output,
+                        };
+                        let child_node = MctsNode::new(
+                            child_id,
+                            Some(selected_id),
+                            Some(crate::types::TacticCandidate {
+                                tactic_code: fast_tac.to_string(),
+                                score: 1.0,
+                                generator_model: "native_decision_proc".to_string(),
+                                is_terminal: true,
+                            }),
+                            child_state,
+                            selected_depth + 1,
+                        );
+                        nodes.push(child_node);
+                        created_child_ids.push(child_id);
+                        self.backpropagate(&mut nodes, child_id, 1.0);
+                        solved_node_id = Some(child_id);
+                        fast_solved = true;
+                        info!("⚡ Fast decision procedure '{}' solved goal in <5ms without LLM expansion!", fast_tac);
+                        break;
+                    }
+                }
+            }
+
+            if fast_solved {
+                nodes[selected_id].children_ids = created_child_ids;
+                nodes[selected_id].is_expanded = true;
+                break;
+            }
+
+            // 2B. Model-Guided Expansion: Generate candidate tactics
             let candidates = self
                 .tactic_gen
                 .generate_candidates(
                     &nodes[selected_id].proof_state,
-                    &self.available_premises,
+                    &active_premises,
                     self.config.num_candidates_per_step,
                 )
                 .await?;
 
             nodes[selected_id].is_expanded = true;
-
-            let mut created_child_ids = Vec::new();
 
             // 3. Evaluation / Simulation for each candidate tactic
             for candidate in candidates {
