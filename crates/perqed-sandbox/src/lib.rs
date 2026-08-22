@@ -1,8 +1,12 @@
+pub mod domain_synth;
 pub mod exact_math;
+pub mod graph_sanity;
 pub mod hadwiger_nelson;
 pub mod harness;
 
+pub use domain_synth::{AlgebraicFieldError, AlgebraicNumber, AlgebraicNumberField, Point2DAlgebraic};
 pub use exact_math::{ArbInterval, DegeneracyChecker, ExactMathError, Point2DQ2, QuadraticFieldQ2};
+pub use graph_sanity::{GraphCycleProfile, GraphSanityChecker, SanityCertificate, SanityError};
 pub use hadwiger_nelson::UnitDistanceGraphQ2;
 pub use harness::{CompiledFalsifier, DeadEndRecord, DeadEndsDb, HarnessError};
 
