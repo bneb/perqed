@@ -11,6 +11,7 @@ pub mod pipeline;
 pub mod program_search;
 pub mod publication;
 pub mod roi;
+pub mod router;
 pub mod tactic_generator;
 pub mod types;
 
@@ -27,5 +28,6 @@ pub use pipeline::{FrontierPipeline, PipelineError, PipelineResult};
 pub use program_search::{BoundCandidate, OeisSequence, ProgramInvariantSearch};
 pub use publication::PublicationPipeline;
 pub use roi::{RoiEvaluator, RoiScore};
+pub use router::{TaskType, TierConfig, TieredModelRouter};
 pub use tactic_generator::TacticGenerator;
 pub use types::{AuditReport, Conjecture, MctsConfig, ParsedTheorem, ProofState, PublicationDraft, TacticCandidate};
