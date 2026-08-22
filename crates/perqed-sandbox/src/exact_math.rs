@@ -207,7 +207,7 @@ impl DegeneracyChecker {
 }
 
 /// Exact element in the quadratic field extension ℚ[√2] represented as a + b√2 (a, b ∈ ℚ)
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct QuadraticFieldQ2 {
     pub a: BigRational, // Rational component
     pub b: BigRational, // √2 coefficient
@@ -299,7 +299,7 @@ impl QuadraticFieldQ2 {
 }
 
 /// 2D Point with exact coordinates in (ℚ[√2])²
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Point2DQ2 {
     pub x: QuadraticFieldQ2,
     pub y: QuadraticFieldQ2,

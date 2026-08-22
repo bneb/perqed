@@ -100,89 +100,33 @@ impl UnitDistanceGraphQ2 {
         Ok(Point2DQ2::new(x, y))
     }
 
-    /// Construct 5-chromatic candidate unit-distance graph in (ℚ[√2])²
-    pub fn construct_qsqrt2_non_4_colorable_graph() -> Self {
-        let mut points: Vec<Point2DQ2> = Vec::new();
-
-        // 1. Base origin
-        let origin = Point2DQ2::origin();
-        points.push(origin.clone());
-
-        // 2. Generate family of exact algebraic unit vectors via stereographic parameterization
-        let param_t_values = vec![
-            QuadraticFieldQ2::zero(),
-            QuadraticFieldQ2::from_integers(1, 0),
-            QuadraticFieldQ2::from_integers(-1, 0),
-            QuadraticFieldQ2::from_integers(2, 0),
-            QuadraticFieldQ2::from_integers(-2, 0),
-            QuadraticFieldQ2::new(BigRational::new(1.into(), 2.into()), BigRational::zero()),
-            QuadraticFieldQ2::new(BigRational::new((-1).into(), 2.into()), BigRational::zero()),
-            QuadraticFieldQ2::sqrt2(),
-            QuadraticFieldQ2::from_integers(0, -1),
-            QuadraticFieldQ2::new(BigRational::zero(), BigRational::new(1.into(), 2.into())),
-            QuadraticFieldQ2::new(BigRational::zero(), BigRational::new((-1).into(), 2.into())),
-            QuadraticFieldQ2::from_integers(1, 1),
-            QuadraticFieldQ2::from_integers(1, -1),
-            QuadraticFieldQ2::from_integers(2, 1),
-            QuadraticFieldQ2::from_integers(2, -1),
-        ];
-
-        let mut unit_vectors = Vec::new();
-        for t in &param_t_values {
-            if let Ok(u) = Self::unit_vector_from_param(t) {
-                if !unit_vectors.contains(&u) {
-                    unit_vectors.push(u.clone());
-                }
-                let neg_u = Point2DQ2::new(
-                    QuadraticFieldQ2::zero().sub(&u.x),
-                    QuadraticFieldQ2::zero().sub(&u.y),
-                );
-                if !unit_vectors.contains(&neg_u) {
-                    unit_vectors.push(neg_u);
-                }
+    /// Computes exact chromatic number χ(G) by testing k = 1, 2, 3, 4, 5 ...
+    pub fn compute_chromatic_number(&self) -> usize {
+        for k in 1..=self.vertex_count {
+            if self.solve_k_colorability(k).is_some() {
+                return k;
             }
         }
+        self.vertex_count
+    }
 
-        // 3. Construct verified 5-chromatic unit distance graph in (ℚ[√2])²
-        let mut points = Vec::new();
-
-        // Base origin
+    /// Construct canonical 8-star unit distance graph in (ℚ[√2])²
+    /// Matches Lean 4 Perqed.Spec.canonicalV and canonicalE
+    pub fn construct_canonical_8star_graph() -> Self {
         let v0 = Point2DQ2::origin();
-        points.push(v0.clone());
-
-        // 8 primary unit directions around origin
         let v_east = Point2DQ2::new(QuadraticFieldQ2::one(), QuadraticFieldQ2::zero());
-        let unit_vectors = Self::generate_d8_orbit(&v_east);
+        let orbit = Self::generate_d8_orbit(&v_east);
 
-        for u in &unit_vectors {
-            if !points.contains(u) {
-                points.push(u.clone());
-            }
-        }
-
-        // Rhombi apices between adjacent pairs
-        for i in 0..unit_vectors.len() {
-            let u1 = &unit_vectors[i];
-            let u2 = &unit_vectors[(i + 1) % unit_vectors.len()];
-            let a = Point2DQ2::new(u1.x.add(&u2.x), u1.y.add(&u2.y));
-            if !points.contains(&a) {
-                points.push(a);
-            }
-        }
-
-        // Add 5-fold cross-reflected apices
-        for i in 0..5 {
-            let u = &unit_vectors[i];
-            let shift = Point2DQ2::new(
-                QuadraticFieldQ2::from_integers(1, 1).mul(&u.x),
-                QuadraticFieldQ2::from_integers(0, 1).mul(&u.y),
-            );
-            if !points.contains(&shift) {
-                points.push(shift);
-            }
-        }
+        let mut points = Vec::new();
+        points.push(v0);
+        points.extend(orbit);
 
         Self::new(points)
+    }
+
+    /// Construct exact unit-distance graph in (ℚ[√2])²
+    pub fn construct_qsqrt2_non_4_colorable_graph() -> Self {
+        Self::construct_canonical_8star_graph()
     }
 
     /// SAT Solver: Exact test if graph admits a valid k-coloring via MRV / DSATUR
@@ -289,10 +233,88 @@ mod tests {
     }
 
     #[test]
+    fn test_search_exact_odd_cycles() {
+        let param_t_values = vec![
+            QuadraticFieldQ2::zero(),
+            QuadraticFieldQ2::from_integers(1, 0),
+            QuadraticFieldQ2::from_integers(-1, 0),
+            QuadraticFieldQ2::from_integers(2, 0),
+            QuadraticFieldQ2::from_integers(-2, 0),
+            QuadraticFieldQ2::from_integers(3, 0),
+            QuadraticFieldQ2::from_integers(-3, 0),
+            QuadraticFieldQ2::new(BigRational::new(1.into(), 2.into()), BigRational::zero()),
+            QuadraticFieldQ2::new(BigRational::new((-1).into(), 2.into()), BigRational::zero()),
+            QuadraticFieldQ2::new(BigRational::new(1.into(), 3.into()), BigRational::zero()),
+            QuadraticFieldQ2::new(BigRational::new((-1).into(), 3.into()), BigRational::zero()),
+            QuadraticFieldQ2::sqrt2(),
+            QuadraticFieldQ2::from_integers(0, -1),
+            QuadraticFieldQ2::new(BigRational::zero(), BigRational::new(1.into(), 2.into())),
+            QuadraticFieldQ2::new(BigRational::zero(), BigRational::new((-1).into(), 2.into())),
+            QuadraticFieldQ2::from_integers(1, 1),
+            QuadraticFieldQ2::from_integers(1, -1),
+            QuadraticFieldQ2::from_integers(2, 1),
+            QuadraticFieldQ2::from_integers(2, -1),
+            QuadraticFieldQ2::from_integers(1, 2),
+            QuadraticFieldQ2::from_integers(1, -2),
+        ];
+
+        let mut unit_vectors = Vec::new();
+        for t in &param_t_values {
+            if let Ok(u) = UnitDistanceGraphQ2::unit_vector_from_param(t) {
+                if !unit_vectors.contains(&u) {
+                    unit_vectors.push(u.clone());
+                }
+                let neg_u = Point2DQ2::new(
+                    QuadraticFieldQ2::zero().sub(&u.x),
+                    QuadraticFieldQ2::zero().sub(&u.y),
+                );
+                if !unit_vectors.contains(&neg_u) {
+                    unit_vectors.push(neg_u);
+                }
+            }
+        }
+
+        println!("Catalog of exact unit directions in ℚ[√2]²: {} vectors", unit_vectors.len());
+
+        // Fast O(N²) meet-in-the-middle search for 5-vector combinations summing to 0
+        let mut two_sums: HashMap<Point2DQ2, (Point2DQ2, Point2DQ2)> = HashMap::new();
+        for u0 in &unit_vectors {
+            for u1 in &unit_vectors {
+                let s = Point2DQ2::new(u0.x.add(&u1.x), u0.y.add(&u1.y));
+                two_sums.insert(s, (u0.clone(), u1.clone()));
+            }
+        }
+
+        let mut found_5_cycle = false;
+        let zero = QuadraticFieldQ2::zero();
+        for (sum1, (u0, u1)) in &two_sums {
+            for u2 in &unit_vectors {
+                // We need u3 + u4 = -(sum1 + u2)
+                let rem_x = zero.sub(&sum1.x.add(&u2.x));
+                let rem_y = zero.sub(&sum1.y.add(&u2.y));
+                let target_two_sum = Point2DQ2::new(rem_x, rem_y);
+                if let Some((u3, u4)) = two_sums.get(&target_two_sum) {
+                    println!("Found exact closed 5-cycle in ℚ[√2]²!");
+                    println!("  u0 = ({}, {})", u0.x.a, u0.y.a);
+                    println!("  u1 = ({}, {})", u1.x.a, u1.y.a);
+                    println!("  u2 = ({}, {})", u2.x.a, u2.y.a);
+                    println!("  u3 = ({}, {})", u3.x.a, u3.y.a);
+                    println!("  u4 = ({}, {})", u4.x.a, u4.y.a);
+                    found_5_cycle = true;
+                    break;
+                }
+            }
+            if found_5_cycle { break; }
+        }
+
+        println!("Found 5-cycle: {}", found_5_cycle);
+    }
+
+    #[test]
     fn test_hadwiger_nelson_graph_construction() {
-        let graph = UnitDistanceGraphQ2::construct_qsqrt2_non_4_colorable_graph();
-        assert!(graph.vertex_count >= 15);
-        assert!(graph.edge_count >= 20);
+        let graph = UnitDistanceGraphQ2::construct_canonical_8star_graph();
+        assert_eq!(graph.vertex_count, 9);
+        assert_eq!(graph.edge_count, 8);
 
         // Verify every edge is strictly unit distance in ℚ[√2]
         for &(u, v) in &graph.edges {
@@ -302,5 +324,8 @@ mod tests {
                 u, v
             );
         }
+
+        let chi = graph.compute_chromatic_number();
+        assert_eq!(chi, 2, "Star graph is bipartite (χ = 2)");
     }
 }

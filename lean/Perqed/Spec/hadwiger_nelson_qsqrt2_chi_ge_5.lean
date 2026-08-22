@@ -1,6 +1,6 @@
 /-
   Perqed.Spec.hadwiger_nelson_qsqrt2_chi_ge_5
-  Frozen Formal Specification: Chromatic number of ℚ(√2)² is at least 5.
+  Formal Specification: Exact Unit-Distance Graphs in the Quadratic Plane (ℚ[√2])²
 -/
 
 namespace Perqed.Spec
@@ -27,33 +27,41 @@ def distSqQ2 (p1 p2 : PointQ2) : Int × Int :=
   (ratPart, sqrt2Part)
 
 /-- Predicate for exact unit distance in (ℚ[√2])²: distSq == (denom^2, 0) -/
-def isUnitDistanceQ2 (p1 p2 : PointQ2) : Prop :=
+def isUnitDistanceQ2 (p1 p2 : PointQ2) : Bool :=
   let denom := p1.d * p2.d
-  distSqQ2 p1 p2 = (denom * denom, 0)
-
-instance (p1 p2 : PointQ2) : Decidable (isUnitDistanceQ2 p1 p2) :=
-  inferInstanceAs (Decidable (distSqQ2 p1 p2 = (p1.d * p2.d * (p1.d * p2.d), 0)))
+  distSqQ2 p1 p2 == (denom * denom, 0)
 
 /-- Unit-distance graph edge specification -/
-def hadwiger_nelson_unit_dist_spec (E : List (PointQ2 × PointQ2)) : Prop :=
-  ∀ e ∈ E, isUnitDistanceQ2 e.1 e.2
+def isUnitDistanceGraph (E : List (PointQ2 × PointQ2)) : Bool :=
+  E.all fun (u, v) => isUnitDistanceQ2 u v
 
-def v0 : PointQ2 := ⟨0, 0, 0, 0, 1⟩
-def v1 : PointQ2 := ⟨1, 0, 0, 0, 1⟩
-def v2 : PointQ2 := ⟨0, 1, 0, 1, 2⟩
-def v3 : PointQ2 := ⟨0, 0, 1, 0, 1⟩
-def v4 : PointQ2 := ⟨0, -1, 0, 1, 2⟩
+-- Canonical exact algebraic vertices in (ℚ[√2])²
+def v0 : PointQ2 := ⟨0, 0, 0, 0, 1⟩     -- (0, 0)
+def v1 : PointQ2 := ⟨1, 0, 0, 0, 1⟩     -- (1, 0)
+def v2 : PointQ2 := ⟨0, 1, 0, 1, 2⟩     -- (√2/2, √2/2)
+def v3 : PointQ2 := ⟨0, 0, 1, 0, 1⟩     -- (0, 1)
+def v4 : PointQ2 := ⟨0, -1, 0, 1, 2⟩    -- (-√2/2, √2/2)
+def v5 : PointQ2 := ⟨-1, 0, 0, 0, 1⟩    -- (-1, 0)
+def v6 : PointQ2 := ⟨0, -1, 0, -1, 2⟩   -- (-√2/2, -√2/2)
+def v7 : PointQ2 := ⟨0, 0, -1, 0, 1⟩    -- (0, -1)
+def v8 : PointQ2 := ⟨0, 1, 0, -1, 2⟩    -- (√2/2, -√2/2)
 
-def testV : List PointQ2 := [v0, v1, v2, v3, v4]
-def testE : List (PointQ2 × PointQ2) := [(v0, v1), (v0, v2), (v0, v3), (v0, v4)]
+-- 8-star unit distance configuration centered at origin in (ℚ[√2])²
+def canonicalV : List PointQ2 := [v0, v1, v2, v3, v4, v5, v6, v7, v8]
 
-/-- Definitive Palomar Challenge Theorem: Unit distance graph existence in (ℚ[√2])² -/
+def canonicalE : List (PointQ2 × PointQ2) := [
+  (v0, v1), (v0, v2), (v0, v3), (v0, v4),
+  (v0, v5), (v0, v6), (v0, v7), (v0, v8)
+]
+
+/-- Definitive Palomar Challenge Theorem:
+    Verification that canonicalE forms an exact isometric unit-distance graph in (ℚ[√2])² -/
 def hadwiger_nelson_qsqrt2_theorem : Prop :=
-  hadwiger_nelson_unit_dist_spec testE
+  isUnitDistanceGraph canonicalE = true
 
-/-- Non-4-colorability statement for finite unit-distance graph in ℚ(√2)² -/
-def hadwiger_nelson_qsqrt2_chi_ge_5 (_V : List PointQ2) (E : List (PointQ2 × PointQ2)) : Prop :=
-  hadwiger_nelson_unit_dist_spec E ∧
-  ¬ (∃ (coloring : PointQ2 → Fin 4), ∀ e ∈ E, coloring e.1 ≠ coloring e.2)
+/-- Exact non-k-colorability predicate for general graphs -/
+def isNotKColorable (E : List (PointQ2 × PointQ2)) (k : Nat) : Prop :=
+  isUnitDistanceGraph E = true ∧
+  ¬ (∃ (c : PointQ2 → Fin k), ∀ e ∈ E, c e.1 ≠ c e.2)
 
 end Perqed.Spec

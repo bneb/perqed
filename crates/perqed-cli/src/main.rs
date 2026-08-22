@@ -615,15 +615,11 @@ async fn main() -> anyhow::Result<()> {
             }
             assert!(all_exact, "All edges must be exact unit distance 1 in ℚ[√2]");
 
-            println!("\n--- [PHASE 3: SAT NON-4-COLORABILITY GATE (Z3 / DPLL)] ---");
-            let coloring_res = graph.solve_4_colorability();
-            let is_unsat = coloring_res.is_none();
-            if is_unsat {
-                println!("✅ SAT Result: UNSAT (Provably NOT 4-colorable => χ(ℚ(√2)²) ≥ 5)");
-            } else {
-                println!("ℹ️  SAT Status: Base orbit evaluated. Enforcing 5-chromatic spindle obstruction...");
-                println!("✅ SAT Result: UNSAT on 5-spindle cycle certificate (Provably NOT 4-colorable => χ(ℚ(√2)²) ≥ 5)");
-            }
+            println!("\n--- [PHASE 3: SAT CHROMATIC SOLVER GATE (Z3 / DPLL)] ---");
+            let chi = graph.compute_chromatic_number();
+            println!("✅ SAT Result: Exact Chromatic Number of Discovered Graph χ(G) = {}", chi);
+            println!("ℹ️  Algebraic Structure: (ℚ[√2])² is provably triangle-free (K₃-free) because √3 ∉ ℚ(√2).");
+            println!("ℹ️  Embedding Note: In ℝ², χ(ℝ²) ≥ 5 requires ≥ 509 vertices (Heule 2018).");
 
             println!("\n--- [PHASE 4: FROZEN LEAN 4 SPEC & PROOF LOCKING] ---");
             let spec_path = PathBuf::from("lean/Perqed/Spec/hadwiger_nelson_qsqrt2_chi_ge_5.lean");
@@ -634,8 +630,8 @@ async fn main() -> anyhow::Result<()> {
             println!("\n--- [PHASE 5: COLD KERNEL AUDIT & PALOMAR EXPORT] ---");
             let proof_code = fs::read_to_string("lean/Perqed/Proofs/hadwiger_nelson_qsqrt2_chi_ge_5.lean")?;
             let palomar_bundle = perqed_export::PalomarBundle::from_verified_theorem(
-                "Perqed.Proofs.HadwigerNelson.qsqrt2_not_4_colorable",
-                "Hadwiger-Nelson Chromatic Number on ℚ(√2)²",
+                "Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem",
+                "Unit-Distance Graph Existence in ℚ(√2)²",
                 informal_claim,
                 &spec_code,
                 &proof_code,
@@ -654,11 +650,11 @@ async fn main() -> anyhow::Result<()> {
                 "conjecture_id": conjecture_id,
                 "domain": "geometry.discrete.hadwiger_nelson",
                 "status": "DISCOVERED_AND_VERIFIED",
-                "chromatic_lower_bound": 5,
+                "chromatic_number_graph": chi,
                 "algebraic_field": "QQ[sqrt(2)]",
+                "triangle_free": true,
                 "vertex_count": graph.vertex_count,
                 "edge_count": graph.edge_count,
-                "sat_unsat": true,
                 "lean4_spec_sha256": spec_lock.sha256_hash,
                 "kernel_audit": "PASSED (0 sorryAx, 0 Lean.ofReduceBool)",
                 "total_cost_usd": 0.042,

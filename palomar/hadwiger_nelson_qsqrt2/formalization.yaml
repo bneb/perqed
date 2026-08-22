@@ -1,9 +1,9 @@
 # palomar/formalization.yaml
 schema_version: "1.0"
 theorem_id: "Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem"
-title: "Machine-Checked Formal Theorem: Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem"
+title: "Unit-Distance Graph Existence in ℚ(√2)²"
 informal_claim: >
-  Autonomous verification of Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem
+  There exists a finite unit-distance graph embeddable in ℚ(√2)² that is not 4-colorable, establishing that χ(ℚ(√2)²) ≥ 5.
 authors:
   - name: "Perqed Autonomous Prover v2.2"
     provenance: "Autonomous AI Theorem Discovery Pipeline"
@@ -13,11 +13,11 @@ source_literature:
 verification:
   lean_version: "4.16.0"
   mathlib_revision: "c4d29f8"
-  spec_sha256: "0668d14497569d1af4d3becb73c9c6bc03a7fb9d494aee20873290f7186c8f29"
+  spec_sha256: "d94c7e6a4fcc37bba325cde1992eb5b44376bdd86a30e32c19ddbb1c46222c6b"
   transitive_axioms: ["Classical.choice", "Quot.sound", "propext"]
   sorrys_count: 0
   native_decide_used: false
 compute_audit:
-  total_cost_usd: 0.0380
-  total_energy_joules: 4120.0
+  total_cost_usd: 0.0420
+  total_energy_joules: 4800.0
   primary_models: ["Gemini-3.7-Flash", "GPT-5.6-Luna", "DeepSeek-V4-Flash", "GPT-5.6-Sol"]

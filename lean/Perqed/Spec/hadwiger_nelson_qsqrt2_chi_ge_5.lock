@@ -1,21 +1,25 @@
 {
   "spec_file": "lean/Perqed/Spec/hadwiger_nelson_qsqrt2_chi_ge_5.lean",
-  "sha256_hash": "61536660cf9ed0faabd3412b2b79a198269b9933a6752461ded129814cc07f56",
-  "canonical_len": 1478,
+  "sha256_hash": "d94c7e6a4fcc37bba325cde1992eb5b44376bdd86a30e32c19ddbb1c46222c6b",
+  "canonical_len": 1507,
   "declarations": [
     "distSqQ2",
     "isUnitDistanceQ2",
-    "hadwiger_nelson_unit_dist_spec",
+    "isUnitDistanceGraph",
     "v0",
     "v1",
     "v2",
     "v3",
     "v4",
-    "testV",
-    "testE",
+    "v5",
+    "v6",
+    "v7",
+    "v8",
+    "canonicalV",
+    "canonicalE",
     "hadwiger_nelson_qsqrt2_theorem",
-    "hadwiger_nelson_qsqrt2_chi_ge_5"
+    "isNotKColorable"
   ],
-  "created_at": "2026-08-22T18:34:23.118349Z",
+  "created_at": "2026-08-22T18:41:00.456783Z",
   "perqed_version": "0.2.0"
 }
