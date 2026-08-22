@@ -26,8 +26,8 @@ async fn test_red_to_green_symbolic_decision_procedure_interleaving() {
         .await;
     assert!(!tactics.is_empty());
 
-    // Top priority tactic must be the fast symbolic decision procedure `omega`
+    // Top priority tactic must be the fast symbolic decision procedure `omega` (<5ms budget)
     assert_eq!(tactics[0].tactic_code, "omega");
-    assert_eq!(tactics[0].generator_model, "symbolic_proc:omega");
+    assert_eq!(tactics[0].generator_model, "symbolic_proc:omega[<5ms]");
     assert!(tactics[0].is_terminal);
 }

@@ -34,19 +34,22 @@ fn test_red_to_green_dead_ends_pruning() {
     // Initial state: target is not a known dead end
     assert!(!db.is_known_dead_end(target_expr));
 
-    // Record dead end with counterexample
+    // Record dead end with counterexample on (x)
     let mut cex = HashMap::new();
     cex.insert("x".to_string(), 5);
     db.record_dead_end(DeadEndRecord {
         conjecture_id: "conj_failed_01".to_string(),
         domain: "arithmetic".to_string(),
         target: target_expr.to_string(),
+        canonical_target: String::new(),
         counterexample: cex,
         timestamp: "2026-08-22T08:30:00Z".to_string(),
         test_count: 50_000,
     })
     .unwrap();
 
-    // After recording: subsequent queries immediately flag as dead end
+    // After recording: queries with identical or alpha-equivalent variable names (y * y >= 1000000)
+    // are immediately recognized and pruned!
     assert!(db.is_known_dead_end(target_expr));
+    assert!(db.is_known_dead_end("y * y >= 1000000"), "DeadEndsDb must recognize alpha-equivalent variable permutation!");
 }

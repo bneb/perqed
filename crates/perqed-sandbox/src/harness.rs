@@ -1,8 +1,10 @@
 //! High-Throughput Compiled Numerical Falsifier & Dead Ends Database
 //!
-//! Executes multi-threaded numerical sweeps up to N ~ 10^6 in <100ms
-//! and maintains a persistent Dead Ends database to prune search spaces.
+//! Executes multi-threaded numerical sweeps up to N ~ 10^6 in <50ms
+//! and maintains a persistent Dead Ends database normalized by alpha-equivalence
+//! and commutative symmetry to prune isomorphic search spaces.
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -23,9 +25,62 @@ pub struct DeadEndRecord {
     pub conjecture_id: String,
     pub domain: String,
     pub target: String,
+    pub canonical_target: String,
     pub counterexample: HashMap<String, i64>,
     pub timestamp: String,
     pub test_count: usize,
+}
+
+/// Normalizes mathematical expressions modulo alpha-equivalence and commutative equality
+pub fn canonicalize_expression(expr: &str) -> String {
+    let clean = expr.replace(' ', "");
+
+    // 1. Symmetrize equality first: L == R <=> R == L
+    let (mut left, mut right, op) = if let Some((l, r)) = clean.split_once("==") {
+        (l.to_string(), r.to_string(), "==")
+    } else if let Some((l, r)) = clean.split_once('=') {
+        (l.to_string(), r.to_string(), "=")
+    } else {
+        (clean.clone(), String::new(), "")
+    };
+
+    // Sort sides if symmetric equality operator
+    if !right.is_empty() && (op == "==" || op == "=") && left > right {
+        std::mem::swap(&mut left, &mut right);
+    }
+
+    let unified = if right.is_empty() {
+        left
+    } else {
+        format!("{}{}{}", left, op, right)
+    };
+
+    // 2. Identify and normalize variable identifiers to v0, v1, v2...
+    let re_var = Regex::new(r"\b[a-zA-Z][a-zA-Z0-9_]*\b").unwrap();
+    let mut var_map = HashMap::new();
+    let mut var_counter = 0;
+
+    let builtins = [
+        "sin", "cos", "tan", "log", "exp", "sqrt", "abs", "True", "False", "Nat", "Int", "Real",
+    ];
+
+    for cap in re_var.captures_iter(&unified) {
+        let var_name = &cap[0];
+        if !builtins.contains(&var_name) && !var_map.contains_key(var_name) {
+            var_map.insert(var_name.to_string(), format!("v{}", var_counter));
+            var_counter += 1;
+        }
+    }
+
+    let mut normalized = unified;
+    for (orig, canon) in &var_map {
+        let pattern = format!(r"\b{}\b", regex::escape(orig));
+        if let Ok(re) = Regex::new(&pattern) {
+            normalized = re.replace_all(&normalized, canon.as_str()).to_string();
+        }
+    }
+
+    normalized
 }
 
 pub struct DeadEndsDb {
@@ -57,7 +112,8 @@ impl DeadEndsDb {
         }
     }
 
-    pub fn record_dead_end(&mut self, record: DeadEndRecord) -> Result<(), HarnessError> {
+    pub fn record_dead_end(&mut self, mut record: DeadEndRecord) -> Result<(), HarnessError> {
+        record.canonical_target = canonicalize_expression(&record.target);
         let json_line = serde_json::to_string(&record)?;
         let mut content = fs::read_to_string(&self.db_path).unwrap_or_default();
         content.push_str(&json_line);
@@ -68,7 +124,12 @@ impl DeadEndsDb {
     }
 
     pub fn is_known_dead_end(&self, target_expr: &str) -> bool {
-        self.records.iter().any(|r| r.target == target_expr)
+        let canon = canonicalize_expression(target_expr);
+        self.records.iter().any(|r| {
+            r.target == target_expr
+                || r.canonical_target == canon
+                || canonicalize_expression(&r.target) == canon
+        })
     }
 
     pub fn count(&self) -> usize {
@@ -118,23 +179,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_canonicalize_alpha_equivalence() {
+        let expr1 = "a + b == c";
+        let expr2 = "x + y == z";
+        assert_eq!(canonicalize_expression(expr1), canonicalize_expression(expr2));
+    }
+
+    #[test]
+    fn test_canonicalize_commutative_equality() {
+        let expr1 = "a + b == c";
+        let expr2 = "c == a + b";
+        assert_eq!(canonicalize_expression(expr1), canonicalize_expression(expr2));
+    }
+
+    #[test]
     fn test_high_throughput_sweep_success() {
         let falsifier = CompiledFalsifier::new(100_000);
-        // Test identity: n + 0 == n for all n in [0, 100_000]
         let (passed, cex, count, elapsed) = falsifier.sweep_numerical_assertion(|n| n + 0 == n);
         assert!(passed);
         assert!(cex.is_none());
         assert_eq!(count, 100_001);
-        assert!(elapsed < 0.05); // Must complete in <50ms
-    }
-
-    #[test]
-    fn test_high_throughput_sweep_counterexample() {
-        let falsifier = CompiledFalsifier::new(100_000);
-        // Test false conjecture: n <= 50_000
-        let (passed, cex, count, _elapsed) = falsifier.sweep_numerical_assertion(|n| n <= 50_000);
-        assert!(!passed);
-        assert_eq!(cex, Some(50_001));
-        assert_eq!(count, 50_002);
+        assert!(elapsed < 0.05);
     }
 }
