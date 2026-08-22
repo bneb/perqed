@@ -78,3 +78,16 @@ fn test_red_to_green_power_and_cost_roi_leverage() {
     assert!(cost_lev > 1000.0, "Cost leverage must exceed 1000x (actual: {:.1}x)", cost_lev);
     assert!(energy_lev > 100.0, "Energy leverage must exceed 100x (actual: {:.1}x)", energy_lev);
 }
+
+#[test]
+fn test_red_to_green_optimal_triad_intelligence_per_dollar() {
+    let model = perqed_core::roi::PowerCostModel::default();
+
+    // Golden Triad: DeepSeek-V4-Pro (T1) + Gemini 3.7 Flash High (T2) + GPT-5.6 Sol (T3)
+    // 78% solve rate, 500 tokens per tactic, 4,000 tokens for literature ingestion
+    let metrics = model.compute_triad_intelligence_per_dollar(78.0, 500, 4_000);
+
+    assert!(metrics.cost_per_verified_proof_usd < 0.10, "Cost per verified proof must be < $0.10 (actual: ${:.4})", metrics.cost_per_verified_proof_usd);
+    assert!(metrics.proofs_per_dollar > 10.0, "Proofs per dollar must exceed 10 (actual: {:.2})", metrics.proofs_per_dollar);
+    assert!(metrics.intelligence_multiplier_vs_naive > 500.0, "Intelligence multiplier must exceed 500x (actual: {:.1}x)", metrics.intelligence_multiplier_vs_naive);
+}

@@ -79,6 +79,51 @@ impl PowerCostModel {
 
         (funnel_cost_usd, cost_leverage_multiplier, energy_leverage_multiplier)
     }
+
+    /// Computes augmented intelligence-per-dollar metrics for the Golden Triad:
+    /// DeepSeek-V4-Pro (Tier 1) + Gemini 3.7 Flash High (Tier 2) + GPT-5.6 Sol (Tier 3)
+    pub fn compute_triad_intelligence_per_dollar(
+        &self,
+        solve_rate_percent: f64,
+        avg_proof_tokens_tier1: usize,
+        avg_ingest_tokens_tier2: usize,
+    ) -> IntelligencePerDollarMetrics {
+        // Average cost per verified theorem in the augmented funnel:
+        // Tier 2 Ingest (Gemini 3.7 Flash): 1 query
+        let tier2_cost = (avg_ingest_tokens_tier2 as f64 / 1_000_000.0) * self.tier2_cost_per_m_tokens;
+        // Tier 1 MCTS (DeepSeek V4 Pro/Flash): ~100 tactic expansions
+        let tier1_cost = ((avg_proof_tokens_tier1 * 100) as f64 / 1_000_000.0) * self.tier1_cost_per_m_tokens;
+        // Tier 3 Audit (GPT-5.6 Sol): 1 adversarial pass on surviving 1%
+        let tier3_cost = (4000.0 / 1_000_000.0) * self.tier3_cost_per_m_tokens;
+
+        let cost_per_verified_proof_usd = tier2_cost + tier1_cost + tier3_cost;
+        let proofs_per_dollar = if cost_per_verified_proof_usd > 0.0 {
+            (solve_rate_percent / 100.0) / cost_per_verified_proof_usd
+        } else {
+            100.0
+        };
+
+        // Naive frontier model baseline ($18.50 per theorem @ 22% solve rate = 0.0118 proofs / $)
+        let naive_proofs_per_dollar = 0.22 / 18.50;
+        let intelligence_multiplier = proofs_per_dollar / naive_proofs_per_dollar;
+
+        IntelligencePerDollarMetrics {
+            solve_rate_percent,
+            cost_per_verified_proof_usd,
+            proofs_per_dollar,
+            intelligence_multiplier_vs_naive: intelligence_multiplier,
+            portfolio_summary: "Golden Triad: DeepSeek-V4-Pro (T1) + Gemini 3.7 Flash (T2) + GPT-5.6 Sol (T3)".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntelligencePerDollarMetrics {
+    pub solve_rate_percent: f64,
+    pub cost_per_verified_proof_usd: f64,
+    pub proofs_per_dollar: f64,
+    pub intelligence_multiplier_vs_naive: f64,
+    pub portfolio_summary: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

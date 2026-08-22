@@ -27,7 +27,7 @@ pub use model_client::{ModelMessage, ModelProvider, ModelRequest, ModelResponse,
 pub use pipeline::{FrontierPipeline, PipelineError, PipelineResult};
 pub use program_search::{BoundCandidate, OeisSequence, ProgramInvariantSearch};
 pub use publication::PublicationPipeline;
-pub use roi::{PowerCostModel, RoiEvaluator, RoiScore};
+pub use roi::{IntelligencePerDollarMetrics, PowerCostModel, RoiEvaluator, RoiScore};
 pub use router::{BudgetTracker, TaskType, TierConfig, TieredModelRouter};
 pub use tactic_generator::TacticGenerator;
 pub use types::{AuditReport, Conjecture, MctsConfig, ParsedTheorem, ProofState, PublicationDraft, TacticCandidate};
