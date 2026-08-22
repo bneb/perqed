@@ -1,10 +1,10 @@
 {
   "spec_file": "/Users/kevin/projects/perqed/lean/Perqed/Spec/nat_add_right_id.lean",
-  "sha256_hash": "26b0cf0167ddd94e4611b0ea532a748fb1c685cbf4ec50fe5b61a2a3ec2e6021",
-  "canonical_len": 93,
+  "sha256_hash": "b4fd27800f4cabcb026bb52bfb9c826465ce6b0174b16f14ec28ca59bb2eafe1",
+  "canonical_len": 111,
   "declarations": [
     "nat_add_right_id"
   ],
-  "created_at": "2026-08-22T15:57:05.847094Z",
+  "created_at": "2026-08-22T16:00:04.179876Z",
   "perqed_version": "0.2.0"
 }

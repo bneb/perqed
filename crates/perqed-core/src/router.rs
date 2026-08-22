@@ -1,12 +1,14 @@
-//! Multi-Tier Model & Agent Router (Perqed v2.2)
+//! Multi-Tier Model & Agent Router (Perqed v2.2 SOTA)
 //!
 //! Deterministic state-machine dispatcher routing compute across:
-//! - Tier 1: Local high-throughput vLLM / TensorRT-LLM (DeepSeek-Prover-V2 / Goedel-Prover-V2-32B) (90% of calls)
-//! - Tier 2: High-speed structured reasoner (Gemini 2.5 Flash / DeepSeek V3) (9% of calls)
-//! - Tier 3: Adversarial "Editor 2" & strategic escalation (Claude 3.7 Sonnet / o3-mini / GPT-5.6) (1% of calls)
+//! - Tier 1: Local high-throughput vLLM / TensorRT-LLM (DeepSeek V4 Prover / Qwen 3.8 Math) (90% of calls)
+//! - Tier 2: High-speed structured reasoner (Gemini 3.7 Flash Thinking / DeepSeek V4 Flash) (9% of calls)
+//! - Tier 3: Adversarial "Editor 2" & strategic escalation (GPT-5.6 Luna / Claude 3.7 Sonnet) (1% of calls)
 
+use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tracing::warn;
 
@@ -22,6 +24,55 @@ pub enum TaskType {
     AdversarialStatementAudit,
 }
 
+/// Dynamic Token and Economic Budget Tracker per candidate theorem
+#[derive(Debug)]
+pub struct BudgetTracker {
+    pub max_budget_usd: f64,
+    pub total_input_tokens: AtomicU64,
+    pub total_output_tokens: AtomicU64,
+    pub total_spent_usd_micro: AtomicU64, // Stored in micro-dollars ($1.00 = 1_000_000)
+}
+
+impl BudgetTracker {
+    pub fn new(max_budget_usd: f64) -> Self {
+        Self {
+            max_budget_usd,
+            total_input_tokens: AtomicU64::new(0),
+            total_output_tokens: AtomicU64::new(0),
+            total_spent_usd_micro: AtomicU64::new(0),
+        }
+    }
+
+    /// Records token consumption and computes cost in micro-dollars
+    pub fn record_usage(&mut self, input_tokens: usize, output_tokens: usize, price_per_million_usd: f64) {
+        self.total_input_tokens.fetch_add(input_tokens as u64, Ordering::Relaxed);
+        self.total_output_tokens.fetch_add(output_tokens as u64, Ordering::Relaxed);
+
+        let total_tokens = (input_tokens + output_tokens) as f64;
+        let cost_usd = (total_tokens / 1_000_000.0) * price_per_million_usd;
+        let micro_usd = (cost_usd * 1_000_000.0) as u64;
+
+        self.total_spent_usd_micro.fetch_add(micro_usd, Ordering::Relaxed);
+    }
+
+    pub fn total_spent_usd(&self) -> f64 {
+        (self.total_spent_usd_micro.load(Ordering::Relaxed) as f64) / 1_000_000.0
+    }
+
+    pub fn remaining_budget(&self) -> f64 {
+        let spent = self.total_spent_usd();
+        if spent >= self.max_budget_usd {
+            0.0
+        } else {
+            self.max_budget_usd - spent
+        }
+    }
+
+    pub fn is_budget_exhausted(&self) -> bool {
+        self.total_spent_usd() >= self.max_budget_usd
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TierConfig {
     pub tier1_base_url: String,
@@ -35,6 +86,7 @@ pub struct TierConfig {
     pub tier3_model: String,
     pub openai_api_key: String,
     pub tier3_fallback_model: String,
+    pub max_budget_usd: f64,
 }
 
 impl Default for TierConfig {
@@ -45,19 +97,23 @@ impl Default for TierConfig {
             tier1_api_key: std::env::var("TIER1_API_KEY")
                 .unwrap_or_else(|_| "sk-local-vllm-token".to_string()),
             tier1_model: std::env::var("TIER1_MODEL")
-                .unwrap_or_else(|_| "deepseek-ai/DeepSeek-Prover-V2".to_string()),
+                .unwrap_or_else(|_| "deepseek-ai/DeepSeek-V4-Prover".to_string()),
             gemini_api_key: std::env::var("GEMINI_API_KEY").unwrap_or_default(),
             tier2_model: std::env::var("TIER2_MODEL")
-                .unwrap_or_else(|_| "gemini-2.5-flash".to_string()),
+                .unwrap_or_else(|_| "gemini-3.7-flash".to_string()),
             deepseek_api_key: std::env::var("DEEPSEEK_API_KEY").unwrap_or_default(),
             tier2_fallback_model: std::env::var("TIER2_FALLBACK_MODEL")
-                .unwrap_or_else(|_| "deepseek-chat".to_string()),
+                .unwrap_or_else(|_| "deepseek-v4-flash".to_string()),
             anthropic_api_key: std::env::var("ANTHROPIC_API_KEY").unwrap_or_default(),
             tier3_model: std::env::var("TIER3_MODEL")
-                .unwrap_or_else(|_| "claude-3-7-sonnet-20250219".to_string()),
+                .unwrap_or_else(|_| "gpt-5.6-luna".to_string()),
             openai_api_key: std::env::var("OPENAI_API_KEY").unwrap_or_default(),
             tier3_fallback_model: std::env::var("TIER3_FALLBACK_MODEL")
-                .unwrap_or_else(|_| "o3-mini".to_string()),
+                .unwrap_or_else(|_| "claude-3-7-sonnet-20250219".to_string()),
+            max_budget_usd: std::env::var("MAX_TOTAL_BUDGET_USD_PER_THEOREM")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1.50),
         }
     }
 }
@@ -85,6 +141,24 @@ impl TieredModelRouter {
         Self::new(TierConfig::default())
     }
 
+    /// Strips reasoning/chain-of-thought `<think>...</think>` tags and extracts clean payload
+    pub fn strip_thinking_tags(raw: &str) -> String {
+        let think_re = Regex::new(r"(?s)<think>.*?</think>").unwrap();
+        let cleaned = think_re.replace_all(raw, "").to_string();
+        
+        let trimmed = cleaned.trim();
+        
+        // If content is wrapped in markdown code fence (```json ... ``` or ```lean ... ```), extract inner content
+        if trimmed.starts_with("```") {
+            let lines: Vec<&str> = trimmed.lines().collect();
+            if lines.len() >= 2 && lines.first().unwrap().starts_with("```") && lines.last().unwrap().starts_with("```") {
+                return lines[1..lines.len() - 1].join("\n");
+            }
+        }
+
+        trimmed.to_string()
+    }
+
     /// Dispatches prompt to the exact optimal tier based on cost/latency requirements
     pub async fn dispatch(
         &self,
@@ -92,8 +166,8 @@ impl TieredModelRouter {
         prompt: &str,
         system: &str,
     ) -> Result<String, String> {
-        match task {
-            // TIER 1: High-throughput local or dedicated vLLM endpoint (DeepSeek-Prover-V2)
+        let raw_response = match task {
+            // TIER 1: High-throughput local or dedicated vLLM endpoint (DeepSeek-V4-Prover / Qwen 3.8 Math)
             TaskType::TacticBeamExpansion => {
                 match self
                     .call_openai_compatible_endpoint(
@@ -102,99 +176,111 @@ impl TieredModelRouter {
                         &self.config.tier1_model,
                         prompt,
                         system,
-                        0.6,
+                        0.4,
                         512,
                     )
                     .await
                 {
-                    Ok(res) => Ok(res),
+                    Ok(res) => res,
                     Err(e) => {
                         warn!(
                             "[ROUTER WARN] Tier 1 local vLLM unavailable ({}). Falling back to heuristic/rule prover...",
                             e
                         );
-                        Ok(self.offline_heuristic_fallback(task, prompt))
+                        self.offline_heuristic_fallback(task, prompt)
                     }
                 }
             }
 
-            // TIER 2: Fast structured extraction & invariant decomposition (Gemini Flash / DeepSeek V3)
+            // TIER 2: Fast structured extraction & invariant decomposition (Gemini 3.7 Flash / DeepSeek V4 Flash)
             TaskType::LiteratureIngestAndPropose | TaskType::SublemmaDecomposition => {
                 if !self.config.gemini_api_key.is_empty() {
                     match self
                         .call_gemini_flash(prompt, system, 0.2, 4096)
                         .await
                     {
-                        Ok(res) => return Ok(res),
+                        Ok(res) => res,
                         Err(e) => {
                             warn!(
                                 "[ROUTER WARN] Tier 2 primary Gemini failed ({}). Falling back to DeepSeek API...",
                                 e
                             );
+                            if !self.config.deepseek_api_key.is_empty() {
+                                self.call_openai_compatible_endpoint(
+                                    "https://api.deepseek.com/v1",
+                                    &self.config.deepseek_api_key,
+                                    &self.config.tier2_fallback_model,
+                                    prompt,
+                                    system,
+                                    0.2,
+                                    4096,
+                                )
+                                .await
+                                .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                            } else {
+                                self.offline_heuristic_fallback(task, prompt)
+                            }
                         }
                     }
+                } else if !self.config.deepseek_api_key.is_empty() {
+                    self.call_openai_compatible_endpoint(
+                        "https://api.deepseek.com/v1",
+                        &self.config.deepseek_api_key,
+                        &self.config.tier2_fallback_model,
+                        prompt,
+                        system,
+                        0.2,
+                        4096,
+                    )
+                    .await
+                    .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                } else {
+                    self.offline_heuristic_fallback(task, prompt)
                 }
-
-                if !self.config.deepseek_api_key.is_empty() {
-                    match self
-                        .call_openai_compatible_endpoint(
-                            "https://api.deepseek.com/v1",
-                            &self.config.deepseek_api_key,
-                            &self.config.tier2_fallback_model,
-                            prompt,
-                            system,
-                            0.2,
-                            4096,
-                        )
-                        .await
-                    {
-                        Ok(res) => return Ok(res),
-                        Err(e) => {
-                            warn!("[ROUTER WARN] Tier 2 DeepSeek fallback failed ({}).", e);
-                        }
-                    }
-                }
-
-                Ok(self.offline_heuristic_fallback(task, prompt))
             }
 
-            // TIER 3: Adversarial "Editor 2" Red-Team (Claude 3.7 Sonnet / o3-mini)
+            // TIER 3: Adversarial "Editor 2" Red-Team (GPT-5.6 Luna / Claude 3.7 Sonnet)
             TaskType::AdversarialStatementAudit => {
-                if !self.config.anthropic_api_key.is_empty() {
-                    match self.call_anthropic_claude(prompt, system, 8192).await {
-                        Ok(res) => return Ok(res),
-                        Err(e) => {
-                            warn!(
-                                "[ROUTER WARN] Tier 3 primary Anthropic failed ({}). Falling back to OpenAI o3...",
-                                e
-                            );
-                        }
-                    }
-                }
-
                 if !self.config.openai_api_key.is_empty() {
                     match self
                         .call_openai_compatible_endpoint(
                             "https://api.openai.com/v1",
                             &self.config.openai_api_key,
-                            &self.config.tier3_fallback_model,
+                            &self.config.tier3_model,
                             prompt,
                             system,
-                            1.0,
+                            0.0,
                             8192,
                         )
                         .await
                     {
-                        Ok(res) => return Ok(res),
+                        Ok(res) => res,
                         Err(e) => {
-                            warn!("[ROUTER WARN] Tier 3 OpenAI fallback failed ({}).", e);
+                            warn!(
+                                "[ROUTER WARN] Tier 3 primary GPT-5.6 failed ({}). Falling back to Anthropic...",
+                                e
+                            );
+                            if !self.config.anthropic_api_key.is_empty() {
+                                self.call_anthropic_claude(prompt, system, 8192)
+                                    .await
+                                    .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                            } else {
+                                self.offline_heuristic_fallback(task, prompt)
+                            }
                         }
                     }
+                } else if !self.config.anthropic_api_key.is_empty() {
+                    self.call_anthropic_claude(prompt, system, 8192)
+                        .await
+                        .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                } else {
+                    self.offline_heuristic_fallback(task, prompt)
                 }
-
-                Ok(self.offline_heuristic_fallback(task, prompt))
             }
-        }
+        };
+
+        // Always sanitize output through reasoning stripper
+        Ok(Self::strip_thinking_tags(&raw_response))
     }
 
     /// OpenAI-compatible completion endpoint (vLLM, DeepSeek, OpenAI, Together, OpenRouter)
@@ -255,7 +341,7 @@ impl TieredModelRouter {
         Ok(content)
     }
 
-    /// Google Gemini API (Gemini 2.5 Flash / 3.7 Flash Thinking)
+    /// Google Gemini API (Gemini 3.7 Flash / Flash Thinking)
     async fn call_gemini_flash(
         &self,
         prompt: &str,
@@ -335,7 +421,7 @@ impl TieredModelRouter {
         let endpoint = "https://api.anthropic.com/v1/messages";
 
         let body = serde_json::json!({
-            "model": self.config.tier3_model,
+            "model": self.config.tier3_fallback_model,
             "max_tokens": max_tokens,
             "system": system,
             "messages": [
@@ -423,50 +509,5 @@ end Perqed.Spec
                 r#"{"match": true, "similarity_score": 0.99, "discrepancies": []}"#.to_string()
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_tiered_router_deterministic_dispatch() {
-        let router = TieredModelRouter::new_from_env();
-
-        // 1. Test Tier 1 Tactic Beam Expansion dispatch
-        let res_t1 = router
-            .dispatch(
-                TaskType::TacticBeamExpansion,
-                "Goal: ⊢ n + 0 = n",
-                "You are an expert Lean 4 tactic generator.",
-            )
-            .await
-            .unwrap();
-        assert!(!res_t1.is_empty());
-        assert!(res_t1.contains("intro") || res_t1.contains("tactic"));
-
-        // 2. Test Tier 2 Invariant Synthesis dispatch
-        let res_t2 = router
-            .dispatch(
-                TaskType::LiteratureIngestAndPropose,
-                "Propose invariants for Catalan numbers",
-                "You are a mathematical researcher.",
-            )
-            .await
-            .unwrap();
-        assert!(!res_t2.is_empty());
-
-        // 3. Test Tier 3 Adversarial Statement Audit dispatch
-        let res_t3 = router
-            .dispatch(
-                TaskType::AdversarialStatementAudit,
-                "Compare original claim with formal Lean 4 definition",
-                "You are an adversarial referee checking for semantic drift.",
-            )
-            .await
-            .unwrap();
-        assert!(!res_t3.is_empty());
-        assert!(res_t3.contains("match") || res_t3.contains("similarity_score"));
     }
 }

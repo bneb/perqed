@@ -173,9 +173,9 @@ impl ModelProvider for GeminiProvider {
         let gemini_model = if req.model.starts_with("gemini-") {
             req.model.clone()
         } else if req.model.contains("thinking") || req.model.contains("reason") {
-            "gemini-2.0-flash-thinking-exp-01-21".to_string()
+            "gemini-3.7-flash-thinking".to_string()
         } else {
-            "gemini-2.5-flash".to_string()
+            "gemini-3.7-flash".to_string()
         };
 
         let endpoint = format!(
@@ -243,14 +243,16 @@ impl ModelProvider for HeuristicProverProvider {
         let prompt = req.messages.last().map(|m| m.content.as_str()).unwrap_or("");
         
         let content = if prompt.contains("Translate into Lean 4 specification") || prompt.contains("Autoformalize") {
-            r#"```lean
-namespace Perqed.Spec
-
-def generated_conjecture (n : Nat) : Prop :=
-  n + 0 = n
-
-end Perqed.Spec
-```"#.to_string()
+            let decl_name = if let Some(pos) = prompt.find("Conjecture ID: ") {
+                let rest = &prompt[pos + 15..];
+                rest.lines().next().unwrap_or("generated_conjecture").trim()
+            } else {
+                "generated_conjecture"
+            };
+            format!(
+                "```lean\nnamespace Perqed.Spec\n\ndef {} (n : Nat) : Prop :=\n  n + 0 = n\n\nend Perqed.Spec\n```",
+                decl_name
+            )
         } else if prompt.contains("Translate back into English") {
             "For any natural number n, adding zero to n equals n.".to_string()
         } else if prompt.contains("Adversarial Semantic Diff") {
