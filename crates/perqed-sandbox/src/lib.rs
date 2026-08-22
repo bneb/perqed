@@ -1,5 +1,7 @@
+pub mod exact_math;
 pub mod harness;
 
+pub use exact_math::{ArbInterval, DegeneracyChecker, ExactMathError};
 pub use harness::{CompiledFalsifier, DeadEndRecord, DeadEndsDb, HarnessError};
 
 use serde::{Deserialize, Serialize};

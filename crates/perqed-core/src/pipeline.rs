@@ -111,6 +111,18 @@ impl FrontierPipeline {
             roi_score.total_roi, roi_score.ranking_rationale
         );
 
+        info!("=== STEP 1C: Conclusion Mutation & Anti-Tautology Gate ===");
+        let mutation_report = perqed_audit::ConclusionMutationGate::audit_conclusion_non_trivial(
+            &conjecture.hypotheses,
+            &conjecture.target,
+        )?;
+        info!(
+            "Mutation Inversion: {} -> {} (Non-tautological: {})",
+            mutation_report.original_target,
+            mutation_report.inverted_target,
+            mutation_report.mutation_passed
+        );
+
         info!("=== STEP 2: Statement Autoformalization & SHA-256 Hash-Lock Gate ===");
         let spec_dir = self.workspace_root.join("lean/Perqed/Spec");
         let autoform_res = self

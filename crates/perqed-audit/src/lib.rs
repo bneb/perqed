@@ -3,6 +3,9 @@
 //! Provides canonical AST normalization, SHA-256 statement hash-locking,
 //! tampering detection, and axiom/signature verification gates.
 
+pub mod mutation_gate;
+pub use mutation_gate::{ConclusionMutationGate, MutationReport};
+
 use chrono::{DateTime, Utc};
 use hex::ToHex;
 use regex::Regex;

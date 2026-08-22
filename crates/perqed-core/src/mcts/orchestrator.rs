@@ -95,6 +95,7 @@ impl MctsOrchestrator {
         let mut solved_node_id: Option<usize> = None;
         let mut isolated_sublemmas = Vec::new();
         let mut active_premises = self.available_premises.clone();
+        let mut cycle_detector = perqed_lean_client::GoalCycleDetector::new();
 
         for iter in 0..self.config.max_iterations {
             if start_time.elapsed().as_secs() > self.config.timeout_seconds {
@@ -214,16 +215,28 @@ impl MctsOrchestrator {
                     is_solved: eval.is_solved,
                     cumulative_tactics: new_tactics,
                     search_depth: selected_depth + 1,
-                    raw_lean_state: eval.raw_output,
+                    raw_lean_state: eval.raw_output.clone(),
                 };
 
-                let child_node = MctsNode::new(
+                // Cycle Pruning: Check if new state repeats an ancestor goal state
+                let is_cyclic = !eval.is_solved && cycle_detector.check_and_record_cycle(&eval.raw_output);
+
+                let mut child_node = MctsNode::new(
                     child_id,
                     Some(selected_id),
                     Some(candidate.clone()),
                     child_state,
                     selected_depth + 1,
                 );
+
+                if is_cyclic {
+                    info!("🚫 MCTS detected cyclic proof state loop for tactic '{}'. Pruning branch.", candidate.tactic_code);
+                    child_node.is_terminal = true;
+                    nodes.push(child_node);
+                    created_child_ids.push(child_id);
+                    self.backpropagate(&mut nodes, child_id, -1.0);
+                    continue;
+                }
 
                 // Value heuristic
                 let value = self.evaluate_heuristic_value(&child_node);

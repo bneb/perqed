@@ -13,6 +13,7 @@ perqed-core = { path = "../perqed-core" }
 perqed-audit = { path = "../perqed-audit" }
 perqed-sandbox = { path = "../perqed-sandbox" }
 perqed-lean-client = { path = "../perqed-lean-client" }
+perqed-export = { path = "../perqed-export" }
 
 clap.workspace = true
 serde.workspace = true

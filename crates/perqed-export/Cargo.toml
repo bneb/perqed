@@ -1,17 +1,18 @@
 [package]
-name = "perqed-sandbox"
+name = "perqed-export"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-num-rational.workspace = true
-num-bigint.workspace = true
-num-traits.workspace = true
+perqed-audit = { path = "../perqed-audit" }
+perqed-lean-client = { path = "../perqed-lean-client" }
+
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
-regex = "1.10"
+thiserror.workspace = true
+chrono.workspace = true
+regex.workspace = true

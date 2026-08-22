@@ -3,6 +3,9 @@
 //! Handles interaction with the Lean 4 environment, Lake build system,
 //! tactic stepping, and execution of MetaM reflection audit harnesses.
 
+pub mod lean_pool;
+pub use lean_pool::{GoalCycleDetector, LeanWorkerPool, LeanWorkerStats, PoolError};
+
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};

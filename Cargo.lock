@@ -879,6 +879,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
+dependencies = [
+ "num-integer",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "num-integer"
+version = "0.1.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
+dependencies = [
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -995,6 +1027,7 @@ dependencies = [
  "clap",
  "perqed-audit",
  "perqed-core",
+ "perqed-export",
  "perqed-lean-client",
  "perqed-sandbox",
  "serde",
@@ -1012,7 +1045,11 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
  "perqed-audit",
+ "perqed-export",
  "perqed-lean-client",
  "perqed-sandbox",
  "rand",
@@ -1021,6 +1058,22 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "perqed-export"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "perqed-audit",
+ "perqed-lean-client",
+ "regex",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",
@@ -1046,6 +1099,9 @@ name = "perqed-sandbox"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
  "regex",
  "serde",
  "serde_json",
