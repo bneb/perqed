@@ -447,6 +447,9 @@ async fn main() -> anyhow::Result<()> {
             println!("Formally Proved (MCTS):     {}", summary.proofs_solved_count);
             println!("Passed Kernel Audit Gate:   {}", summary.kernel_audited_count);
             println!("Solve Rate:                 {:.1}%", summary.solve_rate_percent);
+            println!("Estimated Cost (USD):       ${:.4}", summary.estimated_cost_usd);
+            println!("Estimated Energy Consumed:  {:.1} Joules", summary.estimated_energy_joules);
+            println!("Asymmetric Compute Leverage:{:.0}x vs naive LLM prompting", summary.compute_leverage_multiplier);
             println!("Total Elapsed Time:         {:.2}s", summary.total_elapsed_seconds);
             println!("Report Saved to:            {}/benchmark_report.json", output.display());
             println!("=======================================================");

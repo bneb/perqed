@@ -34,6 +34,9 @@ pub struct BenchmarkSummary {
     pub kernel_audited_count: usize,
     pub solve_rate_percent: f64,
     pub total_elapsed_seconds: f64,
+    pub estimated_cost_usd: f64,
+    pub estimated_energy_joules: f64,
+    pub compute_leverage_multiplier: f64,
     pub items: Vec<BenchmarkItemResult>,
 }
 
@@ -122,6 +125,11 @@ impl BenchmarkRunner {
             0.0
         };
 
+        let model = crate::roi::PowerCostModel::default();
+        let surviving = total_candidates.saturating_sub(falsified_count);
+        let (est_cost, cost_lev, energy_lev) = model.compute_funnel_leverage(total_candidates, surviving, 100);
+        let est_energy = (total_candidates as f64) * model.native_sweep_joules + (surviving as f64) * 100.0 * model.tier1_joules_per_query;
+
         let summary = BenchmarkSummary {
             total_candidates,
             falsified_count,
@@ -130,6 +138,9 @@ impl BenchmarkRunner {
             kernel_audited_count: audited_count,
             solve_rate_percent: solve_rate,
             total_elapsed_seconds: total_elapsed,
+            estimated_cost_usd: est_cost,
+            estimated_energy_joules: est_energy,
+            compute_leverage_multiplier: cost_lev.max(energy_lev),
             items,
         };
 

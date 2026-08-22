@@ -78,13 +78,18 @@ pub struct TierConfig {
     pub tier1_base_url: String,
     pub tier1_api_key: String,
     pub tier1_model: String,
+    pub tier1_reasoning_effort: String,
     pub gemini_api_key: String,
     pub tier2_model: String,
-    pub deepseek_api_key: String,
-    pub tier2_fallback_model: String,
-    pub anthropic_api_key: String,
-    pub tier3_model: String,
     pub openai_api_key: String,
+    pub tier2_fallback_model: String,
+    pub tier2_fallback_reasoning: String,
+    pub deepseek_api_key: String,
+    pub tier2_deepseek_model: String,
+    pub tier3_model: String,
+    pub tier3_reasoning_effort: String,
+    pub tier3_deepseek_model: String,
+    pub anthropic_api_key: String,
     pub tier3_fallback_model: String,
     pub max_budget_usd: f64,
 }
@@ -97,19 +102,29 @@ impl Default for TierConfig {
             tier1_api_key: std::env::var("TIER1_API_KEY")
                 .unwrap_or_else(|_| "sk-local-vllm-token".to_string()),
             tier1_model: std::env::var("TIER1_MODEL")
-                .unwrap_or_else(|_| "deepseek-ai/DeepSeek-V4-Prover".to_string()),
+                .unwrap_or_else(|_| "qwen/Qwen3.8-27B".to_string()),
+            tier1_reasoning_effort: std::env::var("TIER1_REASONING_EFFORT")
+                .unwrap_or_else(|_| "low".to_string()),
             gemini_api_key: std::env::var("GEMINI_API_KEY").unwrap_or_default(),
             tier2_model: std::env::var("TIER2_MODEL")
                 .unwrap_or_else(|_| "gemini-3.7-flash".to_string()),
-            deepseek_api_key: std::env::var("DEEPSEEK_API_KEY").unwrap_or_default(),
-            tier2_fallback_model: std::env::var("TIER2_FALLBACK_MODEL")
-                .unwrap_or_else(|_| "deepseek-v4-flash".to_string()),
-            anthropic_api_key: std::env::var("ANTHROPIC_API_KEY").unwrap_or_default(),
-            tier3_model: std::env::var("TIER3_MODEL")
-                .unwrap_or_else(|_| "gpt-5.6-luna".to_string()),
             openai_api_key: std::env::var("OPENAI_API_KEY").unwrap_or_default(),
+            tier2_fallback_model: std::env::var("TIER2_FALLBACK_MODEL")
+                .unwrap_or_else(|_| "gpt-5.6-luna".to_string()),
+            tier2_fallback_reasoning: std::env::var("TIER2_FALLBACK_REASONING")
+                .unwrap_or_else(|_| "medium".to_string()),
+            deepseek_api_key: std::env::var("DEEPSEEK_API_KEY").unwrap_or_default(),
+            tier2_deepseek_model: std::env::var("TIER2_DEEPSEEK_MODEL")
+                .unwrap_or_else(|_| "deepseek-v4-flash".to_string()),
+            tier3_model: std::env::var("TIER3_MODEL")
+                .unwrap_or_else(|_| "gpt-5.6-sol".to_string()),
+            tier3_reasoning_effort: std::env::var("TIER3_REASONING_EFFORT")
+                .unwrap_or_else(|_| "high".to_string()),
+            tier3_deepseek_model: std::env::var("TIER3_DEEPSEEK_MODEL")
+                .unwrap_or_else(|_| "deepseek-v4-pro".to_string()),
+            anthropic_api_key: std::env::var("ANTHROPIC_API_KEY").unwrap_or_default(),
             tier3_fallback_model: std::env::var("TIER3_FALLBACK_MODEL")
-                .unwrap_or_else(|_| "claude-3-7-sonnet-20250219".to_string()),
+                .unwrap_or_else(|_| "claude-fable-5".to_string()),
             max_budget_usd: std::env::var("MAX_TOTAL_BUDGET_USD_PER_THEOREM")
                 .ok()
                 .and_then(|s| s.parse().ok())
@@ -167,7 +182,7 @@ impl TieredModelRouter {
         system: &str,
     ) -> Result<String, String> {
         let raw_response = match task {
-            // TIER 1: High-throughput local or dedicated vLLM endpoint (DeepSeek-V4-Prover / Qwen 3.8 Math)
+            // TIER 1: High-throughput local or dedicated vLLM endpoint (Qwen 3.8-27B / DeepSeek-V4-Flash)
             TaskType::TacticBeamExpansion => {
                 match self
                     .call_openai_compatible_endpoint(
@@ -176,8 +191,10 @@ impl TieredModelRouter {
                         &self.config.tier1_model,
                         prompt,
                         system,
-                        0.4,
+                        0.6,
                         512,
+                        Some(&self.config.tier1_reasoning_effort),
+                        Some(serde_json::json!({ "reasoning_effort": self.config.tier1_reasoning_effort })),
                     )
                     .await
                 {
@@ -192,7 +209,7 @@ impl TieredModelRouter {
                 }
             }
 
-            // TIER 2: Fast structured extraction & invariant decomposition (Gemini 3.7 Flash / DeepSeek V4 Flash)
+            // TIER 2: Fast structured extraction & invariant decomposition (Gemini 3.7 Flash -> GPT-5.6 Luna -> DeepSeek V4 Flash)
             TaskType::LiteratureIngestAndPropose | TaskType::SublemmaDecomposition => {
                 if !self.config.gemini_api_key.is_empty() {
                     match self
@@ -202,18 +219,34 @@ impl TieredModelRouter {
                         Ok(res) => res,
                         Err(e) => {
                             warn!(
-                                "[ROUTER WARN] Tier 2 primary Gemini failed ({}). Falling back to DeepSeek API...",
+                                "[ROUTER WARN] Tier 2 primary Gemini 3.7 Flash failed ({}). Falling back to GPT-5.6 Luna...",
                                 e
                             );
-                            if !self.config.deepseek_api_key.is_empty() {
+                            if !self.config.openai_api_key.is_empty() {
                                 self.call_openai_compatible_endpoint(
-                                    "https://api.deepseek.com/v1",
-                                    &self.config.deepseek_api_key,
+                                    "https://api.openai.com/v1",
+                                    &self.config.openai_api_key,
                                     &self.config.tier2_fallback_model,
                                     prompt,
                                     system,
                                     0.2,
                                     4096,
+                                    Some(&self.config.tier2_fallback_reasoning),
+                                    None,
+                                )
+                                .await
+                                .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                            } else if !self.config.deepseek_api_key.is_empty() {
+                                self.call_openai_compatible_endpoint(
+                                    "https://api.deepseek.com/v1",
+                                    &self.config.deepseek_api_key,
+                                    &self.config.tier2_deepseek_model,
+                                    prompt,
+                                    system,
+                                    0.2,
+                                    4096,
+                                    None,
+                                    None,
                                 )
                                 .await
                                 .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
@@ -222,15 +255,31 @@ impl TieredModelRouter {
                             }
                         }
                     }
-                } else if !self.config.deepseek_api_key.is_empty() {
+                } else if !self.config.openai_api_key.is_empty() {
                     self.call_openai_compatible_endpoint(
-                        "https://api.deepseek.com/v1",
-                        &self.config.deepseek_api_key,
+                        "https://api.openai.com/v1",
+                        &self.config.openai_api_key,
                         &self.config.tier2_fallback_model,
                         prompt,
                         system,
                         0.2,
                         4096,
+                        Some(&self.config.tier2_fallback_reasoning),
+                        None,
+                    )
+                    .await
+                    .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                } else if !self.config.deepseek_api_key.is_empty() {
+                    self.call_openai_compatible_endpoint(
+                        "https://api.deepseek.com/v1",
+                        &self.config.deepseek_api_key,
+                        &self.config.tier2_deepseek_model,
+                        prompt,
+                        system,
+                        0.2,
+                        4096,
+                        None,
+                        None,
                     )
                     .await
                     .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
@@ -239,7 +288,7 @@ impl TieredModelRouter {
                 }
             }
 
-            // TIER 3: Adversarial "Editor 2" Red-Team (GPT-5.6 Luna / Claude 3.7 Sonnet)
+            // TIER 3: Adversarial "Editor 2" Red-Team (GPT-5.6 Sol -> DeepSeek-V4-Pro -> Claude Fable 5)
             TaskType::AdversarialStatementAudit => {
                 if !self.config.openai_api_key.is_empty() {
                     match self
@@ -251,16 +300,32 @@ impl TieredModelRouter {
                             system,
                             0.0,
                             8192,
+                            Some(&self.config.tier3_reasoning_effort),
+                            None,
                         )
                         .await
                     {
                         Ok(res) => res,
                         Err(e) => {
                             warn!(
-                                "[ROUTER WARN] Tier 3 primary GPT-5.6 failed ({}). Falling back to Anthropic...",
+                                "[ROUTER WARN] Tier 3 primary GPT-5.6 Sol failed ({}). Escalating to DeepSeek-V4-Pro...",
                                 e
                             );
-                            if !self.config.anthropic_api_key.is_empty() {
+                            if !self.config.deepseek_api_key.is_empty() {
+                                self.call_openai_compatible_endpoint(
+                                    "https://api.deepseek.com/v1",
+                                    &self.config.deepseek_api_key,
+                                    &self.config.tier3_deepseek_model,
+                                    prompt,
+                                    system,
+                                    0.0,
+                                    8192,
+                                    None,
+                                    Some(serde_json::json!({ "thinking": { "mode": "enabled" } })),
+                                )
+                                .await
+                                .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
+                            } else if !self.config.anthropic_api_key.is_empty() {
                                 self.call_anthropic_claude(prompt, system, 8192)
                                     .await
                                     .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
@@ -269,6 +334,20 @@ impl TieredModelRouter {
                             }
                         }
                     }
+                } else if !self.config.deepseek_api_key.is_empty() {
+                    self.call_openai_compatible_endpoint(
+                        "https://api.deepseek.com/v1",
+                        &self.config.deepseek_api_key,
+                        &self.config.tier3_deepseek_model,
+                        prompt,
+                        system,
+                        0.0,
+                        8192,
+                        None,
+                        Some(serde_json::json!({ "thinking": { "mode": "enabled" } })),
+                    )
+                    .await
+                    .unwrap_or_else(|_| self.offline_heuristic_fallback(task, prompt))
                 } else if !self.config.anthropic_api_key.is_empty() {
                     self.call_anthropic_claude(prompt, system, 8192)
                         .await
@@ -293,6 +372,8 @@ impl TieredModelRouter {
         system: &str,
         temperature: f32,
         max_tokens: usize,
+        reasoning_effort: Option<&str>,
+        extra_body: Option<serde_json::Value>,
     ) -> Result<String, String> {
         let endpoint = format!("{}/chat/completions", base_url.trim_end_matches('/'));
         let mut messages = Vec::new();
@@ -301,12 +382,24 @@ impl TieredModelRouter {
         }
         messages.push(serde_json::json!({ "role": "user", "content": prompt }));
 
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "model": model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens
         });
+
+        if let Some(effort) = reasoning_effort {
+            body["reasoning_effort"] = serde_json::Value::String(effort.to_string());
+        }
+
+        if let Some(extra) = extra_body {
+            if let Some(extra_map) = extra.as_object() {
+                for (k, v) in extra_map {
+                    body[k] = v.clone();
+                }
+            }
+        }
 
         let mut req = self.http_client.post(&endpoint).json(&body);
         if !api_key.is_empty() {

@@ -45,9 +45,13 @@ async fn test_red_to_green_budget_tracker_enforcement() {
 #[tokio::test]
 async fn test_red_to_green_sota_models_configuration() {
     let mut config = TierConfig::default();
-    config.tier1_model = "deepseek-ai/DeepSeek-V4-Prover".to_string();
+    config.tier1_model = "qwen/Qwen3.8-27B".to_string();
+    config.tier1_reasoning_effort = "low".to_string();
     config.tier2_model = "gemini-3.7-flash".to_string();
-    config.tier3_model = "gpt-5.6-luna".to_string();
+    config.tier2_fallback_model = "gpt-5.6-luna".to_string();
+    config.tier3_model = "gpt-5.6-sol".to_string();
+    config.tier3_reasoning_effort = "high".to_string();
+    config.tier3_deepseek_model = "deepseek-v4-pro".to_string();
 
     let router = TieredModelRouter::new(config);
 
@@ -60,4 +64,17 @@ async fn test_red_to_green_sota_models_configuration() {
 
     let t3_res = router.dispatch(TaskType::AdversarialStatementAudit, "Adversarial referee check", "").await.unwrap();
     assert!(!t3_res.is_empty());
+}
+
+#[test]
+fn test_red_to_green_power_and_cost_roi_leverage() {
+    let model = perqed_core::roi::PowerCostModel::default();
+
+    // 10,000 candidates, 95% (9,500) falsified early in <50ms by native compiled sweeps, 500 surviving
+    let (funnel_cost, cost_lev, energy_lev) = model.compute_funnel_leverage(10_000, 500, 100);
+
+    // Verify asymmetric cost efficiency is > 3,000x over naive unconstrained prompting ($1.50 vs $4,687.50)
+    assert!(funnel_cost < 2.00, "Funnel cost for 10,000 candidate funnel must be under $2.00 (actual: ${:.2})", funnel_cost);
+    assert!(cost_lev > 1000.0, "Cost leverage must exceed 1000x (actual: {:.1}x)", cost_lev);
+    assert!(energy_lev > 100.0, "Energy leverage must exceed 100x (actual: {:.1}x)", energy_lev);
 }

@@ -11,6 +11,76 @@ use crate::dag::MathlibDag;
 use crate::types::Conjecture;
 use serde::{Deserialize, Serialize};
 
+/// Computational Power & Energy Profile for August 2026 SOTA Architectures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PowerCostModel {
+    /// Joules consumed per Tier 1 query (DeepSeek V4 Prover local vLLM FP8: ~0.8 J)
+    pub tier1_joules_per_query: f64,
+    /// Joules consumed per Tier 2 query (Gemini 3.7 Flash Cloud TPU: ~2.5 J)
+    pub tier2_joules_per_query: f64,
+    /// Joules consumed per Tier 3 query (GPT-5.6 Luna Frontier Cluster: ~15.0 J)
+    pub tier3_joules_per_query: f64,
+    /// Joules consumed per native Rust / SMT compiled sweep (<50ms CPU: ~0.005 J)
+    pub native_sweep_joules: f64,
+    /// Pricing per 1M tokens (USD)
+    pub tier1_cost_per_m_tokens: f64, // $0.05 / M
+    pub tier2_cost_per_m_tokens: f64, // $0.25 / M
+    pub tier3_cost_per_m_tokens: f64, // $3.125 / M average
+}
+
+impl Default for PowerCostModel {
+    fn default() -> Self {
+        Self {
+            tier1_joules_per_query: 0.8,
+            tier2_joules_per_query: 2.5,
+            tier3_joules_per_query: 15.0,
+            native_sweep_joules: 0.005,
+            tier1_cost_per_m_tokens: 0.05,
+            tier2_cost_per_m_tokens: 0.25,
+            tier3_cost_per_m_tokens: 3.125,
+        }
+    }
+}
+
+impl PowerCostModel {
+    /// Computes asymmetric compute leverage compared to unconstrained naive LLM prompting
+    pub fn compute_funnel_leverage(
+        &self,
+        total_candidates: usize,
+        surviving_falsification: usize,
+        mcts_expansions_per_thm: usize,
+    ) -> (f64, f64, f64) {
+        // Naive approach: Run frontier LLM reasoning across all candidates with full tree
+        let naive_queries = (total_candidates * mcts_expansions_per_thm) as f64;
+        let naive_tokens = naive_queries * 1500.0;
+        let naive_cost_usd = (naive_tokens / 1_000_000.0) * self.tier3_cost_per_m_tokens;
+        let naive_joules = naive_queries * self.tier3_joules_per_query;
+
+        // Perqed Asymmetric Funnel approach:
+        // 1. Native falsification on all candidates (0 LLM cost)
+        let falsify_joules = (total_candidates as f64) * self.native_sweep_joules;
+        // 2. Tier 1 MCTS only on surviving candidates
+        let funnel_queries = (surviving_falsification * mcts_expansions_per_thm) as f64;
+        let funnel_tokens = funnel_queries * 600.0;
+        let funnel_cost_usd = (funnel_tokens / 1_000_000.0) * self.tier1_cost_per_m_tokens;
+        let funnel_joules = falsify_joules + funnel_queries * self.tier1_joules_per_query;
+
+        let cost_leverage_multiplier = if funnel_cost_usd > 0.0 {
+            naive_cost_usd / funnel_cost_usd
+        } else {
+            10_000.0
+        };
+
+        let energy_leverage_multiplier = if funnel_joules > 0.0 {
+            naive_joules / funnel_joules
+        } else {
+            10_000.0
+        };
+
+        (funnel_cost_usd, cost_leverage_multiplier, energy_leverage_multiplier)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoiScore {
     pub conjecture_id: String,
@@ -26,6 +96,7 @@ pub struct RoiScore {
 pub struct RoiEvaluator {
     dag: MathlibDag,
     mdl_lambda: f64, // Description length penalty weight (default 0.05)
+    pub power_cost_model: PowerCostModel,
 }
 
 impl RoiEvaluator {
@@ -33,11 +104,16 @@ impl RoiEvaluator {
         Self {
             dag,
             mdl_lambda: 0.05,
+            power_cost_model: PowerCostModel::default(),
         }
     }
 
     pub fn with_lambda(dag: MathlibDag, mdl_lambda: f64) -> Self {
-        Self { dag, mdl_lambda }
+        Self {
+            dag,
+            mdl_lambda,
+            power_cost_model: PowerCostModel::default(),
+        }
     }
 
     /// Computes the Minimum Description Length (MDL) Information Gain:
