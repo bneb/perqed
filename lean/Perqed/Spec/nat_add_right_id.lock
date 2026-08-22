@@ -1,0 +1,10 @@
+{
+  "spec_file": "./lean/Perqed/Spec/nat_add_right_id.lean",
+  "sha256_hash": "5b3eddc9a559a7da0094e637f15e2667b352599c3b25aaccc60a2e04f9b93307",
+  "canonical_len": 96,
+  "declarations": [
+    "nat_add_right_id"
+  ],
+  "created_at": "2026-08-22T15:33:23.116429Z",
+  "perqed_version": "0.2.0"
+}

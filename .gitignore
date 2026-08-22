@@ -1,24 +1,72 @@
-# Rust
-target/
-Cargo.lock
+# ==============================================================================
+# Perqed Git Ignore Specification
+# ==============================================================================
 
-# Lean 4 / Lake
+# Rust / Cargo
+target/
+**/*.rs.bk
+*.profraw
+*.profdata
+
+# Lean 4 / Lake Build Artifacts
 .lake/
-lake-manifest.json
 *.olean
 *.ilean
 *.c
-*.setup.json
 *.o
-*.lock
+*.setup.json
+*.trace
+*.hash
 
-# Python
+# Python / Probers
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.env
+.venv
+env/
+venv/
+ENV/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# OS / Editor
+# Temporary / Scratch Files
+scratch/
+*.tmp
+*.bak
+*~
+
+# Operating System & Editor Files
 .DS_Store
-.vscode/
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 .idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace

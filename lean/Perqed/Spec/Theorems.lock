@@ -1,0 +1,17 @@
+{
+  "spec_file": "lean/Perqed/Spec/Theorems.lean",
+  "sha256_hash": "b9508e8fa6d6b332a96d67d7dac813c3d04782ea9a8d73fa5762fd06f953e266",
+  "canonical_len": 606,
+  "declarations": [
+    "de_morgan_not_or",
+    "nat_add_right_id",
+    "nat_add_comm_spec",
+    "imp_trans_spec",
+    "not_and_from_or_not",
+    "and_or_distrib_spec",
+    "IsEven",
+    "sum_of_evens_is_even"
+  ],
+  "created_at": "2026-08-22T15:15:51.468468Z",
+  "perqed_version": "0.2.0"
+}
