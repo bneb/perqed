@@ -1,7 +1,9 @@
 pub mod exact_math;
+pub mod hadwiger_nelson;
 pub mod harness;
 
-pub use exact_math::{ArbInterval, DegeneracyChecker, ExactMathError};
+pub use exact_math::{ArbInterval, DegeneracyChecker, ExactMathError, Point2DQ2, QuadraticFieldQ2};
+pub use hadwiger_nelson::UnitDistanceGraphQ2;
 pub use harness::{CompiledFalsifier, DeadEndRecord, DeadEndsDb, HarnessError};
 
 use serde::{Deserialize, Serialize};

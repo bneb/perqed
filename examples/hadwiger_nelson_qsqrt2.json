@@ -1,0 +1,12 @@
+{
+  "conjecture_id": "hadwiger_nelson_qsqrt2_chi_ge_5",
+  "domain": "geometry.discrete.hadwiger_nelson",
+  "informal_claim": "There exists a finite unit-distance graph embeddable in ℚ(√2)² that is not 4-colorable, establishing that χ(ℚ(√2)²) ≥ 5.",
+  "algebraic_field": "QQ[sqrt(2)]",
+  "hypotheses": [
+    "V is a finite subset of (ℚ[√2])²",
+    "E is the set of pairs (u, v) in V × V with exact Euclidean distance squared equal to 1"
+  ],
+  "target": "¬ (∃ c : V → Fin 4, ∀ (u v : V), (u, v) ∈ E → c u ≠ c v)",
+  "budget_limit_usd": 6.00
+}

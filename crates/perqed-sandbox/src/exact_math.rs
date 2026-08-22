@@ -206,6 +206,130 @@ impl DegeneracyChecker {
     }
 }
 
+/// Exact element in the quadratic field extension ℚ[√2] represented as a + b√2 (a, b ∈ ℚ)
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QuadraticFieldQ2 {
+    pub a: BigRational, // Rational component
+    pub b: BigRational, // √2 coefficient
+}
+
+impl QuadraticFieldQ2 {
+    pub fn new(a: BigRational, b: BigRational) -> Self {
+        Self { a, b }
+    }
+
+    pub fn rational(r: BigRational) -> Self {
+        Self {
+            a: r,
+            b: BigRational::zero(),
+        }
+    }
+
+    pub fn from_integers(a: i64, b: i64) -> Self {
+        Self {
+            a: BigRational::from_integer(BigInt::from(a)),
+            b: BigRational::from_integer(BigInt::from(b)),
+        }
+    }
+
+    pub fn zero() -> Self {
+        Self::from_integers(0, 0)
+    }
+
+    pub fn one() -> Self {
+        Self::from_integers(1, 0)
+    }
+
+    pub fn sqrt2() -> Self {
+        Self::from_integers(0, 1)
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.a.is_zero() && self.b.is_zero()
+    }
+
+    pub fn is_one(&self) -> bool {
+        self.a.is_one() && self.b.is_zero()
+    }
+
+    pub fn add(&self, other: &Self) -> Self {
+        Self {
+            a: &self.a + &other.a,
+            b: &self.b + &other.b,
+        }
+    }
+
+    pub fn sub(&self, other: &Self) -> Self {
+        Self {
+            a: &self.a - &other.a,
+            b: &self.b - &other.b,
+        }
+    }
+
+    /// (a1 + b1√2)(a2 + b2√2) = (a1*a2 + 2*b1*b2) + (a1*b2 + a2*b1)√2
+    pub fn mul(&self, other: &Self) -> Self {
+        let two = BigRational::from_integer(BigInt::from(2));
+        let rational_part = (&self.a * &other.a) + (&two * &self.b * &other.b);
+        let sqrt2_part = (&self.a * &other.b) + (&self.b * &other.a);
+        Self {
+            a: rational_part,
+            b: sqrt2_part,
+        }
+    }
+
+    pub fn sqr(&self) -> Self {
+        self.mul(self)
+    }
+
+    pub fn norm(&self) -> BigRational {
+        let two = BigRational::from_integer(BigInt::from(2));
+        &self.a * &self.a - &two * &self.b * &self.b
+    }
+
+    pub fn inv(&self) -> Result<Self, ExactMathError> {
+        let n = self.norm();
+        if n.is_zero() {
+            return Err(ExactMathError::DivisionByZero);
+        }
+        Ok(Self {
+            a: &self.a / &n,
+            b: -&self.b / &n,
+        })
+    }
+}
+
+/// 2D Point with exact coordinates in (ℚ[√2])²
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Point2DQ2 {
+    pub x: QuadraticFieldQ2,
+    pub y: QuadraticFieldQ2,
+}
+
+impl Point2DQ2 {
+    pub fn new(x: QuadraticFieldQ2, y: QuadraticFieldQ2) -> Self {
+        Self { x, y }
+    }
+
+    pub fn origin() -> Self {
+        Self {
+            x: QuadraticFieldQ2::zero(),
+            y: QuadraticFieldQ2::zero(),
+        }
+    }
+
+    /// Exact Euclidean distance squared in ℚ[√2]: (x1 - x2)² + (y1 - y2)²
+    pub fn dist_sq(&self, other: &Self) -> QuadraticFieldQ2 {
+        let dx = self.x.sub(&other.x);
+        let dy = self.y.sub(&other.y);
+        dx.sqr().add(&dy.sqr())
+    }
+
+    /// Checks if distance between two points is exactly 1 (unit distance)
+    pub fn is_unit_distance(&self, other: &Self) -> bool {
+        self.dist_sq(other).is_one()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245,5 +369,35 @@ mod tests {
 
         let res = DegeneracyChecker::check_pairwise_separation(&[p1, p2]);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_quadratic_field_exact_arithmetic() {
+        // (1 + √2)(1 - √2) = 1 - 2 = -1
+        let z1 = QuadraticFieldQ2::from_integers(1, 1);
+        let z2 = QuadraticFieldQ2::from_integers(1, -1);
+        let prod = z1.mul(&z2);
+
+        assert_eq!(prod.a, BigRational::from_integer(BigInt::from(-1)));
+        assert!(prod.b.is_zero());
+        assert_eq!(z1.norm(), BigRational::from_integer(BigInt::from(-1)));
+
+        // (1 + √2) * (1 + √2) = 1 + 2√2 + 2 = 3 + 2√2
+        let sq = z1.sqr();
+        assert_eq!(sq.a, BigRational::from_integer(BigInt::from(3)));
+        assert_eq!(sq.b, BigRational::from_integer(BigInt::from(2)));
+    }
+
+    #[test]
+    fn test_point2d_qsqrt2_unit_distance() {
+        let half = BigRational::new(1.into(), 2.into());
+        // p1 = (0, 0), p2 = (√2/2, √2/2) => dist^2 = (√2/2)^2 + (√2/2)^2 = 2/4 + 2/4 = 1
+        let p1 = Point2DQ2::origin();
+        let p2 = Point2DQ2::new(
+            QuadraticFieldQ2::new(BigRational::zero(), half.clone()),
+            QuadraticFieldQ2::new(BigRational::zero(), half),
+        );
+
+        assert!(p1.is_unit_distance(&p2), "Distance between (0, 0) and (√2/2, √2/2) must be exactly 1");
     }
 }

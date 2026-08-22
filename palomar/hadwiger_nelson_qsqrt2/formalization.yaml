@@ -1,0 +1,23 @@
+# palomar/formalization.yaml
+schema_version: "1.0"
+theorem_id: "Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem"
+title: "Machine-Checked Formal Theorem: Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem"
+informal_claim: >
+  Autonomous verification of Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem
+authors:
+  - name: "Perqed Autonomous Prover v2.2"
+    provenance: "Autonomous AI Theorem Discovery Pipeline"
+source_literature:
+  seed_arxiv: "2603.24708"
+  doi: null
+verification:
+  lean_version: "4.16.0"
+  mathlib_revision: "c4d29f8"
+  spec_sha256: "0668d14497569d1af4d3becb73c9c6bc03a7fb9d494aee20873290f7186c8f29"
+  transitive_axioms: ["Classical.choice", "Quot.sound", "propext"]
+  sorrys_count: 0
+  native_decide_used: false
+compute_audit:
+  total_cost_usd: 0.0380
+  total_energy_joules: 4120.0
+  primary_models: ["Gemini-3.7-Flash", "GPT-5.6-Luna", "DeepSeek-V4-Flash", "GPT-5.6-Sol"]

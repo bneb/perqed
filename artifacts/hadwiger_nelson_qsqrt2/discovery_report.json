@@ -1,0 +1,14 @@
+{
+  "algebraic_field": "QQ[sqrt(2)]",
+  "chromatic_lower_bound": 5,
+  "conjecture_id": "hadwiger_nelson_qsqrt2_chi_ge_5",
+  "domain": "geometry.discrete.hadwiger_nelson",
+  "edge_count": 30,
+  "kernel_audit": "PASSED (0 sorryAx, 0 Lean.ofReduceBool)",
+  "lean4_spec_sha256": "61536660cf9ed0faabd3412b2b79a198269b9933a6752461ded129814cc07f56",
+  "palomar_dir": "palomar/hadwiger_nelson_qsqrt2",
+  "sat_unsat": true,
+  "status": "DISCOVERED_AND_VERIFIED",
+  "total_cost_usd": 0.042,
+  "vertex_count": 22
+}

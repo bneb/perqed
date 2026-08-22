@@ -1,7 +1,7 @@
 import Lean
 import Lean.Meta
 import Lean.Util.CollectAxioms
-import Mathlib
+import Perqed
 
 open Lean Meta
 
@@ -12,7 +12,7 @@ open Lean Meta
     3. Proof term is sorry-free
 -/
 
-def runComparator (challengeModule : Name) (solutionModule : Name) (challengeDecl : Name) (solutionDecl : Name) : MetaM Bool := do
+def runComparator (_challengeModule : Name) (_solutionModule : Name) (challengeDecl : Name) (solutionDecl : Name) : MetaM Bool := do
   let env ← getEnv
 
   let some chalInfo := env.find? challengeDecl
@@ -44,7 +44,15 @@ def runComparator (challengeModule : Name) (solutionModule : Name) (challengeDec
       return false
 
   -- 2. Definitional Equality Check between Challenge and Solution Type
-  let isEq ← isDefEq chalInfo.type solInfo.type
+  let directEq ← isDefEq chalInfo.type solInfo.type
+  let isEq ← if directEq then
+    pure true
+  else
+    forallTelescope chalInfo.type fun xs _ => do
+      let app := mkAppN (mkConst challengeDecl) xs
+      let quantified ← mkForallFVars xs app
+      isDefEq quantified solInfo.type
+
   if !isEq then
     IO.eprintln "❌ COMPARATOR REJECTED: Solution type is not definitionally equal to Challenge type."
     IO.eprintln s!"  Challenge Type: {chalInfo.type}"
@@ -56,14 +64,12 @@ def runComparator (challengeModule : Name) (solutionModule : Name) (challengeDec
 
 unsafe def main (args : List String) : IO UInt32 := do
   initSearchPath (← findSysroot)
-  let challengeDecl := match args.get? 0 with
-    | some s => s.toName
-    | none => `Perqed.Spec.nat_add_right_id
-  let solutionDecl := match args.get? 1 with
-    | some s => s.toName
-    | none => `Perqed.Proofs.nat_add_right_id
+  let (challengeDecl, solutionDecl) := match args with
+    | c :: s :: _ => (c.toName, s.toName)
+    | c :: []     => (c.toName, `Perqed.Proofs.nat_add_right_id)
+    | []          => (`Perqed.Spec.nat_add_right_id, `Perqed.Proofs.nat_add_right_id)
 
-  let env ← importModules #[{ module := `Perqed }, { module := `Mathlib }] {} 0
+  let env ← importModules #[{ module := `Perqed }] {} 0
   let coreContext : Core.Context := { fileName := "<palomar_comparator>", fileMap := FileMap.ofString "" }
   let coreState : Core.State := { env := env }
 
