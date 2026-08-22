@@ -110,6 +110,36 @@ enum Commands {
         expected_hash: Option<String>,
     },
 
+    /// Synthesize programmatic invariants, extremal bounds, and OEIS sequence matches
+    SynthesizeInvariants {
+        /// Mathematical domain (e.g. algebra.nat, combinatorics.extremal)
+        #[arg(short, long, default_value = "algebra.nat")]
+        domain: String,
+        /// Informal claim context
+        #[arg(short, long)]
+        claim: String,
+        /// Comma-separated empirical observation values (e.g. 1,1,2,5,14,42,132)
+        #[arg(short, long)]
+        terms: String,
+    },
+
+    /// Rank candidate conjectures using the Mathematical ROI Value Function
+    RankRoi {
+        /// Path to conjectures JSON file
+        #[arg(short, long)]
+        input: PathBuf,
+        /// Promotion percentile threshold (e.g. 5.0 for top 5%)
+        #[arg(short, long, default_value_t = 5.0)]
+        top_percent: f64,
+    },
+
+    /// Inspect or clear the persistent Dead Ends database
+    Deadends {
+        /// Print all recorded dead ends
+        #[arg(short = 'a', long)]
+        list: bool,
+    },
+
     /// Emit verified Lean proof artifact and publication-grade LaTeX draft
     Publish {
         /// Theorem title
@@ -322,6 +352,62 @@ async fn main() -> anyhow::Result<()> {
                     std::process::exit(1);
                 }
             }
+        }
+
+        Commands::SynthesizeInvariants { domain, claim, terms } => {
+            info!("Running Constrained Program & Invariant Synthesis Engine...");
+            let parsed_terms: Vec<i64> = terms
+                .split(',')
+                .filter_map(|s| s.trim().parse::<i64>().ok())
+                .collect();
+
+            let searcher = perqed_core::program_search::ProgramInvariantSearch::new();
+            let synthesized = searcher.synthesize_program_conjectures(&domain, &claim, &parsed_terms);
+
+            println!("\n=== Synthesized Program Invariants & Bounds ({}) ===", synthesized.len());
+            for conj in &synthesized {
+                println!("\n[ID]: {}", conj.conjecture_id);
+                println!("Source: {}", conj.provenance_source.as_deref().unwrap_or("ProgramSearch"));
+                println!("Claim: {}", conj.informal_claim);
+                println!("Target: {}", conj.target);
+            }
+        }
+
+        Commands::RankRoi { input, top_percent } => {
+            info!("Evaluating conjectures with Mathematical ROI Value Function...");
+            let content = fs::read_to_string(&input)?;
+            let conjectures: Vec<Conjecture> = if let Ok(list) = serde_json::from_str::<Vec<Conjecture>>(&content) {
+                list
+            } else if let Ok(single) = serde_json::from_str::<Conjecture>(&content) {
+                vec![single]
+            } else {
+                eprintln!("Failed to parse JSON file into Conjecture or Vec<Conjecture>");
+                std::process::exit(1);
+            };
+
+            let dag = perqed_core::dag::MathlibDag::new();
+            let evaluator = perqed_core::roi::RoiEvaluator::new(dag);
+            let ranked = evaluator.rank_and_filter(&conjectures, top_percent);
+
+            println!("\n=== Mathematical ROI Value Function Rankings ===");
+            for (idx, (c, score)) in ranked.iter().enumerate() {
+                let status = if score.is_promoted { "🚀 PROMOTED (Top 5%)" } else { "Filtered" };
+                println!(
+                    "\n{}. [{}] (ROI: {:.3}) - {}",
+                    idx + 1,
+                    c.conjecture_id,
+                    score.total_roi,
+                    status
+                );
+                println!("   {}", score.ranking_rationale);
+                println!("   Target: {}", c.target);
+            }
+        }
+
+        Commands::Deadends { list: _ } => {
+            let db = perqed_sandbox::DeadEndsDb::new(".");
+            println!("\n=== Dead Ends Database ===");
+            println!("Total recorded falsified dead ends: {}", db.count());
         }
 
         Commands::Publish {

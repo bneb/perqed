@@ -41,6 +41,7 @@ pub enum PipelineError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineResult {
     pub conjecture: Conjecture,
+    pub roi_score: crate::roi::RoiScore,
     pub autoformalization: AutoformalizationResult,
     pub proof_search: ProofSearchResult,
     pub audit_report: AuditReport,
@@ -55,6 +56,8 @@ pub struct FrontierPipeline {
     lean_client: LeanClient,
     publication_pipeline: PublicationPipeline,
     mcts_config: MctsConfig,
+    roi_evaluator: crate::roi::RoiEvaluator,
+    dead_ends_db: perqed_sandbox::DeadEndsDb,
 }
 
 impl FrontierPipeline {
@@ -66,6 +69,9 @@ impl FrontierPipeline {
         let autoformalizer = Autoformalizer::new(router.clone());
         let lean_client = LeanClient::with_root(&root);
         let pub_pipeline = PublicationPipeline::new(root.join("artifacts/publications"));
+        let dag = crate::dag::MathlibDag::new();
+        let roi_evaluator = crate::roi::RoiEvaluator::new(dag);
+        let dead_ends_db = perqed_sandbox::DeadEndsDb::new(&root);
 
         Self {
             workspace_root: root,
@@ -75,12 +81,21 @@ impl FrontierPipeline {
             lean_client,
             publication_pipeline: pub_pipeline,
             mcts_config: MctsConfig::default(),
+            roi_evaluator,
+            dead_ends_db,
         }
     }
 
-    /// Run full pipeline from a mathematical conjecture
+    /// Run full asymmetric compute funnel pipeline on a mathematical conjecture
     pub async fn run_on_conjecture(&self, conjecture: &Conjecture) -> Result<PipelineResult, PipelineError> {
-        info!("=== STEP 1: Sandboxed Falsification Gate ===");
+        info!("=== STEP 1A: Dead Ends & High-Throughput Falsification Gate ===");
+        if self.dead_ends_db.is_known_dead_end(&conjecture.target) {
+            return Err(PipelineError::Failed(format!(
+                "Conjecture target '{}' matches known dead end in database. Compute pruned.",
+                conjecture.target
+            )));
+        }
+
         let falsify_verdict = self.falsification_gate.check_conjecture(conjecture).await?;
         if !falsify_verdict.passed {
             return Err(PipelineError::Failed(format!(
@@ -88,6 +103,13 @@ impl FrontierPipeline {
                 falsify_verdict.reason
             )));
         }
+
+        info!("=== STEP 1B: Mathematical ROI Value Function Evaluation ===");
+        let roi_score = self.roi_evaluator.evaluate_conjecture(conjecture, 100);
+        info!(
+            "Calculated ROI: {:.3} ({})",
+            roi_score.total_roi, roi_score.ranking_rationale
+        );
 
         info!("=== STEP 2: Statement Autoformalization & SHA-256 Hash-Lock Gate ===");
         let spec_dir = self.workspace_root.join("lean/Perqed/Spec");
@@ -102,7 +124,7 @@ impl FrontierPipeline {
             &autoform_res.spec_lean_path,
         )?;
 
-        info!("=== STEP 3: MCTS Hybrid Proof Search ===");
+        info!("=== STEP 3: Dual-Engine MCTS Hybrid Proof Search ===");
         let tactic_gen = TacticGenerator::new(self.model_router.clone(), None);
         let library_dir = self.workspace_root.join("lean/Perqed/Library");
         let mcts = MctsOrchestrator::new(
@@ -205,6 +227,7 @@ impl FrontierPipeline {
 
         Ok(PipelineResult {
             conjecture: conjecture.clone(),
+            roi_score,
             autoformalization: autoform_res,
             proof_search: proof_res,
             audit_report,

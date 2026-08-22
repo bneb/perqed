@@ -1,23 +1,29 @@
-//! Perqed v2 Core Orchestration Library
-
 pub mod autoformalize;
 pub mod conjecture;
+pub mod dag;
+pub mod dual_engine;
 pub mod falsification;
 pub mod ingestion;
 pub mod mcts;
 pub mod model_client;
 pub mod pipeline;
+pub mod program_search;
 pub mod publication;
+pub mod roi;
 pub mod tactic_generator;
 pub mod types;
 
 pub use autoformalize::{AutoformalizationResult, Autoformalizer};
 pub use conjecture::{ConjectureGenerator, SynthesisStrategy};
+pub use dag::{MathlibDag, MathlibNode};
+pub use dual_engine::{DecisionProcedure, DualEngineProver};
 pub use falsification::{FalsificationGate, PredicateSpec};
 pub use ingestion::{PremiseIndex, PremiseItem, TexAstParser};
 pub use mcts::{MctsError, MctsNode, MctsOrchestrator, ProofSearchResult, SubLemma, SubLemmaIsolator};
 pub use model_client::{ModelMessage, ModelProvider, ModelRequest, ModelResponse, ModelRouter};
 pub use pipeline::{FrontierPipeline, PipelineError, PipelineResult};
+pub use program_search::{BoundCandidate, OeisSequence, ProgramInvariantSearch};
 pub use publication::PublicationPipeline;
+pub use roi::{RoiEvaluator, RoiScore};
 pub use tactic_generator::TacticGenerator;
 pub use types::{AuditReport, Conjecture, MctsConfig, ParsedTheorem, ProofState, PublicationDraft, TacticCandidate};

@@ -1,7 +1,6 @@
-//! Sandboxed Falsification Execution Runner
-//!
-//! Provides isolated process execution for Z3/SymPy mathematical probers
-//! with strict CPU timeouts, memory safety limits, and structured JSON IPC.
+pub mod harness;
+
+pub use harness::{CompiledFalsifier, DeadEndRecord, DeadEndsDb, HarnessError};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
