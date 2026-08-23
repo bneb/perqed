@@ -3,84 +3,84 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout
-  title="Perqed — Autonomous Mathematical Discovery & Verified Proving Engine"
-  description="Autonomous theorem discovery system discovering novel mathematics and formally verifying proofs in Lean 4 with zero auxiliary axioms."
+  title="Perqed — Automated Mathematical Exploration & Formal Verification"
+  description="An automated framework for mathematical exploration, heuristic search, and formal verification in Lean 4."
 >
 
   <!-- Hero -->
   <section class="hero">
     <div class="container">
-      <p class="eyebrow">Autonomous Formal Discovery</p>
+      <p class="eyebrow">Automated Formal Mathematics</p>
       <h1 class="hero-title">
-        Discovering novel mathematics.<br>
-        <span style="color: var(--accent);">Verified in pure Lean 4.</span>
+        Mathematical exploration.<br>
+        <span style="color: var(--accent);">Formalized in Lean 4.</span>
       </h1>
       <p class="hero-sub">
-        Perqed is an autonomous theorem discovery and interactive proof system. It formulates mathematical conjectures, applies analytical number theory and sieve methods, and compiles zero-axiom machine proofs verified by the Lean&nbsp;4 kernel.
+        Perqed is an experimental research system for exploring mathematical conjectures, computing analytical bounds, and verifying machine-checked proofs in Lean&nbsp;4 with zero auxiliary axioms.
       </p>
       <div class="hero-actions">
-        <a href="#discoveries" class="btn btn-primary">Explore Discoveries ↓</a>
-        <a href="/blog/" class="btn btn-ghost">Research Articles</a>
+        <a href="#case-studies" class="btn btn-primary">View Case Studies ↓</a>
+        <a href="/blog/" class="btn btn-ghost">Technical Notes</a>
         <a href="https://github.com/bneb/perqed" class="btn btn-ghost" target="_blank" rel="noopener">GitHub ↗</a>
       </div>
     </div>
   </section>
 
-  <!-- Key Discoveries -->
-  <section class="section" id="discoveries">
+  <!-- Key Case Studies -->
+  <section class="section" id="case-studies">
     <div class="container">
-      <p class="eyebrow">Recent Mathematical Breakthroughs</p>
-      <h2 class="section-heading">Verified Research Results</h2>
+      <p class="eyebrow">Research Case Studies</p>
+      <h2 class="section-heading">Recent Explorations</h2>
       <p class="section-lede">
-        Bridging open problems in analytical number theory with zero-defect formal verification.
+        Case studies combining heuristic search, analytical bounds, and formal verification.
       </p>
 
       <div class="discoveries-grid">
         <div class="discovery-card">
           <div class="card-tag">Number Theory · Sieve Anatomy</div>
-          <h3 class="card-title">Terence Tao's Erdős–Graham Factorial Problem</h3>
+          <h3 class="card-title">Erdős–Graham Factorial Products</h3>
           <p class="card-source">Grounded in Terence Tao (<em>arXiv:2603.27990</em>, March 2026)</p>
           <p class="card-body">
-            Resolved Tao's open conjecture on 3-factorial square products by isolating the dominant H=1 family and proving the exact leading asymptotic constant:
+            Analysis of the counting function for <code>a₁! a₂! a₃! = m²</code> by parameterizing the dominant H=1 family and computing the leading asymptotic constant:
           </p>
           <div class="card-formula">
-            <code>C₁ = ∑ 1 / √(s(a₁!)) = 4.26529314...</code>
+            <code>C₁ = ∑ 1 / √(s(a₁!)) ≈ 4.265293...</code>
           </div>
           <ul class="card-list">
-            <li>Unconditional exponential tail decay: R(50) &lt; 10⁻⁶</li>
-            <li>Sieve parity equidistribution & square collision rigidity</li>
-            <li>8 locked Lean 4 declarations audited with 0 <code>sorryAx</code></li>
+            <li>Identified exponential remainder decay: R(50) &lt; 10⁻⁶</li>
+            <li>Evaluated sieve parity distribution and consecutive square collisions</li>
+            <li>8 Lean 4 declarations audited with zero <code>sorryAx</code></li>
           </ul>
         </div>
 
         <div class="discovery-card">
-          <div class="card-tag">Diophantine Equations · Baker's Method</div>
-          <h3 class="card-title">Generalized Cunningham Diophantine Resolution</h3>
-          <p class="card-source">Generalized from Panda (2024)</p>
+          <div class="card-tag">Diophantine Equations · Linear Forms</div>
+          <h3 class="card-title">Generalized Cunningham Diophantine Equations</h3>
+          <p class="card-source">Generalizing Panda (2024)</p>
           <p class="card-body">
-            Complete classification of pˣ + (2ᵏ p + 1)ʸ = z² for odd primes p and integer steps k ≥ 2:
+            Parametrization and obstruction analysis for <code>pˣ + (2ᵏ p + 1)ʸ = z²</code> with odd primes p and k ≥ 2:
           </p>
           <div class="card-formula">
             <code>pˣ + (2ᵏ p + 1)ʸ = z²</code>
           </div>
           <ul class="card-list">
-            <li>Universal Mersenne & Affine solution families for (x=1, y=1)</li>
-            <li>Complete Modulo 8 & Modulo 4 non-residue obstructions</li>
-            <li>Baker–Davenport continued fraction reduction certifying global exhaustiveness</li>
-            <li>11 locked Lean 4 declarations audited with 0 <code>sorryAx</code></li>
+            <li>Mersenne & Affine solution families for (x=1, y=1)</li>
+            <li>Modulo 8 & Modulo 4 algebraic obstructions for low exponents</li>
+            <li>Baker–Davenport continued fraction reduction on log forms</li>
+            <li>11 Lean 4 declarations audited with zero <code>sorryAx</code></li>
           </ul>
         </div>
 
         <div class="discovery-card">
           <div class="card-tag">Topology · Graph Theory</div>
           <h3 class="card-title">Hamiltonian Torus Decompositions</h3>
-          <p class="card-source">Zero-Sorry Prop-Valued Proofs</p>
+          <p class="card-source">Decidable Universal Quantifiers</p>
           <p class="card-body">
-            Proved exact edge-disjoint Hamiltonian decompositions on 3-dimensional tori for M=4 (64 vertices) and M=6 (216 vertices) using custom decidable universal quantifiers.
+            Formalized edge-disjoint Hamiltonian decompositions on 3D tori for M=4 (64 vertices) and M=6 (216 vertices) using decidable quantifier reflection.
           </p>
           <ul class="card-list">
-            <li>Zero <code>sorry</code>, fully decidable quantifier reflection</li>
-            <li>Verified injection and non-short orbit closure</li>
+            <li>Machine-checked proofs with zero <code>sorry</code></li>
+            <li>Verified injection and orbit closure properties</li>
           </ul>
         </div>
       </div>
@@ -90,47 +90,47 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   <!-- Architecture -->
   <section class="section">
     <div class="container">
-      <p class="eyebrow">Discovery Architecture</p>
+      <p class="eyebrow">System Design</p>
       <h2 class="section-heading">How Perqed Works</h2>
       <p class="section-lede">
-        Autonomous heuristic search coupled with cold-kernel formal verification.
+        Heuristic search and analytical reductions paired with formal proof verification.
       </p>
 
       <div class="steps">
         <div class="step">
           <span class="step-n">01</span>
-          <h3 class="step-title">Conjecture Formulation & Ingestion</h3>
+          <h3 class="step-title">Problem Ingestion & Formulation</h3>
           <p class="step-body">
-            Ingests active open problems from recent literature (arXiv preprints), extracting theorem candidates, algebraic structures, and search parameters.
+            Parses mathematical context and conjecture statements from literature to extract search targets and parameter domains.
           </p>
-          <span class="step-tech">arXiv Ingestion · AST Parser</span>
+          <span class="step-tech">Problem Ingestion · AST Parsing</span>
         </div>
 
         <div class="step">
           <span class="step-n">02</span>
-          <h3 class="step-title">Mathematical Depth Evaluation</h3>
+          <h3 class="step-title">Depth & Technique Evaluation</h3>
           <p class="step-body">
-            Penalizes trivial Presburger identities (0.15×) and rewards deep sieve/analytical methods (3.5×), ensuring the system targets high-impact mathematics.
+            Evaluates candidate directions, prioritizing structural and analytical techniques over purely elementary identities.
           </p>
-          <span class="step-tech">MathematicalDepthEvaluator · MDL</span>
+          <span class="step-tech">Depth Evaluator · Heuristic Scoring</span>
         </div>
 
         <div class="step">
           <span class="step-n">03</span>
-          <h3 class="step-title">Analytical Trapping & Reductions</h3>
+          <h3 class="step-title">Analytical Bounds & Reductions</h3>
           <p class="step-body">
-            Applies Baker's linear forms in logarithms and Baker–Davenport continued fraction reductions to collapse infinite exponent domains into finite testable bounds.
+            Applies logarithmic linear forms and continued fraction reductions to establish explicit search bounds.
           </p>
-          <span class="step-tech">LinearFormsLogarithmEngine · Laurent Bounds</span>
+          <span class="step-tech">Baker Engine · Laurent Bounds</span>
         </div>
 
         <div class="step">
           <span class="step-n">04</span>
-          <h3 class="step-title">Zero-Axiom Lean 4 Proving</h3>
+          <h3 class="step-title">Formal Verification</h3>
           <p class="step-body">
-            Compiles candidate theorems into pure Lean 4 specifications and machine proofs, checked by the cold Lean 4 kernel with 0 <code>sorryAx</code> auxiliary axioms.
+            Mechanizes theorem statements and proofs in pure Lean 4, verified directly by the proof assistant kernel.
           </p>
-          <span class="step-tech">Lean 4 · AuditSpec Reflection</span>
+          <span class="step-tech">Lean 4 · Spec Auditing</span>
         </div>
       </div>
     </div>
@@ -139,13 +139,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   <!-- CTA -->
   <section class="cta">
     <div class="container" style="text-align: center;">
-      <h2 class="cta-heading">Open Science & Reproducibility</h2>
+      <h2 class="cta-heading">Open Source & Reproducible</h2>
       <p class="cta-body">
-        All theorem specifications, machine proofs, and Python verification scripts are open source and cryptographically hash-locked.
+        All theorem specifications, machine proofs, and verification scripts are available on GitHub.
       </p>
       <div class="cta-actions">
-        <a href="https://github.com/bneb/perqed" class="btn btn-primary" target="_blank" rel="noopener">View GitHub Repository ↗</a>
-        <a href="/blog/" class="btn btn-ghost">Read Research Articles</a>
+        <a href="https://github.com/bneb/perqed" class="btn btn-primary" target="_blank" rel="noopener">View Repository ↗</a>
+        <a href="/blog/" class="btn btn-ghost">Technical Notes</a>
       </div>
     </div>
   </section>

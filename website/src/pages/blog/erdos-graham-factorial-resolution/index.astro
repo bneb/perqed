@@ -3,8 +3,8 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout
-  title="Resolving Terence Tao's Erdős–Graham Factorial Conjecture — Perqed Journal"
-  description="How Perqed analytically closed the asymptotic leading constant for the Erdős-Graham factorial problem and verified 8 theorems in pure Lean 4."
+  title="On Terence Tao's Factorial Diophantine Conjecture — Perqed Journal"
+  description="Analysis of the asymptotic leading constant for the Erdős-Graham factorial problem and formalization of 8 theorems in Lean 4."
   activeNav="blog"
 >
 
@@ -12,56 +12,55 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     <div class="container">
       <header class="article-header">
         <p class="eyebrow">Number Theory · Formal Proving</p>
-        <h1 class="article-title">Resolving Terence Tao's Factorial Conjecture: Exact Asymptotics & Lean 4 Mechanization</h1>
+        <h1 class="article-title">On the Erdős–Graham Factorial Problem: Asymptotics & Lean 4 Formalization</h1>
         <div class="article-meta">
           <time>August 23, 2026</time>
           <span class="dot">·</span>
-          <span>Perqed Research Group</span>
+          <span>Perqed Research Notes</span>
           <span class="dot">·</span>
           <span class="tag">Lean 4</span>
-          <span class="tag">Sieve Anatomy</span>
+          <span class="tag">Sieve Methods</span>
         </div>
       </header>
 
       <div class="article-content">
         <p class="lead">
-          In March 2026, Terence Tao published <em>"Products of consecutive integers with unusual anatomy"</em> (arXiv:2603.27990), establishing near-asymptotics for the factorial Diophantine equation <code>a₁! a₂! a₃! = m²</code> and conjecturing the existence of an explicit asymptotic leading constant.
+          In <em>"Products of consecutive integers with unusual anatomy"</em> (arXiv:2603.27990, March 2026), Terence Tao studied the multiplicative factorial Diophantine equation <code>a₁! a₂! a₃! = m²</code>, establishing near-asymptotics of the form <code>N(x) = x^(1/2 + o(1))</code> and proposing an asymptotic leading term.
         </p>
 
-        <h2>The Open Problem</h2>
+        <h2>The Problem Setting</h2>
         <p>
-          The Erdős–Graham factorial problem investigates products of consecutive integers and factorials that evaluate to exact perfect squares:
+          The classical Erdős–Graham question concerns products of consecutive factorials evaluating to an exact integer square:
         </p>
         <pre class="math-block"><code>a₁! a₂! a₃! = m²   (1 ≤ a₁ &lt; a₂ &lt; a₃ ≤ x)</code></pre>
         <p>
-          While Tao bounded the solution count by <code>N(x) = x^(1/2 + o(1))</code>, identifying the exact leading constant and proving unconditional convergence remained open.
+          Tao's work established upper and lower bounds on <code>N(x)</code> and highlighted the question of explicit leading constants for the primary solution families.
         </p>
 
-        <h2>The Dominant H=1 Analytical Decomposition</h2>
+        <h2>The Dominant H=1 Parameter Family</h2>
         <p>
-          By analyzing the squarefree kernel <code>s(K)</code>, Perqed decomposed all solutions with interval gap <code>H = a₃ - a₂ = 1</code> into the universal two-parameter family:
+          For solutions with interval gap <code>H = a₃ - a₂ = 1</code>, every solution triple is parameterized by:
         </p>
         <pre class="math-block"><code>(a₁, s(a₁!) n² - 1, s(a₁!) n²)</code></pre>
         <p>
-          Summing over all initial factorials <code>a₁ ≥ 1</code>, the leading term is governed by the unconditionally convergent series:
+          where <code>s(K)</code> denotes the squarefree kernel of <code>K</code>. Summing across <code>a₁ ≥ 1</code> produces the asymptotic leading constant:
         </p>
-        <pre class="math-block"><code>C₁ = ∑ (a₁ = 1 to ∞) 1 / √(s(a₁!)) ≈ 4.26529314...</code></pre>
+        <pre class="math-block"><code>C₁ = ∑ (a₁ = 1 to ∞) 1 / √(s(a₁!)) ≈ 4.265293...</code></pre>
 
-        <h2>Exponential Convergence & Collision Rigidity</h2>
+        <h2>Convergence and Lower-Order Terms</h2>
         <p>
-          Because the squarefree kernel <code>s(a₁!)</code> grows exponentially (scaling as <code>2^(a₁/2)</code> on average), the remainder tail decays with exponential rapidity:
+          Because <code>s(a₁!)</code> grows exponentially with <code>a₁</code> on average, the series converges rapidly, with the remainder after 50 terms satisfying <code>R(50) &lt; 10⁻⁶</code>.
         </p>
-        <pre class="math-block"><code>R(50) = ∑ (a₁ &gt; 50) 1 / √(s(a₁!)) &lt; 10⁻⁶</code></pre>
         <p>
-          Furthermore, higher interval gaps contribute sub-dominant terms: <code>H=2</code> yields Pell equation families scaling as <code>O(log x)</code>, and <code>H ≥ 3</code> corresponds to elliptic and hyperelliptic curves with only finitely many integer points by Siegel's and Faltings' theorems.
+          Higher interval lengths contribute strictly lower-order terms: <code>H=2</code> yields Pell-type families scaling as <code>O(log x)</code>, and <code>H ≥ 3</code> corresponds to elliptic and hyperelliptic curves with finite integer point sets.
         </p>
 
-        <h2>Zero-Defect Lean 4 Formalization</h2>
+        <h2>Lean 4 Formalization</h2>
         <p>
-          All 8 core algebraic declarations—including the 3-factorial universal family, the orthogonal 4-factorial family, and the strict sequence ordering theorems—are verified in pure Lean 4 with <strong>zero axioms</strong> (<code>sorryAx</code>-free).
+          The underlying algebraic structure—including the 3-factorial family for <code>a₁=1</code>, the orthogonal 4-factorial family, and sequence ordering conditions—has been mechanized in pure Lean 4 with zero auxiliary axioms (`sorryAx`-free).
         </p>
         <p>
-          The complete review package and 5-second turnkey Python verification script are available in the <a href="https://github.com/bneb/perqed" target="_blank" rel="noopener">Perqed GitHub repository</a>.
+          The Lean 4 source and numerical verification scripts are available in the <a href="https://github.com/bneb/perqed" target="_blank" rel="noopener">Perqed GitHub repository</a>.
         </p>
       </div>
     </div>
