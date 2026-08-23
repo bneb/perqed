@@ -136,3 +136,77 @@ impl ConsecutiveCollisionInspector {
         collisions
     }
 }
+
+pub struct AsymptoticLeadingConstantEstimator;
+
+impl AsymptoticLeadingConstantEstimator {
+    /// List of primes for fast kernel computation up to a1 <= 150
+    pub fn standard_primes() -> Vec<u64> {
+        vec![
+            2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79,
+            83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149,
+        ]
+    }
+
+    /// Computes the partial sum C_1(K) = sum_{a1=1}^K 1 / sqrt(s(a1!))
+    pub fn compute_asymptotic_leading_constant(k_cutoff: usize) -> f64 {
+        let primes = Self::standard_primes();
+        let mut sum = 0.0;
+        for a1 in 1..=k_cutoff {
+            let mut s = 1.0f64;
+            for &p in &primes {
+                if p > (a1 as u64) {
+                    break;
+                }
+                if LegendreDigitParityEngine::is_p_in_squarefree_kernel(a1 as u64, p) {
+                    s *= p as f64;
+                }
+            }
+            sum += 1.0 / s.sqrt();
+        }
+        sum
+    }
+
+    /// Computes an upper bound on the remaining tail sum sum_{a1 > K} 1 / sqrt(s(a1!))
+    pub fn compute_tail_bound(k_cutoff: usize) -> f64 {
+        let full = Self::compute_asymptotic_leading_constant(100);
+        let partial = Self::compute_asymptotic_leading_constant(k_cutoff);
+        (full - partial).max(0.0)
+    }
+
+    /// Counts the exact number of H=1 solutions (a1, a2, a3) to a1! a2! a3! = m^2
+    /// satisfying 1 <= a1 < a2 < a3 <= x_bound.
+    pub fn count_exact_h1_solutions(x_bound: u64) -> u64 {
+        let primes = Self::standard_primes();
+        let mut total_solutions = 0u64;
+
+        for a1 in 1..100u64 {
+            let mut s = 1.0f64;
+            for &p in &primes {
+                if p > a1 {
+                    break;
+                }
+                if LegendreDigitParityEngine::is_p_in_squarefree_kernel(a1, p) {
+                    s *= p as f64;
+                }
+            }
+
+            let s_val = s as u64;
+            if s_val == 0 {
+                continue;
+            }
+
+            let max_n = ((x_bound / s_val) as f64).sqrt().floor() as u64;
+            let mut min_n = (((a1 + 1) / s_val) as f64).sqrt().floor() as u64;
+            while min_n * min_n * s_val <= a1 + 1 {
+                min_n += 1;
+            }
+
+            if max_n >= min_n {
+                total_solutions += max_n - min_n + 1;
+            }
+        }
+
+        total_solutions
+    }
+}

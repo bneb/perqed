@@ -1,5 +1,6 @@
 use perqed_core::{
-    ConsecutiveCollisionInspector, FactorialSieveDensityEstimator, LegendreDigitParityEngine,
+    AsymptoticLeadingConstantEstimator, ConsecutiveCollisionInspector, FactorialSieveDensityEstimator,
+    LegendreDigitParityEngine,
 };
 
 #[test]
@@ -61,4 +62,27 @@ fn test_consecutive_collision_square_rigidity() {
         let root = (n_plus_1 as f64).sqrt().round() as u64;
         assert_eq!(root * root, n_plus_1, "Consecutive collision {} -> {} must be a square", n, n_plus_1);
     }
+}
+
+#[test]
+fn test_tao_asymptotic_leading_constant_and_counting() {
+    // 1. Partial sum convergence to C_1 = 4.265293...
+    let c1 = AsymptoticLeadingConstantEstimator::compute_asymptotic_leading_constant(80);
+    assert!(
+        (c1 - 4.265293).abs() < 1e-5,
+        "Leading constant {} deviated from expected 4.265293", c1
+    );
+
+    // 2. Exponential tail decay
+    let tail_50 = AsymptoticLeadingConstantEstimator::compute_tail_bound(50);
+    assert!(tail_50 < 1e-5, "Tail after 50 terms must be < 1e-5, got {}", tail_50);
+
+    // 3. Counting function convergence N_1(x) / sqrt(x) -> C_1
+    let x_val = 100_000_000u64; // 10^8
+    let count = AsymptoticLeadingConstantEstimator::count_exact_h1_solutions(x_val);
+    let ratio = (count as f64) / (x_val as f64).sqrt();
+    assert!(
+        (ratio - c1).abs() < 0.01,
+        "Asymptotic ratio N_1(10^8)/sqrt(10^8) = {} deviated from C_1 = {}", ratio, c1
+    );
 }

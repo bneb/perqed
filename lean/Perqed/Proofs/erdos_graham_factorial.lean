@@ -71,4 +71,18 @@ theorem f4_universal_orthogonal (m n : Nat) : Perqed.Spec.f4_universal_orthogona
     _ = A * (B * (A * B)) := by rw [Nat.mul_comm (A * B) B]
     _ = (A * B) * (A * B) := by rw [← Nat.mul_assoc A B (A * B)]
 
+/-- Proof of Strict Ordering of the Dominant H=1 Factorial Family -/
+theorem h1_strictly_increasing (a1 s1 n : Nat) : Perqed.Spec.h1_strictly_increasing_spec a1 s1 n := by
+  dsimp [Perqed.Spec.h1_strictly_increasing_spec]
+  intro ha1 hn
+  constructor
+  · omega
+  · omega
+
+/-- Proof of Unit Interval Width of the Dominant Asymptotic Family -/
+theorem h1_interval_length_one (s1 n : Nat) : Perqed.Spec.h1_interval_length_one_spec s1 n := by
+  dsimp [Perqed.Spec.h1_interval_length_one_spec]
+  intro hn
+  omega
+
 end Perqed.Proofs

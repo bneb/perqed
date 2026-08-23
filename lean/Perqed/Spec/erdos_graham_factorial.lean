@@ -52,4 +52,20 @@ def f4_universal_orthogonal_spec (m n : Nat) : Prop :=
   (fact (m^2 - 1) * fact (m^2)) * (fact (n^2 - 1) * fact (n^2)) =
     (m * fact (m^2 - 1) * (n * fact (n^2 - 1)))^2
 
+/-- 
+  Strict Ordering of the Dominant H=1 Factorial Family:
+  For any a1 >= 1 and s1 >= 1, whenever s1 * n^2 > a1 + 1, the triple
+  (a1, s1*n^2 - 1, s1*n^2) forms a strictly increasing sequence 1 <= a1 < a2 < a3.
+-/
+def h1_strictly_increasing_spec (a1 s1 n : Nat) : Prop :=
+  a1 ≥ 1 → s1 * n^2 > a1 + 1 →
+  a1 < s1 * n^2 - 1 ∧ s1 * n^2 - 1 < s1 * n^2
+
+/-- 
+  Unit Interval Width of the Dominant Asymptotic Family:
+  The right endpoints a2 = s1*n^2 - 1 and a3 = s1*n^2 satisfy a3 - a2 = 1.
+-/
+def h1_interval_length_one_spec (s1 n : Nat) : Prop :=
+  s1 * n^2 ≥ 1 → s1 * n^2 - (s1 * n^2 - 1) = 1
+
 end Perqed.Spec

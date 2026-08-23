@@ -51,8 +51,8 @@ pub use divisor_param::{
 pub use dual_engine::{DecisionProcedure, DualEngineProver};
 pub use embeddings::{DensePremiseStore, DenseVector, EmbedderConfig, SubwordEmbedder};
 pub use erdos_sieve::{
-    ConsecutiveCollisionInspector, FactorialSieveDensityEstimator, FactorialSquarefreeReport,
-    LegendreDigitParityEngine,
+    AsymptoticLeadingConstantEstimator, ConsecutiveCollisionInspector,
+    FactorialSieveDensityEstimator, FactorialSquarefreeReport, LegendreDigitParityEngine,
 };
 pub use falsification::{FalsificationConfig, FalsificationGate, PredicateSpec};
 pub use ingestion::{HybridPremiseWeights, PremiseIndex, PremiseItem, TexAstParser};
