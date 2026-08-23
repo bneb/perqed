@@ -84,10 +84,11 @@ class SymPyProber:
                 clean_target = normalize_math_expr(target_assertion)
                 target_val = bool(eval(clean_target, {"__builtins__": {}}, env))
                 if not target_val:
+                    cex_clean = {name: env[name] for name in var_names}
                     return (
                         True,
-                        env,
-                        f"SymPy counterexample found at assignment: {env}",
+                        cex_clean,
+                        f"SymPy counterexample found at assignment: {cex_clean}",
                     )
             except Exception:
                 continue

@@ -134,7 +134,10 @@ impl LakatosianRefiner {
 
         if let Some(obj) = counterexample.as_object() {
             for (var_name, val) in obj {
-                if let Some(num) = val.as_i64() {
+                let maybe_i64 = val.as_i64().or_else(|| val.as_str().and_then(|s| s.parse::<i64>().ok()));
+                let maybe_f64 = val.as_f64().or_else(|| val.as_str().and_then(|s| s.parse::<f64>().ok()));
+
+                if let Some(num) = maybe_i64 {
                     // Check if negative value violated a quadratic/power constraint
                     if num < 0 && (target.contains(&format!("{} >=", var_name)) || target.contains(&format!("{}^2", var_name))) {
                         new_hypotheses.push(format!("{} >= 0", var_name));
@@ -143,7 +146,7 @@ impl LakatosianRefiner {
                     } else {
                         new_hypotheses.push(format!("{} != {}", var_name, num));
                     }
-                } else if let Some(num) = val.as_f64() {
+                } else if let Some(num) = maybe_f64 {
                     if num < 0.0 && (target.contains(&format!("{} >=", var_name)) || target.contains(&format!("{}^2", var_name))) {
                         new_hypotheses.push(format!("{} >= 0", var_name));
                     } else {

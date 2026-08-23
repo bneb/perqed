@@ -55,7 +55,7 @@ class Z3Prober:
                 z3_vars[name] = var
             elif "int" in vtype.lower():
                 z3_vars[name] = z3.Int(name)
-            elif "real" in vtype.lower():
+            elif any(t in vtype.lower() for t in ("real", "rat", "float")):
                 z3_vars[name] = z3.Real(name)
             elif "bool" in vtype.lower():
                 z3_vars[name] = z3.Bool(name)
@@ -97,7 +97,7 @@ class Z3Prober:
                 z3_vars[name] = var
             elif "int" in vtype.lower():
                 z3_vars[name] = z3.Int(name)
-            elif "real" in vtype.lower():
+            elif any(t in vtype.lower() for t in ("real", "rat", "float")):
                 z3_vars[name] = z3.Real(name)
             elif "bool" in vtype.lower():
                 z3_vars[name] = z3.Bool(name)

@@ -1,0 +1,49 @@
+{
+  "spec_hash": "356b6c8283ff70a6a407dddfa12d2f6adb840ce35bdb81f308f7050930ce1980",
+  "entries": [
+    {
+      "field_spec": "QQ[sqrt(2)]",
+      "point_count": 24,
+      "edge_count": 23,
+      "chromatic_number": 2,
+      "bipartite": true,
+      "odd_cycle": false,
+      "verified": true,
+      "note": "all gates passed"
+    },
+    {
+      "field_spec": "QQ[sqrt(3)]",
+      "point_count": 24,
+      "edge_count": 29,
+      "chromatic_number": 3,
+      "bipartite": false,
+      "odd_cycle": true,
+      "verified": true,
+      "note": "all gates passed"
+    },
+    {
+      "field_spec": "QQ[cbrt(2)]",
+      "point_count": 38,
+      "edge_count": 37,
+      "chromatic_number": 2,
+      "bipartite": true,
+      "odd_cycle": false,
+      "verified": true,
+      "note": "all gates passed"
+    },
+    {
+      "field_spec": "QQ[zeta_5]",
+      "point_count": 92,
+      "edge_count": 91,
+      "chromatic_number": 2,
+      "bipartite": true,
+      "odd_cycle": false,
+      "verified": true,
+      "note": "all gates passed"
+    }
+  ],
+  "max_chromatic": 3,
+  "fields_with_odd_cycle": [
+    "QQ[sqrt(3)]"
+  ]
+}

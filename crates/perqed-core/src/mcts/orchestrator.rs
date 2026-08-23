@@ -44,6 +44,7 @@ pub struct MctsOrchestrator {
     sublemma_isolator: SubLemmaIsolator,
     config: MctsConfig,
     available_premises: Vec<String>,
+    premise_index: crate::ingestion::PremiseIndex,
 }
 
 impl MctsOrchestrator {
@@ -54,6 +55,7 @@ impl MctsOrchestrator {
         config: MctsConfig,
     ) -> Self {
         let sublemma_isolator = SubLemmaIsolator::new(library_dir);
+        let premise_index = crate::ingestion::PremiseIndex::with_weights(config.premise_weights.clone());
         Self {
             tactic_gen,
             lean_client,
@@ -67,6 +69,7 @@ impl MctsOrchestrator {
                 "Or.inl".to_string(),
                 "Or.inr".to_string(),
             ],
+            premise_index,
         }
     }
 
@@ -104,11 +107,23 @@ impl MctsOrchestrator {
         }
         let mut cycle_detector = perqed_lean_client::GoalCycleDetector::new();
         let mut transposition_table = crate::mcts::TranspositionTable::new();
-        let mut cyclic_detector = crate::mcts::CyclicProofDetector::new();
+        let cyclic_detector = crate::mcts::CyclicProofDetector::new();
         let mut replay_cache = crate::mcts::SubtreeReplayCache::new();
         replay_cache.register_subtree("?X + 0 = ?X", "rw [Nat.add_zero]", &["X".to_string()]);
         replay_cache.register_subtree("0 + ?X = ?X", "rw [Nat.zero_add]", &["X".to_string()]);
         replay_cache.register_subtree("?X = ?X", "rfl", &["X".to_string()]);
+
+        let mut search_imports = vec![
+            "Perqed.Spec.Theorems".to_string(),
+            "Perqed.Library.Lemmas".to_string(),
+        ];
+        let spec_import = format!("Perqed.Spec.{}", theorem_name);
+        let spec_file = self.lean_client.root_dir().join("lean/Perqed/Spec").join(format!("{}.lean", theorem_name));
+        let has_spec = spec_file.exists() || theorem_signature.contains(&spec_import);
+        if has_spec {
+            search_imports.push(spec_import.clone());
+        }
+        let import_refs: Vec<&str> = search_imports.iter().map(|s| s.as_str()).collect();
 
         for iter in 0..self.config.max_iterations {
             if start_time.elapsed().as_secs() > self.config.timeout_seconds {
@@ -214,12 +229,22 @@ impl MctsOrchestrator {
                 "rfl".to_string(),
                 "intro n; rfl".to_string(),
                 "intro a b; rfl".to_string(),
+                "intro n; rw [Nat.add_zero]".to_string(),
                 "omega".to_string(),
                 "linarith".to_string(),
                 "ring".to_string(),
                 "simp".to_string(),
                 "aesop".to_string(),
             ];
+
+            if has_spec {
+                fast_tactics.insert(0, format!("intro; simp [{}]", spec_import));
+                fast_tactics.insert(1, format!("intro n; dsimp [{}]; rw [Nat.add_zero]", spec_import));
+                fast_tactics.insert(2, format!("intro; dsimp [{}]; rfl", spec_import));
+                fast_tactics.insert(3, format!("intro; dsimp [{}]; ring", spec_import));
+                fast_tactics.insert(4, format!("intro; dsimp [{}]; omega", spec_import));
+                fast_tactics.insert(5, format!("simp [{}]", spec_import));
+            }
 
             if let Some(knot_tac) = priority_knot_tactic {
                 fast_tactics.insert(0, knot_tac);
@@ -239,8 +264,7 @@ impl MctsOrchestrator {
                 let mut test_tactics = nodes[selected_id].proof_state.cumulative_tactics.clone();
                 test_tactics.push(fast_tac.to_string());
                 let proof_body = format!("theorem probe_thm : {} := by\n  {}", theorem_signature, test_tactics.join("\n  "));
-                let imports = ["Perqed.Spec.Theorems", "Perqed.Library.Lemmas"];
-                if let Ok(eval) = self.lean_client.evaluate_proof_snippet(&imports, &proof_body).await {
+                if let Ok(eval) = self.lean_client.evaluate_proof_snippet(&import_refs, &proof_body).await {
                     if eval.is_solved {
                         let child_id = nodes.len();
                         let child_state = ProofState {
@@ -280,12 +304,24 @@ impl MctsOrchestrator {
                 break;
             }
 
-            // 2B. Model-Guided Expansion: Generate candidate tactics
+            // 2B. Model-Guided Expansion with Dynamic Subgoal Premise Retrieval
+            let mut dynamic_active_premises = active_premises.clone();
+            if let Some(goal) = nodes[selected_id].proof_state.open_goals.first() {
+                let retrieved = self
+                    .premise_index
+                    .hybrid_search(goal, self.config.premise_weights.default_retrieval_limit);
+                for p in retrieved {
+                    if !dynamic_active_premises.contains(&p.name) {
+                        dynamic_active_premises.push(p.name);
+                    }
+                }
+            }
+
             let candidates = self
                 .tactic_gen
                 .generate_candidates(
                     &nodes[selected_id].proof_state,
-                    &active_premises,
+                    &dynamic_active_premises,
                     self.config.num_candidates_per_step,
                 )
                 .await?;
@@ -299,8 +335,7 @@ impl MctsOrchestrator {
 
                 // Evaluate candidate in Lean
                 let proof_body = format!("theorem probe_thm : {} := by\n  {}", theorem_signature, new_tactics.join("\n  "));
-                let imports = ["Perqed.Spec.Theorems", "Perqed.Library.Lemmas"];
-                let eval = self.lean_client.evaluate_proof_snippet(&imports, &proof_body).await?;
+                let eval = self.lean_client.evaluate_proof_snippet(&import_refs, &proof_body).await?;
 
                 let child_id = nodes.len();
                 let child_state = ProofState {
@@ -328,7 +363,7 @@ impl MctsOrchestrator {
                     child_node.is_terminal = true;
                     nodes.push(child_node);
                     created_child_ids.push(child_id);
-                    self.backpropagate(&mut nodes, child_id, -1.0);
+                    self.backpropagate(&mut nodes, child_id, self.config.heuristics.cycle_penalty_value);
                     continue;
                 }
 
@@ -415,18 +450,20 @@ impl MctsOrchestrator {
 
     fn evaluate_heuristic_value(&self, node: &MctsNode) -> f64 {
         if node.is_solved {
-            return 1.0;
+            return self.config.heuristics.solved_value;
         }
         if node.proof_state.open_goals.is_empty() {
-            return 0.9;
+            return self.config.heuristics.empty_goals_value;
         }
 
         // Distance to goal heuristic: fewer goals + smaller AST length = higher score
         let goal_count = node.proof_state.open_goals.len() as f64;
-        let goal_reduction_score = 1.0 / (1.0 + goal_count);
+        let goal_reduction_score = self.config.heuristics.goal_reduction_base / (1.0 + goal_count);
 
-        let depth_penalty = (node.depth as f64) * 0.05;
-        (goal_reduction_score - depth_penalty).max(0.0).min(0.95)
+        let depth_penalty = (node.depth as f64) * self.config.heuristics.depth_penalty_factor;
+        (goal_reduction_score - depth_penalty)
+            .max(0.0)
+            .min(self.config.heuristics.max_heuristic_value)
     }
 
     fn backpropagate(&self, nodes: &mut [MctsNode], leaf_id: usize, value: f64) {

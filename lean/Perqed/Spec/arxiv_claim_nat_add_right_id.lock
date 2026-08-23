@@ -1,0 +1,10 @@
+{
+  "spec_file": "/Users/kevin/projects/perqed/lean/Perqed/Spec/arxiv_claim_nat_add_right_id.lean",
+  "sha256_hash": "9d98c41affcb1457b98a26d833466b4773e6da5476af897748b286b0c1e7033d",
+  "canonical_len": 100,
+  "declarations": [
+    "arxiv_claim_nat_add_right_id"
+  ],
+  "created_at": "2026-08-23T11:44:41.298626Z",
+  "perqed_version": "0.2.0"
+}

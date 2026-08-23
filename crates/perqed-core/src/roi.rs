@@ -138,26 +138,52 @@ pub struct RoiScore {
     pub ranking_rationale: String,
 }
 
+/// Configuration weights for scientific return-on-investment evaluation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoiWeights {
+    pub intrinsic_weight: f64,
+    pub difficulty_weight: f64,
+    pub novelty_weight: f64,
+    pub mdl_lambda: f64,
+    pub token_bit_weight: f64,
+    pub char_bit_weight: f64,
+}
+
+impl Default for RoiWeights {
+    fn default() -> Self {
+        Self {
+            intrinsic_weight: 0.45,
+            difficulty_weight: 0.35,
+            novelty_weight: 0.20,
+            mdl_lambda: 0.05,
+            token_bit_weight: 8.0,
+            char_bit_weight: 3.0,
+        }
+    }
+}
+
 pub struct RoiEvaluator {
     dag: MathlibDag,
-    mdl_lambda: f64, // Description length penalty weight (default 0.05)
+    pub weights: RoiWeights,
     pub power_cost_model: PowerCostModel,
 }
 
 impl RoiEvaluator {
     pub fn new(dag: MathlibDag) -> Self {
-        Self {
-            dag,
-            mdl_lambda: 0.05,
-            power_cost_model: PowerCostModel::default(),
-        }
+        Self::with_weights(dag, RoiWeights::default(), PowerCostModel::default())
     }
 
     pub fn with_lambda(dag: MathlibDag, mdl_lambda: f64) -> Self {
+        let mut weights = RoiWeights::default();
+        weights.mdl_lambda = mdl_lambda;
+        Self::with_weights(dag, weights, PowerCostModel::default())
+    }
+
+    pub fn with_weights(dag: MathlibDag, weights: RoiWeights, power_cost_model: PowerCostModel) -> Self {
         Self {
             dag,
-            mdl_lambda,
-            power_cost_model: PowerCostModel::default(),
+            weights,
+            power_cost_model,
         }
     }
 
@@ -170,9 +196,10 @@ impl RoiEvaluator {
         // Estimate AST bit-length from token and character complexity
         let token_count = conjecture.target.split_whitespace().count().max(1);
         let char_len = conjecture.target.len();
-        let ast_bit_length = (token_count as f64) * 8.0 + (char_len as f64) * 3.0;
+        let ast_bit_length = (token_count as f64) * self.weights.token_bit_weight
+            + (char_len as f64) * self.weights.char_bit_weight;
 
-        let raw_mdl_gain = data_entropy - self.mdl_lambda * (ast_bit_length / 10.0);
+        let raw_mdl_gain = data_entropy - self.weights.mdl_lambda * (ast_bit_length / 10.0);
         raw_mdl_gain.max(0.1)
     }
 

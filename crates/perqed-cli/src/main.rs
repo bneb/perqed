@@ -206,7 +206,7 @@ enum Commands {
         #[arg(long)]
         domain: String,
         /// Discovery spec JSON, e.g. {"target": 8, "quotient_bound": 2}
-        #[arg(long)]
+        #[arg(long, default_value = "{}")]
         spec: String,
         /// For number_theory.zaremba: sweep k = 1..=K over 2^k instead of a
         /// single target, recording the per-k witness table
@@ -255,6 +255,9 @@ enum Commands {
         /// Optional output path for extracted conjecture candidates JSON
         #[arg(short, long)]
         output: Option<PathBuf>,
+        /// Automatically run full discovery & verification pipeline on extracted claims
+        #[arg(long)]
+        autoformalize: bool,
     },
 
     /// Inspect abstract graveyard and execute Lakatosian boundary refinement on falsified conjectures
@@ -761,7 +764,12 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::Arxiv { query, limit, output } => {
+        Commands::Arxiv {
+            query,
+            limit,
+            output,
+            autoformalize,
+        } => {
             println!("\n=======================================================");
             println!("📚 SEARCHING & INGESTING RESEARCH LITERATURE FROM ARXIV");
             println!("Query: {}", query);
@@ -795,6 +803,18 @@ async fn main() -> anyhow::Result<()> {
                 }
                 fs::write(&out_path, serde_json::to_string_pretty(&all_claims)?)?;
                 println!("\nSaved {} extracted papers to: {}", all_claims.len(), out_path.display());
+            }
+
+            if autoformalize {
+                println!("\n--- [RUNNING AUTOMATED DISCOVERY & VERIFICATION ON ARXIV CLAIMS] ---");
+                let pipeline = FrontierPipeline::new(".");
+                let results = pipeline.run_on_arxiv_query(&query, limit).await?;
+                println!("\n🎉 Successfully proved & verified {} theorems from arXiv!", results.len());
+                for res in &results {
+                    println!("  - [{}] {}", res.conjecture.conjecture_id, res.conjecture.informal_claim);
+                    println!("    Lean Proof: {}", res.proof_search.proof_script);
+                    println!("    Spec SHA-256: {}", res.autoformalization.spec_lock.sha256_hash);
+                }
             }
         }
 

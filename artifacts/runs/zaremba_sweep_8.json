@@ -1,0 +1,58 @@
+[
+  {
+    "k": 1,
+    "m": 2,
+    "numerator": 1,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 2,
+    "m": 4,
+    "numerator": 3,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 3,
+    "m": 8,
+    "numerator": 3,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 4,
+    "m": 16,
+    "numerator": 7,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 5,
+    "m": 32,
+    "numerator": 25,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 6,
+    "m": 64,
+    "numerator": 45,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 7,
+    "m": 128,
+    "numerator": 47,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 8,
+    "m": 256,
+    "numerator": 181,
+    "max_quotient": 2,
+    "bound": 5
+  }
+]

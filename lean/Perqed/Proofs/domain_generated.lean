@@ -1,2 +1,2 @@
-theorem zaremba_witness_8_3 : Perqed.Spec.zaremba_witness_8_3 := by
+theorem cap_set_3_9 : Perqed.Spec.cap_set_3_9 := by
   decide

@@ -1,0 +1,76 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\title{\textbf{Autonomous Theorem Discovery: For any natural number n, n + 0 = n}}
+\author{Perqed Autonomous Discovery Engine \\ \texttt{frontier-lab@perqed.org}}
+\date{\today}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{definition}{Definition}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{teal},
+  breaklines=true,
+  frame=single
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present the autonomous discovery, formal specification, and machine-checked verification of \textbf{arxiv_claim_nat_add_right_id}. The statement was generated via automated premise synthesis, passed sandboxed SMT and algebraic counterexample sweeps, was frozen under an immutable SHA-256 hash lock, and proved using Monte Carlo Tree Search. The resulting proof was verified by the Lean 4 kernel reflection audit gate with strict transitive axiom closure.
+\end{abstract}
+
+\section{Informal Statement}
+\begin{theorem}[arxiv_claim_nat_add_right_id]
+For any natural number n, n + 0 = n
+\end{theorem}
+
+\section{Cryptographic Provenance \& Lock Commitment}
+\begin{itemize}
+  \item \textbf{Specification SHA-256}: \texttt{9d98c41affcb1457b98a26d833466b4773e6da5476af897748b286b0c1e7033d}
+  \item \textbf{Verification Status}: \textbf{ALL AUDIT GATES PASSED}
+  \item \textbf{Axioms Utilized}: \texttt{[] (Constructive / Core Tactics Only)}
+  \item \textbf{Sorry-Free Invariant}: \texttt{sorryAx} count = 0 (Strictly Verified)
+\end{itemize}
+
+\section{Formal Lean 4 Specification}
+\begin{lstlisting}[language=Lean]
+namespace Perqed.Spec
+
+def arxiv_claim_nat_add_right_id (n : Nat) : Prop :=
+  n + 0 = n
+
+end Perqed.Spec
+\end{lstlisting}
+
+\section{Machine-Checked Proof Artifact}
+\begin{lstlisting}[language=Lean]
+/-
+  Perqed.Proofs.arxiv_claim_nat_add_right_id
+  Automated Formal Proof Artifact
+-/
+import Perqed.Spec.Theorems
+import Perqed.Spec.arxiv_claim_nat_add_right_id
+import Perqed.Library.Lemmas
+
+namespace Perqed.Proofs
+
+theorem arxiv_claim_nat_add_right_id : ∀ (n : Nat), Perqed.Spec.arxiv_claim_nat_add_right_id n := by
+  intro; simp [Perqed.Spec.arxiv_claim_nat_add_right_id]
+
+end Perqed.Proofs
+\end{lstlisting}
+
+\section{Kernel Audit Verification Certificate}
+The proof was mechanically audited by the Lean 4 kernel reflection gate (\texttt{AuditSpec.lean}). No unauthorized axioms or hypothesis stuffing were detected. Definitional equality with the frozen target was verified.
+
+\end{document}

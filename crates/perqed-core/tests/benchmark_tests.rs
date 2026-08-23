@@ -19,7 +19,7 @@ async fn test_red_to_green_benchmark_campaign_execution() {
     // Dataset containing 1 genuine theorem and 1 false conjecture
     let dataset = vec![
         Conjecture {
-            conjecture_id: "nat_add_right_id".to_string(),
+            conjecture_id: "bm_valid_add_id".to_string(),
             domain: "algebra.nat".to_string(),
             informal_claim: "For any natural number n, n + 0 = n".to_string(),
             hypotheses: vec!["n >= 0".to_string()],
@@ -41,6 +41,10 @@ async fn test_red_to_green_benchmark_campaign_execution() {
     ];
 
     let summary = runner.run_benchmark(&dataset).await;
+
+    for item in &summary.items {
+        println!("Item: {} (Passed: {}, Error: {:?})", item.conjecture_id, item.passed_falsification, item.error);
+    }
 
     // Verify campaign metrics
     assert_eq!(summary.total_candidates, 2);

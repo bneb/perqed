@@ -123,7 +123,10 @@ impl Autoformalizer {
         let system_prompt = r#"You are an expert formal mathematician specialized in Lean 4.
 Translate the mathematical claim into a clean, syntactically valid Lean 4 specification.
 Place all declarations under namespace Perqed.Spec.
-Do NOT include proofs or `sorry` — only definitions and theorem statement specifications.
+CRITICAL SYNTAX RULE: Define the specification as a proposition:
+def <conjecture_id> (<vars>) : Prop :=
+  <formula>
+Do NOT use `axiom`, `theorem`, `sorry`, or proofs — ONLY `def ... : Prop := <formula>`.
 Return ONLY valid Lean 4 code inside a markdown code block.
 "#;
 
@@ -150,7 +153,7 @@ Return ONLY valid Lean 4 code inside a markdown code block.
         };
 
         let resp = self.model_router.complete(&req).await?;
-        let code = resp
+        let mut code = resp
             .content
             .trim()
             .trim_start_matches("```lean")
@@ -158,6 +161,20 @@ Return ONLY valid Lean 4 code inside a markdown code block.
             .trim_end_matches("```")
             .trim()
             .to_string();
+
+        // Normalize any accidental axiom / theorem declarations to def ... : Prop :=
+        if code.contains("axiom ") || code.contains("theorem ") {
+            code = code
+                .replace("axiom ", "def ")
+                .replace("theorem ", "def ");
+            if !code.contains(": Prop :=") {
+                // If it was "def foo (n : Nat) : n + 0 = n", convert to "def foo (n : Nat) : Prop :=\n  n + 0 = n"
+                if let Some(pos) = code.rfind(" : ") {
+                    let (head, tail) = code.split_at(pos);
+                    code = format!("{} : Prop :=\n  {}", head, &tail[3..]);
+                }
+            }
+        }
 
         let formatted = if !code.contains("namespace Perqed.Spec") {
             format!(

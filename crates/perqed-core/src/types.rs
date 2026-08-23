@@ -42,6 +42,60 @@ pub struct TacticCandidate {
     pub is_terminal: bool,
 }
 
+/// Heuristic weights and scoring parameters for MCTS proof search
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MctsHeuristicWeights {
+    pub depth_penalty_factor: f64,
+    pub goal_reduction_base: f64,
+    pub cycle_penalty_value: f64,
+    pub solved_value: f64,
+    pub empty_goals_value: f64,
+    pub max_heuristic_value: f64,
+}
+
+impl Default for MctsHeuristicWeights {
+    fn default() -> Self {
+        Self {
+            depth_penalty_factor: 0.05,
+            goal_reduction_base: 1.0,
+            cycle_penalty_value: -1.0,
+            solved_value: 1.0,
+            empty_goals_value: 0.9,
+            max_heuristic_value: 0.95,
+        }
+    }
+}
+
+/// Prior probability scores for heuristic and premise candidate tactic injection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TacticPriorScores {
+    pub rfl_score: f64,
+    pub decision_proc_score: f64,
+    pub rewrite_premise_score: f64,
+    pub exact_premise_score: f64,
+    pub exact_hole_premise_score: f64,
+    pub apply_premise_score: f64,
+    pub simp_premise_score: f64,
+    pub constructor_score: f64,
+    pub intro_score: f64,
+}
+
+impl Default for TacticPriorScores {
+    fn default() -> Self {
+        Self {
+            rfl_score: 0.95,
+            decision_proc_score: 0.90,
+            rewrite_premise_score: 0.85,
+            exact_premise_score: 0.84,
+            exact_hole_premise_score: 0.83,
+            apply_premise_score: 0.82,
+            simp_premise_score: 0.81,
+            constructor_score: 0.80,
+            intro_score: 0.85,
+        }
+    }
+}
+
 /// Proof State representation for MCTS search
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofState {
@@ -62,6 +116,12 @@ pub struct MctsConfig {
     pub num_candidates_per_step: usize,
     pub sublemma_depth_threshold: usize,
     pub timeout_seconds: u64,
+    #[serde(default)]
+    pub heuristics: MctsHeuristicWeights,
+    #[serde(default)]
+    pub premise_weights: crate::ingestion::HybridPremiseWeights,
+    #[serde(default)]
+    pub tactic_scores: TacticPriorScores,
 }
 
 impl Default for MctsConfig {
@@ -73,6 +133,9 @@ impl Default for MctsConfig {
             num_candidates_per_step: 5,
             sublemma_depth_threshold: 4,
             timeout_seconds: 60,
+            heuristics: MctsHeuristicWeights::default(),
+            premise_weights: crate::ingestion::HybridPremiseWeights::default(),
+            tactic_scores: TacticPriorScores::default(),
         }
     }
 }

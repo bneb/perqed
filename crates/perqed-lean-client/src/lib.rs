@@ -82,6 +82,10 @@ impl LeanClient {
         }
     }
 
+    pub fn root_dir(&self) -> &Path {
+        &self.config.workspace_root
+    }
+
     /// Run `lake build` to compile modules and build oleans
     pub async fn lake_build(&self) -> Result<(), LeanClientError> {
         let mut cmd = Command::new("lake");

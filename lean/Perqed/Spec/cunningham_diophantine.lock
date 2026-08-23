@@ -1,0 +1,10 @@
+{
+  "spec_file": "lean/Perqed/Spec/cunningham_diophantine.lean",
+  "sha256": "5534cd0c850f1b692d13e72f9f47012a8003ed432b13dfa8be214e048955e6b9",
+  "locked_at": "2026-08-23T04:44:10Z",
+  "declarations": [
+    "sophie_germain_diophantine_spec",
+    "cunningham_diff_squares_spec",
+    "cunningham_strict_gap_spec"
+  ]
+}

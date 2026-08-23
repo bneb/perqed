@@ -1,3 +1,11 @@
+/--
+  Palomar Challenge Specification
+  Theorem: Perqed.Spec.combinatorics.cap_set
+  Frozen SHA-256: 47b6ef96e01fc02e795b94a18386ce1fb63ee44cf0cffd9e71ecdf27ce31d07a
+--/
+import Mathlib
+import Perqed
+
 /-
   Perqed.Spec.cap_set_3_9
   Domain: combinatorics.cap_set

@@ -1,0 +1,74 @@
+{
+  "certificate": {
+    "compute_cost_usd": 0.0,
+    "domain": "combinatorics.cap_set",
+    "payload": {
+      "data": {
+        "dimension": 3,
+        "target_size": 9,
+        "vectors": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            1
+          ],
+          [
+            0,
+            2,
+            1
+          ],
+          [
+            1,
+            0,
+            1
+          ],
+          [
+            1,
+            1,
+            2
+          ],
+          [
+            1,
+            2,
+            2
+          ],
+          [
+            2,
+            0,
+            1
+          ],
+          [
+            2,
+            1,
+            2
+          ],
+          [
+            2,
+            2,
+            2
+          ]
+        ]
+      },
+      "type": "CapSet"
+    },
+    "probe_id": "domain::combinatorics.cap_set",
+    "spec_hash": "9a75013fbdfb648d1a7cdfdbff44e6a4931f00d7bac1e240f64e6c6e7a4e80e3",
+    "timestamp_utc": "1787465184"
+  },
+  "verdict": {
+    "data": {
+      "dimension": 3,
+      "is_three_ap_free": true,
+      "reason": "Verified 3-AP free cap set in F_3^3 with |S| = 9 >= 9",
+      "size": 9,
+      "target_size": 9,
+      "verified": true
+    },
+    "domain": "CapSet"
+  }
+}

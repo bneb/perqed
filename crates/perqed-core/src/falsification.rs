@@ -28,13 +28,40 @@ pub struct PredicateSpec {
     pub variables: HashMap<String, String>,
 }
 
+/// Configuration parameters for the Sandboxed Falsification Gate
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FalsificationConfig {
+    pub default_timeout_seconds: f64,
+    pub default_sample_budget: usize,
+    pub default_coord_min: f64,
+    pub default_coord_max: f64,
+    pub float_tolerance: f64,
+}
+
+impl Default for FalsificationConfig {
+    fn default() -> Self {
+        Self {
+            default_timeout_seconds: 5.0,
+            default_sample_budget: 100,
+            default_coord_min: -100.0,
+            default_coord_max: 100.0,
+            float_tolerance: 1e-6,
+        }
+    }
+}
+
 pub struct FalsificationGate {
     runner: SandboxRunner,
+    pub config: FalsificationConfig,
 }
 
 impl FalsificationGate {
     pub fn new(runner: SandboxRunner) -> Self {
-        Self { runner }
+        Self::with_config(runner, FalsificationConfig::default())
+    }
+
+    pub fn with_config(runner: SandboxRunner, config: FalsificationConfig) -> Self {
+        Self { runner, config }
     }
 
     /// Run full falsification suite against candidate conjecture
@@ -75,6 +102,14 @@ impl FalsificationGate {
 
         if verdict.falsified {
             warn!("Conjecture {} falsified! Reason: {}", conjecture.conjecture_id, verdict.reason);
+            return Err(FalsificationGateError::ConjectureFalsified(
+                verdict.counterexample,
+                verdict.reason,
+            ));
+        }
+
+        if !verdict.passed {
+            warn!("Conjecture {} failed falsification gate! Reason: {}", conjecture.conjecture_id, verdict.reason);
             return Err(FalsificationGateError::ConjectureFalsified(
                 verdict.counterexample,
                 verdict.reason,

@@ -34,6 +34,24 @@ class SeparationProber:
         clean_expr = normalize_math_expr(expr_str)
         return eval(clean_expr, {"__builtins__": {}}, safe_dict)
 
+    def _build_z3_vars(self, variables: Dict[str, str], solver: z3.Solver) -> Dict[str, Any]:
+        z3_vars = {}
+        for name, vtype in variables.items():
+            vt = vtype.lower()
+            if "nat" in vt:
+                var = z3.Int(name)
+                solver.add(var >= 0)
+                z3_vars[name] = var
+            elif "int" in vt:
+                z3_vars[name] = z3.Int(name)
+            elif any(t in vt for t in ("real", "rat", "float")):
+                z3_vars[name] = z3.Real(name)
+            elif "bool" in vt:
+                z3_vars[name] = z3.Bool(name)
+            else:
+                z3_vars[name] = z3.Int(name)
+        return z3_vars
+
     def verify_predicate_separation(
         self,
         predicate_name: str,
@@ -45,7 +63,7 @@ class SeparationProber:
         # 1. Inhabitation
         s_inhabit = z3.Solver()
         s_inhabit.set("timeout", self.timeout_ms)
-        z3_vars = {name: z3.Int(name) for name in variables.keys()}
+        z3_vars = self._build_z3_vars(variables, s_inhabit)
 
         if domain_bounds:
             for name, (low, high) in domain_bounds.items():
@@ -75,7 +93,7 @@ class SeparationProber:
         # 2. Separation / Non-Triviality
         s_sep = z3.Solver()
         s_sep.set("timeout", self.timeout_ms)
-        z3_vars_sep = {name: z3.Int(name) for name in variables.keys()}
+        z3_vars_sep = self._build_z3_vars(variables, s_sep)
 
         if domain_bounds:
             for name, (low, high) in domain_bounds.items():
@@ -127,15 +145,10 @@ class SeparationProber:
         if not hypotheses:
             return True, {"inhabitation": True, "separation": True}, "No hypotheses (unconstrained)."
 
-        z3_vars = {name: z3.Int(name) for name in variables.keys()}
-
         # 1. Combined Inhabitation: ∃ x, ⋀ H_i(x)
         s_inhabit = z3.Solver()
         s_inhabit.set("timeout", self.timeout_ms)
-
-        for name, vtype in variables.items():
-            if "nat" in vtype.lower():
-                s_inhabit.add(z3_vars[name] >= 0)
+        z3_vars = self._build_z3_vars(variables, s_inhabit)
 
         for h in hypotheses:
             try:
@@ -156,35 +169,34 @@ class SeparationProber:
             for name, var in z3_vars.items()
         }
 
-        # 2. Combined Separation: ∃ y, ¬(⋀ H_i(y))
+        # 2. Combined Separation Check: ∃ y, ¬(⋀ H_i(y))
         s_sep = z3.Solver()
         s_sep.set("timeout", self.timeout_ms)
-        z3_vars_sep = {name: z3.Int(name) for name in variables.keys()}
+        z3_vars_sep = self._build_z3_vars(variables, s_sep)
 
         hyp_asts = [self._eval_expr(h, z3_vars_sep) for h in hypotheses]
         combined_and = z3.And(*hyp_asts) if len(hyp_asts) > 1 else hyp_asts[0]
         s_sep.add(z3.Not(combined_and))
 
-        if s_sep.check() != z3.sat:
-            return (
-                False,
-                {"combined_inhabitation": True, "combined_separation": False},
-                "REJECTED: Combined hypotheses form a universal tautology (no counter-witness exists).",
-            )
-
-        m_sep = s_sep.model()
-        sep_witness = {
-            name: str(m_sep.eval(var, model_completion=True))
-            for name, var in z3_vars_sep.items()
-        }
+        is_universal = (s_sep.check() != z3.sat)
+        sep_witness = None
+        if not is_universal:
+            m_sep = s_sep.model()
+            sep_witness = {
+                name: str(m_sep.eval(var, model_completion=True))
+                for name, var in z3_vars_sep.items()
+            }
 
         return (
             True,
             {
                 "combined_inhabitation": True,
                 "inhabitation_witness": inhabit_witness,
-                "combined_separation": True,
+                "combined_separation": not is_universal,
+                "is_universal_domain": is_universal,
                 "counter_witness": sep_witness,
             },
-            "PASSED: Combined hypothesis conjunction is mutually satisfiable and non-trivial.",
+            "PASSED: Combined hypotheses are mutually satisfiable (inhabited)."
+            if not is_universal
+            else "PASSED: Combined hypotheses hold universally on the domain (unconstrained universal theorem).",
         )

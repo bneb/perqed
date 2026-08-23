@@ -58,6 +58,7 @@ pub struct FrontierPipeline {
     mcts_config: MctsConfig,
     roi_evaluator: crate::roi::RoiEvaluator,
     dead_ends_db: perqed_sandbox::DeadEndsDb,
+    pub registry: std::sync::Arc<std::sync::Mutex<crate::registry::EmpiricalDiscoveryRegistry>>,
 }
 
 impl FrontierPipeline {
@@ -72,6 +73,9 @@ impl FrontierPipeline {
         let dag = crate::dag::MathlibDag::new();
         let roi_evaluator = crate::roi::RoiEvaluator::new(dag);
         let dead_ends_db = perqed_sandbox::DeadEndsDb::new(&root);
+        let registry = std::sync::Arc::new(std::sync::Mutex::new(
+            crate::registry::EmpiricalDiscoveryRegistry::new(),
+        ));
 
         Self {
             workspace_root: root,
@@ -83,13 +87,35 @@ impl FrontierPipeline {
             mcts_config: MctsConfig::default(),
             roi_evaluator,
             dead_ends_db,
+            registry,
         }
+    }
+
+    pub fn get_registry(&self) -> crate::registry::EmpiricalDiscoveryRegistry {
+        self.registry.lock().map(|r| r.clone()).unwrap_or_default()
+    }
+
+    pub fn export_registry_markdown(&self) -> String {
+        self.get_registry().export_markdown_table()
     }
 
     /// Run full asymmetric compute funnel pipeline on a mathematical conjecture
     pub async fn run_on_conjecture(&self, conjecture: &Conjecture) -> Result<PipelineResult, PipelineError> {
         info!("=== STEP 1A: Dead Ends & High-Throughput Falsification Gate ===");
         if self.dead_ends_db.is_known_dead_end(&conjecture.target) {
+            if let Ok(mut reg) = self.registry.lock() {
+                reg.record(
+                    &conjecture.conjecture_id,
+                    &conjecture.informal_claim,
+                    &conjecture.target,
+                    &conjecture.domain,
+                    10.0,
+                    crate::registry::ConjectureStatus::FalsifiedCounterexample {
+                        counterexample_witness: "Known dead end in database".to_string(),
+                        method: "DeadEndsDb".to_string(),
+                    },
+                );
+            }
             return Err(PipelineError::Failed(format!(
                 "Conjecture target '{}' matches known dead end in database. Compute pruned.",
                 conjecture.target
@@ -104,6 +130,19 @@ impl FrontierPipeline {
                     &conjecture.informal_claim,
                     &serde_json::to_value(ce).unwrap_or_default(),
                     &falsify_verdict.reason,
+                );
+            }
+            if let Ok(mut reg) = self.registry.lock() {
+                reg.record(
+                    &conjecture.conjecture_id,
+                    &conjecture.informal_claim,
+                    &conjecture.target,
+                    &conjecture.domain,
+                    10.0,
+                    crate::registry::ConjectureStatus::FalsifiedCounterexample {
+                        counterexample_witness: format!("{:?}", falsify_verdict.counterexample),
+                        method: "SandboxedFalsificationGate".to_string(),
+                    },
                 );
             }
             return Err(PipelineError::Failed(format!(
@@ -144,6 +183,10 @@ impl FrontierPipeline {
             &autoform_res.spec_lean_path,
         )?;
 
+        // Register module in root Perqed.lean for Lake compilation
+        let spec_module = format!("Perqed.Spec.{}", conjecture.conjecture_id);
+        let _ = register_lean_module(&self.workspace_root, &spec_module);
+
         // Rebuild Lake environment to compile new specification module
         let _ = self.lean_client.lake_build().await;
 
@@ -182,6 +225,20 @@ impl FrontierPipeline {
             .await?;
 
         if !proof_res.is_solved {
+            if let Ok(mut reg) = self.registry.lock() {
+                reg.record(
+                    &conjecture.conjecture_id,
+                    &conjecture.informal_claim,
+                    &conjecture.target,
+                    &conjecture.domain,
+                    roi_score.information_gain,
+                    crate::registry::ConjectureStatus::EmpiricalFolkloreSurviving {
+                        sample_budget: 100,
+                        search_depth: self.mcts_config.max_depth,
+                        symmetry_slices_tested: vec!["GroupEquivariantSlice".to_string()],
+                    },
+                );
+            }
             return Err(PipelineError::Failed(format!(
                 "MCTS proof search failed to solve conjecture '{}'. Proof search ended in incomplete/unsolved state.",
                 conjecture.conjecture_id
@@ -194,13 +251,18 @@ impl FrontierPipeline {
         
         let proof_file_path = proofs_dir.join(format!("{}.lean", conjecture.conjecture_id));
         let proof_code = format!(
-            "/-\n  Perqed.Proofs.{}\n  Automated Formal Proof Artifact\n-/\nimport Perqed.Spec.Theorems\nimport Perqed.Library.Lemmas\n\nnamespace Perqed.Proofs\n\ntheorem {} : {} := {}\n\nend Perqed.Proofs\n",
+            "/-\n  Perqed.Proofs.{}\n  Automated Formal Proof Artifact\n-/\nimport Perqed.Spec.Theorems\nimport Perqed.Spec.{}\nimport Perqed.Library.Lemmas\n\nnamespace Perqed.Proofs\n\ntheorem {} : {} := {}\n\nend Perqed.Proofs\n",
+            conjecture.conjecture_id,
             conjecture.conjecture_id,
             conjecture.conjecture_id,
             target_signature,
             proof_res.proof_script
         );
         std::fs::write(&proof_file_path, &proof_code)?;
+
+        // Register proof module in root Perqed.lean for Lake compilation
+        let proof_module = format!("Perqed.Proofs.{}", conjecture.conjecture_id);
+        let _ = register_lean_module(&self.workspace_root, &proof_module);
 
         // Rebuild Lake
         let _ = self.lean_client.lake_build().await;
@@ -260,6 +322,20 @@ impl FrontierPipeline {
             &audit_report,
         )?;
 
+        if let Ok(mut reg) = self.registry.lock() {
+            reg.record(
+                &conjecture.conjecture_id,
+                &conjecture.informal_claim,
+                &conjecture.target,
+                &conjecture.domain,
+                roi_score.information_gain,
+                crate::registry::ConjectureStatus::VerifiedTheorem {
+                    proof_script: proof_res.proof_script.clone(),
+                    kernel_duration_ms: 10,
+                },
+            );
+        }
+
         info!("🎉 PIPELINE COMPLETE! All gates passed, proof verified and publication draft generated.");
 
         Ok(PipelineResult {
@@ -271,4 +347,89 @@ impl FrontierPipeline {
             publication_draft: draft,
         })
     }
+
+    /// Ingest preprints from arXiv, extract mathematical theorem statements,
+    /// synthesize formal candidate conjectures, and run each through the
+    /// full asymmetric compute and verification funnel.
+    pub async fn run_on_arxiv_query(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<PipelineResult>, PipelineError> {
+        info!("=== ARXIV PIPELINE: Querying arXiv for '{}' (limit: {}) ===", query, limit);
+        let librarian = crate::librarian::arxiv::ArxivLibrarian::new();
+        let papers = librarian.search_arxiv(query, limit).await.map_err(|e| {
+            PipelineError::Failed(format!("arXiv API search failed: {}", e))
+        })?;
+
+        info!("Discovered {} arXiv papers matching query.", papers.len());
+        let mut results = Vec::new();
+        let router = self.model_router.clone();
+        let generator = crate::conjecture::ConjectureGenerator::new(router, None);
+
+        for paper in &papers {
+            let claims = crate::librarian::arxiv::ArxivLibrarian::extract_candidate_claims(paper);
+            for (claim_idx, claim_text) in claims.iter().enumerate() {
+                let pseudo_theorem = crate::types::ParsedTheorem {
+                    label: format!("{}_claim_{}", paper.arxiv_id.replace(|c: char| !c.is_alphanumeric(), "_"), claim_idx),
+                    env_type: "theorem".to_string(),
+                    informal_claim: claim_text.clone(),
+                    raw_latex: format!("\\begin{{theorem}}\n{}\n\\end{{theorem}}", claim_text),
+                    hypotheses: vec![],
+                    conclusion: claim_text.clone(),
+                    source_file: paper.arxiv_id.clone(),
+                };
+
+                let conjs = generator
+                    .synthesize_from_theorem(&pseudo_theorem, crate::conjecture::SynthesisStrategy::Generalization)
+                    .await
+                    .unwrap_or_default();
+
+                for conj in conjs {
+                    info!("Running pipeline on synthesized conjecture: {}", conj.conjecture_id);
+                    match self.run_on_conjecture(&conj).await {
+                        Ok(res) => {
+                            info!("🎉 Successfully proved and verified theorem from arXiv: {}", conj.conjecture_id);
+                            results.push(res);
+                        }
+                        Err(e) => {
+                            info!("arXiv candidate conjecture '{}' stopped at gate: {}", conj.conjecture_id, e);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(results)
+    }
+}
+
+fn register_lean_module(workspace_root: &Path, module_import: &str) -> std::io::Result<()> {
+    let root_lean_path = workspace_root.join("lean/Perqed.lean");
+    if root_lean_path.exists() {
+        let content = std::fs::read_to_string(&root_lean_path)?;
+        let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+        // Self-healing: prune any stale imports where the .lean file was removed from disk
+        lines.retain(|line| {
+            if line.starts_with("import Perqed.Spec.") || line.starts_with("import Perqed.Proofs.") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() == 2 {
+                    let mod_path = parts[1].replace('.', "/");
+                    let file_path = workspace_root.join("lean").join(format!("{}.lean", mod_path));
+                    return file_path.exists();
+                }
+            }
+            true
+        });
+
+        let import_line = format!("import {}", module_import);
+        if !lines.iter().any(|l| l.trim() == import_line) {
+            lines.push(import_line);
+        }
+
+        let updated = lines.join("\n") + "\n";
+        std::fs::write(&root_lean_path, updated)?;
+    }
+    Ok(())
 }

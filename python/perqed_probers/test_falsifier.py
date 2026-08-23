@@ -122,6 +122,47 @@ class TestFalsifier(unittest.TestCase):
         self.assertIsNotNone(res.counterexample)
 
 
+    def test_unicode_math_operators(self):
+        """Conjecture with Unicode operators: x ≤ y ∧ y ≤ z ⇒ x ≤ z"""
+        conj = {
+            "conjecture_id": "test_unicode_transitivity",
+            "variables": {"x": "Real", "y": "Real", "z": "Real"},
+            "hypotheses": ["x ≤ y", "y ≤ z"],
+            "target": "x ≤ z",
+        }
+        res = self.engine.run_falsification_suite(conj)
+        self.assertTrue(res.passed)
+        self.assertFalse(res.falsified)
+
+    def test_unicode_falsifiable_conjecture(self):
+        """False conjecture with Unicode: x ≥ 5 ∧ x ≠ 10 ⇒ x ≥ 20"""
+        conj = {
+            "conjecture_id": "test_unicode_false",
+            "variables": {"x": "Int"},
+            "hypotheses": ["x ≥ 5", "x ≠ 10"],
+            "target": "x ≥ 20",
+        }
+        res = self.engine.run_falsification_suite(conj)
+        self.assertFalse(res.passed)
+        self.assertTrue(res.falsified)
+        self.assertIsNotNone(res.counterexample)
+
+    def test_sympy_counterexample_json_serializable(self):
+        """Ensure counterexample from probers is strictly JSON serializable"""
+        import json
+        from dataclasses import asdict
+        conj = {
+            "conjecture_id": "test_sympy_json",
+            "variables": {"n": "Int"},
+            "hypotheses": ["n >= 2"],
+            "target": "n >= 10",
+        }
+        res = self.engine.run_falsification_suite(conj)
+        self.assertTrue(res.falsified)
+        dumped = json.dumps(asdict(res))
+        self.assertIn('"conjecture_id": "test_sympy_json"', dumped)
+
+
 if __name__ == "__main__":
     unittest.main()
 

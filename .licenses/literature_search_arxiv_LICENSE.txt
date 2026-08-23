@@ -1,0 +1,3 @@
+Terms of Use acknowledgment: arXiv API terms at https://info.arxiv.org/help/api/index.html.
+All retrieved paper licenses are respected.
+Recorded at: 2026-08-23T04:40:50-07:00

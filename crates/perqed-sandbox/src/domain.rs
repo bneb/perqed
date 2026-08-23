@@ -63,6 +63,12 @@ pub enum DomainPayload {
         numerator: i64,
         quotient_bound: i64,
     },
+    /// Domain C: Additive combinatorics / Cap-set bounds over F_3^n
+    CapSet {
+        dimension: usize,
+        vectors: Vec<Vec<u8>>,
+        target_size: usize,
+    },
 }
 
 impl DomainPayload {
@@ -70,6 +76,7 @@ impl DomainPayload {
         match self {
             DomainPayload::UnitDistanceGraph { .. } => "geometry.unit_distance",
             DomainPayload::BoundedContinuedFraction { .. } => "number_theory.zaremba",
+            DomainPayload::CapSet { .. } => "combinatorics.cap_set",
         }
     }
 
@@ -107,20 +114,30 @@ pub enum DomainVerdict {
         max_quotient: i64,
         quotient_bound: i64,
     },
+    CapSet {
+        verified: bool,
+        reason: String,
+        dimension: usize,
+        size: usize,
+        target_size: usize,
+        is_three_ap_free: bool,
+    },
 }
 
 impl DomainVerdict {
     pub fn verified(&self) -> bool {
         match self {
             DomainVerdict::UnitDistanceGraph { verified, .. }
-            | DomainVerdict::BoundedContinuedFraction { verified, .. } => *verified,
+            | DomainVerdict::BoundedContinuedFraction { verified, .. }
+            | DomainVerdict::CapSet { verified, .. } => *verified,
         }
     }
 
     pub fn reason(&self) -> &str {
         match self {
             DomainVerdict::UnitDistanceGraph { reason, .. }
-            | DomainVerdict::BoundedContinuedFraction { reason, .. } => reason,
+            | DomainVerdict::BoundedContinuedFraction { reason, .. }
+            | DomainVerdict::CapSet { reason, .. } => reason,
         }
     }
 }
@@ -194,6 +211,7 @@ impl DomainRegistry {
         let mut domains: HashMap<&'static str, Box<dyn MathematicalDomain>> = HashMap::new();
         domains.insert(UnitDistanceDomain.domain_id(), Box::new(UnitDistanceDomain));
         domains.insert(BoundedCfDomain.domain_id(), Box::new(BoundedCfDomain));
+        domains.insert(CapSetDomain.domain_id(), Box::new(CapSetDomain));
         Self { domains }
     }
 
@@ -635,6 +653,308 @@ pub fn zaremba_sweep(k_max: u32, bound: i64) -> Vec<ZarembaRow> {
         });
     }
     rows
+}
+
+// ---------------------------------------------------------------------------
+// Domain C: Additive Combinatorics / Cap-Set bounds in F_3^n
+// ---------------------------------------------------------------------------
+
+pub struct CapSetDomain;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CapSetRow {
+    pub dimension: usize,
+    pub size: usize,
+    pub vectors: Vec<Vec<u8>>,
+}
+
+/// Computes whether (u + v + w) = 0 mod 3 elementwise in F_3^n
+fn is_3ap_triple(u: &[u8], v: &[u8], w: &[u8]) -> bool {
+    u.iter()
+        .zip(v.iter())
+        .zip(w.iter())
+        .all(|((&a, &b), &c)| (a as u16 + b as u16 + c as u16) % 3 == 0)
+}
+
+/// Verifies whether vector list in F_3^n is free of non-trivial 3-APs
+fn check_3ap_free(vectors: &[Vec<u8>], dim: usize) -> (bool, Option<String>) {
+    let mut set = std::collections::HashSet::new();
+    for (i, v) in vectors.iter().enumerate() {
+        if v.len() != dim {
+            return (
+                false,
+                Some(format!(
+                    "vector #{i} has dimension {}, expected {dim}",
+                    v.len()
+                )),
+            );
+        }
+        for (coord_idx, &c) in v.iter().enumerate() {
+            if c >= 3 {
+                return (
+                    false,
+                    Some(format!(
+                        "vector #{i} coordinate {coord_idx} = {c} is not in F_3 = {{0,1,2}}"
+                    )),
+                );
+            }
+        }
+        if !set.insert(v.clone()) {
+            return (false, Some(format!("duplicate vector found: {v:?}")));
+        }
+    }
+
+    let n = vectors.len();
+    for i in 0..n {
+        for j in (i + 1)..n {
+            for k in (j + 1)..n {
+                if is_3ap_triple(&vectors[i], &vectors[j], &vectors[k]) {
+                    return (
+                        false,
+                        Some(format!(
+                            "collinear 3-AP arithmetic progression detected: #{i} {:?}, #{j} {:?}, #{k} {:?}",
+                            vectors[i], vectors[j], vectors[k]
+                        )),
+                    );
+                }
+            }
+        }
+    }
+
+    (true, None)
+}
+
+/// Search or construct maximal cap-set in F_3^n
+pub fn cap_set_search(dim: usize, target_size: usize) -> Vec<Vec<u8>> {
+    if dim == 0 {
+        return vec![];
+    }
+    if dim == 1 {
+        return vec![vec![0], vec![1]];
+    }
+    if dim == 2 {
+        return vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1]];
+    }
+    if dim == 3 {
+        // Classical 9-point affine paraboloid z = (x^2 + y^2) mod 3
+        let mut pts = Vec::new();
+        for x in 0..3u8 {
+            for y in 0..3u8 {
+                let z = ((x * x + y * y) % 3) as u8;
+                pts.push(vec![x, y, z]);
+            }
+        }
+        return pts;
+    }
+    if dim == 4 {
+        // Pellegrino 20-point maximal cap set in F_3^4
+        return vec![
+            vec![0, 0, 0, 1], vec![0, 0, 0, 2], vec![0, 0, 1, 1], vec![0, 0, 2, 2],
+            vec![0, 1, 2, 1], vec![0, 2, 0, 0], vec![0, 2, 0, 2], vec![0, 2, 2, 1],
+            vec![0, 2, 2, 2], vec![1, 0, 0, 1], vec![1, 1, 2, 2], vec![2, 0, 0, 2],
+            vec![2, 1, 0, 1], vec![2, 1, 1, 2], vec![2, 1, 2, 1], vec![2, 1, 2, 2],
+            vec![2, 2, 0, 1], vec![2, 2, 0, 2], vec![2, 2, 2, 0], vec![2, 2, 2, 1],
+        ];
+    }
+
+    // For dim >= 4: Multi-start greedy search over F_3^n points
+    let total_points = 3usize.pow(dim as u32);
+    let mut all_points = Vec::with_capacity(total_points);
+    for idx in 0..total_points {
+        let mut curr = idx;
+        let mut v = vec![0u8; dim];
+        for d in 0..dim {
+            v[d] = (curr % 3) as u8;
+            curr /= 3;
+        }
+        all_points.push(v);
+    }
+
+    let mut best_cap: Vec<Vec<u8>> = Vec::new();
+    let mut rng = rand::thread_rng();
+    let max_restarts = if dim == 4 { 400 } else { 100 };
+
+    for restart in 0..max_restarts {
+        let mut pts = all_points.clone();
+        if restart > 0 {
+            use rand::seq::SliceRandom;
+            pts.shuffle(&mut rng);
+        } else {
+            pts.sort_by_key(|v| {
+                let quad_sum: u32 = v.iter().map(|&x| (x * x) as u32).sum();
+                let lin_sum: u32 = v.iter().map(|&x| x as u32).sum();
+                (lin_sum % 3, quad_sum % 3)
+            });
+        }
+
+        let mut current_cap: Vec<Vec<u8>> = Vec::new();
+        for p in pts {
+            let mut can_add = true;
+            for member in &current_cap {
+                let third: Vec<u8> = (0..dim)
+                    .map(|d| ((2 * (p[d] as u16 + member[d] as u16)) % 3) as u8)
+                    .collect();
+                if current_cap.contains(&third) {
+                    can_add = false;
+                    break;
+                }
+            }
+            if can_add {
+                current_cap.push(p);
+            }
+        }
+
+        if current_cap.len() > best_cap.len() {
+            best_cap = current_cap;
+            if best_cap.len() >= target_size {
+                break;
+            }
+        }
+    }
+
+    best_cap
+}
+
+pub fn cap_set_sweep(max_dim: usize) -> Vec<CapSetRow> {
+    let mut rows = Vec::new();
+    for d in 1..=max_dim {
+        let target = match d {
+            1 => 2,
+            2 => 4,
+            3 => 9,
+            4 => 20,
+            5 => 45,
+            _ => 2 * 3usize.pow((d - 1) as u32) / 3,
+        };
+        let vecs = cap_set_search(d, target);
+        rows.push(CapSetRow {
+            dimension: d,
+            size: vecs.len(),
+            vectors: vecs,
+        });
+    }
+    rows
+}
+
+impl MathematicalDomain for CapSetDomain {
+    fn domain_id(&self) -> &'static str {
+        "combinatorics.cap_set"
+    }
+
+    fn propose(&self, spec: &Value) -> Result<DomainPayload, DomainError> {
+        let dimension = spec
+            .get("dimension")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| DomainError::InvalidSpec("missing \"dimension\"".to_string()))?
+            as usize;
+        let target_size = spec
+            .get("target_size")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(2) as usize;
+
+        if dimension == 0 {
+            return Err(DomainError::InvalidSpec("dimension must be >= 1".to_string()));
+        }
+
+        let vectors = cap_set_search(dimension, target_size);
+        Ok(DomainPayload::CapSet {
+            dimension,
+            vectors,
+            target_size,
+        })
+    }
+
+    fn verify(&self, payload: &DomainPayload) -> Result<DomainVerdict, DomainError> {
+        let (dimension, vectors, target_size) = match payload {
+            DomainPayload::CapSet {
+                dimension,
+                vectors,
+                target_size,
+            } => (*dimension, vectors, *target_size),
+            _ => {
+                return Err(DomainError::InvalidSpec(
+                    "CapSetDomain received non-CapSet payload".to_string(),
+                ))
+            }
+        };
+
+        let (is_free, err) = check_3ap_free(vectors, dimension);
+        let size = vectors.len();
+        let verified = is_free && size >= target_size;
+
+        let reason = if verified {
+            format!(
+                "Verified 3-AP free cap set in F_3^{dimension} with |S| = {size} >= {target_size}"
+            )
+        } else if let Some(e) = err {
+            e
+        } else {
+            format!("Cap set size {size} is strictly less than target size {target_size}")
+        };
+
+        Ok(DomainVerdict::CapSet {
+            verified,
+            reason,
+            dimension,
+            size,
+            target_size,
+            is_three_ap_free: is_free,
+        })
+    }
+
+    fn generate_lean_spec(
+        &self,
+        payload: &DomainPayload,
+        _verdict: &DomainVerdict,
+    ) -> Result<String, DomainError> {
+        let (dimension, vectors, target_size) = match payload {
+            DomainPayload::CapSet {
+                dimension,
+                vectors,
+                target_size,
+            } => (*dimension, vectors, *target_size),
+            _ => return Err(DomainError::InvalidSpec("not a CapSet payload".into())),
+        };
+
+        let spec_name = format!("cap_set_{dimension}_{}", vectors.len());
+        let vec_lines: Vec<String> = vectors
+            .iter()
+            .map(|v| {
+                format!(
+                    "  [{}]",
+                    v.iter()
+                        .map(|c| c.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })
+            .collect();
+        let vecs_text = vec_lines.join(",\n");
+
+        Ok(format!(
+            "/-\n  Perqed.Spec.{spec_name}\n  Domain: combinatorics.cap_set\n  Dimension: F_3^{dimension}\n  Witness size: {size} (target {target_size})\n  Kernel-decidable by finite combinatorial reflection.\n-/\n\nnamespace Perqed.Spec\n\n/-- F_3 vector of dimension n represented as a list of coordinates mod 3 -/\ndef F3Vector := List Int\n\n/-- Elementwise addition in F_3^n -/\ndef addF3 (u v : F3Vector) : F3Vector :=\n  (u.zip v).map (fun (a, b) => (a + b) % 3)\n\n/-- Check if three points form a 3-term arithmetic progression (u + v + w = 0 mod 3) -/\ndef is_3ap (u v w : F3Vector) : Bool :=\n  let sum := addF3 (addF3 u v) w\n  sum.all (fun x => x == 0)\n\n/-- Check if a vector list is free of non-trivial 3-APs -/\ndef is_3ap_free (vecs : List F3Vector) : Bool :=\n  let n := vecs.length\n  (List.range n).all fun i =>\n    (List.range n).all fun j =>\n      if i < j then\n        (List.range n).all fun k =>\n          if j < k then\n            !is_3ap (vecs.get! i) (vecs.get! j) (vecs.get! k)\n          else true\n      else true\n\ndef VECS_{dimension} : List F3Vector := [\n{vecs_text}\n]\n\ntheorem {spec_name} : is_3ap_free VECS_{dimension} = true ∧ VECS_{dimension}.length ≥ {target_size} :=\n  by\nend Perqed.Spec\n",
+            spec_name = spec_name,
+            dimension = dimension,
+            size = vectors.len(),
+            target_size = target_size,
+            vecs_text = vecs_text
+        ))
+    }
+
+    fn generate_lean_proof(
+        &self,
+        payload: &DomainPayload,
+        _verdict: &DomainVerdict,
+    ) -> Result<String, DomainError> {
+        let (dimension, vectors) = match payload {
+            DomainPayload::CapSet { dimension, vectors, .. } => (*dimension, vectors),
+            _ => return Err(DomainError::InvalidSpec("not a CapSet payload".into())),
+        };
+        let spec_name = format!("cap_set_{dimension}_{}", vectors.len());
+        Ok(format!(
+            "theorem {spec_name} : Perqed.Spec.{spec_name} := by\n  decide\n"
+        ))
+    }
 }
 
 #[cfg(test)]

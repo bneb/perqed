@@ -18,16 +18,28 @@ pub enum TacticError {
     Json(#[from] serde_json::Error),
 }
 
+use crate::types::TacticPriorScores;
+
 pub struct TacticGenerator {
     model_router: ModelRouter,
     model_name: String,
+    pub scores: TacticPriorScores,
 }
 
 impl TacticGenerator {
     pub fn new(model_router: ModelRouter, model_name: Option<String>) -> Self {
+        Self::with_scores(model_router, model_name, TacticPriorScores::default())
+    }
+
+    pub fn with_scores(
+        model_router: ModelRouter,
+        model_name: Option<String>,
+        scores: TacticPriorScores,
+    ) -> Self {
         Self {
             model_router,
             model_name: model_name.unwrap_or_else(|| "deepseek-prover-v2".to_string()),
+            scores,
         }
     }
 
@@ -144,31 +156,31 @@ impl TacticGenerator {
             if goal.contains("→") || goal.contains("forall") || goal.contains("∀") {
                 list.push(TacticCandidate {
                     tactic_code: "intro n".to_string(),
-                    score: 0.98,
+                    score: self.scores.intro_score,
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });
                 list.push(TacticCandidate {
                     tactic_code: "intro n; rfl".to_string(),
-                    score: 0.97,
+                    score: (self.scores.intro_score + 0.02).min(1.0),
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: true,
                 });
                 list.push(TacticCandidate {
                     tactic_code: "intros".to_string(),
-                    score: 0.95,
+                    score: self.scores.intro_score,
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });
                 list.push(TacticCandidate {
                     tactic_code: "intro h".to_string(),
-                    score: 0.94,
+                    score: (self.scores.intro_score - 0.01).max(0.0),
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });
                 list.push(TacticCandidate {
                     tactic_code: "intro a b".to_string(),
-                    score: 0.90,
+                    score: (self.scores.intro_score - 0.05).max(0.0),
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });
@@ -178,7 +190,7 @@ impl TacticGenerator {
             if goal.contains("∧") || goal.contains("↔") {
                 list.push(TacticCandidate {
                     tactic_code: "constructor".to_string(),
-                    score: 0.92,
+                    score: self.scores.constructor_score,
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });
@@ -188,13 +200,13 @@ impl TacticGenerator {
             if goal.contains("∨") {
                 list.push(TacticCandidate {
                     tactic_code: "apply Or.inl".to_string(),
-                    score: 0.75,
+                    score: (self.scores.constructor_score - 0.05).max(0.0),
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });
                 list.push(TacticCandidate {
                     tactic_code: "apply Or.inr".to_string(),
-                    score: 0.75,
+                    score: (self.scores.constructor_score - 0.05).max(0.0),
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });
@@ -204,13 +216,13 @@ impl TacticGenerator {
             if goal.contains("+ 0") || goal.contains("0 +") {
                 list.push(TacticCandidate {
                     tactic_code: "exact Nat.add_zero _".to_string(),
-                    score: 0.98,
+                    score: self.scores.exact_hole_premise_score,
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: true,
                 });
                 list.push(TacticCandidate {
                     tactic_code: "rw [Nat.add_zero]".to_string(),
-                    score: 0.92,
+                    score: self.scores.rewrite_premise_score,
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: false,
                 });
@@ -219,13 +231,13 @@ impl TacticGenerator {
             if goal.contains("=") {
                 list.push(TacticCandidate {
                     tactic_code: "rfl".to_string(),
-                    score: 0.85,
+                    score: self.scores.rfl_score,
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: true,
                 });
                 list.push(TacticCandidate {
                     tactic_code: "omega".to_string(),
-                    score: 0.88,
+                    score: self.scores.decision_proc_score,
                     generator_model: "heuristic_rule".to_string(),
                     is_terminal: true,
                 });
@@ -233,16 +245,34 @@ impl TacticGenerator {
         }
 
         // Add premise applications
-        for p in premises.iter().take(3) {
+        for p in premises.iter().take(5) {
+            list.push(TacticCandidate {
+                tactic_code: format!("rw [{}]", p),
+                score: self.scores.rewrite_premise_score,
+                generator_model: "premise_injection".to_string(),
+                is_terminal: false,
+            });
             list.push(TacticCandidate {
                 tactic_code: format!("exact {}", p),
-                score: 0.82,
+                score: self.scores.exact_premise_score,
+                generator_model: "premise_injection".to_string(),
+                is_terminal: true,
+            });
+            list.push(TacticCandidate {
+                tactic_code: format!("exact {} _", p),
+                score: self.scores.exact_hole_premise_score,
                 generator_model: "premise_injection".to_string(),
                 is_terminal: true,
             });
             list.push(TacticCandidate {
                 tactic_code: format!("apply {}", p),
-                score: 0.80,
+                score: self.scores.apply_premise_score,
+                generator_model: "premise_injection".to_string(),
+                is_terminal: false,
+            });
+            list.push(TacticCandidate {
+                tactic_code: format!("simp only [{}]", p),
+                score: self.scores.simp_premise_score,
                 generator_model: "premise_injection".to_string(),
                 is_terminal: false,
             });

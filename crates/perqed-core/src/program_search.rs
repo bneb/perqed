@@ -34,10 +34,36 @@ pub struct HeuristicProgram {
     pub domain: String,
 }
 
+/// Configuration for programmatic invariant search and evolutionary synthesis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeneticSearchConfig {
+    pub default_database_capacity: usize,
+    pub crossover_temperature: f64,
+    pub max_generation_budget: usize,
+    pub min_terms_for_oeis_match: usize,
+}
+
+impl Default for GeneticSearchConfig {
+    fn default() -> Self {
+        Self {
+            default_database_capacity: 50,
+            crossover_temperature: 0.2,
+            max_generation_budget: 20,
+            min_terms_for_oeis_match: 3,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProgramDatabase {
     capacity: usize,
     programs: Vec<HeuristicProgram>,
+}
+
+impl Default for ProgramDatabase {
+    fn default() -> Self {
+        Self::new(GeneticSearchConfig::default().default_database_capacity)
+    }
 }
 
 impl ProgramDatabase {
@@ -302,6 +328,20 @@ impl ProgramInvariantSearch {
                 terms: vec![1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024],
                 formula: Some("2^n".to_string()),
                 domain: "algebra.nat".to_string(),
+            },
+            OeisSequence {
+                id: "A001694".to_string(),
+                name: "Powerful numbers".to_string(),
+                terms: vec![1, 4, 8, 9, 16, 25, 27, 32, 36, 49, 64, 72, 81, 100],
+                formula: Some("a^2 * b^3".to_string()),
+                domain: "number_theory.powerful".to_string(),
+            },
+            OeisSequence {
+                id: "A005117".to_string(),
+                name: "Squarefree numbers".to_string(),
+                terms: vec![1, 2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23],
+                formula: Some("s(n) == n".to_string()),
+                domain: "number_theory.squarefree".to_string(),
             },
         ];
     }
