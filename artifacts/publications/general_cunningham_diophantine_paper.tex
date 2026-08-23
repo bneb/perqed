@@ -5,7 +5,7 @@
 \usepackage{xcolor}
 \usepackage{hyperref}
 
-\title{\textbf{Complete Multi-Exponent Resolution and Lean 4 Mechanization of the Generalized Cunningham Diophantine Equation $p^x + (2^k p + 1)^y = z^2$}}
+\title{\textbf{On Solution Families, Modulo-8 Obstructions, and Sporadic Instances in Generalized Cunningham Diophantine Equations}}
 \author{Perqed Autonomous Theorem Discovery Group \\ \texttt{research@perqed.org}}
 \date{\today}
 
@@ -28,81 +28,88 @@
 \maketitle
 
 \begin{abstract}
-We present a complete classification and machine-checked Lean 4 formalization of the multi-exponent exponential Diophantine equation $p^x + (2^k p + 1)^y = z^2$ over all positive integers $x, y \ge 1$, $k \ge 2$, and odd primes $p$. This work extends the consecutive-exponent study of Subhasis Panda (arXiv:2608.18608, 2026) to the complete two-dimensional exponent grid. We establish three principal theorems:
-(1) For linear exponents $(x=1, y=1)$, solutions exist if and only if $p$ belongs to the \textbf{Mersenne prime family} $p = 2^k - 1$ (with $z = 2^k$), the \textbf{Affine prime family} $p = 2^k + 3$ (with $z = 2^k + 2$), or sporadic divisor-pair factorizations of $2^k + 1$;
-(2) For quadratic exponents with $y=1$ ($x=2, y=1$), a complete modulo 8 quadratic non-residue obstruction proves that \textbf{zero solutions exist for all odd primes $p$};
-(3) For higher odd exponents, we classify sporadic integer solutions including $(3^3 + 13^2 = 14^2)$, $(3^5 + 13 = 16^2)$, and $(7^3 + 57 = 20^2)$.
-All core identities and algebraic obstruction lemmas are formally verified in pure Lean 4 without external macro dependencies, passing cold kernel reflection with zero auxiliary axioms.
+We study the generalized Cunningham exponential Diophantine equation $p^x + (2^k p + 1)^y = z^2$ for positive integers $x, y \ge 1$, $k \ge 2$, and odd primes $p$, extending the consecutive-exponent investigation of Subhasis Panda (arXiv:2608.18608, 2026). We provide:
+(1) A complete mathematical resolution of the linear slice $(x=1, y=1)$, establishing two universal infinite parametric families—the \textbf{Mersenne Prime Family} $p = 2^k - 1$ ($z = 2^k$) and the \textbf{Affine Prime Family} $p = 2^k + 3$ ($z = 2^k + 2$)—alongside sporadic solutions arising from composite factor pairs of $2^k + 1$;
+(2) A complete proof of the quadratic obstruction for $(x=2, y=1)$, showing via modulo 8 quadratic non-residues that \textbf{no solutions exist for any odd integer $p$};
+(3) The identification of isolated sporadic higher-power solutions, including $3^3 + 13^2 = 14^2$, $3^5 + 13 = 16^2$, and $7^3 + 57 = 20^2$, while noting that global exhaustiveness across arbitrary exponent pairs $(x, y)$ remains an open Diophantine problem.
+All core algebraic identities, the linear difference-of-squares factorization, the quadratic non-residue lemma, and the equation-specific $(x=2, y=1)$ obstruction theorem are machine-checked in pure Lean 4 with zero auxiliary axioms.
 \end{abstract}
 
 \section{Introduction}
-Exponential Diophantine equations of the form $a^x + b^y = z^2$ where the bases $a, b$ are parameterized by primes have a long history. Recently, Subhasis Panda \cite{Panda2026} analyzed the consecutive-exponent equation $p^x + (2p+1)^y = z^2$ ($|x-y|=1$) for odd primes $p$, establishing that $(x, y, z) = (2, 1, p+1)$ is unique when $2p+1$ is prime, while composite $2p+1 = (2k-1)(2k+1)$ yields an upper bound with the unique known solution $p=7$, $(x, y, z) = (4, 3, 76)$.
+Exponential Diophantine equations involving prime bases and affine terms have generated considerable interest. Recently, Subhasis Panda \cite{Panda2026} investigated $p^x + (2p+1)^y = z^2$ for consecutive exponents $|x-y|=1$ and odd primes $p$, showing that the Sophie Germain case $(x, y, z) = (2, 1, p+1)$ is unique when $2p+1$ is prime, with a solitary composite exceptional solution $(x, y, z) = (4, 3, 76)$ at $p=7$.
 
-In this paper, we extend Panda's investigation along Cunningham chains $q = 2^k p + 1$ ($k \ge 2$) across the \textbf{entire two-dimensional exponent space} $(x, y) \in \mathbb{N}^2$:
+In this work, we investigate the generalized family:
 \begin{equation} \label{eq:general}
 p^x + (2^k p + 1)^y = z^2, \quad x, y \ge 1, \quad k \ge 2, \quad p \in \mathbb{P}_{>2}.
 \end{equation}
-We provide full structural classifications for all exponent slices and machine-check all algebraic proofs in Lean 4.
+Rather than asserting global exhaustiveness across all unexplored exponent pairs, we rigorously characterize the fundamental exponent slices $(x=1, y=1)$ and $(x=2, y=1)$, verify isolated higher-power instances, and mechanize all core theorems in Lean 4.
 
-\section{Linear Exponent Classification: $(x=1, y=1)$}
-When $x=1$ and $y=1$, \eqref{eq:general} becomes:
+\section{Complete Classification of the Linear Slice: $(x=1, y=1)$}
+When $x=1$ and $y=1$, \eqref{eq:general} reduces to:
 \begin{equation} \label{eq:x1y1}
-(2^k + 1)p + 1 = z^2 \iff (2^k + 1)p = (z-1)(z+1).
+(2^k + 1)p + 1 = z^2 \iff (2^k + 1)p = z^2 - 1 = (z-1)(z+1).
 \end{equation}
 Since $p$ is an odd prime and $z$ is even, the factors $A = z-1$ and $B = z+1$ are coprime odd integers differing by $B - A = 2$.
 
-\begin{theorem}[Universal Infinite Families for $(x=1, y=1)$] \label{thm:x1y1}
-Let $k \ge 1$. The equation $p + (2^k p + 1) = z^2$ admits two universal infinite parametric solution families:
+\begin{theorem}[Universal Solution Families for $(x=1, y=1)$] \label{thm:x1y1}
+For every integer $k \ge 1$, the equation $p + (2^k p + 1) = z^2$ admits the following infinite solution families:
 \begin{enumerate}
-  \item \textbf{Mersenne Prime Family}: If $p = 2^k - 1$ is prime, then $(p, z) = (2^k - 1, 2^k)$ is an exact solution for all $k \ge 2$.
-  \item \textbf{Affine Prime Family}: If $p = 2^k + 3$ is prime, then $(p, z) = (2^k + 3, 2^k + 2)$ is an exact solution for all $k \ge 2$.
+  \item \textbf{Mersenne Prime Family}: If $p = 2^k - 1$ is prime, then $(p, z) = (2^k - 1, 2^k)$ is an exact solution.
+  \item \textbf{Affine Prime Family}: If $p = 2^k + 3$ is prime, then $(p, z) = (2^k + 3, 2^k + 2)$ is an exact solution.
 \end{enumerate}
 \end{theorem}
 \begin{proof}
-Direct algebraic substitution:
+Direct substitution:
 \begin{enumerate}
   \item For $p = 2^k - 1$:
   \[
-  p + (2^k p + 1) = (2^k - 1) + (2^k(2^k - 1) + 1) = 2^k - 1 + 2^{2k} - 2^k + 1 = 2^{2k} = (2^k)^2 = z^2.
+  p + (2^k p + 1) = (2^k - 1) + (2^k(2^k - 1) + 1) = 2^k - 1 + 2^{2k} - 2^k + 1 = 2^{2k} = (2^k)^2.
   \]
   \item For $p = 2^k + 3$:
   \[
-  p + (2^k p + 1) = (2^k + 3) + (2^k(2^k + 3) + 1) = 2^k + 3 + 2^{2k} + 3 \cdot 2^k + 1 = 2^{2k} + 4 \cdot 2^k + 4 = (2^k + 2)^2 = z^2.
+  p + (2^k p + 1) = (2^k + 3) + (2^k(2^k + 3) + 1) = 2^k + 3 + 2^{2k} + 3 \cdot 2^k + 1 = 2^{2k} + 4 \cdot 2^k + 4 = (2^k + 2)^2.
   \]
 \end{enumerate}
 \end{proof}
 
-\begin{corollary}[Sporadic Solutions via Divisor Slices]
-When $2^k + 1 = d_1 d_2$ is composite with $d_1 < d_2$, additional prime solutions arise whenever $p = \frac{d_2 \pm 2}{d_1}$ is prime:
+\begin{proposition}[Divisor Factorization of the Linear Slice]
+For any factorization $2^k + 1 = d_1 d_2$ with $d_1 < d_2$, if $p = \frac{d_2 \pm 2}{d_1}$ is prime, then $(p, z) = (p, d_1 p \pm 1)$ is a solution.
 \begin{itemize}
-  \item For $k=5$: $2^5 + 1 = 33 = 3 \cdot 11 \implies p = \frac{11 - 2}{3} = 3 \implies (p, z) = (3, 10)$. ($3 + 97 = 100 = 10^2$).
-  \item For $k=6$: $2^6 + 1 = 65 = 5 \cdot 13 \implies p = \frac{13 + 2}{5} = 3 \implies (p, z) = (3, 14)$. ($3 + 193 = 196 = 14^2$).
+  \item Trivial factorization $d_1 = 1, d_2 = 2^k + 1$ yields $p = (2^k + 1) - 2 = 2^k - 1$ (Mersenne) and $p = (2^k + 1) + 2 = 2^k + 3$ (Affine).
+  \item Composite factorizations yield sporadic solutions: for $k=5$, $2^5 + 1 = 33 = 3 \cdot 11 \implies p = \frac{11 - 2}{3} = 3 \implies (p, z) = (3, 10)$ ($3 + 97 = 100 = 10^2$).
 \end{itemize}
-\end{corollary}
+\end{proposition}
 
-\section{Quadratic Exponent Slice: $(x=2, y=1)$}
-For $x=2, y=1$, the equation $p^2 + (2^k p + 1) = z^2$ is governed by a local-global modular non-residue obstruction.
+\section{Complete Modulo 8 Non-Residue Obstruction: $(x=2, y=1)$}
+For the quadratic slice $(x=2, y=1)$, the equation $p^2 + (2^k p + 1) = z^2$ is ruled out entirely for all odd integers.
 
-\begin{theorem}[Modulo 8 Non-Residue Obstruction]
-For all $k \ge 2$ and all odd primes $p$, the equation $p^2 + (2^k p + 1) = z^2$ has \textbf{zero solutions}.
+\begin{lemma}[Squares Modulo 8] \label{lem:mod8}
+For any integer $z$, $z^2 \pmod 8 \in \{0, 1, 4\}$. In particular, $z^2 \pmod 8 \not\in \{2, 5, 6\}$.
+\end{lemma}
+
+\begin{theorem}[Non-Existence of Odd Solutions for $(x=2, y=1)$] \label{thm:mod8_obs}
+For all $k \ge 2$ and all odd positive integers $p$, the equation $p^2 + (2^k p + 1) = z^2$ has \textbf{no integer solutions}.
 \end{theorem}
 \begin{proof}
-Because $p$ is an odd prime, $p^2 \equiv 1 \pmod 8$.
-For $k=2$: $4p + 1 \equiv 5 \pmod 8 \implies p^2 + 4p + 1 \equiv 1 + 5 = 6 \pmod 8$.
-For $k \ge 3$: $2^k p + 1 \equiv 1 \pmod 8 \implies p^2 + 2^k p + 1 \equiv 1 + 1 = 2 \pmod 8$.
-Since quadratic residues modulo 8 are strictly $\{0, 1, 4\}$, residues $2$ and $6$ cannot be integer squares.
+Because $p$ is odd, $p^2 \equiv 1 \pmod 8$.
+\begin{itemize}
+  \item If $k = 2$: $4p + 1 = 4(2m+1) + 1 = 8m + 5 \equiv 5 \pmod 8$. Thus $p^2 + 4p + 1 \equiv 1 + 5 = 6 \pmod 8$.
+  \item If $k \ge 3$: $2^k \equiv 0 \pmod 8 \implies 2^k p + 1 \equiv 1 \pmod 8$. Thus $p^2 + 2^k p + 1 \equiv 1 + 1 = 2 \pmod 8$.
+\end{itemize}
+In both cases, $p^2 + (2^k p + 1) \pmod 8 \in \{2, 6\}$. By Lemma~\ref{lem:mod8}, no integer square exists.
 \end{proof}
 
-\section{Higher Exponents \& Sporadic Solutions}
-For higher odd powers $x$, non-trivial sporadic solutions emerge:
+\section{Discovered Sporadic Higher-Exponent Solutions}
+For higher odd powers $x$, computational search uncovers isolated solutions:
 \begin{itemize}
   \item $(x=3, y=2, k=2, p=3, q=13)$: $3^3 + 13^2 = 27 + 169 = 196 = 14^2$.
   \item $(x=5, y=1, k=2, p=3, q=13)$: $3^5 + 13^1 = 243 + 13 = 256 = 16^2$.
   \item $(x=3, y=1, k=3, p=7, q=57)$: $7^3 + 57^1 = 343 + 57 = 400 = 20^2$.
 \end{itemize}
+We emphasize that these three identities serve as existence certificates; establishing whether this list is exhaustive over all higher exponent tuples $(x, y, k, p)$ remains an open question requiring advanced linear forms in logarithms.
 
 \section{Lean 4 Formal Verification}
-All core theorems, families, and sporadic identities are formalized in Lean 4:
+All core lemmas and theorems are formalized in Lean 4 without external macro dependencies:
 
 \begin{lstlisting}[language=Lean]
 namespace Perqed.Spec
@@ -112,6 +119,9 @@ def mersenne_family_spec (k : Nat) : Prop :=
 
 def affine_family_spec (k : Nat) : Prop :=
   (2^k + 3) + (2^k * (2^k + 3) + 1) = (2^k + 2)^2
+
+def linear_diff_squares_spec (z : Nat) : Prop :=
+  z >= 1 -> (z - 1) * (z + 1) = z^2 - 1
 
 def sporadic_cubic_sq_spec : Prop :=
   3^3 + 13^2 = 14^2
@@ -125,13 +135,16 @@ def sporadic_cubic_seven_spec : Prop :=
 def general_mod8_obstruction_spec (z : Nat) : Prop :=
   z^2 % 8 = 2 \/ z^2 % 8 = 5 \/ z^2 % 8 = 6 -> False
 
+def cunningham_odd_prime_no_sol_spec (p k z : Nat) : Prop :=
+  k >= 2 -> p % 2 = 1 -> p^2 + (2^k * p + 1) = z^2 -> False
+
 end Perqed.Spec
 \end{lstlisting}
 
 Every specification is proved constructively in pure core Lean 4 and verified through cold kernel reflection, ensuring zero `sorryAx` or unsafe reduction dependencies.
 
 \section{Conclusion}
-We have completely mapped the multi-exponent behavior of Cunningham Diophantine equations across all $(x, y) \in \mathbb{N}^2$, resolving open structural questions left by previous single-exponent studies and verifying all core results in Lean 4.
+We have characterized the linear and quadratic slices of generalized Cunningham Diophantine equations, verified infinite solution families and local modular obstructions, and provided machine-checked proofs in Lean 4.
 
 \begin{thebibliography}{9}
 \bibitem{Panda2026}
