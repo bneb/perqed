@@ -1,12 +1,14 @@
 {
   "spec_file": "lean/Perqed/Spec/cunningham_diophantine.lean",
-  "raw_file_sha256": "8a3d90858075578944ea6db471824312d8005744ef28599c4ac5b9842865e43e",
-  "canonical_spec_sha256": "d2cf8dc1394735f2db649f266494f21d9c0c6645cbe7314f34ee529b19d49956",
+  "raw_file_sha256": "186e00a52ddd0624de285b5173bea9a4a225e2d427d85b9e735fd8b16d1b3365",
+  "canonical_spec_sha256": "132ea9a5595bee6bb31746eee7032942c7f554c2599e391370338ed863f0ad57",
   "hashing_algorithm": "Canonical SHA-256 (comments and whitespace stripped by AuditSpec)",
-  "locked_at": "2026-08-23T05:19:00Z",
+  "locked_at": "2026-08-23T05:35:00Z",
   "declarations": [
     "sophie_germain_diophantine_spec",
     "cunningham_strict_gap_spec",
-    "cunningham_mod8_non_square_spec"
+    "cunningham_mod8_non_square_spec",
+    "cunningham_lower_bound_trap_spec",
+    "cunningham_divisor_param_spec"
   ]
 }
