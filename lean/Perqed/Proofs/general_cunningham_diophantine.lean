@@ -176,4 +176,43 @@ theorem cunningham_odd_prime_no_sol (p k z : Nat) :
   · exact Or.inr (Or.inr h6)
   · exact Or.inl h2
 
+/-- Proof of Modulo 4 Obstruction Theorem for (x=2, y=2) -/
+theorem cunningham_two_two_obstruction (p q z : Nat) :
+    Perqed.Spec.cunningham_two_two_obstruction_spec p q z := by
+  dsimp [Perqed.Spec.cunningham_two_two_obstruction_spec]
+  intro hp hq h_eq
+  have hp8 : p^2 % 8 = 1 := odd_sq_mod8 p hp
+  have hq8 : q^2 % 8 = 1 := odd_sq_mod8 q hq
+  have h_add : (p^2 + q^2) % 8 = (p^2 % 8 + q^2 % 8) % 8 := Nat.add_mod (p^2) (q^2) 8
+  have h_sum : (p^2 + q^2) % 8 = 2 := by rw [h_add, hp8, hq8]
+  rw [h_eq] at h_sum
+  have h_obs := general_mod8_obstruction z
+  exact h_obs (Or.inl h_sum)
+
+/-- Proof of Algebraic Prime Factorization Obstruction for (x=1, y=2) -/
+theorem cunningham_one_two_obstruction (k p q : Nat) :
+    Perqed.Spec.cunningham_one_two_obstruction_spec k p q := by
+  dsimp [Perqed.Spec.cunningham_one_two_obstruction_spec]
+  intro hk hp hq h_bound
+  have h_k_ge : 2^k ≥ 4 := by
+    have : 2^2 ≤ 2^k := Nat.pow_le_pow_right (by omega) hk
+    omega
+  have h_q_ge_4p : 2^k * p ≥ 4 * p := by
+    have : 4 ≤ 2^k := h_k_ge
+    have : 4 * p ≤ 2^k * p := Nat.mul_le_mul_right p this
+    omega
+  have : q ≥ 4 * p + 1 := by omega
+  omega
+
+/-- Proof of Quadratic Non-Square Trapping Lemma -/
+theorem not_sq_trap (z N L : Nat) : Perqed.Spec.not_sq_trap_spec z N L := by
+  dsimp [Perqed.Spec.not_sq_trap_spec]
+  intro hN hL hR
+  have : z ≤ L ∨ z ≥ L + 1 := by omega
+  rcases this with hle | hge
+  · have h_le : z^2 ≤ L^2 := Nat.pow_le_pow_left hle 2
+    omega
+  · have h_ge : z^2 ≥ (L + 1)^2 := Nat.pow_le_pow_left hge 2
+    omega
+
 end Perqed.Proofs

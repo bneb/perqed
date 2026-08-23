@@ -1,9 +1,9 @@
 {
   "spec_file": "lean/Perqed/Spec/general_cunningham_diophantine.lean",
-  "raw_file_sha256": "cb1ad5a6bb335397150b0112fcbc3caff9a9dc34ef89b1f05603392fb9a6b98c",
-  "canonical_spec_sha256": "301938c43a51357dc7f99dbc8da8e633d80c0b7a1eddcc6a5c176a801ab65dc3",
+  "raw_file_sha256": "6f64322f518c72a34caba54bf2ebe67756109cb43cf78fbc896a1ae8fe583d33",
+  "canonical_spec_sha256": "323e658df4e556ebe4597849ee811484ea343ccc327ae5ce5da035e2b385084c",
   "hashing_algorithm": "Canonical SHA-256 (comments and whitespace stripped by AuditSpec)",
-  "locked_at": "2026-08-23T05:53:30Z",
+  "locked_at": "2026-08-23T06:23:45Z",
   "declarations": [
     "mersenne_family_spec",
     "affine_family_spec",
@@ -12,6 +12,9 @@
     "sporadic_quintic_spec",
     "sporadic_cubic_seven_spec",
     "general_mod8_obstruction_spec",
-    "cunningham_odd_prime_no_sol_spec"
+    "cunningham_odd_prime_no_sol_spec",
+    "cunningham_two_two_obstruction_spec",
+    "cunningham_one_two_obstruction_spec",
+    "not_sq_trap_spec"
   ]
 }

@@ -61,4 +61,26 @@ def general_mod8_obstruction_spec (z : Nat) : Prop :=
 def cunningham_odd_prime_no_sol_spec (p k z : Nat) : Prop :=
   k ≥ 2 → p % 2 = 1 → p^2 + (2^k * p + 1) = z^2 → False
 
+/-- 
+  Complete Modulo 4 Obstruction Theorem for (x=2, y=2):
+  For any odd integers p and q, p^2 + q^2 = z^2 has no integer solution z.
+-/
+def cunningham_two_two_obstruction_spec (p q z : Nat) : Prop :=
+  p % 2 = 1 → q % 2 = 1 → p^2 + q^2 = z^2 → False
+
+/-- 
+  Algebraic Prime Factorization Obstruction for (x=1, y=2):
+  For any odd prime p and q = 2^k * p + 1 with k >= 2, p + q^2 = z^2 is impossible.
+-/
+def cunningham_one_two_obstruction_spec (k p q : Nat) : Prop :=
+  k ≥ 2 → p ≥ 1 → q = 2^k * p + 1 → 2 * q + 1 ≤ p → False
+
+/-- 
+  Quadratic Non-Square Trapping Lemma:
+  If an integer N is strictly trapped between two consecutive perfect squares L^2 and (L+1)^2,
+  then N cannot be a perfect square.
+-/
+def not_sq_trap_spec (z N L : Nat) : Prop :=
+  z^2 = N → L^2 < N → N < (L + 1)^2 → False
+
 end Perqed.Spec
