@@ -2,6 +2,7 @@ pub mod anatomy;
 pub mod autoformalize;
 pub mod benchmark;
 pub mod conjecture;
+pub mod coverage;
 pub mod dag;
 pub mod dual_engine;
 pub mod embeddings;
@@ -25,6 +26,10 @@ pub use anatomy::{IntegerAnatomy, IntegerAnatomyInspector};
 pub use autoformalize::{AutoformalizationResult, Autoformalizer};
 pub use benchmark::{BenchmarkItemResult, BenchmarkRunner, BenchmarkSummary};
 pub use conjecture::{ConjectureGenerator, SynthesisStrategy};
+pub use coverage::{
+    CoverageError, FormalGoalDescriptor, GoalCoverageGuard, GoalCoverageReport, GoalQuantifier,
+    ProvedTheoremDescriptor,
+};
 pub use dag::{MathlibDag, MathlibNode};
 pub use dual_engine::{DecisionProcedure, DualEngineProver};
 pub use embeddings::{DensePremiseStore, DenseVector, EmbedderConfig, SubwordEmbedder};
