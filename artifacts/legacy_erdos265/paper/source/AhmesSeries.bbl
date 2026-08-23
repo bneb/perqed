@@ -1,0 +1,191 @@
+\begin{thebibliography}{10}
+
+\bibitem{AZ98}
+Tewodros Amdeberhan and Doron Zeilberger.
+\newblock {$q$}-{A}p\'ery irrationality proofs by {$q$}-{WZ} pairs.
+\newblock {\em Adv. in Appl. Math.}, 20(2):275--283, 1998.
+\newblock \href {https://doi.org/10.1006/aama.1997.0565} {\path{doi:10.1006/aama.1997.0565}}.
+
+\bibitem{Bad87}
+C\u{a}t\u{a}lin Badea.
+\newblock The irrationality of certain infinite series.
+\newblock {\em Glasgow Math. J.}, 29(2):221--228, 1987.
+\newblock \href {https://doi.org/10.1017/S0017089500006868} {\path{doi:10.1017/S0017089500006868}}.
+
+\bibitem{BFP13}
+Artur Bartoszewicz, Ma{\l}gorzata Filipczak, and Franciszek Prus-Wi\'sniowski.
+\newblock Topological and algebraic aspects of subsums of series.
+\newblock In {\em Traditional and present-day topics in real analysis}, pages 345--366. Faculty of Mathematics and Computer Science. University of \L\'od\'z, \L\'od\'z, 2013.
+
+\bibitem{EP}
+Thomas Bloom.
+\newblock {Erd\H{o}s} problems.
+\newblock \url{https://www.erdosproblems.com/}.
+\newblock Accessed: November 27, 2024.
+
+\bibitem{BE22}
+Thomas~F. Bloom and Christian Elsholtz.
+\newblock Egyptian fractions.
+\newblock {\em Nieuw Arch. Wiskd. (5)}, 23(4):237--245, 2022.
+
+\bibitem{Bor91}
+Peter~B. Borwein.
+\newblock On the irrationality of {$\sum(1/(q^n+r))$}.
+\newblock {\em J. Number Theory}, 37(3):253--259, 1991.
+\newblock \href {https://doi.org/10.1016/S0022-314X(05)80041-1} {\path{doi:10.1016/S0022-314X(05)80041-1}}.
+
+\bibitem{Bor92}
+Peter~B. Borwein.
+\newblock On the irrationality of certain series.
+\newblock {\em Math. Proc. Cambridge Philos. Soc.}, 112(1):141--146, 1992.
+\newblock \href {https://doi.org/10.1017/S030500410007081X} {\path{doi:10.1017/S030500410007081X}}.
+
+\bibitem{Cho47}
+Sarvadaman Chowla.
+\newblock On series of the {L}ambert type which assume irrational values for rational values of the argument.
+\newblock {\em Proc. Nat. Inst. Sci. India}, 13:171--173, 1947.
+
+\bibitem{Duv01}
+Daniel Duverney.
+\newblock Irrationality of fast converging series of rational numbers.
+\newblock {\em J. Math. Sci. Univ. Tokyo}, 8(2):275--316, 2001.
+
+\bibitem{Erd48}
+Paul Erd\H{o}s.
+\newblock On arithmetical properties of {L}ambert series.
+\newblock {\em J. Indian Math. Soc. (N.S.)}, 12:63--66, 1948.
+
+\bibitem{E68}
+Paul Erd\H{o}s.
+\newblock On the irrationality of certain series.
+\newblock {\em Math. Student}, 36:222--226, 1968.
+
+\bibitem{E75}
+Paul Erd\H{o}s.
+\newblock Some problems and results on the irrationality of the sum of infinite series.
+\newblock {\em J. Math. Sci.}, 10:1--7, 1975.
+
+\bibitem{Erd85}
+Paul Erd\H{o}s.
+\newblock E. {S}traus (1921--1983).
+\newblock {\em Rocky Mountain J. Math.}, 15(2):331--341, 1985.
+\newblock Number theory (Winnipeg, Man., 1983).
+\newblock \href {https://doi.org/10.1216/RMJ-1985-15-2-331} {\path{doi:10.1216/RMJ-1985-15-2-331}}.
+
+\bibitem{Erd88}
+Paul Erd\H{o}s.
+\newblock On the irrationality of certain series: problems and results.
+\newblock In {\em New advances in transcendence theory ({D}urham, 1986), {A}lan {B}aker ({E}d.)}, pages 102--109. Cambridge Univ. Press, Cambridge, 1988.
+
+\bibitem{EG80}
+Paul Erd\H{o}s and Ronald~L. Graham.
+\newblock {\em Old and new problems and results in combinatorial number theory}, volume~28 of {\em Monographies de L'Enseignement Math\'{e}matique}.
+\newblock Universit\'{e} de Gen\`eve, L'Enseignement Math\'{e}matique, Geneva, 1980.
+
+\bibitem{ES64}
+Paul Erd\H{o}s and Ernst~G. Straus.
+\newblock On the irrationality of certain {A}hmes series.
+\newblock {\em J. Indian Math. Soc. (N.S.)}, 27:129--133, 1964.
+
+\bibitem{Gra13}
+Ronald~L. Graham.
+\newblock Paul {Erd\H{o}s} and {E}gyptian fractions.
+\newblock In {\em Erd\H{o}s centennial}, volume~25 of {\em Bolyai Soc. Math. Stud.}, pages 289--309. J\'{a}nos Bolyai Math. Soc., Budapest, 2013.
+\newblock URL: \url{https://doi.org/10.1007/978-3-642-39286-3_9}, \href {https://doi.org/10.1007/978-3-642-39286-3\_9} {\path{doi:10.1007/978-3-642-39286-3\_9}}.
+
+\bibitem{GKP89}
+Ronald~L. Graham, Donald~E. Knuth, and Oren Patashnik.
+\newblock {\em Concrete mathematics}.
+\newblock Addison-Wesley Publishing Company, Advanced Book Program, Reading, 1989.
+
+\bibitem{GN88}
+Joe~A. Guthrie and James~E. Nymann.
+\newblock The topological structure of the set of subsums of an infinite series.
+\newblock {\em Colloq. Math.}, 55(2):323--327, 1988.
+\newblock \href {https://doi.org/10.4064/cm-55-2-323-327} {\path{doi:10.4064/cm-55-2-323-327}}.
+
+\bibitem{Han91}
+Jaroslav Han\v{c}l.
+\newblock Expression of real numbers with the help of infinite series.
+\newblock {\em Acta Arith.}, 59(2):97--104, 1991.
+\newblock \href {https://doi.org/10.4064/aa-59-2-97-104} {\path{doi:10.4064/aa-59-2-97-104}}.
+
+\bibitem{HT04}
+Jaroslav Han\v{c}l and Robert Tijdeman.
+\newblock On the irrationality of {C}antor and {A}hmes series.
+\newblock {\em Publ. Math. Debrecen}, 65(3-4):371--380, 2004.
+\newblock \href {https://doi.org/10.5486/pmd.2004.3254} {\path{doi:10.5486/pmd.2004.3254}}.
+
+\bibitem{HSS08}
+Jaroslav Han\v{c}l, Jan \v{S}t\v{e}pni\v{c}ka, and Jan \v{S}ustek.
+\newblock Linearly unrelated sequences and problem of {E}rd{\H{o}}s.
+\newblock {\em Ramanujan J.}, 17(3):331--342, 2008.
+\newblock \href {https://doi.org/10.1007/s11139-008-9137-x} {\path{doi:10.1007/s11139-008-9137-x}}.
+
+\bibitem{HW54}
+Godfrey~H. Hardy and Edward~M. Wright.
+\newblock {\em An introduction to the theory of numbers}.
+\newblock Oxford, at the Clarendon Press, 1954.
+\newblock 3rd ed.
+
+\bibitem{Kak14a}
+S\={o}ichi Kakeya.
+\newblock On the partial sums of an infinite series.
+\newblock {\em T\^{o}hoku Sci. Rep.}, 3:159--164, 1914.
+
+\bibitem{Kak14b}
+S\={o}ichi Kakeya.
+\newblock On the set of partial sums of an infinite series.
+\newblock {\em Proc. Tokyo Math.-Phys. Soc., 2nd ser.}, 7:250--251, 1914.
+
+\bibitem{Kov24}
+Vjekoslav Kova\v{c}.
+\newblock On the set of points represented by harmonic subseries.
+\newblock Accepted for publication in Amer. Math. Monthly, 17 pp., 2024.
+\newblock URL: \url{https://arxiv.org/abs/2405.07681}.
+
+\bibitem{NS00}
+James~E. Nymann and Ricardo~A. S\'{a}enz.
+\newblock On a paper of {G}uthrie and {N}ymann on subsums of infinite series.
+\newblock {\em Colloq. Math.}, 83(1):1--4, 2000.
+\newblock \href {https://doi.org/10.4064/cm-83-1-1-4} {\path{doi:10.4064/cm-83-1-1-4}}.
+
+\bibitem{PS98}
+George P\'{o}lya and Gabor Szeg\H{o}.
+\newblock {\em Problems and theorems in analysis. {I}. {S}eries, integral calculus, theory of functions}.
+\newblock Classics in Mathematics. Springer-Verlag, Berlin, 1998.
+\newblock \href {https://doi.org/10.1007/978-3-642-61983-0} {\path{doi:10.1007/978-3-642-61983-0}}.
+
+\bibitem{Pra24}
+Kyle Pratt.
+\newblock The irrationality of a prime factor series under a prime tuples conjecture.
+\newblock Preprint, 11 pp., 2024.
+\newblock URL: \url{https://arxiv.org/abs/2409.15185}.
+
+\bibitem{San84}
+J\'{o}zsef S\'{a}ndor.
+\newblock Some classes of irrational numbers.
+\newblock {\em Studia Univ. Babe\c{s}-Bolyai Math.}, 29:3--12, 1984.
+
+\bibitem{OEIS}
+Neil J.~A. Sloane and The OEIS~Foundation Inc.
+\newblock The on-line encyclopedia of integer sequences, 2024.
+\newblock URL: \url{http://oeis.org}.
+
+\bibitem{TY02}
+Robert Tijdeman and Pingzhi Yuan.
+\newblock On the rationality of {C}antor and {A}hmes series.
+\newblock {\em Indag. Math. (N.S.)}, 13(3):407--418, 2002.
+\newblock \href {https://doi.org/10.1016/S0019-3577(02)80018-0} {\path{doi:10.1016/S0019-3577(02)80018-0}}.
+
+\bibitem{Var91}
+Ilan Vardi.
+\newblock {\em Computational recreations in {M}athematica}.
+\newblock Addison-Wesley Publishing Company, Advanced Book Program, Redwood City, CA, 1991.
+
+\bibitem{WS80}
+Alek~D. Weinstein and Boris~Zalmanovich Shapiro.
+\newblock On the structure of the set of $\overline{\alpha}$-representable numbers.
+\newblock {\em Izv. Vyssh. Uchebn. Zaved. Mat.}, 24:8--11, 1980.
+
+\end{thebibliography}
