@@ -1,10 +1,12 @@
 pub mod academic_linter;
 pub mod anatomy;
 pub mod autoformalize;
+pub mod baker_engine;
 pub mod benchmark;
 pub mod conjecture;
 pub mod coverage;
 pub mod dag;
+pub mod depth_evaluator;
 pub mod divisor_param;
 pub mod dual_engine;
 pub mod embeddings;
@@ -29,6 +31,9 @@ pub mod types;
 pub use academic_linter::{AcademicLintFinding, AcademicLintSeverity, AcademicSanityLinter};
 pub use anatomy::{IntegerAnatomy, IntegerAnatomyInspector};
 pub use autoformalize::{AutoformalizationResult, Autoformalizer};
+pub use baker_engine::{
+    BakerReductionReport, ContinuedFractionConvergent, LinearFormsLogarithmEngine,
+};
 pub use benchmark::{BenchmarkItemResult, BenchmarkRunner, BenchmarkSummary};
 pub use conjecture::{ConjectureGenerator, SynthesisStrategy};
 pub use coverage::{
@@ -36,6 +41,9 @@ pub use coverage::{
     ProvedTheoremDescriptor,
 };
 pub use dag::{DagScoringConfig, MathlibDag, MathlibNode};
+pub use depth_evaluator::{
+    DepthClassification, DepthEvaluationReport, MathematicalDepthEvaluator,
+};
 pub use divisor_param::{
     CunninghamParametrizationReport, DivisorVarietyParametrizationEngine, ParametricSolution,
 };

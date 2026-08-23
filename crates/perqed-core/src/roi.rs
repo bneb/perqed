@@ -243,18 +243,18 @@ impl RoiEvaluator {
         // 3. Information Gain: MDL formulation penalizing complex expressions
         let info_gain = self.compute_mdl_information_gain(conjecture, empirical_table_size);
 
-        // 4. Estimated Proof Search Cost & Triviality Penalty:
-        let is_arithmetic = conjecture.domain.contains("nat") || conjecture.domain.contains("int") || conjecture.domain.contains("arith");
-        let is_linear = conjecture.target.contains('+') || conjecture.target.contains('-');
-        
-        // If a statement is trivial linear arithmetic (solvable in 1 omega step), penalize its intrinsic significance
-        let adjusted_significance = if is_arithmetic && is_linear && conjecture.hypotheses.is_empty() {
-            self.weights.tautology_significance_penalty
-        } else {
-            raw_significance
-        };
+        // 4. Mathematical Depth & Technique Rigor Evaluation:
+        let depth_report = crate::depth_evaluator::MathematicalDepthEvaluator::evaluate_depth(
+            &conjecture.target,
+            &conjecture.domain,
+            conjecture.domain.contains("analytical") || conjecture.domain.contains("sieve"),
+            conjecture.domain.contains("exhaustiveness") || conjecture.domain.contains("baker"),
+        );
 
-        let estimated_cost = if is_arithmetic && is_linear {
+        // Apply depth multiplier to eliminate trivial Presburger/identity gaming
+        let adjusted_significance = raw_significance * depth_report.depth_multiplier;
+
+        let estimated_cost = if depth_report.classification == crate::depth_evaluator::DepthClassification::TrivialPresburgerOrIdentity {
             self.weights.cost_arithmetic_linear
         } else if conjecture.domain.contains("ring") || conjecture.domain.contains("algebra") {
             self.weights.cost_algebra_ring
@@ -265,8 +265,8 @@ impl RoiEvaluator {
         let total_roi = (novelty * adjusted_significance * info_gain) / estimated_cost;
 
         let rationale = format!(
-            "Novelty: {:.2}, AdjSignificance: {:.2} ({} unified), InfoGain(MDL): {:.2}, Cost: {:.2}",
-            novelty, adjusted_significance, unification_count, info_gain, estimated_cost
+            "Novelty: {:.2}, Depth: {:?} (mult: {:.2}), AdjSignificance: {:.2} ({} unified), InfoGain(MDL): {:.2}, Cost: {:.2}",
+            novelty, depth_report.classification, depth_report.depth_multiplier, adjusted_significance, unification_count, info_gain, estimated_cost
         );
 
         RoiScore {
