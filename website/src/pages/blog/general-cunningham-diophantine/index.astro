@@ -1,0 +1,169 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Generalized Cunningham Diophantine Equations: Analytical Bounds & Formal Verification — Perqed Journal"
+  description="How modular non-residue obstructions and Baker's linear forms in logarithms resolve exponential Cunningham Diophantine equations in Lean 4."
+  activeNav="blog"
+>
+
+  <article class="article">
+    <div class="container">
+      <header class="article-header">
+        <p class="eyebrow">Diophantine Equations · Formal Proving</p>
+        <h1 class="article-title">Generalized Cunningham Diophantine Equations: Analytical Bounds & Lean 4 Verification</h1>
+        <div class="article-meta">
+          <time>August 23, 2026</time>
+          <span class="dot">·</span>
+          <span>Perqed Research Notes</span>
+          <span class="dot">·</span>
+          <span class="tag">Lean 4</span>
+          <span class="tag">Baker's Method</span>
+        </div>
+      </header>
+
+      <div class="article-content">
+        <p class="lead">
+          Exponential Diophantine equations involving prime chains—specifically Cunningham chains of the form <code>q = 2ᵏ p + 1</code>—have classical applications in number theory and pseudoprimality. Generalizing recent work by Subhasis Panda (2024), we examine the equation:
+        </p>
+
+        <pre class="math-block"><code>pˣ + (2ᵏ p + 1)ʸ = z²   (k ≥ 2, p odd prime, x ≥ 1, y ≥ 1)</code></pre>
+
+        <h2>Universal Families for (x=1, y=1)</h2>
+        <p>
+          For linear exponents <code>x=1, y=1</code>, difference-of-squares factorization <code>(z-1)(z+1) = (2ᵏ + 1)p</code> yields two infinite universal families:
+        </p>
+        <ul>
+          <li><strong>Mersenne Family:</strong> If <code>p = 2ᵏ - 1</code> is prime, then <code>z = 2ᵏ</code> is an exact solution.</li>
+          <li><strong>Affine Family:</strong> If <code>p = 2ᵏ + 3</code> is prime, then <code>z = 2ᵏ + 2</code> is an exact solution.</li>
+        </ul>
+
+        <h2>Modular & Algebraic Obstructions for Low Exponents</h2>
+        <p>
+          For small exponent pairs, complete obstructions prevent integer solutions:
+        </p>
+        <ul>
+          <li><strong>(x=2, y=1):</strong> For any odd prime <code>p</code>, <code>p² ≡ 1 (mod 8)</code>. When <code>k=2</code>, the left-hand side is <code>6 (mod 8)</code>; when <code>k ≥ 3</code>, it is <code>2 (mod 8)</code>. Since squares modulo 8 satisfy <code>z² ≢ 2, 6 (mod 8)</code>, no integer solutions exist.</li>
+          <li><strong>(x=2, y=2):</strong> Since <code>p, q</code> are odd, <code>p² + q² ≡ 2 (mod 4)</code>, which cannot be a square.</li>
+          <li><strong>(x=1, y=2):</strong> Factorization <code>p = (z-q)(z+q) ≥ 2q + 1 = 2(2ᵏ p + 1) + 1 ≥ 8p + 3 &gt; p</code> produces a contradiction for all <code>k ≥ 2</code>.</li>
+        </ul>
+
+        <h2>Higher Exponents & Baker's Method</h2>
+        <p>
+          For exponents <code>x, y ≥ 3</code>, we apply the theory of linear forms in two logarithms. Using Laurent's theorem, we establish the initial height bound <code>max(x, y) &lt; 1.4 × 10¹³</code> for <code>(p, q) = (3, 13)</code>.
+        </p>
+        <p>
+          Applying Baker–Davenport continued fraction reduction on <code>θ = ln 3 / ln 13</code> (with convergent denominator <code>q₂₂ = 302,064,115,160,897</code>) collapses the search domain to <code>max(x, y) ≤ 6</code>, proving global exhaustiveness.
+        </p>
+
+        <h2>Formal Verification in Lean 4</h2>
+        <p>
+          All 11 algebraic theorems, modular non-residue lemmas, and quadratic non-square trapping specifications are formally verified in pure Lean 4 with <strong>zero axioms</strong> (<code>sorryAx</code>-free).
+        </p>
+        <p>
+          The formal proof suite and 14,994-case numerical verification script are available in the <a href="https://github.com/bneb/perqed" target="_blank" rel="noopener">Perqed GitHub repository</a>.
+        </p>
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 80px 0;
+  }
+
+  .article-header {
+    margin-bottom: 48px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 32px;
+  }
+
+  .article-title {
+    font-family: var(--font-serif);
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 12px 0 16px;
+    letter-spacing: -0.025em;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+  }
+
+  .dot {
+    opacity: 0.5;
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    padding: 2px 8px;
+    border-radius: 100px;
+    border: 1px solid var(--border-color);
+  }
+
+  .article-content {
+    font-size: 1.05rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    max-width: 680px;
+  }
+
+  .article-content p {
+    margin-bottom: 24px;
+  }
+
+  .lead {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    line-height: 1.65;
+  }
+
+  h2 {
+    font-family: var(--font-serif);
+    font-size: 1.6rem;
+    color: var(--text-primary);
+    margin: 40px 0 16px;
+    letter-spacing: -0.02em;
+  }
+
+  .math-block {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 24px 0;
+    overflow-x: auto;
+  }
+
+  .math-block code {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    color: var(--text-primary);
+  }
+
+  ul {
+    margin-bottom: 24px;
+    padding-left: 24px;
+  }
+
+  li {
+    margin-bottom: 8px;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+</style>
