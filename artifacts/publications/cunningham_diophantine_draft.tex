@@ -5,7 +5,7 @@
 \usepackage{xcolor}
 \usepackage{hyperref}
 
-\title{\textbf{On the Solvability and Quadratic Gaps of Cunningham Exponential Diophantine Equations}}
+\title{\textbf{On the Solvability, Gaps, and Modular Obstructions of Cunningham Exponential Diophantine Equations}}
 \author{Perqed Autonomous Theorem Discovery Engine \\ \texttt{frontier-lab@perqed.org}}
 \date{\today}
 
@@ -27,7 +27,7 @@
 \maketitle
 
 \begin{abstract}
-We investigate the parameterized exponential Diophantine equation $p^x + (2^k p + 1)^y = z^2$, extending the Sophie Germain case ($k=1$) recently examined by Subhasis Panda (arXiv:2608.18608, August 2026). While $k=1$ yields the infinite solution family $(x, y, z) = (2, 1, p+1)$ for all integers $p$, we formalize in Lean 4 that the candidate $z = p+1$ strictly fails for all $k \ge 2$ and $p \ge 1$ via the inequality $(p+1)^2 < p^2 + (2^k p + 1)$. Furthermore, we analyze the exact quadratic defect $\delta(k) = 2^{2k-2} - 1$, classify the two-sided trapping boundary $p > \frac{(2^{k-1}-1)^2 - 1}{2}$, and document explicit composite solutions (e.g., $k=3, p=4 \implies z=7$) alongside the algebraic primality obstruction for odd primes.
+We investigate the parameterized exponential Diophantine equation $p^x + (2^k p + 1)^y = z^2$, extending the Sophie Germain case ($k=1$) recently examined by Subhasis Panda (arXiv:2608.18608, August 2026). While $k=1$ yields the infinite solution family $(x, y, z) = (2, 1, p+1)$ for all integers $p$, we formalize in Lean 4 that the candidate $z = p+1$ strictly fails for all $k \ge 2$ and $p \ge 1$ via the inequality $(p+1)^2 < p^2 + (2^k p + 1)$. Furthermore, we analyze the exact quadratic defect $\delta(k) = 2^{2k-2} - 1$, classify the two-sided trapping boundary $p > \frac{(2^{k-1}-1)^2 - 1}{2}$, and prove the complete modulo 8 quadratic residue obstruction ruling out all odd integers $p$ (and hence all odd primes) for all $k \ge 2$.
 \end{abstract}
 
 \section{Introduction and Mathematical Analysis}
@@ -54,30 +54,50 @@ For all integers $p \ge 1$ and $k \ge 2$,
 Consequently, $z = p + 1$ is never a solution for any $k \ge 2$.
 \end{theorem}
 
-\subsection{Quadratic Defect and Asymptotic Trapping}
+\subsection{Modulo 8 Obstruction for Odd Integers}
+Beyond the failure of $z = p+1$, the equation $p^2 + (2^k p + 1) = z^2$ has zero integer solutions for any odd integer $p$:
+
+\begin{theorem}[Modulo 8 Quadratic Residue Obstruction]
+For all $k \ge 2$ and all odd integers $p$, the integer $p^2 + 2^k p + 1$ is never a perfect square.
+\end{theorem}
+\begin{proof}
+Recall that for any odd integer $n$, $n^2 \equiv 1 \pmod 8$, and the quadratic residues modulo 8 are strictly $\{0, 1, 4\}$.
+Assume $p$ is odd ($p = 2m + 1$). Then $p^2 \equiv 1 \pmod 8$.
+\begin{enumerate}
+  \item For $k = 2$: $2^k p + 1 = 4(2m + 1) + 1 = 8m + 5 \equiv 5 \pmod 8$.
+  Thus,
+  \[
+  p^2 + (4p + 1) \equiv 1 + 5 = 6 \pmod 8.
+  \]
+  Since $6 \not\in \{0, 1, 4\}$, this is never a square.
+  \item For $k \ge 3$: $2^k p \equiv 0 \pmod 8$, so $2^k p + 1 \equiv 1 \pmod 8$.
+  Thus,
+  \[
+  p^2 + (2^k p + 1) \equiv 1 + 1 = 2 \pmod 8.
+  \]
+  Since $2 \not\in \{0, 1, 4\}$, this is never a square.
+\end{enumerate}
+In all cases $k \ge 2$, $p^2 + 2^k p + 1 \pmod 8 \in \{2, 6\}$, which contains no quadratic residues. Thus no integer $z$ can satisfy the equation for any odd $p$.
+\end{proof}
+
+\subsection{Quadratic Defect and Composite Solutions}
 Completing the square yields:
 \[
 p^2 + 2^k p + 1 = (p + 2^{k-1})^2 - (2^{2k-2} - 1).
 \]
-Let $m = 2^{k-1}$. The upper bound $p^2 + 2^k p + 1 < (p + m)^2$ holds unconditionally for all $k \ge 2$ ($m \ge 2$). The two-sided trapping inequality:
-\[
-(p + m - 1)^2 < p^2 + 2^k p + 1 < (p + m)^2
-\]
-holds \textbf{if and only if} $p > \frac{(m-1)^2 - 1}{2}$.
-
-\begin{remark}[Small-$p$ Boundary \& Composite Solutions]
-For $p \le \frac{(m-1)^2 - 1}{2}$, the lower bound fails. Indeed, when $p$ is composite, integer solutions exist:
+Let $m = 2^{k-1}$. The two-sided trapping inequality $(p + m - 1)^2 < p^2 + 2^k p + 1 < (p + m)^2$ holds \textbf{if and only if} $p > \frac{(m-1)^2 - 1}{2}$.
+For small composite $p \le \frac{(m-1)^2 - 1}{2}$ with $p \equiv 0 \pmod 4$, solutions exist:
 \begin{itemize}
   \item $k=3, p=4: \quad 4^2 + (8 \cdot 4 + 1) = 16 + 33 = 49 = 7^2$.
   \item $k=4, p=4: \quad 4^2 + (16 \cdot 4 + 1) = 16 + 65 = 81 = 9^2$.
   \item $k=4, p=24: \quad 24^2 + (16 \cdot 24 + 1) = 576 + 385 = 961 = 31^2$.
 \end{itemize}
-\end{remark}
 
-\section{Cryptographic Provenance \& Lean 4 Verification}
+\section{Cryptographic Provenance \& Dual-Hash Specification}
 \begin{itemize}
   \item \textbf{Specification File}: \texttt{lean/Perqed/Spec/cunningham\_diophantine.lean}
-  \item \textbf{SHA-256 Hash}: \texttt{f9a5f9c1f49d31a9c8d4eb7f48e270e40a3801d6e454d2fe230978c9c02ac551}
+  \item \textbf{Raw File SHA-256 (\texttt{shasum -a 256})}: \texttt{eb3b51e2928588f0374ff34a51293b640a6511c7b7153dd827db40c41caa7caa}
+  \item \textbf{Canonical Spec SHA-256 (\texttt{AuditSpec.lean})}: \texttt{f9a5f9c1f49d31a9c8d4eb7f48e270e40a3801d6e454d2fe230978c9c02ac551}
   \item \textbf{Audit Gate}: \texttt{AuditSpec.lean} (Cold kernel reflection, 0 \texttt{sorryAx}, 0 \texttt{Lean.ofReduceBool}).
 \end{itemize}
 
