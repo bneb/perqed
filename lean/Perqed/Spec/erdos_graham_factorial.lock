@@ -1,9 +1,9 @@
 {
   "spec_file": "lean/Perqed/Spec/erdos_graham_factorial.lean",
-  "raw_file_sha256": "841996dee1940c6207c38c088b3ee0b3f093afaed520ff22d572177421ef14da",
-  "canonical_spec_sha256": "17a24e4c2a30c180edd3ef9dcb0a0474f01807861f52a0c853343c16177b6ad6",
+  "raw_file_sha256": "781747a20ba4dbc2df756f1e4571c81ee468e69e3258de984567087386aea436",
+  "canonical_spec_sha256": "2026bee5fd5be1a539beae71816fca8f3be14e620df14b699616cb8e9d51edaf",
   "hashing_algorithm": "Canonical SHA-256 (comments and whitespace stripped by AuditSpec)",
-  "locked_at": "2026-08-23T06:31:55Z",
+  "locked_at": "2026-08-23T06:53:15Z",
   "declarations": [
     "factorial_square_neighbor_spec",
     "f3_universal_family_one_spec",
@@ -12,6 +12,8 @@
     "f3_sporadic_three_twentythree_twentyfive_spec",
     "f4_universal_orthogonal_spec",
     "h1_strictly_increasing_spec",
-    "h1_interval_length_one_spec"
+    "h1_interval_length_one_spec",
+    "f5_composite_family_spec",
+    "f6_triple_orthogonal_spec"
   ]
 }

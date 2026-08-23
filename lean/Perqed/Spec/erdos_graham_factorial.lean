@@ -68,4 +68,22 @@ def h1_strictly_increasing_spec (a1 s1 n : Nat) : Prop :=
 def h1_interval_length_one_spec (s1 n : Nat) : Prop :=
   s1 * n^2 ≥ 1 → s1 * n^2 - (s1 * n^2 - 1) = 1
 
+/-- 
+  Universal Composite 5-Factorial Product (k=5):
+  Multiplying any 3-factorial square solution by any 2-factorial square solution produces a 5-factorial square.
+-/
+def f5_composite_family_spec (a1 a2 a3 a4 a5 A B : Nat) : Prop :=
+  fact a1 * fact a2 * fact a3 = A^2 →
+  fact a4 * fact a5 = B^2 →
+  fact a1 * fact a2 * fact a3 * (fact a4 * fact a5) = (A * B)^2
+
+/-- 
+  Universal Triple-Orthogonal 6-Factorial Family (k=6):
+  For all m1, m2, m3 >= 1, the product of three disjoint consecutive square pairs evaluates to an exact square.
+-/
+def f6_triple_orthogonal_spec (m1 m2 m3 : Nat) : Prop :=
+  m1 ≥ 1 → m2 ≥ 1 → m3 ≥ 1 →
+  (fact (m1^2 - 1) * fact (m1^2)) * ((fact (m2^2 - 1) * fact (m2^2)) * (fact (m3^2 - 1) * fact (m3^2))) =
+    ((m1 * fact (m1^2 - 1)) * ((m2 * fact (m2^2 - 1)) * (m3 * fact (m3^2 - 1))))^2
+
 end Perqed.Spec

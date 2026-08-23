@@ -19,6 +19,7 @@ pub mod librarian;
 pub mod mcts;
 pub mod model_client;
 pub mod modular_obstruction;
+pub mod multi_factorial;
 pub mod pipeline;
 pub mod program_search;
 pub mod publication;
@@ -63,6 +64,7 @@ pub use model_client::{ModelMessage, ModelProvider, ModelRequest, ModelResponse,
 pub use modular_obstruction::{
     CongruenceClassObstruction, ModularResidueObstructionEngine, ResidueObstruction,
 };
+pub use multi_factorial::MultiFactorialHierarchyEngine;
 pub use pipeline::{FrontierPipeline, PipelineError, PipelineResult};
 pub use program_search::{
     BoundCandidate, FunSearchCrossover, GeneticSearchConfig, HeuristicProgram, OeisSequence,

@@ -85,4 +85,44 @@ theorem h1_interval_length_one (s1 n : Nat) : Perqed.Spec.h1_interval_length_one
   intro hn
   omega
 
+/-- Proof of Universal Composite 5-Factorial Product (k=5) -/
+theorem f5_composite_family (a1 a2 a3 a4 a5 A B : Nat) :
+    Perqed.Spec.f5_composite_family_spec a1 a2 a3 a4 a5 A B := by
+  dsimp [Perqed.Spec.f5_composite_family_spec]
+  intro h3 h2
+  have h_prod : (fact a1 * fact a2 * fact a3) * (fact a4 * fact a5) = A^2 * B^2 := by
+    rw [h3, h2]
+  have h_sq : A^2 * B^2 = (A * B)^2 := by
+    rw [Nat.pow_two A, Nat.pow_two B, Nat.pow_two (A * B)]
+    calc
+      (A * A) * (B * B) = A * (A * (B * B)) := by rw [Nat.mul_assoc]
+      _ = A * ((A * B) * B) := by rw [Nat.mul_assoc A B B]
+      _ = A * (B * (A * B)) := by rw [Nat.mul_comm (A * B) B]
+      _ = (A * B) * (A * B) := by rw [← Nat.mul_assoc A B (A * B)]
+  rw [h_prod, h_sq]
+
+/-- Proof of Universal Triple-Orthogonal 6-Factorial Family (k=6) -/
+theorem f6_triple_orthogonal (m1 m2 m3 : Nat) :
+    Perqed.Spec.f6_triple_orthogonal_spec m1 m2 m3 := by
+  dsimp [Perqed.Spec.f6_triple_orthogonal_spec]
+  intro hm1 hm2 hm3
+  have h1 := factorial_square_neighbor m1 hm1
+  have h2 := factorial_square_neighbor m2 hm2
+  have h3 := factorial_square_neighbor m3 hm3
+  rw [h1, h2, h3]
+  let A := m1 * fact (m1^2 - 1)
+  let B := m2 * fact (m2^2 - 1)
+  let C := m3 * fact (m3^2 - 1)
+  change A^2 * (B^2 * C^2) = (A * (B * C))^2
+  rw [Nat.pow_two A, Nat.pow_two B, Nat.pow_two C, Nat.pow_two (A * (B * C))]
+  calc
+    (A * A) * ((B * B) * (C * C)) = (A * A) * (B * (B * (C * C))) := by rw [Nat.mul_assoc B B (C * C)]
+    _ = (A * A) * (B * ((B * C) * C)) := by rw [Nat.mul_assoc B C C]
+    _ = (A * A) * (B * (C * (B * C))) := by rw [Nat.mul_comm (B * C) C]
+    _ = (A * A) * ((B * C) * (B * C)) := by rw [← Nat.mul_assoc B C (B * C)]
+    _ = A * (A * ((B * C) * (B * C))) := by rw [Nat.mul_assoc]
+    _ = A * ((A * (B * C)) * (B * C)) := by rw [Nat.mul_assoc A (B * C) (B * C)]
+    _ = A * ((B * C) * (A * (B * C))) := by rw [Nat.mul_comm (A * (B * C)) (B * C)]
+    _ = (A * (B * C)) * (A * (B * C)) := by rw [← Nat.mul_assoc A (B * C) (A * (B * C))]
+
 end Perqed.Proofs
