@@ -12,3 +12,5 @@ import Perqed.Spec.cunningham_diophantine
 import Perqed.Proofs.cunningham_diophantine
 import Perqed.Spec.general_cunningham_diophantine
 import Perqed.Proofs.general_cunningham_diophantine
+import Perqed.Spec.erdos_graham_factorial
+import Perqed.Proofs.erdos_graham_factorial

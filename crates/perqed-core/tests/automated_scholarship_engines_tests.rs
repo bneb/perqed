@@ -150,6 +150,10 @@ fn test_lean_spec_completeness_validator() {
 
 #[test]
 fn test_actual_manuscripts_pass_linter() {
+    let erdos_paper = include_str!("../../../artifacts/publications/erdos_graham_factorial_paper.tex");
+    let findings_erdos = AcademicSanityLinter::lint_manuscript(erdos_paper);
+    assert_eq!(findings_erdos.len(), 0, "Erdos-Graham paper must pass all academic linter rules: {:?}", findings_erdos);
+
     let general_paper = include_str!("../../../artifacts/publications/general_cunningham_diophantine_paper.tex");
     let findings_general = AcademicSanityLinter::lint_manuscript(general_paper);
     assert_eq!(findings_general.len(), 0, "General paper must pass all academic linter rules: {:?}", findings_general);
