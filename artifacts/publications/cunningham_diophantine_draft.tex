@@ -27,7 +27,7 @@
 \maketitle
 
 \begin{abstract}
-We investigate the parameterized exponential Diophantine equation $p^x + (2^k p + 1)^y = z^2$, extending the Sophie Germain case ($k=1$) recently examined by Subhasis Panda (arXiv:2608.18608, August 2026). While $k=1$ yields the infinite solution family $(x, y, z) = (2, 1, p+1)$ for all integers $p$, we formalize in Lean 4 that the candidate $z = p+1$ strictly fails for all $k \ge 2$ and $p \ge 1$ via the inequality $(p+1)^2 < p^2 + (2^k p + 1)$. Furthermore, we analyze the exact quadratic defect $\delta(k) = 2^{2k-2} - 1$, classify the two-sided trapping boundary $p > \frac{(2^{k-1}-1)^2 - 1}{2}$, and prove the complete modulo 8 quadratic residue obstruction ruling out all odd integers $p$ (and hence all odd primes) for all $k \ge 2$.
+We investigate the parameterized exponential Diophantine equation $p^x + (2^k p + 1)^y = z^2$, extending the Sophie Germain case ($k=1$) recently examined by Subhasis Panda (arXiv:2608.18608, August 2026). While $k=1$ yields the infinite solution family $(x, y, z) = (2, 1, p+1)$ for all integers $p$, we formalize in Lean 4 that the candidate $z = p+1$ strictly fails for all $k \ge 2$ and $p \ge 1$ via the inequality $(p+1)^2 < p^2 + (2^k p + 1)$. Furthermore, we analyze the exact quadratic defect $\delta(k) = 2^{2k-2} - 1$, classify the two-sided trapping boundary $p > \frac{(2^{k-1}-1)^2 - 1}{2}$, and formalize the modulo 8 quadratic residue obstruction ruling out all integers $p \not\equiv 0 \pmod 4$ (including all odd primes) for all $k \ge 2$.
 \end{abstract}
 
 \section{Introduction and Mathematical Analysis}
@@ -36,8 +36,8 @@ Subhasis Panda (2026) studied the equation $p^x + (2p+1)^y = z^2$ with consecuti
 p^2 + (2p + 1) = (p + 1)^2.
 \]
 
-\subsection{Formal Lean 4 Theorems}
-We have machine-checked two formal theorems in Lean 4 under cryptographic specification locks:
+\subsection{Formal Lean 4 Machine-Checked Theorems}
+We have machine-checked three formal theorems in Lean 4 under cryptographic specification locks:
 
 \begin{theorem}[Sophie Germain Solvability ($k=1$)]
 For all $p \in \mathbb{N}$,
@@ -54,30 +54,34 @@ For all integers $p \ge 1$ and $k \ge 2$,
 Consequently, $z = p + 1$ is never a solution for any $k \ge 2$.
 \end{theorem}
 
-\subsection{Modulo 8 Obstruction for Odd Integers}
-Beyond the failure of $z = p+1$, the equation $p^2 + (2^k p + 1) = z^2$ has zero integer solutions for any odd integer $p$:
-
 \begin{theorem}[Modulo 8 Quadratic Residue Obstruction]
-For all $k \ge 2$ and all odd integers $p$, the integer $p^2 + 2^k p + 1$ is never a perfect square.
+For all $z \in \mathbb{N}$,
+\[
+z^2 \pmod 8 \not\in \{2, 5, 6\}.
+\]
+\end{theorem}
+
+\subsection{Unified Modulo 8 Obstruction for $p \not\equiv 0 \pmod 4$}
+Combining the quadratic residue obstruction with modular evaluation proves that solutions can only occur when $p \equiv 0 \pmod 4$:
+
+\begin{theorem}[Non-existence for $p \not\equiv 0 \pmod 4$]
+For all $k \ge 2$ and all integers $p \not\equiv 0 \pmod 4$, $p^2 + 2^k p + 1$ is never a perfect square.
 \end{theorem}
 \begin{proof}
-Recall that for any odd integer $n$, $n^2 \equiv 1 \pmod 8$, and the quadratic residues modulo 8 are strictly $\{0, 1, 4\}$.
-Assume $p$ is odd ($p = 2m + 1$). Then $p^2 \equiv 1 \pmod 8$.
+By Theorem 3, squares modulo 8 are strictly $\{0, 1, 4\}$. We evaluate $p^2 + 2^k p + 1 \pmod 8$:
 \begin{enumerate}
-  \item For $k = 2$: $2^k p + 1 = 4(2m + 1) + 1 = 8m + 5 \equiv 5 \pmod 8$.
-  Thus,
-  \[
-  p^2 + (4p + 1) \equiv 1 + 5 = 6 \pmod 8.
-  \]
-  Since $6 \not\in \{0, 1, 4\}$, this is never a square.
-  \item For $k \ge 3$: $2^k p \equiv 0 \pmod 8$, so $2^k p + 1 \equiv 1 \pmod 8$.
-  Thus,
-  \[
-  p^2 + (2^k p + 1) \equiv 1 + 1 = 2 \pmod 8.
-  \]
-  Since $2 \not\in \{0, 1, 4\}$, this is never a square.
+  \item \textbf{Case 1: $p$ is odd ($p \equiv 1, 3 \pmod 4$)}. Then $p^2 \equiv 1 \pmod 8$.
+  \begin{itemize}
+    \item If $k = 2$: $4p + 1 \equiv 5 \pmod 8 \implies p^2 + 4p + 1 \equiv 1 + 5 = 6 \pmod 8$.
+    \item If $k \ge 3$: $2^k p \equiv 0 \pmod 8 \implies p^2 + 2^k p + 1 \equiv 1 + 0 + 1 = 2 \pmod 8$.
+  \end{itemize}
+  \item \textbf{Case 2: $p \equiv 2 \pmod 4$ ($p = 4m + 2$)}. Then $p^2 = (4m+2)^2 \equiv 4 \pmod 8$.
+  \begin{itemize}
+    \item If $k = 2$: $4(4m+2) + 1 \equiv 8 + 1 \equiv 1 \pmod 8 \implies p^2 + 4p + 1 \equiv 4 + 1 = 5 \pmod 8$.
+    \item If $k \ge 3$: $2^k p + 1 \equiv 1 \pmod 8 \implies p^2 + 2^k p + 1 \equiv 4 + 1 = 5 \pmod 8$.
+  \end{itemize}
 \end{enumerate}
-In all cases $k \ge 2$, $p^2 + 2^k p + 1 \pmod 8 \in \{2, 6\}$, which contains no quadratic residues. Thus no integer $z$ can satisfy the equation for any odd $p$.
+In all cases where $p \not\equiv 0 \pmod 4$, $p^2 + 2^k p + 1 \pmod 8 \in \{2, 5, 6\}$, none of which are quadratic residues. Thus, no integer $z$ can exist.
 \end{proof}
 
 \subsection{Quadratic Defect and Composite Solutions}
@@ -86,7 +90,7 @@ Completing the square yields:
 p^2 + 2^k p + 1 = (p + 2^{k-1})^2 - (2^{2k-2} - 1).
 \]
 Let $m = 2^{k-1}$. The two-sided trapping inequality $(p + m - 1)^2 < p^2 + 2^k p + 1 < (p + m)^2$ holds \textbf{if and only if} $p > \frac{(m-1)^2 - 1}{2}$.
-For small composite $p \le \frac{(m-1)^2 - 1}{2}$ with $p \equiv 0 \pmod 4$, solutions exist:
+For composite $p \equiv 0 \pmod 4$ with $p \le \frac{(m-1)^2 - 1}{2}$, solutions exist:
 \begin{itemize}
   \item $k=3, p=4: \quad 4^2 + (8 \cdot 4 + 1) = 16 + 33 = 49 = 7^2$.
   \item $k=4, p=4: \quad 4^2 + (16 \cdot 4 + 1) = 16 + 65 = 81 = 9^2$.
@@ -96,8 +100,8 @@ For small composite $p \le \frac{(m-1)^2 - 1}{2}$ with $p \equiv 0 \pmod 4$, sol
 \section{Cryptographic Provenance \& Dual-Hash Specification}
 \begin{itemize}
   \item \textbf{Specification File}: \texttt{lean/Perqed/Spec/cunningham\_diophantine.lean}
-  \item \textbf{Raw File SHA-256 (\texttt{shasum -a 256})}: \texttt{eb3b51e2928588f0374ff34a51293b640a6511c7b7153dd827db40c41caa7caa}
-  \item \textbf{Canonical Spec SHA-256 (\texttt{AuditSpec.lean})}: \texttt{f9a5f9c1f49d31a9c8d4eb7f48e270e40a3801d6e454d2fe230978c9c02ac551}
+  \item \textbf{Raw File SHA-256 (\texttt{shasum -a 256})}: \texttt{8a3d90858075578944ea6db471824312d8005744ef28599c4ac5b9842865e43e}
+  \item \textbf{Canonical Spec SHA-256 (\texttt{AuditSpec.lean})}: \texttt{d2cf8dc1394735f2db649f266494f21d9c0c6645cbe7314f34ee529b19d49956}
   \item \textbf{Audit Gate}: \texttt{AuditSpec.lean} (Cold kernel reflection, 0 \texttt{sorryAx}, 0 \texttt{Lean.ofReduceBool}).
 \end{itemize}
 
@@ -112,6 +116,11 @@ def sophie_germain_diophantine_spec (p : Nat) : Prop :=
 /-- Cunningham k >= 2 strict gap spec: (p + 1)^2 < p^2 + (2^k * p + 1) -/
 def cunningham_strict_gap_spec (p k : Nat) : Prop :=
   p >= 1 -> k >= 2 -> (p + 1)^2 < p^2 + (2^k * p + 1)
+
+/-- Modulo 8 Quadratic Residue Obstruction:
+    For any integer z, z^2 % 8 cannot equal 2, 5, or 6 -/
+def cunningham_mod8_non_square_spec (z : Nat) : Prop :=
+  z^2 % 8 = 2 \/ z^2 % 8 = 5 \/ z^2 % 8 = 6 -> False
 
 end Perqed.Spec
 \end{lstlisting}

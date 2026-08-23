@@ -52,4 +52,22 @@ theorem cunningham_strict_gap (p k : Nat) : Perqed.Spec.cunningham_strict_gap_sp
     omega
   omega
 
+/-- Proof of Modulo 8 Quadratic Residue Obstruction: z^2 % 8 cannot be 2, 5, or 6 -/
+theorem cunningham_mod8_non_square (z : Nat) : Perqed.Spec.cunningham_mod8_non_square_spec z := by
+  dsimp [Perqed.Spec.cunningham_mod8_non_square_spec]
+  intro h
+  have hsq : z^2 % 8 = (z % 8)^2 % 8 := by
+    rw [Nat.pow_two, Nat.pow_two, Nat.mul_mod]
+  have hcase : z % 8 = 0 ∨ z % 8 = 1 ∨ z % 8 = 2 ∨ z % 8 = 3 ∨ z % 8 = 4 ∨ z % 8 = 5 ∨ z % 8 = 6 ∨ z % 8 = 7 := by omega
+  rw [hsq] at h
+  rcases hcase with h0 | h1 | h2 | h3 | h4 | h5 | h6 | h7
+  · rw [h0] at h; revert h; decide
+  · rw [h1] at h; revert h; decide
+  · rw [h2] at h; revert h; decide
+  · rw [h3] at h; revert h; decide
+  · rw [h4] at h; revert h; decide
+  · rw [h5] at h; revert h; decide
+  · rw [h6] at h; revert h; decide
+  · rw [h7] at h; revert h; decide
+
 end Perqed.Proofs
