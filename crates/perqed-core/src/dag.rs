@@ -1,7 +1,8 @@
 //! Mathlib Dependency DAG & Topological Index
 //!
 //! Maintains a directed acyclic graph of Mathlib 4 definitions, lemmas,
-//! instances, and algebraic structures for topological novelty and unification scoring.
+//! instances, and algebraic structures for topological novelty, unification scoring,
+//! and semantic premise retrieval.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -23,6 +24,12 @@ pub struct MathlibDag {
     reverse_adj: HashMap<String, Vec<String>>,     // from dependent -> dependencies
 }
 
+impl Default for MathlibDag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MathlibDag {
     pub fn new() -> Self {
         let mut dag = Self {
@@ -34,6 +41,14 @@ impl MathlibDag {
         dag
     }
 
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
     pub fn insert_node(&mut self, node: MathlibNode) {
         let name = node.name.clone();
         for dep in &node.dependencies {
@@ -41,6 +56,57 @@ impl MathlibDag {
             self.reverse_adj.entry(name.clone()).or_default().push(dep.clone());
         }
         self.nodes.insert(name, node);
+    }
+
+    /// Finds relevant Mathlib premises matching a target proof goal using token overlap and semantic domain weighting
+    pub fn find_relevant_premises(&self, goal: &str, top_k: usize) -> Vec<String> {
+        let g_lower = goal.to_lowercase();
+        let query_tokens: Vec<&str> = g_lower
+            .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')
+            .filter(|s| s.len() > 1)
+            .collect();
+
+        let mut scored: Vec<(f64, &str)> = Vec::new();
+
+        for (name, node) in &self.nodes {
+            let mut score = 0.0;
+            let name_lower = name.to_lowercase();
+            let stmt_lower = node.statement.to_lowercase();
+            let domain_lower = node.domain.to_lowercase();
+
+            for tok in &query_tokens {
+                if name_lower.contains(tok) {
+                    score += 5.0;
+                }
+                if stmt_lower.contains(tok) {
+                    score += 3.0;
+                }
+                if domain_lower.contains(tok) {
+                    score += 2.0;
+                }
+            }
+
+            // Bonus for direct algebraic concept matching
+            if (g_lower.contains("add") || g_lower.contains("+")) && name_lower.contains("add") {
+                score += 4.0;
+            }
+            if (g_lower.contains("mul") || g_lower.contains("*")) && name_lower.contains("mul") {
+                score += 4.0;
+            }
+            if (g_lower.contains("graph") || g_lower.contains("chromatic") || g_lower.contains("color")) && domain_lower.contains("graph") {
+                score += 6.0;
+            }
+            if (g_lower.contains("series") || g_lower.contains("sum") || g_lower.contains("limsup")) && domain_lower.contains("analysis") {
+                score += 6.0;
+            }
+
+            if score > 0.0 {
+                scored.push((score, name.as_str()));
+            }
+        }
+
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scored.into_iter().take(top_k).map(|(_, name)| name.to_string()).collect()
     }
 
     /// Computes the shortest graph distance between two declarations in Mathlib
@@ -91,7 +157,6 @@ impl MathlibDag {
             if self.nodes.contains_key(name) {
                 min_distances.push(0.0);
             } else {
-                // Find distance to closest known ancestor/concept in same domain
                 let mut best_d = 10.0;
                 for existing_name in self.nodes.keys() {
                     let d = self.topological_distance(name, existing_name) as f64;
@@ -123,7 +188,7 @@ impl MathlibDag {
                 module: "Init".to_string(),
                 domain: "logic.core".to_string(),
                 is_definition: true,
-                statement: "Core logical primitives".to_string(),
+                statement: "Core logical primitives and basic propositions".to_string(),
                 dependencies: vec![],
             },
             MathlibNode {
@@ -131,7 +196,7 @@ impl MathlibDag {
                 module: "Logic".to_string(),
                 domain: "logic".to_string(),
                 is_definition: false,
-                statement: "Basic propositional logic theorems".to_string(),
+                statement: "Basic propositional logic theorems, de Morgan laws, and classical principles".to_string(),
                 dependencies: vec!["Init.Core".to_string()],
             },
             MathlibNode {
@@ -139,15 +204,39 @@ impl MathlibDag {
                 module: "Data.Nat".to_string(),
                 domain: "algebra.nat".to_string(),
                 is_definition: false,
-                statement: "Natural number arithmetic and commutativity".to_string(),
+                statement: "Natural number arithmetic, Nat.add_comm, Nat.add_assoc, and induction".to_string(),
                 dependencies: vec!["Mathlib.Logic.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Nat.add_comm".to_string(),
+                module: "Data.Nat".to_string(),
+                domain: "algebra.nat".to_string(),
+                is_definition: false,
+                statement: "∀ a b : ℕ, a + b = b + a".to_string(),
+                dependencies: vec!["Mathlib.Data.Nat.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Nat.add_assoc".to_string(),
+                module: "Data.Nat".to_string(),
+                domain: "algebra.nat".to_string(),
+                is_definition: false,
+                statement: "∀ a b c : ℕ, (a + b) + c = a + (b + c)".to_string(),
+                dependencies: vec!["Mathlib.Data.Nat.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Nat.add_zero".to_string(),
+                module: "Data.Nat".to_string(),
+                domain: "algebra.nat".to_string(),
+                is_definition: false,
+                statement: "∀ a : ℕ, a + 0 = a".to_string(),
+                dependencies: vec!["Mathlib.Data.Nat.Basic".to_string()],
             },
             MathlibNode {
                 name: "Mathlib.Algebra.Group.Basic".to_string(),
                 module: "Algebra.Group".to_string(),
                 domain: "algebra.group".to_string(),
                 is_definition: true,
-                statement: "Group theory structures and identities".to_string(),
+                statement: "Group theory structures, AddCommGroup, and abelian identities".to_string(),
                 dependencies: vec!["Mathlib.Logic.Basic".to_string()],
             },
             MathlibNode {
@@ -155,7 +244,7 @@ impl MathlibDag {
                 module: "Algebra.Ring".to_string(),
                 domain: "algebra.ring".to_string(),
                 is_definition: true,
-                statement: "Ring theory axioms and distributivity".to_string(),
+                statement: "Ring theory axioms, distributivity, and field structures".to_string(),
                 dependencies: vec!["Mathlib.Algebra.Group.Basic".to_string(), "Mathlib.Data.Nat.Basic".to_string()],
             },
             MathlibNode {
@@ -163,16 +252,104 @@ impl MathlibDag {
                 module: "Combinatorics.SimpleGraph".to_string(),
                 domain: "combinatorics.graph".to_string(),
                 is_definition: true,
-                statement: "Simple graph theory and vertex colorings".to_string(),
+                statement: "Simple graph theory, vertex colorings, chromatic number, and cliques".to_string(),
                 dependencies: vec!["Mathlib.Data.Nat.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Combinatorics.SimpleGraph.Coloring".to_string(),
+                module: "Combinatorics.SimpleGraph.Coloring".to_string(),
+                domain: "combinatorics.graph".to_string(),
+                is_definition: false,
+                statement: "Proper vertex colorings and SimpleGraph.chromaticNumber lower bounds".to_string(),
+                dependencies: vec!["Mathlib.Combinatorics.SimpleGraph.Basic".to_string()],
             },
             MathlibNode {
                 name: "Mathlib.Combinatorics.CapSet".to_string(),
                 module: "Combinatorics".to_string(),
                 domain: "combinatorics.extremal".to_string(),
                 is_definition: false,
-                statement: "Cap-set problem bounds in affine vector spaces".to_string(),
+                statement: "Cap-set problem bounds in affine vector spaces F_3^n".to_string(),
                 dependencies: vec!["Mathlib.Algebra.Ring.Basic".to_string(), "Mathlib.Combinatorics.SimpleGraph.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Analysis.Calculus.Deriv.Basic".to_string(),
+                module: "Analysis.Calculus".to_string(),
+                domain: "analysis.calculus".to_string(),
+                is_definition: true,
+                statement: "Fréchet and real derivatives, chain rule, and mean value theorem".to_string(),
+                dependencies: vec!["Mathlib.Algebra.Ring.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Topology.MetricSpace.Basic".to_string(),
+                module: "Topology.MetricSpace".to_string(),
+                domain: "topology.metric".to_string(),
+                is_definition: true,
+                statement: "Metric spaces, triangle inequality, Cauchy sequences, and completeness".to_string(),
+                dependencies: vec!["Mathlib.Logic.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Topology.Order.Basic".to_string(),
+                module: "Topology.Order".to_string(),
+                domain: "topology.order".to_string(),
+                is_definition: false,
+                statement: "Limsup, liminf, and monotone convergence on conditionally complete lattices".to_string(),
+                dependencies: vec!["Mathlib.Topology.MetricSpace.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Data.Real.Basic".to_string(),
+                module: "Data.Real".to_string(),
+                domain: "analysis.real".to_string(),
+                is_definition: true,
+                statement: "Real number construction, Dedekind cuts, and Archimedean property".to_string(),
+                dependencies: vec!["Mathlib.Algebra.Ring.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.LinearAlgebra.Matrix.Spectrum".to_string(),
+                module: "LinearAlgebra.Matrix".to_string(),
+                domain: "linear_algebra.spectral".to_string(),
+                is_definition: false,
+                statement: "Spectral theorem for self-adjoint matrices and Rayleigh quotient bounds".to_string(),
+                dependencies: vec!["Mathlib.Algebra.Ring.Basic".to_string(), "Mathlib.Data.Real.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.NumberTheory.Zaremba".to_string(),
+                module: "NumberTheory.ContinuedFractions".to_string(),
+                domain: "number_theory.cf".to_string(),
+                is_definition: false,
+                statement: "Bounded partial quotients in continued fractions and Zaremba conjecture".to_string(),
+                dependencies: vec!["Mathlib.Data.Nat.Basic".to_string(), "Mathlib.Algebra.Ring.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Data.Complex.Basic".to_string(),
+                module: "Data.Complex".to_string(),
+                domain: "analysis.complex".to_string(),
+                is_definition: true,
+                statement: "Complex plane, Euler formula, roots of unity, and cyclotomic polynomials".to_string(),
+                dependencies: vec!["Mathlib.Data.Real.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Analysis.SpecialFunctions.Pow.Real".to_string(),
+                module: "Analysis.SpecialFunctions".to_string(),
+                domain: "analysis.special".to_string(),
+                is_definition: false,
+                statement: "Real exponentiation, logarithmic bounds, and power series convergence".to_string(),
+                dependencies: vec!["Mathlib.Data.Real.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Order.Filter.Basic".to_string(),
+                module: "Order.Filter".to_string(),
+                domain: "order.filter".to_string(),
+                is_definition: true,
+                statement: "Filters, atTop limits, convergence of sequences, and ultrafilters".to_string(),
+                dependencies: vec!["Mathlib.Logic.Basic".to_string()],
+            },
+            MathlibNode {
+                name: "Mathlib.Combinatorics.Ramsey".to_string(),
+                module: "Combinatorics.Ramsey".to_string(),
+                domain: "combinatorics.extremal".to_string(),
+                is_definition: false,
+                statement: "Ramsey's theorem for complete graphs and hypergraphs".to_string(),
+                dependencies: vec!["Mathlib.Combinatorics.SimpleGraph.Basic".to_string()],
             },
         ];
 

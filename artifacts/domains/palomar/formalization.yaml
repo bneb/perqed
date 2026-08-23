@@ -1,0 +1,23 @@
+# palomar/formalization.yaml
+schema_version: "1.0"
+theorem_id: "Perqed.Spec.number_theory.zaremba"
+title: "Perqed domain: number_theory.zaremba"
+informal_claim: >
+  a/m = 3/8 = [0, 2, 1, 2], all quotients ≤ 2
+authors:
+  - name: "Perqed Autonomous Prover v2.2"
+    provenance: "Autonomous AI Theorem Discovery Pipeline"
+source_literature:
+  seed_arxiv: "2603.24708"
+  doi: null
+verification:
+  lean_version: "4.16.0"
+  mathlib_revision: "c4d29f8"
+  spec_sha256: "60b6e33a1848ca6e66baffe781741978806904308cc7154e6fb87d8457621b13"
+  transitive_axioms: ["Classical.choice", "Quot.sound", "propext"]
+  sorrys_count: 0
+  native_decide_used: false
+compute_audit:
+  total_cost_usd: 0.0000
+  total_energy_joules: 0.0
+  primary_models: ["Gemini-3.7-Flash", "GPT-5.6-Luna", "DeepSeek-V4-Flash", "GPT-5.6-Sol"]

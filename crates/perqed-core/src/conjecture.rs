@@ -60,21 +60,30 @@ impl ConjectureGenerator {
             }
         };
 
-        let system_prompt = r#"You are a frontier autonomous mathematical researcher.
+        let skill_reg = crate::skills::SkillRegistry::default_catalog();
+        let skill_matcher = crate::skills::SkillMatcher::new(&skill_reg);
+        let matched_skills = skill_matcher.match_skills(&format!("{} {}", theorem.label, theorem.informal_claim), 3);
+        let skill_guidance = crate::skills::SkillRegistry::render_prompt_guidance(&matched_skills);
+
+        let system_prompt = format!(
+            r#"You are a frontier autonomous mathematical researcher.
 Synthesize novel, precise mathematical conjectures based on the provided theorem.
+{}
 Every conjecture must be emitted as a JSON array of structured objects matching this exact schema:
 [
-  {
+  {{
     "conjecture_id": "conj_2026_001",
     "domain": "algebra.nat",
     "informal_claim": "For all natural numbers a, b, c: (a + b) + c = a + (b + c)",
     "hypotheses": ["a >= 0", "b >= 0", "c >= 0"],
     "target": "(a + b) + c = a + (b + c)",
-    "variables": {"a": "Nat", "b": "Nat", "c": "Nat"}
-  }
+    "variables": {{"a": "Nat", "b": "Nat", "c": "Nat"}}
+  }}
 ]
 Only output valid JSON within markdown codeblocks or raw JSON.
-"#;
+"#,
+            skill_guidance
+        );
 
         let user_prompt = format!(
             "Theorem Label: {}\nRaw LaTeX: {}\nInformal Claim: {}\n\nStrategy: {}\nSynthesize mathematical conjectures now.",

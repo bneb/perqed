@@ -17,3 +17,5 @@ anyhow.workspace = true
 sha2.workspace = true
 hex.workspace = true
 regex = "1.10"
+rand.workspace = true
+chrono.workspace = true

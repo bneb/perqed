@@ -109,11 +109,18 @@ impl TacticGenerator {
     }
 
     fn build_prompt(&self, state: &ProofState, premises: &[String], beam_size: usize) -> String {
+        let skill_reg = crate::skills::SkillRegistry::default_catalog();
+        let skill_matcher = crate::skills::SkillMatcher::new(&skill_reg);
+        let query = format!("{} {}", state.open_goals.join(" "), state.hypotheses.join(" "));
+        let matched = skill_matcher.match_skills(&query, 2);
+        let skill_guidance = crate::skills::SkillRegistry::render_prompt_guidance(&matched);
+
         format!(
-            "Generate candidate tactics for Lean 4 proof state:\n\nOpen Goals:\n{}\n\nActive Hypotheses:\n{}\n\nAvailable Premises:\n{}\n\nProvide up to {} tactical steps in JSON format: [ {{\"tactic\": \"intro h\", \"score\": 0.95}} ]",
+            "Generate candidate tactics for Lean 4 proof state:\n\nOpen Goals:\n{}\n\nActive Hypotheses:\n{}\n\nAvailable Premises:\n{}\n{}\nProvide up to {} tactical steps in JSON format: [ {{\"tactic\": \"intro h\", \"score\": 0.95}} ]",
             state.open_goals.join("\n"),
             state.hypotheses.join("\n"),
             premises.join(", "),
+            skill_guidance,
             beam_size
         )
     }

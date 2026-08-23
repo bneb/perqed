@@ -191,7 +191,7 @@ fn run_field(field_spec: &str) -> CampaignEntry {
 
 /// Candidate unit-distance point sets: rotation orbits where the field
 /// contains the rotation entries, plus stereographic unit vectors.
-fn generate_points(field: &Arc<AlgebraicNumberField>) -> Vec<Point2DAlgebraic> {
+pub(crate) fn generate_points(field: &Arc<AlgebraicNumberField>) -> Vec<Point2DAlgebraic> {
     let mut points = vec![Point2DAlgebraic::origin(field.clone())];
 
     // Rotation orbits: π/4 in ℚ(√2) (√2/2 ∈ K), π/3 in ℚ(√3) (1/2, √3/2 ∈ K).

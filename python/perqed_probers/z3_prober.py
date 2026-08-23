@@ -7,6 +7,12 @@ from typing import Dict, List, Any, Optional, Tuple
 import z3
 
 
+try:
+    from .expr_utils import normalize_math_expr
+except ImportError:
+    from expr_utils import normalize_math_expr
+
+
 class Z3Prober:
     """SMT-based counterexample prober using Z3."""
 
@@ -20,13 +26,10 @@ class Z3Prober:
             "Not": z3.Not,
             "Implies": z3.Implies,
             "If": z3.If,
+            "abs": lambda x: z3.If(x >= 0, x, -x),
         }
         safe_dict.update(env)
-        clean = (
-            expr_str.replace("&&", " and ")
-            .replace("||", " or ")
-            .replace("!", " not ")
-        )
+        clean = normalize_math_expr(expr_str)
         return eval(clean, {"__builtins__": {}}, safe_dict)
 
     def check_hypotheses_consistency(

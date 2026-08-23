@@ -1,0 +1,13 @@
+{
+  "spec_file": "lean/Perqed/Spec/domain_generated.lean",
+  "sha256_hash": "60b6e33a1848ca6e66baffe781741978806904308cc7154e6fb87d8457621b13",
+  "canonical_len": 419,
+  "declarations": [
+    "cf_num",
+    "cf_den",
+    "all_le",
+    "zaremba_witness_8_3"
+  ],
+  "created_at": "2026-08-23T04:42:20.506578Z",
+  "perqed_version": "0.2.0"
+}

@@ -9,6 +9,12 @@ from typing import Dict, List, Any, Optional, Tuple
 import z3
 
 
+try:
+    from .expr_utils import normalize_math_expr
+except ImportError:
+    from expr_utils import normalize_math_expr
+
+
 class SeparationProber:
     """Non-Vacuity separation tester for mathematical specifications."""
 
@@ -22,13 +28,10 @@ class SeparationProber:
             "Not": z3.Not,
             "Implies": z3.Implies,
             "If": z3.If,
+            "abs": lambda x: z3.If(x >= 0, x, -x),
         }
         safe_dict.update(env)
-        clean_expr = (
-            expr_str.replace("&&", " and ")
-            .replace("||", " or ")
-            .replace("!", " not ")
-        )
+        clean_expr = normalize_math_expr(expr_str)
         return eval(clean_expr, {"__builtins__": {}}, safe_dict)
 
     def verify_predicate_separation(

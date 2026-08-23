@@ -1,0 +1,114 @@
+[
+  {
+    "k": 1,
+    "m": 2,
+    "numerator": 1,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 2,
+    "m": 4,
+    "numerator": 3,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 3,
+    "m": 8,
+    "numerator": 3,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 4,
+    "m": 16,
+    "numerator": 7,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 5,
+    "m": 32,
+    "numerator": 25,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 6,
+    "m": 64,
+    "numerator": 45,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 7,
+    "m": 128,
+    "numerator": 47,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 8,
+    "m": 256,
+    "numerator": 181,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 9,
+    "m": 512,
+    "numerator": 149,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 10,
+    "m": 1024,
+    "numerator": 275,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 11,
+    "m": 2048,
+    "numerator": 567,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 12,
+    "m": 4096,
+    "numerator": 1557,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 13,
+    "m": 8192,
+    "numerator": 2171,
+    "max_quotient": 3,
+    "bound": 5
+  },
+  {
+    "k": 14,
+    "m": 16384,
+    "numerator": 6229,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 15,
+    "m": 32768,
+    "numerator": 12031,
+    "max_quotient": 2,
+    "bound": 5
+  },
+  {
+    "k": 16,
+    "m": 65536,
+    "numerator": 46073,
+    "max_quotient": 2,
+    "bound": 5
+  }
+]

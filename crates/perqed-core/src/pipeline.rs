@@ -98,6 +98,14 @@ impl FrontierPipeline {
 
         let falsify_verdict = self.falsification_gate.check_conjecture(conjecture).await?;
         if !falsify_verdict.passed {
+            let mut lakatos_vault = perqed_sandbox::LakatosianVault::new(&self.workspace_root);
+            if let Some(ce) = &falsify_verdict.counterexample {
+                let _ = lakatos_vault.record_failure(
+                    &conjecture.informal_claim,
+                    &serde_json::to_value(ce).unwrap_or_default(),
+                    &falsify_verdict.reason,
+                );
+            }
             return Err(PipelineError::Failed(format!(
                 "Conjecture failed falsification gate: {}",
                 falsify_verdict.reason
@@ -149,12 +157,14 @@ impl FrontierPipeline {
             self.mcts_config.clone(),
         );
 
-        let var_decls: Vec<String> = conjecture
-            .variables
+        let mut sorted_vars: Vec<(&String, &String)> = conjecture.variables.iter().collect();
+        sorted_vars.sort_by_key(|(k, _)| *k);
+
+        let var_decls: Vec<String> = sorted_vars
             .iter()
             .map(|(k, v)| format!("({} : {})", k, v))
             .collect();
-        let var_args: Vec<String> = conjecture.variables.keys().cloned().collect();
+        let var_args: Vec<String> = sorted_vars.iter().map(|(k, _)| (*k).clone()).collect();
 
         let target_signature = if var_decls.is_empty() {
             format!("Perqed.Spec.{}", conjecture.conjecture_id)

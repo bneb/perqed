@@ -95,7 +95,20 @@ impl MctsOrchestrator {
         let mut solved_node_id: Option<usize> = None;
         let mut isolated_sublemmas = Vec::new();
         let mut active_premises = self.available_premises.clone();
+        let dag = crate::dag::MathlibDag::new();
+        let dynamic_premises = dag.find_relevant_premises(theorem_signature, 8);
+        for dp in dynamic_premises {
+            if !active_premises.contains(&dp) {
+                active_premises.push(dp);
+            }
+        }
         let mut cycle_detector = perqed_lean_client::GoalCycleDetector::new();
+        let mut transposition_table = crate::mcts::TranspositionTable::new();
+        let mut cyclic_detector = crate::mcts::CyclicProofDetector::new();
+        let mut replay_cache = crate::mcts::SubtreeReplayCache::new();
+        replay_cache.register_subtree("?X + 0 = ?X", "rw [Nat.add_zero]", &["X".to_string()]);
+        replay_cache.register_subtree("0 + ?X = ?X", "rw [Nat.zero_add]", &["X".to_string()]);
+        replay_cache.register_subtree("?X = ?X", "rfl", &["X".to_string()]);
 
         for iter in 0..self.config.max_iterations {
             if start_time.elapsed().as_secs() > self.config.timeout_seconds {
@@ -119,6 +132,65 @@ impl MctsOrchestrator {
                 continue;
             }
 
+            // 1A. Transposition Table Check (Instant Subtree Reuse)
+            let canonical_hash = crate::mcts::CanonicalGoalHasher::hash_proof_state(&nodes[selected_id].proof_state);
+            if let Some(entry) = transposition_table.lookup(&canonical_hash) {
+                if entry.is_solved {
+                    if let Some(script) = &entry.proof_script {
+                        let mut test_tactics = nodes[selected_id].proof_state.cumulative_tactics.clone();
+                        test_tactics.push(script.clone());
+                        let child_id = nodes.len();
+                        let child_state = ProofState {
+                            open_goals: vec![],
+                            hypotheses: vec![],
+                            is_solved: true,
+                            cumulative_tactics: test_tactics,
+                            search_depth: selected_depth + 1,
+                            raw_lean_state: "transposition_cache_hit".to_string(),
+                        };
+                        let child_node = MctsNode::new(
+                            child_id,
+                            Some(selected_id),
+                            Some(crate::types::TacticCandidate {
+                                tactic_code: script.clone(),
+                                score: 1.0,
+                                generator_model: "transposition_table".to_string(),
+                                is_terminal: true,
+                            }),
+                            child_state,
+                            selected_depth + 1,
+                        );
+                        nodes.push(child_node);
+                        self.backpropagate(&mut nodes, child_id, 1.0);
+                        solved_node_id = Some(child_id);
+                        info!("🎯 Instant transposition table hit! Subtree goal solved via cached script: {}", script);
+                        break;
+                    }
+                }
+            }
+
+            // 1B. Cyclic Proof & Well-Founded Inductive Knot Check (Branch-Isolated Ancestor Walk)
+            let mut ancestors = Vec::new();
+            let mut curr_anc = nodes[selected_id].parent_id;
+            while let Some(anc_id) = curr_anc {
+                ancestors.push((anc_id, &nodes[anc_id].proof_state));
+                curr_anc = nodes[anc_id].parent_id;
+            }
+            let cyclic_verdict = cyclic_detector.check_ancestor_cycle(&nodes[selected_id].proof_state, ancestors);
+            let mut priority_knot_tactic: Option<String> = None;
+            match cyclic_verdict {
+                crate::mcts::CyclicVerdict::SterileCycle { repetition_depth } => {
+                    info!("🚫 Pruning sterile rewrite loop (cycle to depth {})", repetition_depth);
+                    nodes[selected_id].is_terminal = true;
+                    continue;
+                }
+                crate::mcts::CyclicVerdict::InductiveKnot { ancestor_id, suggested_descent_tactic, .. } => {
+                    info!("🔄 Detected well-founded inductive descent knot (ancestor node {}) -> scheduling priority tactic '{}'", ancestor_id, suggested_descent_tactic);
+                    priority_knot_tactic = Some(suggested_descent_tactic);
+                }
+                crate::mcts::CyclicVerdict::NoCycle => {}
+            }
+
             // Sub-lemma trigger check
             if selected_depth >= self.config.sublemma_depth_threshold {
                 if let Ok(Some(sublemma)) = self.sublemma_isolator.isolate_sublemma(
@@ -137,11 +209,33 @@ impl MctsOrchestrator {
 
             let mut created_child_ids = Vec::new();
 
-            // 2A. Fast Symbolic Decision Procedure Probing (Zero-LLM Fast-Path)
-            let fast_tactics = ["rfl", "intro n; rfl", "intro a b; rfl", "omega", "linarith", "ring", "simp", "aesop"];
+            // 2A. Fast Symbolic Decision Procedure Probing (Zero-LLM Fast-Path & Subtree Replay)
+            let mut fast_tactics: Vec<String> = vec![
+                "rfl".to_string(),
+                "intro n; rfl".to_string(),
+                "intro a b; rfl".to_string(),
+                "omega".to_string(),
+                "linarith".to_string(),
+                "ring".to_string(),
+                "simp".to_string(),
+                "aesop".to_string(),
+            ];
+
+            if let Some(knot_tac) = priority_knot_tactic {
+                fast_tactics.insert(0, knot_tac);
+            }
+
+            if let Some(goal) = nodes[selected_id].proof_state.open_goals.first() {
+                if let Some(replay_tac) = replay_cache.try_replay(goal) {
+                    if !fast_tactics.contains(&replay_tac) {
+                        fast_tactics.insert(0, replay_tac);
+                    }
+                }
+            }
+
             let mut fast_solved = false;
 
-            for fast_tac in fast_tactics {
+            for fast_tac in &fast_tactics {
                 let mut test_tactics = nodes[selected_id].proof_state.cumulative_tactics.clone();
                 test_tactics.push(fast_tac.to_string());
                 let proof_body = format!("theorem probe_thm : {} := by\n  {}", theorem_signature, test_tactics.join("\n  "));
@@ -248,6 +342,16 @@ impl MctsOrchestrator {
                 self.backpropagate(&mut nodes, child_id, value);
 
                 if is_child_solved {
+                    transposition_table.insert(
+                        canonical_hash.clone(),
+                        crate::mcts::TranspositionEntry {
+                            canonical_hash: canonical_hash.clone(),
+                            is_solved: true,
+                            proof_script: Some(candidate.tactic_code.clone()),
+                            value_estimate: 1.0,
+                            visit_count: 1,
+                        },
+                    );
                     info!("🎉 MCTS discovered valid proof at iteration {}!", iter);
                     solved_node_id = Some(child_id);
                     break;

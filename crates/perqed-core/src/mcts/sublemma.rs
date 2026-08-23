@@ -56,8 +56,8 @@ impl SubLemmaIsolator {
         info!("Isolating sub-lemma: {} for goal: {}", sublemma_name, open_goal);
 
         let sublemma = SubLemma {
-            name: sublemma_name,
-            statement: format!("lemma {} : {} := by sorry", base_name, open_goal),
+            name: sublemma_name.clone(),
+            statement: format!("lemma {} : {} := by sorry", sublemma_name, open_goal),
             hypotheses: state.hypotheses.clone(),
             goal_type: open_goal.clone(),
             proof_script: None,

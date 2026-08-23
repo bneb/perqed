@@ -1047,6 +1047,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
+ "hex",
  "num-bigint",
  "num-rational",
  "num-traits",
@@ -1059,6 +1060,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror",
  "tokio",
@@ -1101,10 +1103,12 @@ name = "perqed-sandbox"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "hex",
  "num-bigint",
  "num-rational",
  "num-traits",
+ "rand",
  "regex",
  "serde",
  "serde_json",

@@ -77,38 +77,26 @@ def runAudit (proofDecl : Name) (frozenSpecDecl : Name) (specFilePath : Option S
   let candType := candInfo.type
   let targetType := targetInfo.type
 
-  let passed ← forallTelescope candType fun candFvars candBody => do
-    forallTelescope targetType fun targetFvars targetBody => do
-      -- Check argument length matches
-      if candFvars.size != targetFvars.size then
-        IO.eprintln s!"❌ AUDIT REJECTED: Arity mismatch. Candidate arity: {candFvars.size}, Spec arity: {targetFvars.size}."
-        return false
-      
-      -- Check each parameter type matches definitionally
-      for i in [0:candFvars.size] do
-        let cType ← inferType candFvars[i]!
-        let tType ← inferType targetFvars[i]!
-        if !(← isDefEq cType tType) then
-          IO.eprintln s!"❌ AUDIT REJECTED: Hypothesis/Type mismatch at parameter {i}."
-          return false
+  let directEq ← isDefEq candType targetType
+  let isEq ← if directEq then
+    pure true
+  else
+    forallTelescope targetType fun targetFvars _ => do
+      let app := mkAppN (mkConst frozenSpecDecl) targetFvars
+      let quantified ← mkForallFVars targetFvars app
+      isDefEq quantified candType
 
-      let isEq ← isDefEq candBody targetBody
-      let isAppOfTarget := match candBody.getAppFn with
-        | Expr.const n _ => n == frozenSpecDecl
-        | _ => false
-
-      if !isEq && !isAppOfTarget then
-        IO.eprintln s!"❌ AUDIT REJECTED: Theorem conclusion does not match frozen specification."
-        IO.eprintln s!"  Candidate conclusion: {candBody}"
-        IO.eprintln s!"  Expected specification: {targetBody} (or application of {frozenSpecDecl})"
-        return false
-      return true
-
-  if !passed then
+  if !isEq then
+    IO.eprintln "❌ AUDIT REJECTED: Theorem conclusion does not match frozen specification."
+    IO.eprintln s!"  Candidate Type: {candType}"
+    IO.eprintln s!"  Expected Type:  {targetType} (or application of {frozenSpecDecl})"
     return false
 
   IO.println s!"✅ ALL AUDIT GATES PASSED: Declaration '{proofDecl}' is sound, unpolluted, matches frozen target '{frozenSpecDecl}'."
   return true
+
+def stringToName (s : String) : Name :=
+  s.splitOn "." |>.foldl (fun acc part => if part.isEmpty then acc else Name.mkStr acc part) Name.anonymous
 
 structure ParsedAuditArgs where
   proofName : Name
@@ -119,11 +107,12 @@ structure ParsedAuditArgs where
 def parseAuditArgs (args : List String) : ParsedAuditArgs :=
   let rec loop (rem : List String) (acc : ParsedAuditArgs) : ParsedAuditArgs :=
     match rem with
-    | "--proof" :: p :: rest => loop rest { acc with proofName := p.toName }
-    | "--spec" :: s :: rest => loop rest { acc with specName := s.toName }
+    | "--" :: rest => loop rest acc
+    | "--proof" :: p :: rest => loop rest { acc with proofName := stringToName p }
+    | "--spec" :: s :: rest => loop rest { acc with specName := stringToName s }
     | "--spec-file" :: f :: rest => loop rest { acc with specFilePath := some f }
     | "--expected-hash" :: h :: rest => loop rest { acc with expectedHash := some h }
-    | p :: s :: rest => loop rest { acc with proofName := p.toName, specName := s.toName }
+    | p :: s :: rest => loop rest { acc with proofName := stringToName p, specName := stringToName s }
     | _ => acc
   loop args {
     proofName := `Perqed.Proofs.nat_add_right_id,

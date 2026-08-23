@@ -26,3 +26,5 @@ chrono.workspace = true
 rand.workspace = true
 futures.workspace = true
 tempfile.workspace = true
+sha2.workspace = true
+hex.workspace = true

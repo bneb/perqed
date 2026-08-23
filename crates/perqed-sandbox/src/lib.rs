@@ -1,4 +1,5 @@
 pub mod campaign;
+pub mod domain;
 pub mod domain_synth;
 pub mod dynamic_probe;
 pub mod exact_math;
@@ -6,13 +7,18 @@ pub mod graph_color;
 pub mod graph_sanity;
 pub mod hadwiger_nelson;
 pub mod harness;
+pub mod lakatos;
+pub mod search;
 
+pub use domain::{DomainError, DomainPayload, DomainRegistry, DomainVerdict, MathematicalDomain, UniversalProbeCertificate};
 pub use domain_synth::{AlgebraicFieldError, AlgebraicNumber, AlgebraicNumberField, FieldSpec, Point2DAlgebraic};
 pub use dynamic_probe::{DynamicProbeVerifier, ProbeCertificate, ProbeError, ProbeVerdict};
 pub use exact_math::{ArbInterval, DegeneracyChecker, ExactMathError, Point2DQ2, QuadraticFieldQ2};
 pub use graph_sanity::{GraphCycleProfile, GraphSanityChecker, SanityCertificate, SanityError};
 pub use hadwiger_nelson::UnitDistanceGraphQ2;
 pub use harness::{CompiledFalsifier, DeadEndRecord, DeadEndsDb, HarnessError};
+pub use lakatos::{GraveyardEntry, LakatosError, LakatosianRefiner, LakatosianVault, RefinedHypothesis};
+pub use search::{CoolingSchedule, DecomposableState, LnsOptimizer, SaConfig, SaIslandModel, StateSpace};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -94,15 +94,23 @@ impl GoalCycleDetector {
         }
     }
 
-    /// Canonicalize Lean proof state goal string (renaming hypotheses h1, h2 -> v1, v2)
+    /// Canonicalize Lean proof state goal string (renaming hypotheses h, h1, h2 -> v1, v2)
     pub fn canonicalize_state(raw_state: &str) -> String {
         let clean = raw_state.trim();
-        let re_hyp = Regex::new(r"\b[hH][0-9_a-zA-Z]*\b").unwrap();
+        let re_hyp = Regex::new(r"\b([hH](?:yp)?\d*|[hH]_\w+|ih\d*)\b").unwrap();
         let mut count = 0;
         let mut map = std::collections::HashMap::new();
 
+        let reserved = [
+            "have", "has", "heq", "head", "hom", "hypo", "hole", "heap", "huge", "help", "hold",
+        ];
+
         for cap in re_hyp.captures_iter(clean) {
             let h = &cap[0];
+            let lower = h.to_lowercase();
+            if reserved.contains(&lower.as_str()) || h.starts_with("Has") || h.starts_with("Hom") {
+                continue;
+            }
             if !map.contains_key(h) {
                 map.insert(h.to_string(), format!("v{}", count));
                 count += 1;
@@ -111,7 +119,12 @@ impl GoalCycleDetector {
 
         let normalized = re_hyp.replace_all(clean, |caps: &regex::Captures| {
             let h = &caps[0];
-            map.get(h).cloned().unwrap_or_else(|| h.to_string())
+            let lower = h.to_lowercase();
+            if reserved.contains(&lower.as_str()) || h.starts_with("Has") || h.starts_with("Hom") {
+                h.to_string()
+            } else {
+                map.get(h).cloned().unwrap_or_else(|| h.to_string())
+            }
         }).to_string();
 
         normalized.replace(' ', "")

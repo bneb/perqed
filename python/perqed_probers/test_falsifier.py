@@ -96,6 +96,32 @@ class TestFalsifier(unittest.TestCase):
         self.assertFalse(res.passed)
         self.assertIn("uninhabited", res.reason.lower())
 
+    def test_single_equals_valid_arithmetic(self):
+        """Conjecture using single = and ^: (x + 0 = x) and x^2 >= 0"""
+        conj = {
+            "conjecture_id": "test_single_eq_valid",
+            "variables": {"x": "Int"},
+            "hypotheses": ["x >= 0"],
+            "target": "x + 0 = x && x^2 >= 0",
+        }
+        res = self.engine.run_falsification_suite(conj)
+        self.assertTrue(res.passed)
+        self.assertFalse(res.falsified)
+
+    def test_single_equals_false_conjecture_falsified(self):
+        """False conjecture with single =: (a + b) + c = a + (b + c) + 1 must be falsified!"""
+        conj = {
+            "conjecture_id": "test_single_eq_false",
+            "variables": {"a": "Int", "b": "Int", "c": "Int"},
+            "hypotheses": ["a >= 0", "b >= 0", "c >= 0"],
+            "target": "(a + b) + c = a + (b + c) + 1",
+        }
+        res = self.engine.run_falsification_suite(conj)
+        self.assertFalse(res.passed)
+        self.assertTrue(res.falsified)
+        self.assertIsNotNone(res.counterexample)
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -1,0 +1,43 @@
+{
+  "certificate": {
+    "compute_cost_usd": 0.0,
+    "domain": "number_theory.zaremba",
+    "payload": {
+      "data": {
+        "numerator": 3,
+        "quotient_bound": 2,
+        "target": 8
+      },
+      "type": "BoundedContinuedFraction"
+    },
+    "probe_id": "domain::number_theory.zaremba",
+    "spec_hash": "4e71244668a26ea53282fa8678a5d31b5710d9b48de7b36f62f82ad8ce6c3f89",
+    "timestamp_utc": "1787460140"
+  },
+  "verdict": {
+    "data": {
+      "max_quotient": 2,
+      "numerator": 3,
+      "quotient_bound": 2,
+      "quotient_count": 4,
+      "reason": "a/m = 3/8 = [0, 2, 1, 2], all quotients ≤ 2",
+      "reconstruction": [
+        [
+          1,
+          [
+            3
+          ]
+        ],
+        [
+          1,
+          [
+            8
+          ]
+        ]
+      ],
+      "target": 8,
+      "verified": true
+    },
+    "domain": "BoundedContinuedFraction"
+  }
+}

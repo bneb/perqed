@@ -8,6 +8,12 @@ import itertools
 import sympy as sp
 
 
+try:
+    from .expr_utils import normalize_math_expr
+except ImportError:
+    from expr_utils import normalize_math_expr
+
+
 class SymPyProber:
     """SymPy CAS solver for symbolic simplification and finite parameter sweeps."""
 
@@ -16,12 +22,7 @@ class SymPyProber:
 
     def _parse_expr(self, expr_str: str, sym_vars: Dict[str, sp.Symbol]) -> Any:
         """Parse mathematical string expression into SymPy expression."""
-        clean_expr = (
-            expr_str.replace("==", "=")
-            .replace("^", "**")
-            .replace("&&", "&")
-            .replace("||", "|")
-        )
+        clean_expr = normalize_math_expr(expr_str)
         return sp.sympify(clean_expr, locals=sym_vars)
 
     def finite_sweep_falsification(
@@ -67,16 +68,7 @@ class SymPyProber:
             hyp_satisfied = True
             for hyp in hypotheses:
                 try:
-                    clean_hyp = (
-                        hyp.replace("&&", " and ")
-                        .replace("||", " or ")
-                        .replace("!", " not ")
-                        .replace("=", "==")
-                        .replace("====", "==")
-                        .replace(">==", ">=")
-                        .replace("<==", "<=")
-                        .replace("!==", "!=")
-                    )
+                    clean_hyp = normalize_math_expr(hyp)
                     if not bool(eval(clean_hyp, {"__builtins__": {}}, env)):
                         hyp_satisfied = False
                         break
@@ -89,16 +81,7 @@ class SymPyProber:
 
             # Hypotheses hold, check target
             try:
-                clean_target = (
-                    target_assertion.replace("&&", " and ")
-                    .replace("||", " or ")
-                    .replace("!", " not ")
-                    .replace("=", "==")
-                    .replace("====", "==")
-                    .replace(">==", ">=")
-                    .replace("<==", "<=")
-                    .replace("!==", "!=")
-                )
+                clean_target = normalize_math_expr(target_assertion)
                 target_val = bool(eval(clean_target, {"__builtins__": {}}, env))
                 if not target_val:
                     return (

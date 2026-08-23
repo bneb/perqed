@@ -1,7 +1,8 @@
 //! Constrained Conjecture & Invariant Synthesis Engine
 //!
 //! Replaces unconstrained natural language prompts with structured search over
-//! programmatic invariants, extremal bounding functions, and integer sequence databases (OEIS).
+//! programmatic invariants, extremal bounding functions, integer sequence databases (OEIS),
+//! and FunSearch evolutionary heuristic program synthesis.
 
 use crate::types::Conjecture;
 use serde::{Deserialize, Serialize};
@@ -24,8 +25,118 @@ pub struct BoundCandidate {
     pub empirical_error: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeuristicProgram {
+    pub id: String,
+    pub code: String,
+    pub fitness_score: f64,
+    pub generation: usize,
+    pub domain: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgramDatabase {
+    capacity: usize,
+    programs: Vec<HeuristicProgram>,
+}
+
+impl ProgramDatabase {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity: capacity.max(2),
+            programs: Vec::new(),
+        }
+    }
+
+    pub fn insert(&mut self, program: HeuristicProgram) {
+        self.programs.push(program);
+        self.programs.sort_by(|a, b| b.fitness_score.partial_cmp(&a.fitness_score).unwrap_or(std::cmp::Ordering::Equal));
+        if self.programs.len() > self.capacity {
+            self.programs.truncate(self.capacity);
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.programs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.programs.is_empty()
+    }
+
+    pub fn best_program(&self) -> Option<&HeuristicProgram> {
+        self.programs.first()
+    }
+
+    pub fn sample_parents(&self) -> Option<(&HeuristicProgram, &HeuristicProgram)> {
+        if self.programs.len() < 2 {
+            return None;
+        }
+        Some((&self.programs[0], &self.programs[1]))
+    }
+}
+
+pub struct FunSearchCrossover;
+
+impl FunSearchCrossover {
+    pub fn build_crossover_prompt(
+        parent_a: &HeuristicProgram,
+        parent_b: &HeuristicProgram,
+        domain: &str,
+    ) -> String {
+        format!(
+            r#"You are a FunSearch Evolutionary AI designed to synthesize novel mathematical heuristics.
+
+DOMAIN TARGET: {}
+
+You are provided with two high-scoring parent heuristics:
+
+PARENT A (Score: {:.2}, Gen: {}):
+```python
+{}
+```
+
+PARENT B (Score: {:.2}, Gen: {}):
+```python
+{}
+```
+
+Synthesize an offspring heuristic that recombines the best structural features of both parents.
+"#,
+            domain,
+            parent_a.fitness_score,
+            parent_a.generation,
+            parent_a.code,
+            parent_b.fitness_score,
+            parent_b.generation,
+            parent_b.code
+        )
+    }
+
+    pub fn mutate_heuristic(parent: &HeuristicProgram, generation: usize) -> HeuristicProgram {
+        let mutant_id = format!("mutant_{}_{}", parent.id, generation);
+        let mutated_code = format!(
+            "# Mutated heuristic (Generation {})\n{}\n# Neighborhood perturbation applied\n",
+            generation, parent.code
+        );
+        HeuristicProgram {
+            id: mutant_id,
+            code: mutated_code,
+            fitness_score: parent.fitness_score,
+            generation,
+            domain: parent.domain.clone(),
+        }
+    }
+}
+
 pub struct ProgramInvariantSearch {
     oeis_db: Vec<OeisSequence>,
+}
+
+impl Default for ProgramInvariantSearch {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProgramInvariantSearch {

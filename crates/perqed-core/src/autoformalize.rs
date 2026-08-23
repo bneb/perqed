@@ -250,29 +250,31 @@ Respond in JSON format:
 
         #[derive(Deserialize)]
         struct DiffResp {
-            #[serde(default = "default_match")]
+            #[serde(default)]
             r#match: bool,
-            #[serde(default = "default_score")]
+            #[serde(default)]
             similarity_score: f64,
             #[serde(default)]
             discrepancies: Vec<String>,
         }
-        fn default_match() -> bool {
-            true
-        }
-        fn default_score() -> f64 {
-            0.95
-        }
 
         if let Ok(parsed) = serde_json::from_str::<DiffResp>(clean) {
             let reason = if parsed.discrepancies.is_empty() {
-                "Claims are semantically equivalent".to_string()
+                if parsed.r#match {
+                    "Claims are semantically equivalent".to_string()
+                } else {
+                    "Model identified semantic discrepancies".to_string()
+                }
             } else {
                 parsed.discrepancies.join("; ")
             };
             Ok((parsed.r#match, parsed.similarity_score, reason))
         } else {
-            Ok((true, 0.90, "Fallback semantic match".to_string()))
+            Ok((
+                false,
+                0.0,
+                "Adversarial diff verification failed: model output could not be parsed as valid JSON verdict".to_string(),
+            ))
         }
     }
 }

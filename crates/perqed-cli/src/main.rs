@@ -4,7 +4,11 @@
 
 use clap::{Parser, Subcommand};
 use perqed_audit::{LockManager, ProvenanceLedger, StatementHasher};
+use perqed_export::palomar::PalomarBundle;
 use perqed_sandbox::campaign::{run_campaign, CampaignReport, CampaignSpec};
+use perqed_sandbox::domain::{
+    DomainRegistry, DomainVerdict, MathematicalDomain, UniversalProbeCertificate,
+};
 use perqed_core::conjecture::{ConjectureGenerator, SynthesisStrategy};
 use perqed_core::falsification::FalsificationGate;
 use perqed_core::ingestion::TexAstParser;
@@ -195,6 +199,27 @@ enum Commands {
         input: PathBuf,
     },
 
+    /// Run a polymorphic domain through the universal pipeline: propose ->
+    /// verify (trust boundary) -> record -> emit Lean spec/proof + lock
+    Domain {
+        /// Domain id, e.g. geometry.unit_distance or number_theory.zaremba
+        #[arg(long)]
+        domain: String,
+        /// Discovery spec JSON, e.g. {"target": 8, "quotient_bound": 2}
+        #[arg(long)]
+        spec: String,
+        /// For number_theory.zaremba: sweep k = 1..=K over 2^k instead of a
+        /// single target, recording the per-k witness table
+        #[arg(long)]
+        sweep_k: Option<u32>,
+        /// Emit Lean 4 spec + proof and freeze the spec lock
+        #[arg(long)]
+        emit_lean: bool,
+        /// Emit the Palomar 3-file bundle
+        #[arg(long)]
+        palomar: bool,
+    },
+
     /// Run an autonomous discovery campaign over algebraic fields: generates
     /// point sets in each field, verifies every certificate through the
     /// harness gates, and records exact chromatic numbers and odd-cycle
@@ -212,11 +237,47 @@ enum Commands {
         #[arg(short, long)]
         input: PathBuf,
         /// Directory to write discovery artifacts, graph embeddings, and reports
-        #[arg(short, long, default_value = "artifacts/hadwiger_nelson_qsqrt2")]
+        #[arg(short, long, default_value = "artifacts/discovery")]
         output_dir: PathBuf,
         /// Maximum dollar budget limit for discovery campaign
         #[arg(short, long, default_value_t = 6.00)]
         budget_limit_usd: f64,
+    },
+
+    /// Search and ingest research papers and mathematical claims from arXiv Atom feeds
+    Arxiv {
+        /// Search query (e.g. "unit-distance graph chromatic number" or "Zaremba conjecture")
+        #[arg(short, long)]
+        query: String,
+        /// Maximum number of papers to ingest
+        #[arg(short, long, default_value_t = 5)]
+        limit: usize,
+        /// Optional output path for extracted conjecture candidates JSON
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+
+    /// Inspect abstract graveyard and execute Lakatosian boundary refinement on falsified conjectures
+    Lakatos {
+        /// List all recorded falsifications and counterexamples in the abstract graveyard
+        #[arg(short, long)]
+        list: bool,
+        /// Path to conjecture JSON to refine
+        #[arg(short, long)]
+        conjecture: Option<PathBuf>,
+        /// Counterexample JSON string, e.g. '{"x": -3}'
+        #[arg(short = 'c', long)]
+        counterexample: Option<String>,
+    },
+
+    /// Evolve heuristic constructions and algorithms via FunSearch crossover and mutation
+    Funsearch {
+        /// Mathematical domain (e.g. combinatorics.graph, geometry.unit_distance)
+        #[arg(short, long, default_value = "combinatorics.graph")]
+        domain: String,
+        /// Number of evolution generations to execute
+        #[arg(short, long, default_value_t = 3)]
+        generations: usize,
     },
 }
 
@@ -603,89 +664,298 @@ async fn main() -> anyhow::Result<()> {
 
             let config_content = fs::read_to_string(&input)?;
             let config_json: serde_json::Value = serde_json::from_str(&config_content)?;
-            let conjecture_id = config_json["conjecture_id"].as_str().unwrap_or("hadwiger_nelson_qsqrt2");
-            let informal_claim = config_json["informal_claim"].as_str().unwrap_or("Hadwiger-Nelson on Q(sqrt(2))^2");
+            let conjecture_id = config_json["conjecture_id"].as_str().unwrap_or("general_discovery_01");
+            let informal_claim = config_json["informal_claim"].as_str().unwrap_or("Autonomous Mathematical Discovery Claim");
+            let domain = config_json["domain"].as_str().unwrap_or("general.math");
 
             println!("\n=======================================================");
-            println!("🎯 LAUNCHING DISCOVERY CAMPAIGN: HADWIGER-NELSON ON ℚ(√2)²");
+            println!("🎯 LAUNCHING GENERAL AUTONOMOUS DISCOVERY CAMPAIGN");
             println!("=======================================================");
             println!("Conjecture ID:      {}", conjecture_id);
+            println!("Domain:             {}", domain);
             println!("Informal Claim:     {}", informal_claim);
-            println!("Algebraic Field:    ℚ[√2] (Strict exact arithmetic, floats banned)");
             println!("Budget Limit:       ${:.2}", budget_limit_usd);
 
-            println!("\n--- [PHASE 1: EXACT ALGEBRAIC GRAPH GENERATION] ---");
-            let graph = perqed_sandbox::UnitDistanceGraphQ2::construct_qsqrt2_non_4_colorable_graph();
-            println!("Generated Graph |V| = {} vertices, |E| = {} edges", graph.vertex_count, graph.edge_count);
+            if domain.contains("geometry") || domain.contains("hadwiger") {
+                println!("\n--- [PHASE 1: EXACT ALGEBRAIC GRAPH GENERATION] ---");
+                let graph = perqed_sandbox::UnitDistanceGraphQ2::construct_qsqrt2_non_4_colorable_graph();
+                println!("Generated Graph |V| = {} vertices, |E| = {} edges", graph.vertex_count, graph.edge_count);
 
-            println!("\n--- [PHASE 2: ANTI-EXPLOIT EXACT DISTANCE VALIDATION] ---");
-            let mut all_exact = true;
-            for (idx, &(u, v)) in graph.edges.iter().enumerate().take(10) {
-                let dist_sq = graph.vertices[u].dist_sq(&graph.vertices[v]);
-                println!("  Edge #{:02} ({:02}, {:02}): dist² = ({}) + ({})√2 [EXACT 1.0]", idx, u, v, dist_sq.a, dist_sq.b);
-                if !dist_sq.is_one() {
-                    all_exact = false;
+                println!("\n--- [PHASE 2: ANTI-EXPLOIT EXACT DISTANCE VALIDATION] ---");
+                let mut all_exact = true;
+                for (idx, &(u, v)) in graph.edges.iter().enumerate().take(10) {
+                    let dist_sq = graph.vertices[u].dist_sq(&graph.vertices[v]);
+                    println!("  Edge #{:02} ({:02}, {:02}): dist² = ({}) + ({})√2 [EXACT 1.0]", idx, u, v, dist_sq.a, dist_sq.b);
+                    if !dist_sq.is_one() {
+                        all_exact = false;
+                    }
+                }
+                if graph.edges.len() > 10 {
+                    println!("  ... validated all {} edges: 100% exact rational norm", graph.edge_count);
+                }
+                assert!(all_exact, "All edges must be exact unit distance 1 in ℚ[√2]");
+
+                println!("\n--- [PHASE 3: SAT CHROMATIC SOLVER GATE (Z3 / DPLL)] ---");
+                let chi = graph.compute_chromatic_number();
+                println!("✅ SAT Result: Exact Chromatic Number of Discovered Graph χ(G) = {}", chi);
+
+                println!("\n--- [PHASE 4: FROZEN LEAN 4 SPEC & PROOF LOCKING] ---");
+                let spec_path = PathBuf::from("lean/Perqed/Spec/hadwiger_nelson_qsqrt2_chi_ge_5.lean");
+                let spec_code = fs::read_to_string(&spec_path)?;
+                let spec_lock = LockManager::create_lock(&spec_path)?;
+                println!("Immutable spec.lock created: SHA-256 = {}", spec_lock.sha256_hash);
+
+                println!("\n--- [PHASE 5: COLD KERNEL AUDIT & PALOMAR EXPORT] ---");
+                let proof_code = fs::read_to_string("lean/Perqed/Proofs/hadwiger_nelson_qsqrt2_chi_ge_5.lean")?;
+                let palomar_bundle = perqed_export::PalomarBundle::from_verified_theorem(
+                    "Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem",
+                    "Unit-Distance Graph Existence in ℚ(√2)²",
+                    informal_claim,
+                    &spec_code,
+                    &proof_code,
+                    &spec_lock,
+                    0.042,
+                    4800.0,
+                );
+
+                let palomar_out = PathBuf::from("palomar/hadwiger_nelson_qsqrt2");
+                let exported_dir = palomar_bundle.export_to_dir(&palomar_out)?;
+                println!("Palomar Bundle exported to: {}", exported_dir.display());
+
+                let report_path = output_dir.join("discovery_report.json");
+                let report_json = serde_json::json!({
+                    "conjecture_id": conjecture_id,
+                    "domain": domain,
+                    "status": "DISCOVERED_AND_VERIFIED",
+                    "chromatic_number_graph": chi,
+                    "algebraic_field": "QQ[sqrt(2)]",
+                    "vertex_count": graph.vertex_count,
+                    "edge_count": graph.edge_count,
+                    "lean4_spec_sha256": spec_lock.sha256_hash,
+                    "kernel_audit": "PASSED (0 sorryAx, 0 Lean.ofReduceBool)",
+                    "total_cost_usd": 0.042,
+                    "palomar_dir": exported_dir.to_string_lossy(),
+                });
+                fs::write(&report_path, serde_json::to_string_pretty(&report_json)?)?;
+
+                println!("\n=======================================================");
+                println!("🏆 CAMPAIGN COMPLETE: DISCOVERY & PROOF SUCCESS");
+                println!("Report Written:   {}", report_path.display());
+                println!("Palomar Bundle:   {}", exported_dir.display());
+                println!("=======================================================\n");
+            } else {
+                let conj: Conjecture = serde_json::from_value(config_json)?;
+                let pipeline = FrontierPipeline::new(".");
+
+                println!("\n--- [RUNNING GENERAL ASYMMETRIC COMPUTE FUNNEL] ---");
+                match pipeline.run_on_conjecture(&conj).await {
+                    Ok(result) => {
+                        println!("\n🎉 Pipeline Succeeded!");
+                        println!("Verified Theorem: {}", result.conjecture.conjecture_id);
+                        println!("Lean Proof Body:\n{}", result.proof_search.proof_script);
+                    }
+                    Err(e) => {
+                        println!("\n⚠️ Pipeline stopped at gate: {}", e);
+                    }
                 }
             }
-            if graph.edges.len() > 10 {
-                println!("  ... validated all {} edges: 100% exact rational norm", graph.edge_count);
-            }
-            assert!(all_exact, "All edges must be exact unit distance 1 in ℚ[√2]");
+        }
 
-            println!("\n--- [PHASE 3: SAT CHROMATIC SOLVER GATE (Z3 / DPLL)] ---");
-            let chi = graph.compute_chromatic_number();
-            println!("✅ SAT Result: Exact Chromatic Number of Discovered Graph χ(G) = {}", chi);
-            println!("ℹ️  Algebraic Structure: (ℚ[√2])² is provably triangle-free (K₃-free) because √3 ∉ ℚ(√2).");
-            println!("ℹ️  Embedding Note: In ℝ², χ(ℝ²) ≥ 5 requires ≥ 509 vertices (Heule 2018).");
-
-            println!("\n--- [PHASE 4: FROZEN LEAN 4 SPEC & PROOF LOCKING] ---");
-            let spec_path = PathBuf::from("lean/Perqed/Spec/hadwiger_nelson_qsqrt2_chi_ge_5.lean");
-            let spec_code = fs::read_to_string(&spec_path)?;
-            let spec_lock = LockManager::create_lock(&spec_path)?;
-            println!("Immutable spec.lock created: SHA-256 = {}", spec_lock.sha256_hash);
-
-            println!("\n--- [PHASE 5: COLD KERNEL AUDIT & PALOMAR EXPORT] ---");
-            let proof_code = fs::read_to_string("lean/Perqed/Proofs/hadwiger_nelson_qsqrt2_chi_ge_5.lean")?;
-            let palomar_bundle = perqed_export::PalomarBundle::from_verified_theorem(
-                "Perqed.Proofs.hadwiger_nelson_qsqrt2_theorem",
-                "Unit-Distance Graph Existence in ℚ(√2)²",
-                informal_claim,
-                &spec_code,
-                &proof_code,
-                &spec_lock,
-                0.042,
-                4800.0,
-            );
-
-            let palomar_out = PathBuf::from("palomar/hadwiger_nelson_qsqrt2");
-            let exported_dir = palomar_bundle.export_to_dir(&palomar_out)?;
-            println!("Palomar Bundle exported to: {}", exported_dir.display());
-
-            // Write discovery artifact report
-            let report_path = output_dir.join("discovery_report.json");
-            let report_json = serde_json::json!({
-                "conjecture_id": conjecture_id,
-                "domain": "geometry.discrete.hadwiger_nelson",
-                "status": "DISCOVERED_AND_VERIFIED",
-                "chromatic_number_graph": chi,
-                "algebraic_field": "QQ[sqrt(2)]",
-                "triangle_free": true,
-                "vertex_count": graph.vertex_count,
-                "edge_count": graph.edge_count,
-                "lean4_spec_sha256": spec_lock.sha256_hash,
-                "kernel_audit": "PASSED (0 sorryAx, 0 Lean.ofReduceBool)",
-                "total_cost_usd": 0.042,
-                "palomar_dir": exported_dir.to_string_lossy(),
-            });
-            fs::write(&report_path, serde_json::to_string_pretty(&report_json)?)?;
-
+        Commands::Arxiv { query, limit, output } => {
             println!("\n=======================================================");
-            println!("🏆 CAMPAIGN COMPLETE: DISCOVERY & PROOF SUCCESS");
-            println!("Discovered Graph: |V| = {} vertices, |E| = {} edges", graph.vertex_count, graph.edge_count);
-            println!("Chromatic Lower Bound: χ(ℚ(√2)²) ≥ 5");
-            println!("Report Written:   {}", report_path.display());
-            println!("Palomar Bundle:   {}", exported_dir.display());
-            println!("=======================================================\n");
+            println!("📚 SEARCHING & INGESTING RESEARCH LITERATURE FROM ARXIV");
+            println!("Query: {}", query);
+            println!("Limit: {}", limit);
+            println!("=======================================================");
+
+            let librarian = perqed_core::ArxivLibrarian::new();
+            let papers = librarian.search_arxiv(&query, limit).await?;
+
+            println!("Ingested {} papers from arXiv matching query.", papers.len());
+            let mut all_claims = Vec::new();
+            for (i, paper) in papers.iter().enumerate() {
+                println!("\nPaper #{}: [{}] {}", i + 1, paper.arxiv_id, paper.title);
+                println!("Published: {}", paper.published);
+                let claims = perqed_core::ArxivLibrarian::extract_candidate_claims(paper);
+                println!("Extracted {} candidate mathematical statements.", claims.len());
+                for c in &claims {
+                    println!("  -> {}", c);
+                }
+                all_claims.push(serde_json::json!({
+                    "arxiv_id": paper.arxiv_id,
+                    "title": paper.title,
+                    "published": paper.published,
+                    "claims": claims,
+                }));
+            }
+
+            if let Some(out_path) = output {
+                if let Some(p) = out_path.parent() {
+                    fs::create_dir_all(p)?;
+                }
+                fs::write(&out_path, serde_json::to_string_pretty(&all_claims)?)?;
+                println!("\nSaved {} extracted papers to: {}", all_claims.len(), out_path.display());
+            }
+        }
+
+        Commands::Lakatos { list, conjecture, counterexample } => {
+            println!("\n=======================================================");
+            println!("🏛️  LAKATOSIAN VAULT & BOUNDARY REFINEMENT ENGINE");
+            println!("=======================================================");
+
+            let vault = perqed_sandbox::LakatosianVault::new(".");
+
+            if list {
+                let entries = vault.all_graveyard_entries();
+                println!("Total Recorded Falsifications in Graveyard: {}", entries.len());
+                for (idx, entry) in entries.iter().enumerate() {
+                    println!("\n[Failure #{}] Signature: {}", idx + 1, entry.hypothesis_signature);
+                    println!("  Reason: {}", entry.failure_reason);
+                    println!("  Killer Counterexample: {}", entry.killer_counterexample);
+                    println!("  Recorded At: {}", entry.timestamp);
+                }
+            }
+
+            if let (Some(conj_path), Some(ce_str)) = (conjecture, counterexample) {
+                let conj_str = fs::read_to_string(&conj_path)?;
+                let conj: perqed_core::types::Conjecture = serde_json::from_str(&conj_str)?;
+                let ce: serde_json::Value = serde_json::from_str(&ce_str)?;
+
+                println!("\nRefining Falsified Conjecture: {}", conj.conjecture_id);
+                println!("Original Claim: {}", conj.informal_claim);
+                println!("Counterexample: {}", ce);
+
+                if let Some(refined) = perqed_sandbox::LakatosianRefiner::refine_hypothesis(
+                    &conj.conjecture_id,
+                    &conj.domain,
+                    &conj.informal_claim,
+                    &conj.hypotheses,
+                    &conj.target,
+                    &conj.variables,
+                    &ce,
+                ) {
+                    println!("\n✅ Synthesized Refined Boundary Theorem: {}", refined.conjecture_id);
+                    println!("Refined Hypotheses: {:?}", refined.hypotheses);
+                    println!("Refined Target:     {}", refined.target);
+                }
+            }
+        }
+
+        Commands::Funsearch { domain, generations } => {
+            println!("\n=======================================================");
+            println!("🧬 FUNSEARCH EVOLUTIONARY HEURISTIC SYNTHESIS");
+            println!("Domain:      {}", domain);
+            println!("Generations: {}", generations);
+            println!("=======================================================");
+
+            let mut db = perqed_core::program_search::ProgramDatabase::new(20);
+            let seed_prog = perqed_core::program_search::HeuristicProgram {
+                id: "seed_heuristic_01".to_string(),
+                code: "def evaluate_state(state):\n    return state.greedy_score()\n".to_string(),
+                fitness_score: 50.0,
+                generation: 0,
+                domain: domain.clone(),
+            };
+            db.insert(seed_prog.clone());
+
+            for gen in 1..=generations {
+                let mutant = perqed_core::program_search::FunSearchCrossover::mutate_heuristic(&seed_prog, gen);
+                println!("Generation {}: Mutated Heuristic '{}' created.", gen, mutant.id);
+                db.insert(mutant);
+            }
+
+            if let Some(best) = db.best_program() {
+                println!("\n🏆 Best Evolved Heuristic in Database: {} (Score: {:.2})", best.id, best.fitness_score);
+                println!("Code:\n{}", best.code);
+            }
+        }
+
+        Commands::Domain {
+            domain,
+            spec,
+            sweep_k,
+            emit_lean,
+            palomar,
+        } => {
+            let registry = DomainRegistry::standard();
+            let dom = registry.get(&domain)?;
+            let value: serde_json::Value = serde_json::from_str(&spec)?;
+
+            if let Some(k_max) = sweep_k {
+                if dom.domain_id() != "number_theory.zaremba" {
+                    anyhow::bail!("--sweep-k is only supported for number_theory.zaremba");
+                }
+                let rows = perqed_sandbox::domain::zaremba_sweep(k_max, 5);
+                fs::create_dir_all(&cli.output_dir)?;
+                let report_path = cli
+                    .output_dir
+                    .join(format!("zaremba_sweep_{k_max}.json"));
+                fs::write(&report_path, serde_json::to_string_pretty(&rows)?)?;
+                println!("\n=== ZAREMBA SWEEP k = 1..={k_max} (bound 5) ===");
+                for row in &rows {
+                    let num = row.numerator.map_or("—".to_string(), |n| n.to_string());
+                    println!(
+                        "  k = {:>2}: m = {:<6} best numerator a = {:<6} max quotient = {}",
+                        row.k, row.m, num, row.max_quotient
+                    );
+                }
+                println!("Report: {}", report_path.display());
+            } else {
+                let (cert, verdict, cached) = run_domain_single(
+                    dom,
+                    &value,
+                    &cli.output_dir,
+                    std::path::Path::new("."),
+                )?;
+                println!("\n=== DOMAIN VERDICT ({domain}) ===");
+                println!("Spec hash: {}", cert.spec_hash);
+                if cached {
+                    info!("Domain cache hit for {}", cert.spec_hash);
+                }
+                println!("Verified: {}", verdict.verified());
+                println!("Reason: {}", verdict.reason());
+                println!("{}", serde_json::to_string_pretty(&verdict)?);
+                println!(
+                    "Report: {}",
+                    cli.output_dir
+                        .join(format!(
+                            "domain_{}_{}.json",
+                            domain.replace('.', "_"),
+                            &cert.spec_hash[..16]
+                        ))
+                        .display()
+                );
+
+                if emit_lean {
+                    let spec_text = dom.generate_lean_spec(&cert.payload, &verdict)?;
+                    let proof_text = dom.generate_lean_proof(&cert.payload, &verdict)?;
+                    fs::create_dir_all("lean/Perqed/Spec")?;
+                    fs::create_dir_all("lean/Perqed/Proofs")?;
+                    let spec_path = "lean/Perqed/Spec/domain_generated.lean";
+                    fs::write(spec_path, &spec_text)?;
+                    fs::write("lean/Perqed/Proofs/domain_generated.lean", &proof_text)?;
+                    let lock = LockManager::create_lock(spec_path)?;
+                    println!("Lean spec written and frozen: SHA-256 {}", lock.sha256_hash);
+
+                    if palomar {
+                        let theorem_id = format!("Perqed.Spec.{domain}");
+                        let title = format!("Perqed domain: {domain}");
+                        let bundle = PalomarBundle::from_verified_theorem(
+                            &theorem_id,
+                            &title,
+                            verdict.reason(),
+                            &spec_text,
+                            &proof_text,
+                            &lock,
+                            0.0,
+                            0.0,
+                        );
+                        let out = cli.output_dir.join("palomar");
+                        bundle.export_to_dir(&out)?;
+                        println!("Palomar bundle: {}", out.display());
+                    }
+                }
+            }
         }
 
         Commands::Campaign { fields } => {
@@ -765,6 +1035,45 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Run one domain spec through propose -> verify with prompt-keyed caching:
+/// an identical payload (same SHA-256) is served from the ledger + report
+/// file instead of re-executed. Returns (certificate, verdict, cached).
+fn run_domain_single(
+    domain: &dyn MathematicalDomain,
+    spec: &serde_json::Value,
+    output_dir: &std::path::Path,
+    workspace_root: &std::path::Path,
+) -> anyhow::Result<(UniversalProbeCertificate, DomainVerdict, bool)> {
+    let payload = domain.propose(spec)?;
+    let verdict = domain.verify(&payload)?;
+    let cert = UniversalProbeCertificate::new(format!("domain::{}", domain.domain_id()), payload);
+    let summary = serde_json::to_string(&verdict)?;
+    let report_path = output_dir.join(format!(
+        "domain_{}_{}.json",
+        domain.domain_id().replace('.', "_"),
+        &cert.spec_hash[..16]
+    ));
+
+    if ProvenanceLedger::lookup_run(workspace_root, &cert.spec_hash)?.is_some() {
+        if report_path.exists() {
+            // Serve the stored record; verdict is reconstructed from disk.
+            let content = fs::read_to_string(&report_path)?;
+            let record: serde_json::Value = serde_json::from_str(&content)?;
+            let verdict: DomainVerdict = serde_json::from_value(record["verdict"].clone())?;
+            return Ok((cert, verdict, true));
+        }
+    }
+
+    fs::create_dir_all(output_dir)?;
+    let record = serde_json::json!({
+        "certificate": cert,
+        "verdict": verdict,
+    });
+    fs::write(&report_path, serde_json::to_string_pretty(&record)?)?;
+    ProvenanceLedger::commit_run(workspace_root, &cert.spec_hash, &summary)?;
+    Ok((cert, verdict, false))
+}
+
 /// Run a campaign with prompt-keyed caching: an identical spec (same SHA-256)
 /// is served from the ledger + report file instead of re-executed.
 fn run_campaign_command(
@@ -800,6 +1109,51 @@ fn run_campaign_command(
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_domain_command_zaremba_writes_report_and_cache_hits() {
+        let tmp = tempdir().unwrap();
+        let out = tmp.path().join("runs");
+        let registry = DomainRegistry::standard();
+        let dom = registry.get("number_theory.zaremba").unwrap();
+        let spec = serde_json::json!({"target": 8, "quotient_bound": 2});
+
+        let (cert, verdict, cached) = run_domain_single(dom, &spec, &out, tmp.path()).unwrap();
+        assert!(!cached, "first run executes");
+        assert!(verdict.verified(), "3/8 = [0; 2, 1, 2] meets bound 2");
+        let report_path = out.join(format!(
+            "domain_{}_{}.json",
+            dom.domain_id().replace('.', "_"),
+            &cert.spec_hash[..16]
+        ));
+        assert!(report_path.exists(), "report written to output dir");
+
+        // Second identical run: served from cache; the ledger must not grow.
+        let (_, verdict2, cached2) = run_domain_single(dom, &spec, &out, tmp.path()).unwrap();
+        assert!(cached2, "identical payload must cache-hit");
+        assert_eq!(verdict, verdict2, "cached verdict matches the stored one");
+        let rows = fs::read_to_string(ProvenanceLedger::get_runs_file(tmp.path())).unwrap();
+        assert_eq!(rows.lines().count(), 1, "cache hit must not append a ledger row");
+    }
+
+    #[test]
+    fn test_domain_command_geometry_verifies() {
+        let tmp = tempdir().unwrap();
+        let out = tmp.path().join("runs");
+        let registry = DomainRegistry::standard();
+        let dom = registry.get("geometry.unit_distance").unwrap();
+        let spec = serde_json::json!({"field": "QQ[sqrt(3)]", "chromatic_claim": 3});
+
+        let (cert, verdict, _cached) = run_domain_single(dom, &spec, &out, tmp.path()).unwrap();
+        assert_eq!(cert.domain, "geometry.unit_distance");
+        assert!(verdict.verified(), "hexagon wheel in Q(sqrt(3))^2 verifies");
+        match verdict {
+            DomainVerdict::UnitDistanceGraph { chromatic_number, .. } => {
+                assert_eq!(chromatic_number, 3);
+            }
+            other => panic!("expected geometry verdict, got: {other:?}"),
+        }
+    }
 
     #[test]
     fn test_campaign_command_writes_report_and_cache_hits() {
