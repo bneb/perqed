@@ -103,6 +103,49 @@ fn test_academic_sanity_linter_catches_errors() {
     ";
     let clean_findings = AcademicSanityLinter::lint_manuscript(clean_latex);
     assert_eq!(clean_findings.len(), 0);
+
+    // 4. Exhaustiveness overclaim on sporadic samples
+    let overclaim_sporadic = r"
+    \documentclass{article}
+    \title{Complete Multi-Exponent Resolution of the Diophantine Equation $p^x + q^y = z^2$}
+    \begin{abstract}
+    We completely resolve the exponent space.
+    \end{abstract}
+    \begin{document}
+    We find sporadic instances $3^3 + 13^2 = 14^2$.
+    \end{document}
+    ";
+    let findings_sporadic = AcademicSanityLinter::lint_manuscript(overclaim_sporadic);
+    assert!(findings_sporadic.iter().any(|f| f.rule_id == "EXHAUSTIVENESS_OVERCLAIM_ON_SPORADIC_SAMPLES" && f.severity == AcademicLintSeverity::Blocking));
+}
+
+#[test]
+fn test_lean_spec_completeness_validator() {
+    use perqed_core::lean_spec_validator::{LeanSpecCompletenessValidator, SpecValidationSeverity};
+
+    // 1. Incomplete spec missing top-level target equation
+    let incomplete_spec = r"
+    def general_mod8_obstruction_spec (z : Nat) : Prop :=
+      z^2 % 8 = 2 \/ z^2 % 8 = 5 \/ z^2 % 8 = 6 -> False
+    ";
+    let findings = LeanSpecCompletenessValidator::validate_diophantine_spec(
+        incomplete_spec,
+        "p^2 + (2^k * p + 1) = z^2",
+        true,
+    );
+    assert!(findings.iter().any(|f| f.check_id == "TARGET_EQUATION_MISSING_IN_SPEC" && f.severity == SpecValidationSeverity::Blocking));
+
+    // 2. Complete spec containing exact target equation and negation goal
+    let complete_spec = r"
+    def cunningham_odd_prime_no_sol_spec (p k z : Nat) : Prop :=
+      k >= 2 -> p % 2 = 1 -> p^2 + (2^k * p + 1) = z^2 -> False
+    ";
+    let findings_complete = LeanSpecCompletenessValidator::validate_diophantine_spec(
+        complete_spec,
+        "p^2 + (2^k * p + 1) = z^2",
+        true,
+    );
+    assert_eq!(findings_complete.len(), 0);
 }
 
 #[test]

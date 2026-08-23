@@ -4,6 +4,7 @@
 //! 1. Rejects CI/internal provenance jargon (`\\section{Cryptographic Provenance}`, raw hashes) in paper body.
 //! 2. Detects Title/Abstract vs Body scope drift (e.g. general exponential title for single-exponent theorem).
 //! 3. Enforces that all major claims in the abstract have matching theorem environments in the body.
+//! 4. Rejects claims of "complete resolution" or "complete classification" when only isolated sporadic instances exist without an exhaustiveness theorem.
 
 use serde::{Deserialize, Serialize};
 
@@ -26,9 +27,9 @@ impl AcademicSanityLinter {
     /// Lints a LaTeX manuscript for academic integrity and journal standards
     pub fn lint_manuscript(latex_content: &str) -> Vec<AcademicLintFinding> {
         let mut findings = Vec::new();
+        let lower = latex_content.to_lowercase();
 
         // 1. CI Provenance pollution in LaTeX body
-        let lower = latex_content.to_lowercase();
         if lower.contains("cryptographic provenance") || lower.contains("auditspec") || lower.contains("sha-256") || lower.contains("hash-lock") {
             findings.push(AcademicLintFinding {
                 rule_id: "NO_CI_PROVENANCE_IN_PAPER".to_string(),
@@ -51,7 +52,24 @@ impl AcademicSanityLinter {
             });
         }
 
-        // 3. Abstract vs Body alignment: Check if abstract claims "obstruction" or "unification" without a matching theorem
+        // 3. Exhaustiveness overclaim when sporadic samples exist without proof of completeness
+        let claims_complete_multi_exponent = (lower.contains("complete multi-exponent resolution") 
+            || lower.contains("completely resolve") || lower.contains("complete resolution of the multi-exponent"))
+            && (lower.contains("p^x") || lower.contains("exponent space"));
+        let has_sporadic_instances = lower.contains("sporadic") || lower.contains("isolated");
+        let has_exhaustiveness_proof = lower.contains("no other solutions exist for any") 
+            || lower.contains("exhaustiveness theorem") 
+            || lower.contains("linear forms in logarithms");
+
+        if claims_complete_multi_exponent && has_sporadic_instances && !has_exhaustiveness_proof {
+            findings.push(AcademicLintFinding {
+                rule_id: "EXHAUSTIVENESS_OVERCLAIM_ON_SPORADIC_SAMPLES".to_string(),
+                severity: AcademicLintSeverity::Blocking,
+                message: "Title/Abstract claims 'complete multi-exponent resolution', but higher-exponent solutions are only presented as isolated sporadic instances without an exhaustiveness theorem.".to_string(),
+            });
+        }
+
+        // 4. Abstract vs Body alignment: Check if abstract claims "obstruction" or "unification" without a matching theorem
         if let Some(abs_start) = lower.find("\\begin{abstract}") {
             if let Some(abs_end) = lower[abs_start..].find("\\end{abstract}") {
                 let abstract_text = &lower[abs_start..abs_start + abs_end];

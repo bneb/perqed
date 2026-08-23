@@ -11,6 +11,7 @@ pub mod embeddings;
 pub mod falsification;
 pub mod ingestion;
 pub mod invariant_search;
+pub mod lean_spec_validator;
 pub mod librarian;
 pub mod mcts;
 pub mod model_client;
