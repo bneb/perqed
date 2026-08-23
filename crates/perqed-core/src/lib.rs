@@ -10,6 +10,7 @@ pub mod depth_evaluator;
 pub mod divisor_param;
 pub mod dual_engine;
 pub mod embeddings;
+pub mod erdos_sieve;
 pub mod falsification;
 pub mod ingestion;
 pub mod invariant_search;
@@ -49,6 +50,10 @@ pub use divisor_param::{
 };
 pub use dual_engine::{DecisionProcedure, DualEngineProver};
 pub use embeddings::{DensePremiseStore, DenseVector, EmbedderConfig, SubwordEmbedder};
+pub use erdos_sieve::{
+    ConsecutiveCollisionInspector, FactorialSieveDensityEstimator, FactorialSquarefreeReport,
+    LegendreDigitParityEngine,
+};
 pub use falsification::{FalsificationConfig, FalsificationGate, PredicateSpec};
 pub use ingestion::{HybridPremiseWeights, PremiseIndex, PremiseItem, TexAstParser};
 pub use invariant_search::{AlgebraicInvariantSearchEngine, AlgebraicInvariantTemplate, ParameterizedCandidate};
