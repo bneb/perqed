@@ -1,0 +1,15 @@
+{
+  "spec_file": "lean/Perqed/Spec/general_cunningham_diophantine.lean",
+  "raw_file_sha256": "9dd43b29be2d0b7791365218d137a8ff5c89ff4cd3be2c8b58afa79db8a7a0f5",
+  "canonical_spec_sha256": "4d29f513acce822d05df59c2eb94ed98cca3a20da9291e9fa2a527d3c8229569",
+  "hashing_algorithm": "Canonical SHA-256 (comments and whitespace stripped by AuditSpec)",
+  "locked_at": "2026-08-23T05:45:30Z",
+  "declarations": [
+    "mersenne_family_spec",
+    "affine_family_spec",
+    "sporadic_cubic_sq_spec",
+    "sporadic_quintic_spec",
+    "sporadic_cubic_seven_spec",
+    "general_mod8_obstruction_spec"
+  ]
+}

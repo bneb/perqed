@@ -10,3 +10,5 @@ import Perqed.Spec.arxiv_claim_nat_add_right_id
 import Perqed.Proofs.arxiv_claim_nat_add_right_id
 import Perqed.Spec.cunningham_diophantine
 import Perqed.Proofs.cunningham_diophantine
+import Perqed.Spec.general_cunningham_diophantine
+import Perqed.Proofs.general_cunningham_diophantine

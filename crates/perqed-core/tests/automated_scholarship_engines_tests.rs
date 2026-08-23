@@ -104,3 +104,14 @@ fn test_academic_sanity_linter_catches_errors() {
     let clean_findings = AcademicSanityLinter::lint_manuscript(clean_latex);
     assert_eq!(clean_findings.len(), 0);
 }
+
+#[test]
+fn test_actual_manuscripts_pass_linter() {
+    let general_paper = include_str!("../../../artifacts/publications/general_cunningham_diophantine_paper.tex");
+    let findings_general = AcademicSanityLinter::lint_manuscript(general_paper);
+    assert_eq!(findings_general.len(), 0, "General paper must pass all academic linter rules: {:?}", findings_general);
+
+    let draft_note = include_str!("../../../artifacts/publications/cunningham_diophantine_draft.tex");
+    let findings_note = AcademicSanityLinter::lint_manuscript(draft_note);
+    assert_eq!(findings_note.len(), 0, "Draft note must pass all academic linter rules: {:?}", findings_note);
+}
