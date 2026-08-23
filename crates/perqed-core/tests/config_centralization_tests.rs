@@ -1,13 +1,15 @@
 //! Verification of Centralized Magic Constants and Modular Hyperparameter Configurations
 
+use perqed_core::dag::{DagScoringConfig, MathlibDag};
 use perqed_core::embeddings::{EmbedderConfig, SubwordEmbedder};
 use perqed_core::falsification::FalsificationConfig;
 use perqed_core::ingestion::{HybridPremiseWeights, PremiseIndex, PremiseItem};
 use perqed_core::program_search::{GeneticSearchConfig, ProgramDatabase};
 use perqed_core::roi::{RoiEvaluator, RoiWeights};
+use perqed_core::skills::{SkillMatchWeights, SkillMatcher, SkillRegistry};
 use perqed_core::tactic_generator::TacticGenerator;
 use perqed_core::types::{Conjecture, ProofState, TacticPriorScores};
-use perqed_core::{MathlibDag, ModelRouter};
+use perqed_core::ModelRouter;
 use std::collections::HashMap;
 
 #[test]
@@ -109,15 +111,35 @@ fn test_tactic_prior_scores_customization() {
 
 #[test]
 fn test_roi_weights_customization() {
-    let dag = MathlibDag::new();
     let custom_weights = RoiWeights {
         intrinsic_weight: 0.50,
         difficulty_weight: 0.30,
         novelty_weight: 0.20,
-        mdl_lambda: 0.10, // aggressive MDL compression penalty
-        token_bit_weight: 12.0,
+        mdl_lambda: 0.08,
+        token_bit_weight: 10.0,
         char_bit_weight: 4.0,
+        ast_bit_divisor: 10.0,
+        min_raw_mdl_gain: 0.1,
+        min_novelty_distance: 0.1,
+        base_significance: 1.0,
+        unification_scale: 0.25,
+        max_significance: 6.0,
+        tautology_significance_penalty: 0.05,
+        cost_arithmetic_linear: 1.5,
+        cost_algebra_ring: 2.0,
+        cost_deep_mcts: 5.0,
+        default_empirical_table_size: 150,
     };
+
+    let dag_config = DagScoringConfig {
+        disconnected_default_distance: 20,
+        initial_best_distance: 12.0,
+        max_distance_normalization: 12.0,
+        min_novelty_distance: 0.05,
+        max_novelty_distance: 1.0,
+        empty_premise_default_novelty: 1.0,
+    };
+    let dag = MathlibDag::with_config(dag_config);
 
     let evaluator = RoiEvaluator::with_weights(dag, custom_weights, Default::default());
 
@@ -138,6 +160,18 @@ fn test_roi_weights_customization() {
     let score = evaluator.evaluate_conjecture(&conj, 50);
     assert!(score.information_gain > 0.0);
     assert!(score.total_roi > 0.0);
+
+    let skill_weights = SkillMatchWeights {
+        direct_name_match_score: 15.0,
+        keyword_exact_match_score: 6.0,
+        keyword_token_partial_score: 2.0,
+        description_token_overlap_score: 0.8,
+        min_query_token_length: 3,
+    };
+    let registry = SkillRegistry::default_catalog();
+    let matcher = SkillMatcher::with_weights(&registry, skill_weights);
+    let matched = matcher.match_skills("number theory diophantine prime", 3);
+    assert!(!matched.is_empty());
 }
 
 #[test]

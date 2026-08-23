@@ -787,13 +787,40 @@ impl SkillRegistry {
 }
 
 /// Dynamic Skill Matcher that scores and retrieves relevant skills for any mathematical claim or query
+/// Configuration weights for skill relevance matching
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillMatchWeights {
+    pub direct_name_match_score: f64,
+    pub keyword_exact_match_score: f64,
+    pub keyword_token_partial_score: f64,
+    pub description_token_overlap_score: f64,
+    pub min_query_token_length: usize,
+}
+
+impl Default for SkillMatchWeights {
+    fn default() -> Self {
+        Self {
+            direct_name_match_score: 10.0,
+            keyword_exact_match_score: 5.0,
+            keyword_token_partial_score: 1.5,
+            description_token_overlap_score: 0.5,
+            min_query_token_length: 2,
+        }
+    }
+}
+
 pub struct SkillMatcher<'a> {
     registry: &'a SkillRegistry,
+    pub weights: SkillMatchWeights,
 }
 
 impl<'a> SkillMatcher<'a> {
     pub fn new(registry: &'a SkillRegistry) -> Self {
-        Self { registry }
+        Self::with_weights(registry, SkillMatchWeights::default())
+    }
+
+    pub fn with_weights(registry: &'a SkillRegistry, weights: SkillMatchWeights) -> Self {
+        Self { registry, weights }
     }
 
     /// Matches the top-k most relevant skills for a given informal claim, theorem signature, or domain
@@ -801,7 +828,7 @@ impl<'a> SkillMatcher<'a> {
         let q_lower = query.to_lowercase();
         let query_tokens: Vec<&str> = q_lower
             .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .filter(|s| s.len() > 2)
+            .filter(|s| s.len() > self.weights.min_query_token_length)
             .collect();
 
         let mut scored_skills: Vec<(f64, &'a MathematicalSkill)> = Vec::new();
@@ -811,18 +838,18 @@ impl<'a> SkillMatcher<'a> {
 
             // Direct name match
             if q_lower.contains(&skill.name.replace('_', " ")) || q_lower.contains(&skill.name) {
-                score += 10.0;
+                score += self.weights.direct_name_match_score;
             }
 
             // Keyword triggers match
             for kw in &skill.trigger_keywords {
                 let kw_lower = kw.to_lowercase();
                 if q_lower.contains(&kw_lower) {
-                    score += 5.0;
+                    score += self.weights.keyword_exact_match_score;
                 } else {
                     for tok in &query_tokens {
                         if kw_lower.contains(tok) {
-                            score += 1.5;
+                            score += self.weights.keyword_token_partial_score;
                         }
                     }
                 }
@@ -832,7 +859,7 @@ impl<'a> SkillMatcher<'a> {
             let desc_lower = skill.description.to_lowercase();
             for tok in &query_tokens {
                 if desc_lower.contains(tok) {
-                    score += 0.5;
+                    score += self.weights.description_token_overlap_score;
                 }
             }
 

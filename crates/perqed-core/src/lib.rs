@@ -30,7 +30,7 @@ pub use coverage::{
     CoverageError, FormalGoalDescriptor, GoalCoverageGuard, GoalCoverageReport, GoalQuantifier,
     ProvedTheoremDescriptor,
 };
-pub use dag::{MathlibDag, MathlibNode};
+pub use dag::{DagScoringConfig, MathlibDag, MathlibNode};
 pub use dual_engine::{DecisionProcedure, DualEngineProver};
 pub use embeddings::{DensePremiseStore, DenseVector, EmbedderConfig, SubwordEmbedder};
 pub use falsification::{FalsificationConfig, FalsificationGate, PredicateSpec};
@@ -48,7 +48,7 @@ pub use publication::PublicationPipeline;
 pub use registry::{ConjectureStatus, EmpiricalDiscoveryRegistry, RegistryEntry};
 pub use roi::{IntelligencePerDollarMetrics, PowerCostModel, RoiEvaluator, RoiScore, RoiWeights};
 pub use router::{BudgetTracker, TaskType, TierConfig, TieredModelRouter};
-pub use skills::{MathematicalSkill, SkillCategory, SkillMatcher, SkillRegistry};
+pub use skills::{MathematicalSkill, SkillCategory, SkillMatchWeights, SkillMatcher, SkillRegistry};
 pub use tactic_generator::TacticGenerator;
 pub use types::{
     AuditReport, Conjecture, MctsConfig, MctsHeuristicWeights, ParsedTheorem, ProofState,

@@ -69,15 +69,20 @@ impl ConjectureGenerator {
             r#"You are a frontier autonomous mathematical researcher.
 Synthesize novel, precise mathematical conjectures based on the provided theorem.
 {}
+CRITICAL REQUIREMENTS:
+1. Avoid trivial linear integer arithmetic tautologies (e.g. n + 0 = n, 2 < 2^k, or trivial inequalities solvable in 0 steps by Presburger arithmetic).
+2. Propose genuine non-trivial algebraic, combinatorial, or number-theoretic relationships with rich mathematical structure (quantifiers, prime divisibility, non-linear varieties, symmetry invariants, or exact threshold bounds).
+3. If generalizing an equation, formulate the full structural classification or obstruction, not just a single-point sub-case.
+
 Every conjecture must be emitted as a JSON array of structured objects matching this exact schema:
 [
   {{
     "conjecture_id": "conj_2026_001",
-    "domain": "algebra.nat",
-    "informal_claim": "For all natural numbers a, b, c: (a + b) + c = a + (b + c)",
-    "hypotheses": ["a >= 0", "b >= 0", "c >= 0"],
-    "target": "(a + b) + c = a + (b + c)",
-    "variables": {{"a": "Nat", "b": "Nat", "c": "Nat"}}
+    "domain": "number_theory.diophantine",
+    "informal_claim": "Precise mathematical statement without narrative exaggeration",
+    "hypotheses": ["p >= 2", "Nat.Prime p"],
+    "target": "Exact formal target predicate",
+    "variables": {{"p": "Nat", "k": "Nat"}}
   }}
 ]
 Only output valid JSON within markdown codeblocks or raw JSON.

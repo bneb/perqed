@@ -102,6 +102,11 @@ impl FrontierPipeline {
     /// Run full asymmetric compute funnel pipeline on a mathematical conjecture
     pub async fn run_on_conjecture(&self, conjecture: &Conjecture) -> Result<PipelineResult, PipelineError> {
         info!("=== STEP 1A: Dead Ends & High-Throughput Falsification Gate ===");
+        let initial_info_gain = self.roi_evaluator.compute_mdl_information_gain(
+            conjecture,
+            self.roi_evaluator.weights.default_empirical_table_size,
+        );
+
         if self.dead_ends_db.is_known_dead_end(&conjecture.target) {
             if let Ok(mut reg) = self.registry.lock() {
                 reg.record(
@@ -109,7 +114,7 @@ impl FrontierPipeline {
                     &conjecture.informal_claim,
                     &conjecture.target,
                     &conjecture.domain,
-                    10.0,
+                    initial_info_gain,
                     crate::registry::ConjectureStatus::FalsifiedCounterexample {
                         counterexample_witness: "Known dead end in database".to_string(),
                         method: "DeadEndsDb".to_string(),
@@ -138,7 +143,7 @@ impl FrontierPipeline {
                     &conjecture.informal_claim,
                     &conjecture.target,
                     &conjecture.domain,
-                    10.0,
+                    initial_info_gain,
                     crate::registry::ConjectureStatus::FalsifiedCounterexample {
                         counterexample_witness: format!("{:?}", falsify_verdict.counterexample),
                         method: "SandboxedFalsificationGate".to_string(),
@@ -152,7 +157,10 @@ impl FrontierPipeline {
         }
 
         info!("=== STEP 1B: Mathematical ROI Value Function Evaluation ===");
-        let roi_score = self.roi_evaluator.evaluate_conjecture(conjecture, 100);
+        let roi_score = self.roi_evaluator.evaluate_conjecture(
+            conjecture,
+            self.roi_evaluator.weights.default_empirical_table_size,
+        );
         info!(
             "Calculated ROI: {:.3} ({})",
             roi_score.total_roi, roi_score.ranking_rationale
@@ -310,6 +318,31 @@ impl FrontierPipeline {
             timestamp: chrono::Utc::now(),
             details: audit_output,
         };
+
+        info!("=== STEP 5B: Semantic Goal Coverage & Anti-Inflation Gate ===");
+        let target_descriptor = crate::coverage::FormalGoalDescriptor {
+            name: conjecture.conjecture_id.clone(),
+            target_predicate: conjecture.target.clone(),
+            quantifier: if conjecture.target.contains("¬ ∃") || conjecture.target.contains("not (exists") {
+                crate::coverage::GoalQuantifier::NegatedExistential
+            } else {
+                crate::coverage::GoalQuantifier::UniversalAll
+            },
+            is_diophantine_classification: conjecture.domain.contains("diophantine") || conjecture.domain.contains("nat"),
+        };
+
+        let proved_descriptor = crate::coverage::ProvedTheoremDescriptor {
+            proof_name: format!("Perqed.Proofs.{}", conjecture.conjecture_id),
+            proved_predicate: target_signature.clone(),
+            quantifier: crate::coverage::GoalQuantifier::UniversalAll,
+        };
+
+        let coverage_report = crate::coverage::GoalCoverageGuard::validate_coverage(
+            &target_descriptor,
+            &proved_descriptor,
+            &conjecture.informal_claim,
+        ).map_err(|e| PipelineError::Failed(format!("Goal coverage and anti-inflation validation failed: {}", e)))?;
+        info!("Goal Coverage verified: {:.1}% ({})", coverage_report.coverage_ratio * 100.0, coverage_report.verified_scope);
 
         info!("=== STEP 6: Publication Pipeline Draft Emission ===");
         let title = format!("Autonomous Theorem Discovery: {}", conjecture.informal_claim);

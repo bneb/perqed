@@ -17,11 +17,36 @@ pub struct MathlibNode {
     pub dependencies: Vec<String>,
 }
 
+/// Configuration parameters for DAG topological distance and novelty scoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DagScoringConfig {
+    pub disconnected_default_distance: usize,
+    pub initial_best_distance: f64,
+    pub max_distance_normalization: f64,
+    pub min_novelty_distance: f64,
+    pub max_novelty_distance: f64,
+    pub empty_premise_default_novelty: f64,
+}
+
+impl Default for DagScoringConfig {
+    fn default() -> Self {
+        Self {
+            disconnected_default_distance: 15,
+            initial_best_distance: 10.0,
+            max_distance_normalization: 10.0,
+            min_novelty_distance: 0.1,
+            max_novelty_distance: 1.0,
+            empty_premise_default_novelty: 1.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MathlibDag {
     nodes: HashMap<String, MathlibNode>,
     adjacency: HashMap<String, Vec<String>>,       // from dependency -> dependents
     reverse_adj: HashMap<String, Vec<String>>,     // from dependent -> dependencies
+    pub config: DagScoringConfig,
 }
 
 impl Default for MathlibDag {
@@ -32,10 +57,15 @@ impl Default for MathlibDag {
 
 impl MathlibDag {
     pub fn new() -> Self {
+        Self::with_config(DagScoringConfig::default())
+    }
+
+    pub fn with_config(config: DagScoringConfig) -> Self {
         let mut dag = Self {
             nodes: HashMap::new(),
             adjacency: HashMap::new(),
             reverse_adj: HashMap::new(),
+            config,
         };
         dag.populate_default_mathlib_dag();
         dag
@@ -143,13 +173,13 @@ impl MathlibDag {
         }
 
         // Return large default distance if disconnected in subgraph
-        15
+        self.config.disconnected_default_distance
     }
 
     /// Computes the average topological distance from a set of premise keywords to the Mathlib DAG
     pub fn compute_novelty_distance(&self, premise_names: &[String]) -> f64 {
         if premise_names.is_empty() {
-            return 1.0;
+            return self.config.empty_premise_default_novelty;
         }
 
         let mut min_distances = Vec::new();
@@ -157,7 +187,7 @@ impl MathlibDag {
             if self.nodes.contains_key(name) {
                 min_distances.push(0.0);
             } else {
-                let mut best_d = 10.0;
+                let mut best_d = self.config.initial_best_distance;
                 for existing_name in self.nodes.keys() {
                     let d = self.topological_distance(name, existing_name) as f64;
                     if d < best_d {
@@ -169,7 +199,9 @@ impl MathlibDag {
         }
 
         let avg = min_distances.iter().sum::<f64>() / (min_distances.len() as f64);
-        (avg / 10.0).min(1.0).max(0.1)
+        (avg / self.config.max_distance_normalization)
+            .min(self.config.max_novelty_distance)
+            .max(self.config.min_novelty_distance)
     }
 
     /// Estimates the number of existing Mathlib theorems that would be unified/implied

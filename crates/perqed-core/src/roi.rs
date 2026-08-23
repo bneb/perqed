@@ -138,7 +138,7 @@ pub struct RoiScore {
     pub ranking_rationale: String,
 }
 
-/// Configuration weights for scientific return-on-investment evaluation
+/// Configuration weights and thresholds for scientific return-on-investment evaluation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoiWeights {
     pub intrinsic_weight: f64,
@@ -147,6 +147,17 @@ pub struct RoiWeights {
     pub mdl_lambda: f64,
     pub token_bit_weight: f64,
     pub char_bit_weight: f64,
+    pub ast_bit_divisor: f64,
+    pub min_raw_mdl_gain: f64,
+    pub min_novelty_distance: f64,
+    pub base_significance: f64,
+    pub unification_scale: f64,
+    pub max_significance: f64,
+    pub tautology_significance_penalty: f64,
+    pub cost_arithmetic_linear: f64,
+    pub cost_algebra_ring: f64,
+    pub cost_deep_mcts: f64,
+    pub default_empirical_table_size: usize,
 }
 
 impl Default for RoiWeights {
@@ -158,6 +169,17 @@ impl Default for RoiWeights {
             mdl_lambda: 0.05,
             token_bit_weight: 8.0,
             char_bit_weight: 3.0,
+            ast_bit_divisor: 10.0,
+            min_raw_mdl_gain: 0.1,
+            min_novelty_distance: 0.1,
+            base_significance: 1.0,
+            unification_scale: 0.2,
+            max_significance: 5.0,
+            tautology_significance_penalty: 0.1,
+            cost_arithmetic_linear: 1.5,
+            cost_algebra_ring: 2.0,
+            cost_deep_mcts: 4.5,
+            default_empirical_table_size: 100,
         }
     }
 }
@@ -199,8 +221,8 @@ impl RoiEvaluator {
         let ast_bit_length = (token_count as f64) * self.weights.token_bit_weight
             + (char_len as f64) * self.weights.char_bit_weight;
 
-        let raw_mdl_gain = data_entropy - self.weights.mdl_lambda * (ast_bit_length / 10.0);
-        raw_mdl_gain.max(0.1)
+        let raw_mdl_gain = data_entropy - self.weights.mdl_lambda * (ast_bit_length / self.weights.ast_bit_divisor);
+        raw_mdl_gain.max(self.weights.min_raw_mdl_gain)
     }
 
     /// Evaluates a single candidate conjecture
@@ -211,38 +233,46 @@ impl RoiEvaluator {
             .split('.')
             .map(|s| s.to_string())
             .collect();
-        let novelty = self.dag.compute_novelty_distance(&premise_keys).max(0.1);
+        let novelty = self.dag.compute_novelty_distance(&premise_keys).max(self.weights.min_novelty_distance);
 
         // 2. Significance: Unification potential + domain impact
         let unification_count = self.dag.estimate_unification_count(&conjecture.domain);
-        let significance = (1.0 + (unification_count as f64) * 0.2).min(5.0);
+        let raw_significance = (self.weights.base_significance + (unification_count as f64) * self.weights.unification_scale)
+            .min(self.weights.max_significance);
 
         // 3. Information Gain: MDL formulation penalizing complex expressions
         let info_gain = self.compute_mdl_information_gain(conjecture, empirical_table_size);
 
-        // 4. Estimated Proof Search Cost: Distance to known decision procedures
+        // 4. Estimated Proof Search Cost & Triviality Penalty:
         let is_arithmetic = conjecture.domain.contains("nat") || conjecture.domain.contains("int") || conjecture.domain.contains("arith");
         let is_linear = conjecture.target.contains('+') || conjecture.target.contains('-');
         
-        let estimated_cost = if is_arithmetic && is_linear {
-            1.2 // High proximity to omega/linarith (<5ms)
-        } else if conjecture.domain.contains("ring") || conjecture.domain.contains("algebra") {
-            2.0 // Proximity to ring/polyrith (<15ms)
+        // If a statement is trivial linear arithmetic (solvable in 1 omega step), penalize its intrinsic significance
+        let adjusted_significance = if is_arithmetic && is_linear && conjecture.hypotheses.is_empty() {
+            self.weights.tautology_significance_penalty
         } else {
-            4.5 // Requires deep heuristic MCTS tactic search
+            raw_significance
         };
 
-        let total_roi = (novelty * significance * info_gain) / estimated_cost;
+        let estimated_cost = if is_arithmetic && is_linear {
+            self.weights.cost_arithmetic_linear
+        } else if conjecture.domain.contains("ring") || conjecture.domain.contains("algebra") {
+            self.weights.cost_algebra_ring
+        } else {
+            self.weights.cost_deep_mcts
+        };
+
+        let total_roi = (novelty * adjusted_significance * info_gain) / estimated_cost;
 
         let rationale = format!(
-            "Novelty: {:.2}, Significance: {:.2} ({} unified), InfoGain(MDL): {:.2}, Cost: {:.2}",
-            novelty, significance, unification_count, info_gain, estimated_cost
+            "Novelty: {:.2}, AdjSignificance: {:.2} ({} unified), InfoGain(MDL): {:.2}, Cost: {:.2}",
+            novelty, adjusted_significance, unification_count, info_gain, estimated_cost
         );
 
         RoiScore {
             conjecture_id: conjecture.conjecture_id.clone(),
             novelty,
-            significance,
+            significance: adjusted_significance,
             information_gain: info_gain,
             estimated_cost,
             total_roi,
