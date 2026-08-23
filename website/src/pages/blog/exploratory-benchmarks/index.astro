@@ -1,0 +1,109 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Exploratory Benchmarking and Solver Stack Integration — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="article-meta">
+            <time>March 21, 2026</time>
+            <span class="sep">&middot;</span>
+            <span>12 min read</span>
+          </div>
+          <h1>Exploratory Benchmarking: From Goldbach to Z3 Solver Stacks</h1>
+        </header>
+
+        <p>The development of a robust autonomous research pipeline requires rigorous evaluation against established mathematical challenges. Our benchmarking strategy has progressed from initial attempts at the Goldbach conjecture to the formalization of solver stacks capable of resolving combinatorial boundaries in Van der Waerden theory.</p>
+
+        <h2>Case Study: The Goldbach Conjecture and Sieve Parity</h2>
+        <p>The Goldbach conjecture served as an early stress test for our orchestration loops. The system was tasked with bridging unconnected domains, specifically evaluating if hyperbolic geometry could control prime sums via the prime geodesic theorem. During this phase, the engine encountered the multiplicative-additive obstruction—the classic sieve parity problem that has challenged analytic number theory for a century.</p>
+        
+        <p>This benchmark revealed critical failure modes in LLM-based reasoning, including the generation of vacuous proofs. Our response was to implement a rigorous audit loop that requires the system to corrected types and bound quantities to actual Selberg coefficients, ultimately reducing the conjecture to a single open axiom: the positivity of the Rankin-Selberg convolution.</p>
+
+        <h2>Van der Waerden Bounds and Stochastic Stagnation</h2>
+        <p>Subsequent benchmarking focused on Van der Waerden numbers, specifically identifying lower bounds for $W(k, l)$ partitions. In these searches, our Simulated Annealing (SA) engines frequently encountered energy plateaus—local minima where incremental mutations failed to reduce violations. This led to the development of our "strategic escapement" protocols, including supercritical reheats and stochastic restarts.</p>
+
+        <h2>The Z3 'UNSAT' Solver Stack Integration</h2>
+        <p>A pivotal milestone in our architectural development occurred during a search for $W(3, 4)$ bounds. When the SA search stagnated at $E=12$, we integrated an SMT-based resolution node using the <strong>Z3 Theorem Prover</strong>. By translating the combinatorial constraint into a Boolean satisfiability problem, the system was able to determine—within seconds—that the target configuration was <code>UNSAT</code> (unsatisfiable).</p>
+
+        <p>This realization transformed our approach to search. Instead of indefinitely tuning hyperparameters for a failing search, the Architect now utilizes a multi-tiered solver stack:</p>
+        <ol>
+          <li><strong>High-Throughput Heuristic Search</strong>: Rapidly identifies candidate witnesses in large configuration spaces.</li>
+          <li><strong>SMT/SAT Resolution</strong>: Formally proves the non-existence of solutions in sub-regions of the search space, providing an early exit for unpromising avenues.</li>
+          <li><strong>Formal Verification (Lean 4)</strong>: Provides the final machine-checked proof for successful witnesses identified by the heuristic layer.</li>
+        </ol>
+
+        <h2>Empirical Calibration</h2>
+        <p>These benchmarks have allowed us to calibrate the system's "strategic temperature," ensuring that compute resources are allocated efficiently between empirical exploration and formal resolution. The integration of the Z3 solver stack, in particular, has formalized the transition from heuristic "guessing" to systematic mathematical search.</p>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-value">30</div>
+            <div class="stat-label">Axioms Mapped (Goldbach)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">Z3</div>
+            <div class="stat-label">SMT Integration Complete</div>
+          </div>
+          <div class="stat-card accent">
+            <div class="stat-value">UNSAT</div>
+            <div class="stat-label">Solver Early Exit Proven</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .article { padding: 64px 0 80px; }
+  .article-header { margin-bottom: 40px; }
+  .article-meta {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 0.78rem;
+    color: var(--text-muted); margin-bottom: 16px;
+  }
+  .sep { color: var(--text-muted); }
+
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 32px 0;
+  }
+  .stat-card {
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); padding: 20px 16px; text-align: center;
+  }
+  .stat-card.accent {
+    border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--bg-secondary));
+  }
+  .stat-value {
+    font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: var(--accent); line-height: 1.2;
+  }
+  .stat-label {
+    font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; font-family: var(--font-mono); line-height: 1.5;
+  }
+
+  .prose :global(h2) {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 40px;
+    margin-bottom: 20px;
+  }
+
+  .prose :global(p) {
+    margin-bottom: 24px;
+    line-height: 1.7;
+  }
+
+  .prose :global(ol) {
+    margin-bottom: 24px;
+    padding-left: 20px;
+  }
+
+  .prose :global(li) {
+    margin-bottom: 12px;
+  }
+</style>

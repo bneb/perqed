@@ -1,0 +1,237 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Technical Journal — Perqed" activeNav="blog">
+
+  <section class="blog-header">
+    <div class="container">
+      <p class="eyebrow">Technical Journal</p>
+      <h1 class="header-title">The Perqed Engine</h1>
+      <p class="header-desc">
+        Formal research logs detailing the development of an autonomous neuro-symbolic hypothesis engine.
+      </p>
+    </div>
+  </section>
+
+  <section class="blog-list">
+    <div class="container">
+      
+      <article class="post-card">
+        <div class="post-meta">
+          <time>August 23, 2026</time>
+          <span class="tag">number-theory</span>
+          <span class="tag">lean4</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/erdos-graham-factorial-resolution/">Resolving Terence Tao's Factorial Conjecture: Exact Asymptotics & Lean 4 Mechanization</a>
+        </h2>
+        <p class="post-excerpt">
+          How Perqed analytically closed the exact leading asymptotic constant (C₁ ≈ 4.265293) for the Erdős–Graham factorial problem and verified all 8 theorems in pure Lean 4.
+        </p>
+        <a class="read-link" href="/blog/erdos-graham-factorial-resolution/">Read research article →</a>
+      </article>
+
+      <article class="post-card">
+        <div class="post-meta">
+          <time>April 4, 2026</time>
+          <span class="tag">infrastructure</span>
+          <span class="tag">wasm</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/hyper-ephemeral-wasm-infrastructure/">Hyper-Ephemeral Wasm Infrastructure and Hardened Agency Topologies</a>
+        </h2>
+        <p class="post-excerpt">
+          Implementation details of our zero-copy sandbox strategy, global cache binding, and cryptographic fuel validation via Trytet v3.0.
+        </p>
+        <a class="read-link" href="/blog/hyper-ephemeral-wasm-infrastructure/">Read technical log →</a>
+      </article>
+
+      <article class="post-card">
+        <div class="post-meta">
+          <time>April 3, 2026</time>
+          <span class="tag">architecture</span>
+          <span class="tag">falsification</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/hub-and-spoke-architecture/">Hub-and-Spoke Orchestration: The Perqed v3.0 Architecture</a>
+        </h2>
+        <p class="post-excerpt">
+          An analysis of the central Architect hub's coordination of specialized spokes for interdisciplinary synthesis and rigorous empirical falsification.
+        </p>
+        <a class="read-link" href="/blog/hub-and-spoke-architecture/">Read technical log →</a>
+      </article>
+
+      <article class="post-card">
+        <div class="post-meta">
+          <time>March 31, 2026</time>
+          <span class="tag">orchestration</span>
+          <span class="tag">xstate</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/xstate-orchestration/">Reactive Proof Search: Orchestration via XState v5</a>
+        </h2>
+        <p class="post-excerpt">
+          Formalizing the research lifecycle through a 10-state DAG architecture and actor-model implementation for deterministic execution.
+        </p>
+        <a class="read-link" href="/blog/xstate-orchestration/">Read technical log →</a>
+      </article>
+
+      <article class="post-card">
+        <div class="post-meta">
+          <time>March 21, 2026</time>
+          <span class="tag">benchmarks</span>
+          <span class="tag">z3</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/exploratory-benchmarks/">Exploratory Benchmarking: From Goldbach to Z3 Solver Stacks</a>
+        </h2>
+        <p class="post-excerpt">
+          Calibrating the engine against historic obstructions and the integration of SMT-based resolution nodes for combinatorial boundary detection.
+        </p>
+        <a class="read-link" href="/blog/exploratory-benchmarks/">Read technical log →</a>
+      </article>
+
+      <article class="post-card">
+        <div class="post-meta">
+          <time>March 19, 2026</time>
+          <span class="tag">rag</span>
+          <span class="tag">literature</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/librarian-and-skill-injection/">Librarian and Skill Injection: Grounding Autonomous Reasoning</a>
+        </h2>
+        <p class="post-excerpt">
+          Retrieving academic context via LanceDB and injecting formalized mathematical skills to minimize context pollution and improve strategic depth.
+        </p>
+        <a class="read-link" href="/blog/librarian-and-skill-injection/">Read technical log →</a>
+      </article>
+
+      <article class="post-card">
+        <div class="post-meta">
+          <time>March 18, 2026</time>
+          <span class="tag">logic</span>
+          <span class="tag">search</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/heuristic-escapement/">Heuristic Escapement and Domain Translation in Autonomous Reasoning</a>
+        </h2>
+        <p class="post-excerpt">
+          Managing convergence stagnation through multi-stage escalation protocols and fundamental domain translation between discrete and continuous spaces.
+        </p>
+        <a class="read-link" href="/blog/heuristic-escapement/">Read technical log →</a>
+      </article>
+
+      <article class="post-card">
+        <div class="post-meta">
+          <time>March 15, 2026</time>
+          <span class="tag">results</span>
+          <span class="tag">lean4</span>
+        </div>
+        <h2 class="post-title">
+          <a href="/blog/torus-decomposition/">Hamiltonian Torus Decompositions: Formal Results for m=4 and m=6</a>
+        </h2>
+        <p class="post-excerpt">
+          Identifying valid decompositions in a 10<sup>167</sup> search space using O(1) incremental energy updates and Lean 4 formal verification.
+        </p>
+        <a class="read-link" href="/blog/torus-decomposition/">Read technical log →</a>
+      </article>
+
+    </div>
+  </section>
+
+</BaseLayout>
+
+<style>
+  .blog-header {
+    padding: 80px 0 40px;
+  }
+
+  .header-title {
+    font-family: var(--font-serif);
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin-bottom: 8px;
+  }
+
+  .header-desc {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    max-width: 520px;
+  }
+
+  .blog-list {
+    padding-bottom: 80px;
+  }
+
+  .post-card {
+    border-top: 1px solid var(--border-color);
+    padding: 36px 0;
+  }
+
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .post-meta time {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    padding: 3px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--border-color);
+  }
+
+  .post-title {
+    font-family: var(--font-serif);
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .post-title a {
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+
+  .post-title a:hover {
+    color: var(--accent);
+  }
+
+  .post-excerpt {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1.7;
+    margin-bottom: 12px;
+    max-width: 600px;
+  }
+
+  .read-link {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .read-link:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 640px) {
+    .blog-header { padding: 48px 0 24px; }
+    .header-title { font-size: 1.9rem; }
+  }
+</style>

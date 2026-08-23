@@ -50,6 +50,12 @@ ENV/
 .coverage
 htmlcov/
 
+# Node.js / Astro Website
+node_modules/
+website/node_modules/
+website/dist/
+website/.astro/
+
 # Temporary / Scratch Files
 scratch/
 *.tmp

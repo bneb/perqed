@@ -1,0 +1,105 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const blogContent = `
+<p>Autonomous mathematical reasoning requires grounding in established academic literature and the ability to utilize specialized proof techniques. We have implemented the <strong>Librarian</strong> and <strong>Skill Injection</strong> frameworks to provide this grounding and strategic depth.</p>
+
+<h2>The Librarian: Literature Grounding via LanceDB</h2>
+<p>The Librarian component facilitates the retrieval of relevant academic context from a local vector store (LanceDB). This store indexes a curated corpus of mathematical abstracts and full-text papers, particularly in the domains of extremal combinatorics and analytic number theory.</p>
+
+<p>During implementation, we addressed several filesystem resolution challenges within the <code>bun</code> runtime. Specifically, we resolved issues where <code>import.meta.dir</code> evaluated to internal virtual paths, preventing database initialization. By transitioning to <code>process.cwd()</code> based resolution, we ensured consistent access to local literature stores across diverse execution environments. The current corpus includes over 240 high-signal arXiv abstracts, providing a robust foundation for strategic planning.</p>
+
+<h2>Skill Injection Framework</h2>
+<p>To reduce reliance on the latent mathematical knowledge of model weights, we developed a structured <strong>SkillLibrary</strong>. This system indexes over 30 formalized mathematical techniques, including <code>pigeonhole_principle</code>, <code>explicit_construction</code>, and <code>spectral_graph_bounds</code>. These skills are stored as structured markdown in the <code>.agents/skills/</code> directory.</p>
+
+<p>The orchestration Hub utilizes semantic relevance matching to identify the most appropriate techniques for a given conjecture. These skills are then injected into the model context, providing a grounded basis for Directed Acyclic Graph (DAG) formulation and Monte Carlo Tree Search (MCTS) verification. This ensures that the Architect's planning phase is informed by rigorous mathematical frameworks rather than generic reasoning patterns.</p>
+
+<h2>Universal Domain Support</h2>
+<p>The integration of the Librarian and SkillLibrary has enabled Perqed to transition from specialized solvers to a generalized reasoning platform. We have successfully demonstrated this by evaluating Schur Number lower bounds, where the Architect was required to dynamically generate evaluation logic for arbitrary partitions. The Librarian provided the necessary historical context, while Skill Injection provided the strategic framework for the search.</p>
+
+<p>By combining literature-based grounding with formalized skill retrieval, we ensure that Perqed's research output is both novel and mathematically rigorous.</p>
+`;
+---
+
+<BaseLayout title="Librarian and Skill Injection: Grounding Autonomous Reasoning — Perqed" activeNav="blog">
+
+  <article class="article">
+    <div class="container">
+      <div class="prose">
+        <header class="article-header">
+          <div class="back-link-container">
+            <a href="/blog/" class="back-link">← Back to Technical Journal</a>
+          </div>
+          <div class="article-meta">
+            <time>March 19, 2026</time>
+            <span class="sep">·</span>
+            <span>6 min read</span>
+          </div>
+          <h1>Librarian and Skill Injection: Grounding Autonomous Reasoning</h1>
+        </header>
+
+        <div set:html={blogContent} />
+      </div>
+    </div>
+  </article>
+
+</BaseLayout>
+
+<style>
+  .article {
+    padding: 64px 0 80px;
+  }
+
+  .back-link-container {
+    margin-bottom: 32px;
+  }
+
+  .back-link {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+
+  .back-link:hover {
+    color: var(--accent);
+  }
+
+  .article-header {
+    margin-bottom: 40px;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+
+  .sep {
+    color: var(--text-muted);
+  }
+
+  .article :global(h2) {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-top: 40px;
+    margin-bottom: 20px;
+  }
+
+  .article :global(p) {
+    margin-bottom: 24px;
+    line-height: 1.7;
+  }
+
+  .article :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--bg-secondary);
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+</style>
